@@ -1,5 +1,7 @@
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
+import { PALETTE } from "@/rendering/theme";
+import { SkullIcon } from "./icons";
 
 interface DefeatOverlayProps {
   hud: HudSnapshot;
@@ -11,11 +13,13 @@ export function DefeatOverlay({ hud, onTryAgain, onExitToMenu }: DefeatOverlayPr
   return (
     <div style={overlayStyle}>
       <div style={cardStyle}>
-        <h1 style={{ margin: 0, fontSize: 28, letterSpacing: 2 }}>FORTRESS FALLEN</h1>
-        <div style={{ display: "flex", gap: 24, margin: "16px 0" }}>
+        <SkullIcon size={34} color={PALETTE.danger} style={{ filter: `drop-shadow(0 0 10px ${PALETTE.danger}aa)` }} />
+        <h1 style={titleStyle}>FORTRESS FALLEN</h1>
+        <div style={dividerStyle} />
+        <div style={{ display: "flex", gap: 28, margin: "18px 0" }}>
           <Stat label="Wave Reached" value={String(hud.wave)} />
           <Stat label="Enemies Defeated" value={String(hud.enemiesDefeated)} />
-          <Stat label="Best Wave" value={String(hud.bestWave)} />
+          <Stat label="Best Wave" value={String(hud.bestWave)} highlight />
         </div>
         <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onTryAgain} style={primaryButtonStyle}>
@@ -30,11 +34,13 @@ export function DefeatOverlay({ hud, onTryAgain, onExitToMenu }: DefeatOverlayPr
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div style={{ textAlign: "center" }}>
-      <div style={{ fontSize: 11, color: "#a89bc2" }}>{label}</div>
-      <div style={{ fontSize: 20, fontWeight: 700 }}>{value}</div>
+      <div style={{ fontSize: 10, letterSpacing: 1, color: PALETTE.uiTextDim, textTransform: "uppercase" }}>
+        {label}
+      </div>
+      <div style={{ fontSize: 22, fontWeight: 700, color: highlight ? PALETTE.gold : PALETTE.uiText }}>{value}</div>
     </div>
   );
 }
@@ -45,34 +51,59 @@ const overlayStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "rgba(10,8,14,0.85)",
+  background: "radial-gradient(circle at 50% 40%, rgba(60,15,15,0.35), rgba(6,4,9,0.92) 70%)",
+  zIndex: 3,
 };
 
 const cardStyle: CSSProperties = {
-  padding: 32,
-  borderRadius: 12,
-  border: "1px solid #4a3f5f",
-  background: "#1a1522",
-  color: "#f2e9ff",
+  padding: "30px 40px",
+  borderRadius: 14,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: `linear-gradient(160deg, rgba(24,17,26,0.97), rgba(11,8,14,0.98))`,
+  boxShadow: "0 0 60px rgba(226,87,74,0.15), 0 20px 50px rgba(0,0,0,0.6)",
+  color: PALETTE.uiText,
   textAlign: "center",
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+};
+
+const titleStyle: CSSProperties = {
+  margin: "10px 0 0",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 30,
+  letterSpacing: 3,
+  color: PALETTE.uiText,
+  textShadow: `0 0 18px ${PALETTE.danger}77`,
+};
+
+const dividerStyle: CSSProperties = {
+  width: 60,
+  height: 2,
+  background: PALETTE.danger,
+  opacity: 0.5,
+  margin: "12px auto 0",
 };
 
 const primaryButtonStyle: CSSProperties = {
-  padding: "10px 24px",
+  padding: "11px 26px",
   borderRadius: 8,
-  border: "1px solid #c9a8ff",
-  background: "#3a2f5a",
-  color: "#f2e9ff",
+  border: `1px solid ${PALETTE.uiAccent}`,
+  background: "rgba(201,168,255,0.15)",
+  color: PALETTE.uiAccentBright,
   fontWeight: 700,
   fontSize: 14,
+  letterSpacing: 1,
+  boxShadow: `0 0 16px ${PALETTE.uiAccent}55`,
 };
 
 const secondaryButtonStyle: CSSProperties = {
-  padding: "10px 24px",
+  padding: "11px 26px",
   borderRadius: 8,
-  border: "1px solid #4a3f5f",
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
   background: "transparent",
-  color: "#a89bc2",
+  color: PALETTE.uiTextDim,
   fontWeight: 700,
   fontSize: 14,
+  letterSpacing: 1,
 };
