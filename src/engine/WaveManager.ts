@@ -60,7 +60,15 @@ export function tickWaveManager(
     }
   }
 
-  if (state.phase === "AWAITING_CLEAR" && aliveEnemyCount === 0) {
+  // `aliveEnemyCount` reflects survivors from BEFORE this tick's spawn (the
+  // caller doesn't know yet whether this tick spawns one, since that's
+  // decided above). If the wave's last enemy just spawned this same tick,
+  // it isn't in that count yet — without adding it back in here, a strong
+  // defense that kills every enemy before the next one spawns would mark
+  // the wave "cleared" the instant the still-very-alive last enemy appears.
+  const effectiveAliveCount = aliveEnemyCount + (enemyTypeToSpawn ? 1 : 0);
+
+  if (state.phase === "AWAITING_CLEAR" && effectiveAliveCount === 0) {
     state.phase = "TRANSITIONING";
     state.transitionTimerMs = WAVE_TRANSITION_DURATION_MS;
     waveJustCleared = true;

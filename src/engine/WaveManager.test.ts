@@ -60,4 +60,26 @@ describe("WaveManager", () => {
     expect(state.currentWave).toBe(2);
     expect(state.phase).toBe("SPAWNING");
   });
+
+  it("does not clear the wave the same tick its last enemy spawns, even with a strong defense", () => {
+    // Regression test: a defense strong enough to kill every enemy before
+    // the next one spawns previously fooled the clear check into firing
+    // the instant the still-alive last enemy appeared, because the
+    // alive-count snapshot passed in doesn't yet include a spawn that
+    // happens during this very call.
+    const state = createWaveManagerState();
+    activateNextWave(state);
+    const totalEnemies = state.spawnQueue.length;
+
+    let clearedWhileSpawning = false;
+    for (let i = 0; i < totalEnemies; i++) {
+      const isLast = i === totalEnemies - 1;
+      const result = tickWaveManager(state, ENEMY_SPAWN_INTERVAL_MS, 0);
+      if (isLast && result.enemyTypeToSpawn && result.waveJustCleared) {
+        clearedWhileSpawning = true;
+      }
+    }
+
+    expect(clearedWhileSpawning).toBe(false);
+  });
 });
