@@ -77,3 +77,30 @@ export const ENEMY_THEME: Record<EnemyType, EnemyTheme> = {
   BRUTE: { body: "#c9432f", dark: "#7a2418", accent: "#f5a06a" },
   SHIELDBEARER: { body: "#4a78c4", dark: "#1f3f7a", accent: "#b8d4f5" },
 };
+
+/**
+ * Visual Design System — status colors used ONLY for state readouts (HP,
+ * effects, readiness), never reused as a decorative body/material color.
+ * Keeping them exclusive is what lets a player read "wounded" or "ready to
+ * fire" at a glance without confusing it with a tower/enemy's own identity
+ * color (spec: "cores de status exclusivas").
+ */
+export const STATUS_COLORS = {
+  hpHealthy: "#6fe06f",
+  hpWounded: "#f5d23a",
+  hpCritical: "#ff4f3a",
+  hpTrack: "rgba(20,14,8,0.65)",
+  readyPulse: "#fff6d8",
+  slow: "#7fd8ff",
+  burn: "#ff8a3a",
+  critFlash: "#ffe9a0",
+  hitFlash: "#ffffff",
+} as const;
+
+/**
+ * The single consistent light source every hand-drawn shape should shade
+ * against: top-left, matching the "iluminação consistente vindo de
+ * cima/esquerda" requirement. Highlights go on the side facing this vector;
+ * contact shadows are cast toward its opposite.
+ */
+export const LIGHT_DIRECTION = { x: -0.55, y: -0.83 } as const;

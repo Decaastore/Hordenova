@@ -1,4 +1,5 @@
 import type { Vector2 } from "@/utils/geometry";
+import { drawMagicCore } from "./lighting";
 
 /**
  * Purely cosmetic "game feel" layer (Phase 2 spec section 10): damage
@@ -27,7 +28,9 @@ interface Burst {
   color: string;
   remainingMs: number;
   totalMs: number;
-  particles: { angle: number; speed: number }[];
+  particles: { angle: number; speed: number; curve: number }[];
+  /** Premium-tier bursts (Etapa 4) paint a white-hot core under the particles. */
+  hotCore?: boolean;
 }
 
 interface Ring {
@@ -72,16 +75,27 @@ export class VfxManager {
     });
   }
 
-  spawnDeathBurst(position: Vector2, color: string): void {
+  /**
+   * `travelDirection`, when given (premium-tier deaths — Etapa 4), biases
+   * the burst into a cone flying backward off the enemy's own heading with
+   * curved trails, instead of a plain uniform ring — reads as directional
+   * debris rather than a generic poof.
+   */
+  spawnDeathBurst(position: Vector2, color: string, travelDirection?: Vector2, hotCore = false): void {
+    const baseAngle = travelDirection ? Math.atan2(travelDirection.y, travelDirection.x) + Math.PI : 0;
+    const spread = travelDirection ? Math.PI * 0.9 : Math.PI * 2;
+    const count = travelDirection ? 12 : 8;
     this.pushBurst({
       x: position.x,
       y: position.y,
       color,
-      remainingMs: 420,
-      totalMs: 420,
-      particles: Array.from({ length: 8 }, (_, i) => ({
-        angle: (i / 8) * Math.PI * 2 + Math.random() * 0.3,
-        speed: 40 + Math.random() * 30,
+      remainingMs: travelDirection ? 520 : 420,
+      totalMs: travelDirection ? 520 : 420,
+      hotCore,
+      particles: Array.from({ length: count }, (_, i) => ({
+        angle: baseAngle + (i / count - 0.5) * spread + (Math.random() - 0.5) * 0.3,
+        speed: 40 + Math.random() * 34,
+        curve: (Math.random() - 0.5) * 1.6,
       })),
     });
   }
@@ -96,6 +110,30 @@ export class VfxManager {
       particles: Array.from({ length: 5 }, (_, i) => ({
         angle: (i / 5) * Math.PI * 2,
         speed: 25,
+        curve: 0,
+      })),
+    });
+  }
+
+  /**
+   * Premium-tier hit impact (Etapa 4): white-hot core + colored halo at the
+   * strike point plus a few sparks kicked back along the incoming shot's
+   * direction, with curved trails. Currently only spawned for hits landing
+   * on the Crawler proof enemy.
+   */
+  spawnHitImpact(position: Vector2, color: string, incomingDirection: Vector2): void {
+    const backAngle = Math.atan2(-incomingDirection.y, -incomingDirection.x);
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color,
+      remainingMs: 260,
+      totalMs: 260,
+      hotCore: true,
+      particles: Array.from({ length: 6 }, (_, i) => ({
+        angle: backAngle + (i / 6 - 0.5) * (Math.PI * 0.7) + (Math.random() - 0.5) * 0.25,
+        speed: 55 + Math.random() * 25,
+        curve: (Math.random() - 0.5) * 1.2,
       })),
     });
   }
@@ -155,13 +193,37 @@ export class VfxManager {
 
     for (const burst of this.bursts) {
       const progress = 1 - burst.remainingMs / burst.totalMs;
-      const traveled = progress * 18;
       ctx.save();
       ctx.globalAlpha = 1 - progress;
-      ctx.fillStyle = burst.color;
+
+      if (burst.hotCore) {
+        drawMagicCore(ctx, burst.x, burst.y, (1 - progress) * 16, burst.color);
+      }
+
+      const traveled = progress * 18;
       for (const p of burst.particles) {
-        const px = burst.x + Math.cos(p.angle) * traveled * (p.speed / 40);
-        const py = burst.y + Math.sin(p.angle) * traveled * (p.speed / 40);
+        const dist = traveled * (p.speed / 40);
+        const dirX = Math.cos(p.angle);
+        const dirY = Math.sin(p.angle);
+        // Curved trail: offset perpendicular to travel, growing with distance,
+        // so the spark arcs instead of flying in a straight line.
+        const perpX = -dirY;
+        const perpY = dirX;
+        const curveAmount = p.curve * dist * 0.35;
+        const px = burst.x + dirX * dist + perpX * curveAmount;
+        const py = burst.y + dirY * dist + perpY * curveAmount;
+        const midDist = dist * 0.5;
+        const midX = burst.x + dirX * midDist + perpX * (p.curve * midDist * 0.35);
+        const midY = burst.y + dirY * midDist + perpY * (p.curve * midDist * 0.35);
+
+        ctx.strokeStyle = burst.color;
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(burst.x, burst.y);
+        ctx.quadraticCurveTo(midX, midY, px, py);
+        ctx.stroke();
+
+        ctx.fillStyle = burst.hotCore ? "#fff6dd" : burst.color;
         ctx.beginPath();
         ctx.arc(px, py, 1.8, 0, Math.PI * 2);
         ctx.fill();

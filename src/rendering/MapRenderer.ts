@@ -1,7 +1,7 @@
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
 import type { Vector2 } from "@/utils/geometry";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
-import { PALETTE } from "./theme";
+import { LIGHT_DIRECTION, PALETTE } from "./theme";
 import { MAP_DECORATIONS, type Decoration } from "./mapDecorations";
 
 /**
@@ -372,6 +372,8 @@ export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]
   ctx.lineWidth = PATH_VISUAL_WIDTH;
   strokePath(ctx, path);
 
+  drawPathBevel(ctx, path);
+
   // Worn ruts down the middle for texture without needing a bitmap.
   ctx.strokeStyle = PALETTE.roadRut;
   ctx.lineWidth = 2.5;
@@ -389,6 +391,43 @@ function strokePath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]): vo
     ctx.lineTo(path[i]!.x, path[i]!.y);
   }
   ctx.stroke();
+}
+
+/**
+ * Per-segment lit/shadow edge lines along the road, so the road reads as
+ * a shallow trench catching the same fixed top-left light as everything
+ * else (Design System: "iluminação consistente" + "profundidade") instead
+ * of a flat painted stripe. Computed per segment (not one global offset)
+ * because the path bends through both horizontal and vertical stretches —
+ * a single direction would put the highlight on the wrong edge half the time.
+ */
+function drawPathBevel(ctx: CanvasRenderingContext2D, path: readonly Vector2[]): void {
+  const inset = (PATH_VISUAL_WIDTH - 8) / 2;
+  ctx.save();
+  ctx.lineWidth = 2.4;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i]!;
+    const b = path[i + 1]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const segLength = Math.hypot(dx, dy) || 1;
+    const nx = -dy / segLength;
+    const ny = dx / segLength;
+    const litSign = nx * LIGHT_DIRECTION.x + ny * LIGHT_DIRECTION.y > 0 ? 1 : -1;
+
+    ctx.strokeStyle = "rgba(255,244,214,0.4)";
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * inset * litSign, a.y + ny * inset * litSign);
+    ctx.lineTo(b.x + nx * inset * litSign, b.y + ny * inset * litSign);
+    ctx.stroke();
+
+    ctx.strokeStyle = "rgba(30,20,8,0.3)";
+    ctx.beginPath();
+    ctx.moveTo(a.x - nx * inset * litSign, a.y - ny * inset * litSign);
+    ctx.lineTo(b.x - nx * inset * litSign, b.y - ny * inset * litSign);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 /** A vibrant magic portal at the path's start and an imposing fortress gate at its end. */

@@ -42,6 +42,9 @@ interface PrevEnemyState {
   hp: number;
   position: Vector2;
   type: EnemyType;
+  direction: Vector2;
+  /** World-clock timestamp (rAF time) this enemy was last hit — drives the Crawler hit-flash. */
+  lastHitTimestamp: number;
 }
 
 /**
@@ -78,6 +81,8 @@ export function CanvasRenderer({
     const vfx = new VfxManager();
     let prevEnemies = new Map<string, PrevEnemyState>();
     let prevTowerLevels = new Map<string, number>();
+    let prevTowerCooldowns = new Map<string, number>();
+    const towerAttackTimestamps = new Map<string, number>();
     let prevGold: number | null = null;
     let lastFrameTimestamp: number | null = null;
 
@@ -114,8 +119,35 @@ export function CanvasRenderer({
       latestSnapshotRef.current = snapshot;
 
       detectVfxEvents(snapshot, hud.gold, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
+
+      // Attack detection: a tower's cooldown only ever counts down during
+      // normal play — it can only go UP when an attack just reset it. That
+      // jump is the one reliable "this tower just fired" signal available
+      // from the engine's own data, no extra event plumbing needed.
+      for (const tower of snapshot.towers) {
+        if (tower.type !== "IRONWOOD") continue;
+        const prevCooldown = prevTowerCooldowns.get(tower.id);
+        if (prevCooldown !== undefined && tower.cooldownRemainingMs > prevCooldown + 50) {
+          towerAttackTimestamps.set(tower.id, timestamp);
+        }
+      }
+      prevTowerCooldowns = new Map(snapshot.towers.map((t) => [t.id, t.cooldownRemainingMs]));
+
       prevEnemies = new Map(
-        snapshot.enemies.map((e) => [e.id, { hp: e.hp, position: e.position, type: e.type }]),
+        snapshot.enemies.map((e) => {
+          const prior = prevEnemies.get(e.id);
+          const hit = prior !== undefined && e.hp < prior.hp;
+          return [
+            e.id,
+            {
+              hp: e.hp,
+              position: e.position,
+              type: e.type,
+              direction: e.direction,
+              lastHitTimestamp: hit ? timestamp : (prior?.lastHitTimestamp ?? -Infinity),
+            },
+          ];
+        }),
       );
       prevTowerLevels = new Map(snapshot.towers.map((t) => [t.id, t.level]));
       prevGold = hud.gold;
@@ -137,13 +169,19 @@ export function CanvasRenderer({
       });
 
       for (const tower of snapshot.towers) {
-        drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp);
+        const attackFlashMs =
+          tower.type === "IRONWOOD" ? timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity) : Infinity;
+        drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs);
         if (tower.id === snapshot.selectedTowerId) {
           drawRangeCircle(ctx, tower.position, getTowerStats(tower).range);
         }
       }
 
-      for (const enemy of snapshot.enemies) drawEnemy(ctx, enemy, timestamp);
+      for (const enemy of snapshot.enemies) {
+        const hitFlashMs =
+          enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
+        drawEnemy(ctx, enemy, timestamp, hitFlashMs);
+      }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
 
       vfx.draw(ctx);
@@ -222,10 +260,16 @@ function detectVfxEvents(
   gatePosition: Vector2,
 ): void {
   // Enemies still alive: damage numbers when their hp dropped since last frame.
+  // The Crawler proof piece additionally gets the premium white-hot impact
+  // burst (spec: "impacto" + "partículas") instead of just a number popping.
   for (const enemy of snapshot.enemies) {
     const prev = prevEnemies.get(enemy.id);
     if (prev && enemy.hp < prev.hp) {
-      vfx.spawnDamageNumber(enemy.position, prev.hp - enemy.hp, prev.hp - enemy.hp >= 15);
+      const damage = prev.hp - enemy.hp;
+      vfx.spawnDamageNumber(enemy.position, damage, damage >= 15);
+      if (enemy.type === "CRAWLER") {
+        vfx.spawnHitImpact(enemy.position, ENEMY_THEME.CRAWLER.accent, enemy.direction);
+      }
     }
   }
 
@@ -237,7 +281,8 @@ function detectVfxEvents(
   for (const [id, prev] of prevEnemies) {
     if (currentIds.has(id)) continue;
     if (prev.hp <= 0.01) {
-      vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent);
+      const premium = prev.type === "CRAWLER";
+      vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
       killPositionsThisFrame.push(prev.position);
     } else {
       vfx.spawnBaseHitFlash(gatePosition);
