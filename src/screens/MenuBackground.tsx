@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
+import { ACTIVE_BIOME } from "@/rendering/biomes";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -56,14 +57,14 @@ export function MenuBackground() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
 
-      drawBackground(ctx);
+      drawBackground(ctx, ACTIVE_BIOME);
       drawDistantSilhouettes(ctx, timestamp);
-      drawDecorations(ctx, timestamp);
-      drawPath(ctx, ENEMY_PATH);
-      drawPathEndpoints(ctx, ENEMY_PATH, timestamp);
-      drawFog(ctx, timestamp);
-      drawAmbientParticles(ctx, timestamp);
-      drawVignette(ctx);
+      drawDecorations(ctx, ACTIVE_BIOME, timestamp);
+      drawPath(ctx, ENEMY_PATH, ACTIVE_BIOME);
+      drawPathEndpoints(ctx, ENEMY_PATH, ACTIVE_BIOME, timestamp);
+      drawFog(ctx, ACTIVE_BIOME, timestamp);
+      drawAmbientParticles(ctx, ACTIVE_BIOME, timestamp);
+      drawVignette(ctx, ACTIVE_BIOME);
 
       rafId = requestAnimationFrame(draw);
     };

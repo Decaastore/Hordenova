@@ -6,6 +6,7 @@ import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ENEMY_THEME } from "./theme";
+import { ACTIVE_BIOME } from "./biomes";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -158,14 +159,22 @@ export function CanvasRenderer({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
 
-      drawBackground(ctx);
-      drawDecorations(ctx, timestamp);
-      drawPath(ctx, ENEMY_PATH);
-      drawPathEndpoints(ctx, ENEMY_PATH, timestamp);
+      drawBackground(ctx, ACTIVE_BIOME);
+      drawDecorations(ctx, ACTIVE_BIOME, timestamp);
+      drawPath(ctx, ENEMY_PATH, ACTIVE_BIOME);
+      drawPathEndpoints(ctx, ENEMY_PATH, ACTIVE_BIOME, timestamp);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
-        drawSlot(ctx, slot, index, occupiedSlotIds.has(slot.id), pendingTowerTypeRef.current !== null, timestamp);
+        drawSlot(
+          ctx,
+          slot,
+          index,
+          occupiedSlotIds.has(slot.id),
+          pendingTowerTypeRef.current !== null,
+          ACTIVE_BIOME,
+          timestamp,
+        );
       });
 
       for (const tower of snapshot.towers) {
@@ -186,9 +195,9 @@ export function CanvasRenderer({
 
       vfx.draw(ctx);
 
-      drawFog(ctx, timestamp);
-      drawAmbientParticles(ctx, timestamp);
-      drawVignette(ctx);
+      drawFog(ctx, ACTIVE_BIOME, timestamp);
+      drawAmbientParticles(ctx, ACTIVE_BIOME, timestamp);
+      drawVignette(ctx, ACTIVE_BIOME);
 
       rafId = requestAnimationFrame(draw);
     };
@@ -244,7 +253,7 @@ export function CanvasRenderer({
         height: "100%",
         display: "block",
         cursor: "pointer",
-        backgroundColor: PALETTE.canopyDark,
+        backgroundColor: PALETTE.mapBackgroundFallback,
       }}
     />
   );

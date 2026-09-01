@@ -1,39 +1,75 @@
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
-import type { Vector2 } from "@/utils/geometry";
+import { distance, type Vector2 } from "@/utils/geometry";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
-import { LIGHT_DIRECTION, PALETTE } from "./theme";
+import { PALETTE } from "./theme";
+import type { BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration } from "./mapDecorations";
 
 /**
  * Pure drawing helpers — world-space coordinates in, pixels on screen out
  * (the caller has already applied the world->canvas transform to `ctx`).
  * Nothing in this file reads or mutates game state; it only takes plain
- * data and paints it. `timeMs` is wall-clock time used only for slow
- * cosmetic animation (torch flicker, crystal pulse) — never gameplay time.
+ * data plus a `BiomeDefinition` (see ./biomes) and paints it. `timeMs` is
+ * wall-clock time used only for slow cosmetic animation — never gameplay
+ * time.
  *
- * Art direction: EPIC FANTASY / MEDIEVAL ADVENTURE — bright forest greens,
- * warm golden light, natural stone/earth tones, vivid colorful magic.
- * Deliberately not dark-fantasy: no near-black grounds, no heavy grey.
+ * Every terrain color comes from the `biome` parameter now, not a
+ * hardcoded palette — that's what lets a future level swap in Terras
+ * Vulcânicas/Tundra/Deserto/Ruínas without touching this file, only
+ * adding a new biomes/*.ts data file.
  */
 
 // ---------------------------------------------------------------------------
-// Background: sunlit forest floor, distant canopy, gentle framing.
+// Background: layered, uneven terrain — several ground tones blotched
+// together (not one flat gradient), so the ground reads as real material.
 // ---------------------------------------------------------------------------
 
-export function drawBackground(ctx: CanvasRenderingContext2D): void {
+function hashPoint(x: number, y: number, seed: number): number {
+  const n = Math.sin(x * 12.9898 + y * 78.233 + seed * 37.719) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+export function drawBackground(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  const p = biome.palette;
   const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_SIZE.height);
-  gradient.addColorStop(0, PALETTE.skyGlow);
-  gradient.addColorStop(0.18, PALETTE.canopyLight);
-  gradient.addColorStop(0.55, PALETTE.canopyMid);
-  gradient.addColorStop(1, PALETTE.canopyDark);
+  gradient.addColorStop(0, p.skyTop);
+  gradient.addColorStop(0.16, p.groundAccentA);
+  gradient.addColorStop(0.55, p.groundBase);
+  gradient.addColorStop(1, p.groundShadowed);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
 
-  drawTreeline(ctx, 0, PALETTE.canopyMid, 0.5);
-  drawTreeline(ctx, 34, PALETTE.canopyDark, 0.6);
+  // Irregular ground-tone blotches, deterministic per-cell — this is what
+  // stops the terrain from reading as a flat color swatch.
+  const cell = 70;
+  const cols = Math.ceil(WORLD_SIZE.width / cell);
+  const rows = Math.ceil(WORLD_SIZE.height / cell);
+  const blotchColors = [p.groundAccentA, p.groundAccentB, p.groundShadowed];
+  ctx.save();
+  ctx.globalAlpha = 0.22;
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols; cx++) {
+      const h = hashPoint(cx, cy, 4.1);
+      if (h < 0.42) continue;
+      const color = blotchColors[Math.floor(h * blotchColors.length) % blotchColors.length]!;
+      const px = cx * cell + hashPoint(cx, cy, 1.2) * cell;
+      const py = cy * cell + hashPoint(cx, cy, 2.6) * cell;
+      const r = cell * (0.5 + hashPoint(cx, cy, 3.4) * 0.5);
+      const blotch = ctx.createRadialGradient(px, py, 0, px, py, r);
+      blotch.addColorStop(0, color);
+      blotch.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = blotch;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+
+  drawTreeline(ctx, 0, p.vegetationSecondary, 0.55);
+  drawTreeline(ctx, 34, p.vegetationDark, 0.65);
 }
 
-/** A soft, repeating silhouette of tree canopies along the top edge for depth. */
 function drawTreeline(ctx: CanvasRenderingContext2D, yOffset: number, color: string, opacity: number): void {
   ctx.save();
   ctx.globalAlpha = opacity;
@@ -51,22 +87,23 @@ function drawTreeline(ctx: CanvasRenderingContext2D, yOffset: number, color: str
   ctx.restore();
 }
 
-export function drawVignette(ctx: CanvasRenderingContext2D): void {
+export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
   const cx = WORLD_SIZE.width / 2;
   const cy = WORLD_SIZE.height / 2;
   const radius = Math.max(WORLD_SIZE.width, WORLD_SIZE.height) * 0.78;
   const gradient = ctx.createRadialGradient(cx, cy, radius * 0.6, cx, cy, radius);
   gradient.addColorStop(0, "rgba(0,0,0,0)");
-  gradient.addColorStop(1, PALETTE.vignette);
+  gradient.addColorStop(1, biome.palette.vignette);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
 }
 
 // ---------------------------------------------------------------------------
-// Scenery: trees, rocks, roots, ruins, crystals, flowers, water, torches.
+// Scenery: trees, rocks, roots, ruins, crystals, flowers, water, torches —
+// all recolored from the active biome's palette.
 // ---------------------------------------------------------------------------
 
-export function drawDecorations(ctx: CanvasRenderingContext2D, timeMs: number): void {
+export function drawDecorations(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
   for (const deco of MAP_DECORATIONS) {
     ctx.save();
     ctx.translate(deco.position.x, deco.position.y);
@@ -77,66 +114,68 @@ export function drawDecorations(ctx: CanvasRenderingContext2D, timeMs: number): 
 
     switch (deco.kind) {
       case "TREE":
-        drawTree(ctx, deco);
+        drawTree(ctx, deco, biome);
         break;
       case "ROCK":
-        drawRock(ctx, deco);
+        drawRock(ctx, deco, biome);
         break;
       case "ROOT":
-        drawRoot(ctx);
+        drawRoot(ctx, biome);
         break;
       case "RUIN":
-        drawRuinDecor(ctx);
+        drawRuinDecor(ctx, biome);
         break;
       case "CRYSTAL":
-        drawCrystalDecor(ctx, timeMs, deco.variant);
+        drawCrystalDecor(ctx, timeMs, biome);
         break;
       case "GRASS":
-        drawGrassTuft(ctx);
+        drawGrassTuft(ctx, biome);
         break;
       case "FLOWER":
         drawFlower(ctx, deco.variant);
         break;
       case "WATER":
-        drawWaterPond(ctx, deco, timeMs);
+        drawWaterPond(ctx, deco, timeMs, biome);
         break;
       case "TORCH":
-        drawTorch(ctx, timeMs);
+        drawTorch(ctx, timeMs, biome);
         break;
     }
     ctx.restore();
   }
 }
 
-function drawTree(ctx: CanvasRenderingContext2D, deco: Decoration): void {
-  ctx.fillStyle = "rgba(30,45,15,0.28)";
+function drawTree(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  ctx.fillStyle = "rgba(10,14,6,0.32)";
   ctx.beginPath();
   ctx.ellipse(2, 5, 16, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#6b4a2f";
+  ctx.fillStyle = p.rockDark;
   ctx.fillRect(-2.5, -2, 5, 16);
 
-  const canopyColors = [PALETTE.canopyLight, PALETTE.canopyMid, "#7bc44a"];
+  const canopyColors = [p.vegetationPrimary, p.vegetationSecondary, p.vegetationDark];
   ctx.fillStyle = canopyColors[deco.variant] ?? canopyColors[0]!;
   for (let i = 0; i < 3; i++) {
     ctx.beginPath();
     ctx.arc(-6 + i * 6, -8 - i * 4, 13 - i * 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
-  ctx.fillStyle = "rgba(255,255,255,0.12)";
+  ctx.fillStyle = `${p.vegetationHighlight}2e`;
   ctx.beginPath();
   ctx.arc(-8, -14, 6, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function drawRock(ctx: CanvasRenderingContext2D, deco: Decoration): void {
-  ctx.fillStyle = "rgba(40,30,10,0.22)";
+function drawRock(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  ctx.fillStyle = "rgba(10,10,4,0.28)";
   ctx.beginPath();
   ctx.ellipse(1, 3, 9, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = deco.variant === 0 ? "#b8ac8e" : "#a89876";
+  ctx.fillStyle = deco.variant === 0 ? p.rock : p.rockDark;
   ctx.beginPath();
   ctx.moveTo(-8, 2);
   ctx.lineTo(-4, -6);
@@ -147,21 +186,21 @@ function drawRock(ctx: CanvasRenderingContext2D, deco: Decoration): void {
   ctx.closePath();
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(-2, -3);
   ctx.lineTo(2, 2);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(80,60,30,0.3)";
+  ctx.strokeStyle = "rgba(0,0,0,0.35)";
   ctx.beginPath();
   ctx.moveTo(-5, 3);
   ctx.lineTo(3, -3);
   ctx.stroke();
 }
 
-function drawRoot(ctx: CanvasRenderingContext2D): void {
-  ctx.strokeStyle = "#7a5735";
+function drawRoot(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  ctx.strokeStyle = biome.palette.vegetationDark;
   ctx.lineWidth = 3;
   ctx.lineCap = "round";
   ctx.beginPath();
@@ -171,19 +210,20 @@ function drawRoot(ctx: CanvasRenderingContext2D): void {
   ctx.stroke();
 }
 
-function drawRuinDecor(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = "rgba(40,30,10,0.25)";
+function drawRuinDecor(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  ctx.fillStyle = "rgba(10,10,4,0.3)";
   ctx.beginPath();
   ctx.ellipse(0, 8, 14, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#c9b790";
+  ctx.fillStyle = p.rock;
   ctx.fillRect(-10, -14, 7, 22);
   ctx.fillRect(2, -8, 8, 16);
-  ctx.fillStyle = "#a89268";
+  ctx.fillStyle = p.rockDark;
   ctx.fillRect(-10, -14, 7, 4);
 
-  ctx.fillStyle = "rgba(120,190,90,0.4)";
+  ctx.fillStyle = `${p.vegetationPrimary}66`;
   ctx.beginPath();
   ctx.arc(-6, -10, 3, 0, Math.PI * 2);
   ctx.fill();
@@ -192,13 +232,13 @@ function drawRuinDecor(ctx: CanvasRenderingContext2D): void {
   ctx.fill();
 }
 
-function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, variant: number): void {
-  const color = variant % 2 === 0 ? PALETTE.crystal : PALETTE.crystalWarm;
+function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
+  const color = biome.palette.accentGlow;
   const pulse = 0.6 + 0.4 * Math.sin(timeMs / 900);
   ctx.save();
   ctx.globalAlpha = pulse;
   const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 28);
-  glow.addColorStop(0, hexToRgba(color, 0.5));
+  glow.addColorStop(0, hexToRgba(color, 0.45));
   glow.addColorStop(1, hexToRgba(color, 0));
   ctx.fillStyle = glow;
   ctx.beginPath();
@@ -206,7 +246,7 @@ function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, variant
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = "rgba(40,30,10,0.22)";
+  ctx.fillStyle = "rgba(10,10,4,0.28)";
   ctx.beginPath();
   ctx.ellipse(0, 6, 8, 3, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -220,7 +260,7 @@ function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, variant
   ctx.lineTo(-5, -2);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.65)";
+  ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.beginPath();
   ctx.moveTo(0, -14);
   ctx.lineTo(2, -2);
@@ -230,8 +270,8 @@ function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, variant
   ctx.fill();
 }
 
-function drawGrassTuft(ctx: CanvasRenderingContext2D): void {
-  ctx.strokeStyle = PALETTE.canopyMid;
+function drawGrassTuft(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  ctx.strokeStyle = biome.palette.vegetationPrimary;
   ctx.lineWidth = 1.5;
   ctx.lineCap = "round";
   for (let i = -2; i <= 2; i++) {
@@ -242,10 +282,10 @@ function drawGrassTuft(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-const FLOWER_COLORS = ["#ff6a6a", "#ffd257", "#c060f5", "#ffffff", "#ff9ecf"];
+const FLOWER_COLORS = ["#e0546a", "#e0b23a", "#8a5cc4", "#e8e2cf", "#c95fa0"];
 
 function drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
-  ctx.strokeStyle = PALETTE.canopyDark;
+  ctx.strokeStyle = "#2a3018";
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(0, 6);
@@ -266,29 +306,30 @@ function drawFlower(ctx: CanvasRenderingContext2D, variant: number): void {
   ctx.fill();
 }
 
-function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: number): void {
+function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: number, biome: BiomeDefinition): void {
+  const p = biome.palette;
   const radiusX = 34 * deco.scale;
   const radiusY = 20 * deco.scale;
 
-  ctx.fillStyle = "rgba(30,45,15,0.2)";
+  ctx.fillStyle = "rgba(10,14,6,0.25)";
   ctx.beginPath();
   ctx.ellipse(2, 4, radiusX + 4, radiusY + 3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#7a6544";
+  ctx.fillStyle = p.rockDark;
   ctx.beginPath();
   ctx.ellipse(0, 0, radiusX + 4, radiusY + 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const waterGradient = ctx.createLinearGradient(0, -radiusY, 0, radiusY);
-  waterGradient.addColorStop(0, PALETTE.waterLight);
-  waterGradient.addColorStop(1, PALETTE.water);
+  waterGradient.addColorStop(0, p.waterLight);
+  waterGradient.addColorStop(1, p.waterDeep);
   ctx.fillStyle = waterGradient;
   ctx.beginPath();
   ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "rgba(255,255,255,0.35)";
+  ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.lineWidth = 1.2;
   for (let i = 0; i < 2; i++) {
     const t = (timeMs / 1800 + i * 0.5) % 1;
@@ -299,31 +340,31 @@ function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: 
   }
   ctx.globalAlpha = 1;
 
-  ctx.fillStyle = "#4a8a3a";
+  ctx.fillStyle = p.vegetationSecondary;
   ctx.beginPath();
   ctx.ellipse(radiusX * 0.4, radiusY * 0.3, 5, 3.4, 0.3, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function drawTorch(ctx: CanvasRenderingContext2D, timeMs: number): void {
-  ctx.fillStyle = "rgba(40,30,10,0.25)";
+function drawTorch(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
+  ctx.fillStyle = "rgba(10,10,4,0.3)";
   ctx.beginPath();
   ctx.ellipse(0, 12, 4, 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#6b4a2f";
+  ctx.fillStyle = biome.palette.rockDark;
   ctx.fillRect(-1.6, -4, 3.2, 16);
 
   const flicker = Math.sin(timeMs / 130) * 1.4;
   const glow = ctx.createRadialGradient(0, -10, 0, 0, -10, 22);
-  glow.addColorStop(0, "rgba(255,166,58,0.55)");
-  glow.addColorStop(1, "rgba(255,166,58,0)");
+  glow.addColorStop(0, "rgba(255,176,74,0.55)");
+  glow.addColorStop(1, "rgba(255,176,74,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
   ctx.arc(0, -10, 22, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = PALETTE.torchFlame;
+  ctx.fillStyle = biome.palette.accentWarm;
   ctx.beginPath();
   ctx.moveTo(-3, -5);
   ctx.quadraticCurveTo(-3 + flicker, -12, 0, -18);
@@ -347,99 +388,192 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Road.
+// Organic road — the gameplay path (ENEMY_PATH, straight rectilinear
+// segments) is untouched; everything below only builds a VISUAL spline for
+// drawing. Enemy movement still uses the original waypoints via
+// getPointAtDistance, completely independent of this.
 // ---------------------------------------------------------------------------
 
-export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]): void {
+function catmullRom(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: number): Vector2 {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return {
+    x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+    y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+  };
+}
+
+/** Smooths the straight-segment gameplay path into a curved visual-only spline. */
+function buildSmoothedPath(path: readonly Vector2[], samplesPerSegment = 14): Vector2[] {
+  if (path.length < 2) return [...path];
+  const first = path[0]!;
+  const second = path[1]!;
+  const last = path[path.length - 1]!;
+  const secondLast = path[path.length - 2]!;
+  const extended: Vector2[] = [
+    { x: first.x - (second.x - first.x), y: first.y - (second.y - first.y) },
+    ...path,
+    { x: last.x + (last.x - secondLast.x), y: last.y + (last.y - secondLast.y) },
+  ];
+
+  const result: Vector2[] = [];
+  for (let i = 1; i < extended.length - 2; i++) {
+    const p0 = extended[i - 1]!;
+    const p1 = extended[i]!;
+    const p2 = extended[i + 1]!;
+    const p3 = extended[i + 2]!;
+    for (let s = 0; s < samplesPerSegment; s++) {
+      result.push(catmullRom(p0, p1, p2, p3, s / samplesPerSegment));
+    }
+  }
+  result.push(last);
+  return result;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+interface OrganicRoad {
+  smoothed: Vector2[];
+  left: Vector2[];
+  right: Vector2[];
+}
+
+/**
+ * Builds the road's visual edges from the smoothed spline: width breathes
+ * along its length and each edge is independently jittered, so the road
+ * reads as a worn trail cut through terrain instead of a uniform painted
+ * ribbon. `widthOffset` lets the caller nest several passes (soft dirt
+ * halo, dark edge, bright fill) around the same centerline.
+ */
+function buildOrganicRoad(path: readonly Vector2[], baseWidth: number, widthOffset: number, seed: number): OrganicRoad {
+  const smoothed = buildSmoothedPath(path);
+  const n = smoothed.length;
+  const cumulative: number[] = [0];
+  for (let i = 1; i < n; i++) {
+    cumulative.push(cumulative[i - 1]! + distance(smoothed[i - 1]!, smoothed[i]!));
+  }
+
+  const left: Vector2[] = [];
+  const right: Vector2[] = [];
+  for (let i = 0; i < n; i++) {
+    const prev = smoothed[Math.max(0, i - 1)]!;
+    const next = smoothed[Math.min(n - 1, i + 1)]!;
+    const tangentLength = Math.hypot(next.x - prev.x, next.y - prev.y) || 1;
+    const tangent = { x: (next.x - prev.x) / tangentLength, y: (next.y - prev.y) / tangentLength };
+    const normal = { x: -tangent.y, y: tangent.x };
+
+    const s = cumulative[i]!;
+    const widthNoise = 1 + 0.16 * Math.sin(s * 0.018 + seed) + 0.08 * Math.sin(s * 0.045 + seed * 2.3);
+    const halfWidth = (baseWidth * clamp(widthNoise, 0.72, 1.32)) / 2 + widthOffset;
+    const jitterL = 3 * Math.sin(s * 0.09 + seed * 3.1);
+    const jitterR = 3 * Math.sin(s * 0.11 + seed * 5.7 + 1.7);
+
+    const point = smoothed[i]!;
+    left.push({ x: point.x + normal.x * (halfWidth + jitterL), y: point.y + normal.y * (halfWidth + jitterL) });
+    right.push({ x: point.x - normal.x * (halfWidth + jitterR), y: point.y - normal.y * (halfWidth + jitterR) });
+  }
+
+  return { smoothed, left, right };
+}
+
+function fillRibbon(ctx: CanvasRenderingContext2D, left: readonly Vector2[], right: readonly Vector2[]): void {
+  ctx.beginPath();
+  ctx.moveTo(left[0]!.x, left[0]!.y);
+  for (let i = 1; i < left.length; i++) ctx.lineTo(left[i]!.x, left[i]!.y);
+  for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i]!.x, right[i]!.y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function strokeSmoothedCenterline(ctx: CanvasRenderingContext2D, smoothed: readonly Vector2[]): void {
+  ctx.beginPath();
+  ctx.moveTo(smoothed[0]!.x, smoothed[0]!.y);
+  for (let i = 1; i < smoothed.length; i++) ctx.lineTo(smoothed[i]!.x, smoothed[i]!.y);
+  ctx.stroke();
+}
+
+const ROAD_SEED = 11;
+
+export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[], biome: BiomeDefinition): void {
   if (path.length < 2) return;
+  const p = biome.palette;
 
   ctx.save();
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  ctx.strokeStyle = "rgba(50,38,18,0.35)";
-  ctx.lineWidth = PATH_VISUAL_WIDTH + 14;
-  strokePath(ctx, path);
+  const halo = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 9, ROAD_SEED);
+  ctx.fillStyle = "rgba(15,11,6,0.32)";
+  fillRibbon(ctx, halo.left, halo.right);
 
-  ctx.strokeStyle = PALETTE.roadEdge;
-  ctx.lineWidth = PATH_VISUAL_WIDTH + 6;
-  strokePath(ctx, path);
+  const edge = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 3, ROAD_SEED);
+  ctx.fillStyle = p.roadEdge;
+  fillRibbon(ctx, edge.left, edge.right);
 
+  const fill = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 0, ROAD_SEED);
   const roadGradient = ctx.createLinearGradient(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
-  roadGradient.addColorStop(0, PALETTE.roadFillLight);
-  roadGradient.addColorStop(1, PALETTE.roadFill);
-  ctx.strokeStyle = roadGradient;
-  ctx.lineWidth = PATH_VISUAL_WIDTH;
-  strokePath(ctx, path);
+  roadGradient.addColorStop(0, p.roadFillLight);
+  roadGradient.addColorStop(1, p.roadFill);
+  ctx.fillStyle = roadGradient;
+  fillRibbon(ctx, fill.left, fill.right);
 
-  drawPathBevel(ctx, path);
-
-  // Worn ruts down the middle for texture without needing a bitmap.
-  ctx.strokeStyle = PALETTE.roadRut;
-  ctx.lineWidth = 2.5;
-  ctx.setLineDash([10, 14]);
-  strokePath(ctx, path);
+  // Worn centerline rut, following the same curve.
+  ctx.strokeStyle = p.roadRut;
+  ctx.lineWidth = 2.4;
+  ctx.setLineDash([9, 13]);
+  strokeSmoothedCenterline(ctx, fill.smoothed);
   ctx.setLineDash([]);
 
-  ctx.restore();
-}
+  drawRoadEdgeGrowth(ctx, fill, biome);
 
-function strokePath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]): void {
-  ctx.beginPath();
-  ctx.moveTo(path[0]!.x, path[0]!.y);
-  for (let i = 1; i < path.length; i++) {
-    ctx.lineTo(path[i]!.x, path[i]!.y);
-  }
-  ctx.stroke();
+  ctx.restore();
 }
 
 /**
- * Per-segment lit/shadow edge lines along the road, so the road reads as
- * a shallow trench catching the same fixed top-left light as everything
- * else (Design System: "iluminação consistente" + "profundidade") instead
- * of a flat painted stripe. Computed per segment (not one global offset)
- * because the path bends through both horizontal and vertical stretches —
- * a single direction would put the highlight on the wrong edge half the time.
+ * Small rocks/roots planted straddling the road's edge at sparse,
+ * deterministic points — this is what makes the path read as "terrain
+ * with a trail worn through it" instead of "a road drawn on top of a
+ * green rectangle".
  */
-function drawPathBevel(ctx: CanvasRenderingContext2D, path: readonly Vector2[]): void {
-  const inset = (PATH_VISUAL_WIDTH - 8) / 2;
-  ctx.save();
-  ctx.lineWidth = 2.4;
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i]!;
-    const b = path[i + 1]!;
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const segLength = Math.hypot(dx, dy) || 1;
-    const nx = -dy / segLength;
-    const ny = dx / segLength;
-    const litSign = nx * LIGHT_DIRECTION.x + ny * LIGHT_DIRECTION.y > 0 ? 1 : -1;
-
-    ctx.strokeStyle = "rgba(255,244,214,0.4)";
-    ctx.beginPath();
-    ctx.moveTo(a.x + nx * inset * litSign, a.y + ny * inset * litSign);
-    ctx.lineTo(b.x + nx * inset * litSign, b.y + ny * inset * litSign);
-    ctx.stroke();
-
-    ctx.strokeStyle = "rgba(30,20,8,0.3)";
-    ctx.beginPath();
-    ctx.moveTo(a.x - nx * inset * litSign, a.y - ny * inset * litSign);
-    ctx.lineTo(b.x - nx * inset * litSign, b.y - ny * inset * litSign);
-    ctx.stroke();
+function drawRoadEdgeGrowth(ctx: CanvasRenderingContext2D, road: OrganicRoad, biome: BiomeDefinition): void {
+  const step = 9;
+  for (let i = 4; i < road.smoothed.length - 4; i += step) {
+    const side = i % (step * 2) < step ? "left" : "right";
+    const edgePoint = side === "left" ? road.left[i]! : road.right[i]!;
+    const h = hashPoint(i, side === "left" ? 1 : 2, 8.3);
+    ctx.save();
+    ctx.translate(edgePoint.x, edgePoint.y);
+    ctx.rotate(h * Math.PI * 2);
+    ctx.scale(0.45 + h * 0.25, 0.45 + h * 0.25);
+    if (h > 0.5) {
+      drawRoot(ctx, biome);
+    } else {
+      drawRock(ctx, { kind: "ROCK", position: { x: 0, y: 0 }, scale: 1, rotation: 0, variant: Math.floor(h * 2) }, biome);
+    }
+    ctx.restore();
   }
-  ctx.restore();
 }
 
-/** A vibrant magic portal at the path's start and an imposing fortress gate at its end. */
 /**
  * The portal/gate graphics sit slightly inboard of the path's literal
  * start/end waypoints (not moved — just where the ornate set-piece is
  * drawn) so they stay comfortably inside frame on a "cover"-fit
  * cinematic background instead of getting clipped at the world's edge.
+ * These two set-pieces keep a fixed, biome-independent magic identity
+ * (violet portal, gold trim) since they're the game's own landmarks, not
+ * terrain — but the gate's stonework now pulls from the biome's rock
+ * tones so it still looks built from the local ground.
  */
 const ENDPOINT_INSET = 130;
 
-export function drawPathEndpoints(ctx: CanvasRenderingContext2D, path: readonly Vector2[], timeMs: number): void {
+export function drawPathEndpoints(
+  ctx: CanvasRenderingContext2D,
+  path: readonly Vector2[],
+  biome: BiomeDefinition,
+  timeMs: number,
+): void {
   if (path.length < 2) return;
   const start = path[0]!;
   const startDir = normalize(path[1]!.x - start.x, path[1]!.y - start.y);
@@ -448,7 +582,7 @@ export function drawPathEndpoints(ctx: CanvasRenderingContext2D, path: readonly 
   const end = path[path.length - 1]!;
   const prev = path[path.length - 2]!;
   const endDir = normalize(end.x - prev.x, end.y - prev.y);
-  drawFortressGate(ctx, { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, timeMs);
+  drawFortressGate(ctx, { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, biome, timeMs);
 }
 
 function normalize(x: number, y: number): Vector2 {
@@ -470,18 +604,16 @@ function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeM
   ctx.arc(0, 0, 52, 0, Math.PI * 2);
   ctx.fill();
 
-  // Gold rune ring.
   ctx.strokeStyle = PALETTE.gold;
   ctx.lineWidth = 3;
   ctx.beginPath();
   ctx.arc(0, 0, 25, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Swirling violet gateway.
   const swirl = ctx.createRadialGradient(0, 0, 2, 0, 0, 21);
   swirl.addColorStop(0, "#f0d8ff");
-  swirl.addColorStop(0.4, PALETTE.portal);
-  swirl.addColorStop(1, "#5a1f8a");
+  swirl.addColorStop(0.4, "#c060f5");
+  swirl.addColorStop(1, "#3a1258");
   ctx.fillStyle = swirl;
   ctx.beginPath();
   ctx.arc(0, 0, 21, 0, Math.PI * 2);
@@ -499,55 +631,50 @@ function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeM
   ctx.restore();
 }
 
-function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, timeMs: number): void {
+function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, biome: BiomeDefinition, timeMs: number): void {
+  const p = biome.palette;
   ctx.save();
   ctx.translate(position.x, position.y);
 
-  ctx.fillStyle = "rgba(40,30,10,0.3)";
+  ctx.fillStyle = "rgba(10,10,4,0.35)";
   ctx.beginPath();
   ctx.ellipse(0, 14, 46, 13, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const wallGradient = ctx.createLinearGradient(0, -46, 0, 20);
-  wallGradient.addColorStop(0, "#e8dcc0");
-  wallGradient.addColorStop(1, "#b8a680");
-  ctx.fillStyle = wallGradient;
+  wallGradient.addColorStop(0, p.rock);
+  wallGradient.addColorStop(1, p.rockDark);
 
-  // Two flanking towers.
   for (const side of [-1, 1]) {
     ctx.save();
     ctx.translate(side * 30, 0);
     ctx.fillStyle = wallGradient;
     ctx.fillRect(-11, -38, 22, 54);
-    // Crenellations.
-    ctx.fillStyle = "#c9b790";
+    ctx.fillStyle = p.rock;
     for (let i = -1; i <= 1; i++) ctx.fillRect(-11 + (i + 1) * 7 - 3, -42, 5, 6);
-    // Roof cone.
-    ctx.fillStyle = "#a8442f";
+    ctx.fillStyle = "#5a1f16";
     ctx.beginPath();
     ctx.moveTo(-13, -38);
     ctx.lineTo(0, -54);
     ctx.lineTo(13, -38);
     ctx.closePath();
     ctx.fill();
-    // Window glow.
     const flicker = 0.6 + 0.4 * Math.sin(timeMs / 400 + side);
-    ctx.fillStyle = `rgba(255,200,100,${flicker})`;
+    ctx.fillStyle = `rgba(255,180,90,${flicker})`;
     ctx.beginPath();
     ctx.arc(0, -20, 3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  // Central wall + gold-trimmed arch door.
   ctx.fillStyle = wallGradient;
   ctx.fillRect(-19, -24, 38, 40);
-  ctx.fillStyle = "#c9b790";
+  ctx.fillStyle = p.rock;
   for (let i = 0; i < 3; i++) ctx.fillRect(-19 + i * 13, -28, 8, 6);
 
   const doorGradient = ctx.createLinearGradient(0, -18, 0, 16);
-  doorGradient.addColorStop(0, "#ffd257");
-  doorGradient.addColorStop(1, "#a8702a");
+  doorGradient.addColorStop(0, PALETTE.gold);
+  doorGradient.addColorStop(1, "#7a4a1a");
   ctx.fillStyle = doorGradient;
   ctx.beginPath();
   ctx.moveTo(-14, 16);
@@ -556,12 +683,11 @@ function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, time
   ctx.lineTo(14, 16);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#7a4a1a";
+  ctx.strokeStyle = "#4a2c0f";
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Banner.
-  ctx.fillStyle = "#c9432f";
+  ctx.fillStyle = "#8a2a22";
   ctx.beginPath();
   ctx.moveTo(-2, -46);
   ctx.lineTo(6, -46);
@@ -570,7 +696,7 @@ function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, time
   ctx.lineTo(-2, -30);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#6b4a2f";
+  ctx.strokeStyle = p.rockDark;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(2, -52);
@@ -602,23 +728,24 @@ export function drawSlot(
   index: number,
   occupied: boolean,
   highlighted: boolean,
+  biome: BiomeDefinition,
   timeMs: number,
 ): void {
   const style = styleForSlot(index);
   ctx.save();
   ctx.translate(slot.position.x, slot.position.y);
 
-  ctx.fillStyle = "rgba(40,30,10,0.25)";
+  ctx.fillStyle = "rgba(10,10,4,0.3)";
   ctx.beginPath();
   ctx.ellipse(0, 4, PLATFORM_RADIUS + 3, (PLATFORM_RADIUS + 3) * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  if (style === "CLEARING") drawClearingPlatform(ctx);
-  else if (style === "STONE") drawStonePlatform(ctx);
+  if (style === "CLEARING") drawClearingPlatform(ctx, biome);
+  else if (style === "STONE") drawStonePlatform(ctx, biome);
   else if (style === "WOOD") drawWoodPlatform(ctx);
-  else if (style === "RUIN") drawRuinPlatform(ctx);
-  else if (style === "ALTAR") drawAltarPlatform(ctx, timeMs);
-  else drawElevatedPlatform(ctx);
+  else if (style === "RUIN") drawRuinPlatform(ctx, biome);
+  else if (style === "ALTAR") drawAltarPlatform(ctx, biome, timeMs);
+  else drawElevatedPlatform(ctx, biome);
 
   if (!occupied && highlighted) {
     ctx.strokeStyle = "rgba(255,210,87,0.9)";
@@ -633,26 +760,26 @@ export function drawSlot(
   ctx.restore();
 }
 
-function drawClearingPlatform(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = PALETTE.slotClearing;
+function drawClearingPlatform(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  ctx.fillStyle = biome.palette.slotClearing;
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = PALETTE.canopyDark;
+  ctx.strokeStyle = biome.palette.vegetationDark;
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  drawGrassTuft(ctx);
+  drawGrassTuft(ctx, biome);
 }
 
-function drawStonePlatform(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = PALETTE.slotStone;
+function drawStonePlatform(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  ctx.fillStyle = biome.palette.slotStone;
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#8a7a5a";
+  ctx.strokeStyle = biome.palette.rockDark;
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.strokeStyle = "rgba(120,105,75,0.4)";
+  ctx.strokeStyle = "rgba(0,0,0,0.28)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(-7, -4);
@@ -663,15 +790,14 @@ function drawStonePlatform(ctx: CanvasRenderingContext2D): void {
 }
 
 function drawWoodPlatform(ctx: CanvasRenderingContext2D): void {
-  // Round wooden deck — cross-section log rings, like a cut tree stump base.
-  ctx.fillStyle = "#8a6238";
+  ctx.fillStyle = "#5a4326";
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#5a3f22";
+  ctx.strokeStyle = "#2b1f12";
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.strokeStyle = "rgba(90,63,34,0.6)";
+  ctx.strokeStyle = "rgba(43,31,18,0.6)";
   ctx.lineWidth = 1;
   for (let r = PLATFORM_RADIUS - 4; r > 2; r -= 4) {
     ctx.beginPath();
@@ -680,19 +806,19 @@ function drawWoodPlatform(ctx: CanvasRenderingContext2D): void {
   }
 }
 
-function drawRuinPlatform(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = PALETTE.slotRuin;
+function drawRuinPlatform(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  ctx.fillStyle = biome.palette.slotRuin;
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#8a6a42";
+  ctx.strokeStyle = biome.palette.rockDark;
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.fillStyle = "rgba(110,180,80,0.35)";
+  ctx.fillStyle = `${biome.palette.vegetationPrimary}59`;
   ctx.beginPath();
   ctx.arc(-4, 4, 3.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = "#5a4530";
+  ctx.strokeStyle = biome.palette.rockDark;
   ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(-9, -1);
@@ -700,20 +826,21 @@ function drawRuinPlatform(ctx: CanvasRenderingContext2D): void {
   ctx.stroke();
 }
 
-function drawAltarPlatform(ctx: CanvasRenderingContext2D, timeMs: number): void {
-  ctx.fillStyle = PALETTE.slotMagic;
+function drawAltarPlatform(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
+  ctx.fillStyle = biome.palette.slotMagic;
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
 
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 800);
-  ctx.strokeStyle = `rgba(255,210,87,${0.5 + 0.35 * pulse})`;
+  const glowColor = biome.palette.accentGlow;
+  ctx.strokeStyle = hexToRgba(glowColor, 0.45 + 0.35 * pulse);
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.strokeStyle = `rgba(255,210,87,${0.6 + 0.3 * pulse})`;
+  ctx.strokeStyle = hexToRgba(glowColor, 0.55 + 0.3 * pulse);
   ctx.lineWidth = 1;
   for (let i = 0; i < 5; i++) {
     const angle = (i / 5) * Math.PI * 2 + timeMs / 4000;
@@ -724,22 +851,22 @@ function drawAltarPlatform(ctx: CanvasRenderingContext2D, timeMs: number): void 
   }
 }
 
-function drawElevatedPlatform(ctx: CanvasRenderingContext2D): void {
-  // A small earthen mound with a rocky rim — reads as "raised ground".
-  ctx.fillStyle = "#7a6238";
+function drawElevatedPlatform(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  ctx.fillStyle = p.groundAccentB;
   ctx.beginPath();
   ctx.ellipse(0, 2, PLATFORM_RADIUS + 2, PLATFORM_RADIUS * 0.55 + 2, 0, 0, Math.PI * 2);
   ctx.fill();
 
   const moundGradient = ctx.createRadialGradient(0, -3, 2, 0, 0, PLATFORM_RADIUS);
-  moundGradient.addColorStop(0, "#9fc464");
-  moundGradient.addColorStop(1, "#6f9c40");
+  moundGradient.addColorStop(0, p.groundAccentA);
+  moundGradient.addColorStop(1, p.vegetationPrimary);
   ctx.fillStyle = moundGradient;
   ctx.beginPath();
   ctx.ellipse(0, 0, PLATFORM_RADIUS, PLATFORM_RADIUS * 0.62, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#a89876";
+  ctx.fillStyle = p.rock;
   for (const [px, py] of [
     [-11, 3],
     [10, 4],
@@ -769,10 +896,9 @@ export function drawRangeCircle(ctx: CanvasRenderingContext2D, center: Vector2, 
 }
 
 // ---------------------------------------------------------------------------
-// Distant landmarks + atmosphere: light haze + golden magical motes.
+// Distant landmarks + atmosphere.
 // ---------------------------------------------------------------------------
 
-/** A couple of small distant watchtower silhouettes near the treeline — used by the main menu for depth. */
 export function drawDistantSilhouettes(ctx: CanvasRenderingContext2D, timeMs: number): void {
   const positions = [
     { x: WORLD_SIZE.width * 0.16, y: 70 },
@@ -781,16 +907,16 @@ export function drawDistantSilhouettes(ctx: CanvasRenderingContext2D, timeMs: nu
   ctx.save();
   for (const pos of positions) {
     const glow = 0.5 + 0.3 * Math.sin(timeMs / 800 + pos.x);
-    ctx.fillStyle = "rgba(140,110,70,0.55)";
+    ctx.fillStyle = "rgba(90,80,60,0.55)";
     ctx.fillRect(pos.x - 4, pos.y - 18, 8, 20);
-    ctx.fillStyle = "#a8442f";
+    ctx.fillStyle = "#5a1f16";
     ctx.beginPath();
     ctx.moveTo(pos.x - 5, pos.y - 18);
     ctx.lineTo(pos.x, pos.y - 27);
     ctx.lineTo(pos.x + 5, pos.y - 18);
     ctx.closePath();
     ctx.fill();
-    ctx.fillStyle = `rgba(255,200,110,${glow})`;
+    ctx.fillStyle = `rgba(255,190,100,${glow})`;
     ctx.beginPath();
     ctx.arc(pos.x, pos.y - 12, 1.6, 0, Math.PI * 2);
     ctx.fill();
@@ -798,7 +924,7 @@ export function drawDistantSilhouettes(ctx: CanvasRenderingContext2D, timeMs: nu
   ctx.restore();
 }
 
-export function drawFog(ctx: CanvasRenderingContext2D, timeMs: number): void {
+export function drawFog(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   for (let i = 0; i < 3; i++) {
@@ -807,8 +933,8 @@ export function drawFog(ctx: CanvasRenderingContext2D, timeMs: number): void {
     const y = 100 + i * 170 + Math.cos(t * 0.7) * 40;
     const radius = 240;
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
-    gradient.addColorStop(0, PALETTE.fog);
-    gradient.addColorStop(1, "rgba(255,248,225,0)");
+    gradient.addColorStop(0, biome.palette.fogColor);
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);
@@ -825,16 +951,16 @@ const ambientMoteSeeds = Array.from({ length: AMBIENT_MOTE_COUNT }, (_, i) => ({
   phase: i,
 }));
 
-export function drawAmbientParticles(ctx: CanvasRenderingContext2D, timeMs: number): void {
+export function drawAmbientParticles(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
   ctx.save();
   for (const mote of ambientMoteSeeds) {
     const y = (mote.baseY - (timeMs / 1000) * mote.speed) % WORLD_SIZE.height;
     const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
     const x = mote.baseX + Math.sin(timeMs / 2000 + mote.phase) * 12;
-    const alpha = 0.25 + 0.25 * Math.sin(timeMs / 1500 + mote.phase * 2);
-    ctx.fillStyle = `rgba(255,224,150,${Math.max(alpha, 0.08)})`;
+    const alpha = 0.18 + 0.18 * Math.sin(timeMs / 1500 + mote.phase * 2);
+    ctx.fillStyle = hexToRgba(biome.palette.vegetationHighlight, Math.max(alpha, 0.05));
     ctx.beginPath();
-    ctx.arc(x, wrappedY, 1.5, 0, Math.PI * 2);
+    ctx.arc(x, wrappedY, 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

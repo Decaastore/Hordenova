@@ -1,6 +1,7 @@
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
+import { ACTIVE_BIOME, type BiomeDefinition } from "./biomes";
 
 /**
  * Purely decorative scenery for Whispering Woods — trees, rocks, roots,
@@ -55,21 +56,25 @@ function isClearOfPlayArea(point: Vector2): boolean {
   return true;
 }
 
-function generate(): Decoration[] {
+const ALL_DECORATION_KINDS: readonly DecorationKind[] = [
+  "TREE",
+  "ROCK",
+  "ROOT",
+  "RUIN",
+  "CRYSTAL",
+  "GRASS",
+  "FLOWER",
+  "WATER",
+  "TORCH",
+];
+
+function generate(biome: BiomeDefinition): Decoration[] {
   const rng = mulberry32(20260831);
   const decorations: Decoration[] = [];
 
-  const counts: Record<DecorationKind, number> = {
-    TREE: 26,
-    ROCK: 12,
-    ROOT: 7,
-    RUIN: 4,
-    CRYSTAL: 6,
-    GRASS: 14,
-    FLOWER: 16,
-    WATER: 3,
-    TORCH: 8,
-  };
+  const counts: Record<DecorationKind, number> = Object.fromEntries(
+    ALL_DECORATION_KINDS.map((kind) => [kind, biome.decorationWeights[kind] ?? 0]),
+  ) as Record<DecorationKind, number>;
 
   (Object.entries(counts) as [DecorationKind, number][]).forEach(([kind, count]) => {
     let placed = 0;
@@ -96,4 +101,4 @@ function generate(): Decoration[] {
   return decorations;
 }
 
-export const MAP_DECORATIONS: readonly Decoration[] = generate();
+export const MAP_DECORATIONS: readonly Decoration[] = generate(ACTIVE_BIOME);

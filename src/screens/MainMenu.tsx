@@ -56,7 +56,7 @@ const rootStyle: CSSProperties = {
   width: "100%",
   height: "100%",
   overflow: "hidden",
-  background: PALETTE.canopyDark,
+  background: PALETTE.mapBackgroundFallback,
 };
 
 const scrimStyle: CSSProperties = {

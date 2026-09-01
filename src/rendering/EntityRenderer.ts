@@ -108,9 +108,14 @@ function glowBlob(
 }
 
 /**
- * PREMIUM TIER — Visual Design System proof piece (Etapa 4). This is the
- * one tower drawn with the full material/lighting/animation treatment;
- * the other three keep their Phase-2 look until the direction is approved.
+ * PREMIUM TIER — Visual Design System proof piece. Rebuilt again per the
+ * "world needs personality" direction: the old round timber deck + gazebo
+ * canopy + chibi archer read as a toy watchtower. This is a heavy siege
+ * structure instead — a gnarled, iron-banded trunk mounting a ballista,
+ * with a small hooded operator crouched behind it (part of the machine,
+ * not the focal point). Silhouette is deliberately horizontal (the swept
+ * ballista arms) so it reads distinctly from the other three towers'
+ * vertical silhouettes even before it fires.
  *
  * `readiness` (0 = just fired, 1 = fully charged) comes straight from the
  * tower's real cooldown state, so the bow visibly draws tighter as the
@@ -127,190 +132,238 @@ function drawIronwood(
   attackFlashMs: number,
   readiness: number,
 ): void {
-  drawContactShadow(ctx, 19, 8, 0.4);
+  drawContactShadow(ctx, 20, 9, 0.42);
 
-  // --- Deck: timber, matte, grain-lined, shaded top-left → bottom-right. ---
-  const deckGradient = ctx.createLinearGradient(-14, -6, 11, 8);
-  deckGradient.addColorStop(0, "#a9855a");
-  deckGradient.addColorStop(0.5, "#7a5433");
-  deckGradient.addColorStop(1, "#54371e");
-  ctx.fillStyle = deckGradient;
+  // --- Gnarled root base — an irregular mound, not a clean ellipse. ---
+  const baseGradient = ctx.createLinearGradient(-16, -8, 15, 10);
+  baseGradient.addColorStop(0, "#6b5636");
+  baseGradient.addColorStop(1, "#221a10");
+  ctx.fillStyle = baseGradient;
   ctx.beginPath();
-  ctx.ellipse(0, 2, 17, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#3a2412";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  ctx.strokeStyle = "rgba(58,36,18,0.35)";
-  ctx.lineWidth = 0.8;
-  for (let i = 0; i < 3; i++) {
-    ctx.beginPath();
-    ctx.ellipse(0, 2, 13 - i * 4, 7.4 - i * 2.2, 0, 0.2, Math.PI - 0.2);
-    ctx.stroke();
-  }
-  rimHighlight(
-    ctx,
-    () => ctx.ellipse(0, 2, 17, 10, 0, Math.PI * 1.05, Math.PI * 1.65),
-    "#f0d7a8",
-    1.3,
-    0.5,
-  );
-
-  // --- Corner posts: wood shaft + iron collar (a visibly different material). ---
-  const sway = Math.sin(timeMs / 1600) * 0.04;
-  const postPositions: [number, number][] = [
-    [-13, 4],
-    [13, 4],
-    [-10, -6],
-    [10, -6],
-  ];
-  for (const [px, py] of postPositions) {
-    ctx.fillStyle = theme.secondary;
-    ctx.fillRect(px - 1.6, py - 20, 3.2, 22);
-    ctx.fillStyle = "rgba(232,222,196,0.4)";
-    ctx.fillRect(px - 1.6, py - 20, 1, 22);
-    ctx.fillStyle = "#382a1c";
-    ctx.fillRect(px - 1.9, py - 5, 3.8, 2.4);
-    ctx.fillStyle = "rgba(210,200,175,0.5)";
-    ctx.fillRect(px - 1.9, py - 5, 3.8, 0.7);
-  }
-
-  // A small level-lit rune on the front-right post — the only per-level
-  // ornament change beyond scale, so growth still reads as "stronger".
-  const runeGlow = 0.2 + Math.min(level, 5) * 0.13;
-  ctx.fillStyle = `rgba(212,247,154,${runeGlow})`;
-  ctx.beginPath();
-  ctx.arc(10, -14, 1.6, 0, Math.PI * 2);
-  ctx.fill();
-
-  // --- Living canopy roof — two-tone foliage shaded against the light. ---
-  glowBlob(ctx, 0, -24, 15 + level * 1.1, theme.glow);
-  ctx.save();
-  ctx.rotate(sway);
-  const roofGradient = ctx.createLinearGradient(-17, -34, 17, -18);
-  roofGradient.addColorStop(0, "#3f7a28");
-  roofGradient.addColorStop(1, theme.secondary);
-  ctx.fillStyle = roofGradient;
-  ctx.beginPath();
-  ctx.moveTo(0, -34 - level);
-  ctx.lineTo(17, -18);
-  ctx.lineTo(-17, -18);
+  ctx.moveTo(-18, 6);
+  ctx.lineTo(-15, -3);
+  ctx.lineTo(-6, -8);
+  ctx.lineTo(4, -7);
+  ctx.lineTo(15, -3);
+  ctx.lineTo(18, 6);
+  ctx.lineTo(9, 10);
+  ctx.lineTo(-9, 10);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = "#150e07";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
   rimHighlight(
     ctx,
     () => {
       ctx.beginPath();
-      ctx.moveTo(0, -34 - level);
-      ctx.lineTo(-17, -18);
+      ctx.moveTo(-15, -3);
+      ctx.lineTo(-6, -8);
+      ctx.lineTo(4, -7);
     },
-    "#c9f78f",
-    1.1,
-    0.5,
+    "#c9a878",
+    1,
+    0.4,
   );
-
-  const clusters = 3 + Math.min(level, 5);
-  for (let i = 0; i < clusters; i++) {
-    const angle = (i / clusters) * Math.PI * 2 + timeMs / 3000;
-    const r = 5.5 + (i % 2) * 2;
-    const facingLight = Math.cos(angle - 2.4) > 0.1;
-    ctx.fillStyle = facingLight ? theme.accent : theme.primary;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * 15, -19 + Math.sin(angle) * 3, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-  ctx.fillStyle = theme.accent;
+  // Moss patches — this structure grew out of the ground, it wasn't built on top of it.
+  ctx.fillStyle = "rgba(110,140,60,0.4)";
   ctx.beginPath();
-  ctx.arc(0, -33 - level, 3, 0, Math.PI * 2);
+  ctx.ellipse(-8, 4, 4, 2, 0.3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(7, 5, 3, 1.7, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  // Root tendrils reaching into the terrain around it.
+  ctx.strokeStyle = "#221a10";
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-17, 4);
+  ctx.quadraticCurveTo(-23, 8, -27, 6);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(16, 5);
+  ctx.quadraticCurveTo(22, 9, 26, 7);
+  ctx.stroke();
 
-  // --- The archer standing watch beneath the canopy. ---
+  // --- Trunk: thick, twisted, wrapped in iron bands. ---
+  const sway = Math.sin(timeMs / 2200) * 0.022;
+  ctx.save();
+  ctx.rotate(sway);
+
+  const trunkGradient = ctx.createLinearGradient(-8, -32, 7, 0);
+  trunkGradient.addColorStop(0, "#8a6f47");
+  trunkGradient.addColorStop(0.5, "#4a3a24");
+  trunkGradient.addColorStop(1, "#1e160c");
+  ctx.fillStyle = trunkGradient;
+  ctx.beginPath();
+  ctx.moveTo(-6, 2);
+  ctx.quadraticCurveTo(-10, -15, -5, -32 - level * 0.6);
+  ctx.lineTo(5, -32 - level * 0.6);
+  ctx.quadraticCurveTo(10, -15, 6, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#150e07";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  ctx.strokeStyle = "rgba(20,14,7,0.45)";
+  ctx.lineWidth = 0.8;
+  for (const x of [-4.5, -1.5, 1.5, 4.5]) {
+    ctx.beginPath();
+    ctx.moveTo(x * 0.85, -1);
+    ctx.lineTo(x, -30 - level * 0.6);
+    ctx.stroke();
+  }
+
+  // Iron reinforcement bands — a visibly different material from the bark.
+  for (const bandY of [-9, -20 - level * 0.4]) {
+    ctx.fillStyle = "#33363a";
+    ctx.fillRect(-8.5, bandY, 17, 3);
+    ctx.fillStyle = "rgba(215,220,225,0.35)";
+    ctx.fillRect(-8.5, bandY, 17, 1);
+    ctx.fillStyle = "#161719";
+    ctx.fillRect(-8.5, bandY + 2, 17, 1);
+  }
+
+  // Carved rune — the only strong saturated color on the whole structure,
+  // brighter with level (spec: cada tipo identificável, poder visível).
+  const runeGlow = 0.3 + Math.min(level, 5) * 0.11 + 0.15 * Math.sin(timeMs / 500);
+  glowBlob(ctx, 0, -15, 9 + level * 0.6, theme.glow);
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = runeGlow;
+  ctx.beginPath();
+  ctx.moveTo(0, -18.5);
+  ctx.lineTo(2.2, -14.5);
+  ctx.lineTo(-2.2, -14.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // --- Ballista mount: heavy, horizontal silhouette — the tower's identity. ---
+  const mountY = -34 - level * 0.6;
   const firing = attackFlashMs < 160;
   const recoil = firing ? 1 - attackFlashMs / 160 : 0;
   const releaseFlash = attackFlashMs < 90 ? 1 - attackFlashMs / 90 : 0;
-  const drawTension = 0.25 + Math.max(0, Math.min(1, readiness)) * 0.85;
-  const idleSway = Math.sin(timeMs / 500) * 0.05;
-  const breath = Math.sin(timeMs / 900) * 0.03;
+  const drawTension = 0.3 + Math.max(0, Math.min(1, readiness)) * 0.8;
 
   ctx.save();
-  ctx.translate(-recoil * 1.4, -3 + recoil * 0.5);
-  ctx.scale(1, 1 + breath);
+  ctx.translate(0, mountY);
 
-  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.fillStyle = "#241a10";
   ctx.beginPath();
-  ctx.ellipse(1, 6, 5, 2.2, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Cloak — cloth material: matte, shaded, with fold lines.
-  const cloakGradient = ctx.createLinearGradient(-5, -9, 5, 6);
-  cloakGradient.addColorStop(0, theme.primary);
-  cloakGradient.addColorStop(1, theme.secondary);
-  ctx.fillStyle = cloakGradient;
-  ctx.beginPath();
-  ctx.moveTo(0, -9);
-  ctx.lineTo(5, 6);
-  ctx.lineTo(-5, 6);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.22)";
-  ctx.lineWidth = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(-1.5, -4);
-  ctx.lineTo(-2.4, 5);
-  ctx.moveTo(1.6, -3);
-  ctx.lineTo(2.5, 5);
-  ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.2)";
-  ctx.beginPath();
-  ctx.moveTo(-3, -6);
-  ctx.lineTo(-3.8, 3);
-  ctx.stroke();
-
-  ctx.fillStyle = "#e8c090";
-  ctx.beginPath();
-  ctx.arc(0, -11, 3.4, 0, Math.PI * 2);
-  ctx.fill();
-  const hoodGradient = ctx.createLinearGradient(-3.6, -15, 3.6, -9);
-  hoodGradient.addColorStop(0, theme.primary);
-  hoodGradient.addColorStop(1, theme.secondary);
-  ctx.fillStyle = hoodGradient;
-  ctx.beginPath();
-  ctx.arc(0, -12.5, 3.6, Math.PI, 0);
+  ctx.ellipse(0, 3, 11, 4, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.save();
-  ctx.rotate(idleSway);
-  const nockPullback = 1.5 * drawTension;
-  ctx.strokeStyle = "#c8a878";
-  ctx.lineWidth = 1.3;
+  ctx.translate(-recoil * 2.2, recoil * 0.4);
+
+  const armSpread = 18 + level * 0.8;
+  const armCurve = 6 + drawTension * 3;
+  ctx.strokeStyle = "#4a3a24";
+  ctx.lineWidth = 2.8;
+  ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.arc(6, -3, 6, Math.PI * 0.65, Math.PI * 1.35);
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(-armSpread * 0.65, -armCurve, -armSpread + drawTension * 4, 2);
   ctx.stroke();
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 0.6;
   ctx.beginPath();
-  ctx.moveTo(6, -8.6);
-  ctx.lineTo(6 - nockPullback, -3);
-  ctx.lineTo(6, 2.6);
+  ctx.moveTo(0, 0);
+  ctx.quadraticCurveTo(armSpread * 0.65, -armCurve, armSpread - drawTension * 4, 2);
+  ctx.stroke();
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-armSpread * 0.65, -armCurve, -armSpread + drawTension * 4, 2);
+    },
+    "#c9a878",
+    1,
+    0.4,
+  );
+
+  // Taut string, pulled back toward the operator as tension builds.
+  const stringPullback = 9 * drawTension;
+  ctx.strokeStyle = "rgba(225,215,195,0.85)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-armSpread + drawTension * 4, 2);
+  ctx.lineTo(0, 3 + stringPullback);
+  ctx.lineTo(armSpread - drawTension * 4, 2);
   ctx.stroke();
 
   if (releaseFlash > 0) {
     ctx.save();
     ctx.globalAlpha = releaseFlash;
-    drawMagicCore(ctx, 6 - nockPullback, -3, 7 * releaseFlash, theme.accent);
+    drawMagicCore(ctx, 0, 3 + stringPullback, 8 * releaseFlash, theme.accent);
     ctx.restore();
   } else if (readiness > 0.92) {
     const pulse = 0.5 + 0.5 * Math.sin(timeMs / 220);
     ctx.fillStyle = STATUS_COLORS.readyPulse;
     ctx.globalAlpha = 0.35 + 0.5 * pulse;
     ctx.beginPath();
-    ctx.arc(6 - nockPullback, -3, 1.1, 0, Math.PI * 2);
+    ctx.arc(0, 3 + stringPullback, 1.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
   }
+
+  // Loading mechanism — a solid block, gives the mount weight/mass.
+  const mechGradient = ctx.createLinearGradient(-3, -3, 3, 6);
+  mechGradient.addColorStop(0, "#5a4a34");
+  mechGradient.addColorStop(1, "#241a10");
+  ctx.fillStyle = mechGradient;
+  ctx.fillRect(-3.2, -2, 6.4, 7);
+  ctx.strokeStyle = "#150e07";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-3.2, -2, 6.4, 7);
+
   ctx.restore();
+
+  // --- Hooded operator, crouched behind the mechanism — small, part of
+  // the structure rather than the tower's focal point. No visible face:
+  // just a dark hood with two glowing points, more ominous than a face. ---
+  ctx.save();
+  ctx.translate(0, 7);
+  ctx.scale(0.68, 0.68);
+  const breath = 1 + Math.sin(timeMs / 900) * 0.025;
+  ctx.scale(1, breath);
+
+  const cloakGradient = ctx.createLinearGradient(-5, -7, 5, 6);
+  cloakGradient.addColorStop(0, "#4a3a24");
+  cloakGradient.addColorStop(1, "#1a1309");
+  ctx.fillStyle = cloakGradient;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(5.5, 6);
+  ctx.lineTo(-5.5, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.3)";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.moveTo(-1.6, -3);
+  ctx.lineTo(-2.6, 5);
+  ctx.moveTo(1.7, -2);
+  ctx.lineTo(2.7, 5);
+  ctx.stroke();
+
+  ctx.fillStyle = "#100b05";
+  ctx.beginPath();
+  ctx.arc(0, -9, 3.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 0.75 + 0.25 * Math.sin(timeMs / 260);
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.arc(-1.1, -9, 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(1.1, -9, 0.55, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -690,10 +743,14 @@ function roundedRect(
 }
 
 /**
- * PREMIUM TIER — Visual Design System proof piece (Etapa 4). Chitin body
- * shaded against the fixed top-left light, rim-lit shell segments, a
- * white hit-flash pop on `hitFlashMs`, and a livelier idle cycle (legs +
- * antenna twitch + body bob) than the Phase-2 version.
+ * PREMIUM TIER — Visual Design System proof piece. Rebuilt again per the
+ * "eliminate the mascote/toy feeling" direction: the old smooth ellipse
+ * body + one big cute eye read as a friendly bug. This is an angular,
+ * jagged carapace instead — dorsal spikes, forward mandibles, a cluster
+ * of small glowing eyes (alien, not cute), and sharp-jointed legs. Dark
+ * oily chitin carries almost no color; the only saturated color is the
+ * toxic-green glow at the eyes/mandible tips/joints, so the danger reads
+ * through light, not through a friendly palette.
  */
 function drawCrawler(
   ctx: CanvasRenderingContext2D,
@@ -703,67 +760,123 @@ function drawCrawler(
 ): void {
   const legPhase = Math.sin(timeMs / 110);
   const bob = Math.sin(timeMs / 220) * 0.4;
-  const antennaTwitch = Math.sin(timeMs / 260) * 0.25;
+  const mandibleTwitch = Math.sin(timeMs / 260) * 0.15;
   const hitFlash = hitFlashMs < 120 ? 1 - hitFlashMs / 120 : 0;
 
   ctx.save();
   ctx.translate(0, bob);
 
-  // Legs — matte chitin, darker than the shell.
+  // Legs — sharp-jointed (elbowed), not smooth curves: reads as scuttling, not walking.
   ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.4;
   ctx.lineCap = "round";
   for (const side of [-1, 1]) {
     for (let i = -1; i <= 1; i++) {
+      const kneeX = i * 3 + legPhase * side * 0.6;
+      const kneeY = side * 6.5;
+      const footX = i * 3 + legPhase * side;
+      const footY = side * (9 + Math.abs(legPhase) * 2.2);
       ctx.beginPath();
-      ctx.moveTo(i * 3, side * 5);
-      ctx.lineTo(i * 3 + legPhase * side, side * (8 + Math.abs(legPhase) * 2));
+      ctx.moveTo(i * 2.6, side * 4.5);
+      ctx.lineTo(kneeX, kneeY);
+      ctx.lineTo(footX, footY);
       ctx.stroke();
     }
   }
 
-  // Antennae — small idle-only detail, not present on the Phase-2 version.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(6, -3);
-  ctx.quadraticCurveTo(9, -6 + antennaTwitch, 10.5, -5 + antennaTwitch);
-  ctx.moveTo(6, 1);
-  ctx.quadraticCurveTo(9, 3 - antennaTwitch, 10.5, 4 - antennaTwitch);
-  ctx.stroke();
-
-  // Body — glossy chitin, shaded top-left (lit) to bottom-right (shadow).
-  const bodyGradient = ctx.createRadialGradient(-3, -2.5, 1, 0, 0, 10);
+  // Body — an elongated, angular carapace (not an ellipse): jagged silhouette front-to-back.
+  const bodyGradient = ctx.createLinearGradient(-4, -3, 6, 4);
   bodyGradient.addColorStop(0, theme.accent);
-  bodyGradient.addColorStop(0.45, theme.body);
+  bodyGradient.addColorStop(0.35, theme.body);
   bodyGradient.addColorStop(1, theme.dark);
   ctx.fillStyle = bodyGradient;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 9, 6.5, 0, 0, Math.PI * 2);
+  ctx.moveTo(11, 0);
+  ctx.lineTo(6, -5.5);
+  ctx.lineTo(-2, -6.5);
+  ctx.lineTo(-9, -3.5);
+  ctx.lineTo(-10.5, 0);
+  ctx.lineTo(-9, 3.5);
+  ctx.lineTo(-2, 6.5);
+  ctx.lineTo(6, 5.5);
+  ctx.closePath();
   ctx.fill();
-  rimHighlight(ctx, () => ctx.ellipse(0, 0, 9, 6.5, 0, Math.PI * 1.1, Math.PI * 1.7), "#ffffff", 1, 0.35);
+  ctx.strokeStyle = "#000000";
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(6, -5.5);
+      ctx.lineTo(-2, -6.5);
+      ctx.lineTo(-9, -3.5);
+    },
+    theme.accent,
+    0.8,
+    0.3,
+  );
 
-  // Overlapping shell segments — each with its own tiny lit/shadow split,
-  // the "material" cue that distinguishes this from a flat blob.
-  for (const x of [-4, 0, 4]) {
-    ctx.fillStyle = theme.dark;
+  // Dorsal spikes along the back ridge — the silhouette cue that reads
+  // "dangerous" even in a small on-screen size.
+  ctx.fillStyle = theme.dark;
+  for (const [bx, by, h] of [
+    [-6, -5.2, 4.5],
+    [-1, -6.4, 5.5],
+    [4, -5.5, 4.5],
+  ] as const) {
     ctx.beginPath();
-    ctx.arc(x, -1, 1.9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "rgba(255,255,255,0.28)";
-    ctx.beginPath();
-    ctx.arc(x - 0.5, -1.6, 0.7, 0, Math.PI * 2);
+    ctx.moveTo(bx - 1.6, by);
+    ctx.lineTo(bx, by - h);
+    ctx.lineTo(bx + 1.6, by);
+    ctx.closePath();
     ctx.fill();
   }
 
+  // Mandibles — reaching forward, twitching, an explicit threat cue absent before.
+  ctx.save();
+  ctx.translate(9, 0);
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 1.6;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(0, -1.5);
+  ctx.quadraticCurveTo(4, -3.5 - mandibleTwitch, 5.5, -1 - mandibleTwitch);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(0, 1.5);
+  ctx.quadraticCurveTo(4, 3.5 + mandibleTwitch, 5.5, 1 + mandibleTwitch);
+  ctx.stroke();
   ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = 0.7;
   ctx.beginPath();
-  ctx.arc(6, -2, 2, 0, Math.PI * 2);
+  ctx.arc(5.5, -1 - mandibleTwitch, 0.8, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.beginPath();
-  ctx.arc(6.6, -2.6, 0.6, 0, Math.PI * 2);
+  ctx.arc(5.5, 1 + mandibleTwitch, 0.8, 0, Math.PI * 2);
   ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  // Eye cluster — several small glowing points instead of one cute round
+  // eye: reads as alien/insectile rather than a mascot's face.
+  const eyeFlicker = 0.65 + 0.35 * Math.sin(timeMs / 300);
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = eyeFlicker;
+  for (const [ex, ey, er] of [
+    [4.5, -2, 1.1],
+    [5.5, 0, 1.3],
+    [4.5, 2, 1.1],
+    [2, -3.2, 0.7],
+    [2, 3.2, 0.7],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(ex, ey, er, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
 
   ctx.restore();
 
@@ -773,7 +886,7 @@ function drawCrawler(
     ctx.globalAlpha = hitFlash * 0.85;
     ctx.fillStyle = STATUS_COLORS.hitFlash;
     ctx.beginPath();
-    ctx.ellipse(0, bob, 9.4, 6.9, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, bob, 10.5, 7, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
