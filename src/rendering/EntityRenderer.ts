@@ -67,12 +67,12 @@ export function drawTower(
   ctx.translate(tower.position.x + 12 * growth, tower.position.y + 12 * growth);
   ctx.beginPath();
   ctx.arc(0, 0, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(10,8,16,0.85)";
+  ctx.fillStyle = "rgba(43,29,18,0.88)";
   ctx.fill();
   ctx.strokeStyle = theme.accent;
   ctx.lineWidth = 1;
   ctx.stroke();
-  ctx.fillStyle = "#f1ecff";
+  ctx.fillStyle = "#fdf6e8";
   ctx.font = "bold 9px system-ui, sans-serif";
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
@@ -267,7 +267,7 @@ function drawStormcaller(
   timeMs: number,
 ): void {
   // Stone pillar with glowing rune bands.
-  ctx.fillStyle = "#2a2436";
+  ctx.fillStyle = "#5a4a38";
   ctx.fillRect(-5, -20, 10, 26);
   ctx.fillStyle = theme.primary;
   for (let i = 0; i < 3; i++) {
@@ -428,6 +428,27 @@ function drawBrute(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["B
   ctx.ellipse(-2, 7, 6, 3.5, 0.2, 0, Math.PI * 2);
   ctx.fill();
 
+  // Riveted chest plate — armored bulk, not just a bigger blob.
+  ctx.fillStyle = "#8a8272";
+  ctx.beginPath();
+  ctx.moveTo(-6, -6);
+  ctx.lineTo(6, -5);
+  ctx.lineTo(4, 6);
+  ctx.lineTo(-4, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = theme.dark;
+  for (const [px, py] of [
+    [-4, -3],
+    [3, -2],
+    [-2, 3],
+    [2, 4],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(px, py, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.fillStyle = theme.accent;
   ctx.beginPath();
   ctx.moveTo(13, -3);
@@ -463,6 +484,10 @@ function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_TH
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
   ctx.arc(-4, 0, 3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.arc(-4, -1.2, 1.1, 0, Math.PI * 2);
   ctx.fill();
 }
 

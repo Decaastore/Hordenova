@@ -51,7 +51,7 @@ const overlayStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  background: "radial-gradient(circle at 50% 40%, rgba(60,15,15,0.35), rgba(6,4,9,0.92) 70%)",
+  background: "radial-gradient(circle at 50% 40%, rgba(90,30,20,0.4), rgba(28,18,10,0.9) 70%)",
   zIndex: 3,
 };
 
@@ -59,7 +59,7 @@ const cardStyle: CSSProperties = {
   padding: "30px 40px",
   borderRadius: 14,
   border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: `linear-gradient(160deg, rgba(24,17,26,0.97), rgba(11,8,14,0.98))`,
+  background: `linear-gradient(160deg, rgba(54,36,22,0.97), rgba(30,20,12,0.98))`,
   boxShadow: "0 0 60px rgba(226,87,74,0.15), 0 20px 50px rgba(0,0,0,0.6)",
   color: PALETTE.uiText,
   textAlign: "center",
@@ -89,7 +89,7 @@ const primaryButtonStyle: CSSProperties = {
   padding: "11px 26px",
   borderRadius: 8,
   border: `1px solid ${PALETTE.uiAccent}`,
-  background: "rgba(201,168,255,0.15)",
+  background: "rgba(255,210,87,0.18)",
   color: PALETTE.uiAccentBright,
   fontWeight: 700,
   fontSize: 14,

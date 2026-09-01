@@ -5,7 +5,7 @@ import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getTowerStats } from "@/entities/Tower";
-import { TOWER_THEME, ENEMY_THEME } from "./theme";
+import { PALETTE, TOWER_THEME, ENEMY_THEME } from "./theme";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -201,7 +201,13 @@ export function CanvasRenderer({
     <canvas
       ref={canvasRef}
       onClick={handleClick}
-      style={{ width: "100%", height: "100%", display: "block", cursor: "pointer" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "block",
+        cursor: "pointer",
+        backgroundColor: PALETTE.canopyDark,
+      }}
     />
   );
 }

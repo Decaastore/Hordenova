@@ -48,9 +48,9 @@ export function MenuBackground() {
       const dpr = window.devicePixelRatio || 1;
       const cssWidth = canvas.width / dpr;
       const cssHeight = canvas.height / dpr;
-      const scale = Math.max(cssWidth / WORLD_SIZE.width, cssHeight / WORLD_SIZE.height) * 1.08;
+      const scale = Math.max(cssWidth / WORLD_SIZE.width, cssHeight / WORLD_SIZE.height) * 1.02;
       const offsetX = (cssWidth - WORLD_SIZE.width * scale) / 2;
-      const offsetY = (cssHeight - WORLD_SIZE.height * scale) / 2 - 40 * scale;
+      const offsetY = (cssHeight - WORLD_SIZE.height * scale) / 2 - 12 * scale;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);

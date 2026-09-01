@@ -76,7 +76,7 @@ const panelStyle: CSSProperties = {
   padding: 14,
   borderRadius: 10,
   border: "1px solid",
-  background: `linear-gradient(160deg, rgba(22,17,31,0.97), rgba(13,10,20,0.97))`,
+  background: `linear-gradient(160deg, rgba(52,37,22,0.97), rgba(30,20,10,0.97))`,
   color: PALETTE.uiText,
   display: "flex",
   flexDirection: "column",

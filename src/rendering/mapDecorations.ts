@@ -10,7 +10,16 @@ import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
  * decorating on top of them).
  */
 
-export type DecorationKind = "TREE" | "ROCK" | "ROOT" | "RUIN" | "CRYSTAL" | "GRASS";
+export type DecorationKind =
+  | "TREE"
+  | "ROCK"
+  | "ROOT"
+  | "RUIN"
+  | "CRYSTAL"
+  | "GRASS"
+  | "FLOWER"
+  | "WATER"
+  | "TORCH";
 
 export interface Decoration {
   kind: DecorationKind;
@@ -53,6 +62,9 @@ function generate(): Decoration[] {
     RUIN: 4,
     CRYSTAL: 6,
     GRASS: 22,
+    FLOWER: 24,
+    WATER: 3,
+    TORCH: 9,
   };
 
   (Object.entries(counts) as [DecorationKind, number][]).forEach(([kind, count]) => {

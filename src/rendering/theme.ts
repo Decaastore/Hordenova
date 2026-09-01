@@ -4,41 +4,51 @@ import type { EnemyType } from "@/config/enemyStats";
 /**
  * Single shared color/identity palette for the whole visual layer — map,
  * entities, HUD and menu all pull from here so the game reads as one
- * consistent dark-fantasy world instead of "game canvas + web dashboard"
- * (Phase 2 spec section 12). Purely presentational: nothing here is a
- * gameplay number, so it lives outside config/ (which stays balance-only).
+ * consistent world (spec section 12). Purely presentational: nothing here
+ * is a gameplay number, so it lives outside config/ (which stays
+ * balance-only).
+ *
+ * Art direction: EPIC FANTASY / MEDIEVAL ADVENTURE — bright, colorful,
+ * cinematic, premium. Rich forest greens, warm gold light, natural stone
+ * and earth tones, vivid magic (violet portal, blue ice, orange fire,
+ * purple lightning). Explicitly NOT dark-fantasy/horror: no near-black
+ * grounds, no desaturated grey-on-grey, no heavy black vignette.
  */
 export const PALETTE = {
-  skyTop: "#120e1c",
-  skyBottom: "#080610",
-  forestFar: "#1c1628",
-  forestNear: "#100c1a",
-  groundShadow: "rgba(5,3,10,0.55)",
+  skyGlow: "#fbe9a8",
+  canopyLight: "#8fce5a",
+  canopyMid: "#5fa83c",
+  canopyDark: "#3d7a28",
+  groundShadow: "rgba(40,55,20,0.25)",
 
-  roadFill: "#4a405e",
-  roadFillDark: "#352c46",
-  roadEdge: "#241c33",
-  roadRut: "rgba(20,14,28,0.35)",
+  roadFill: "#d9b878",
+  roadFillLight: "#ecd39c",
+  roadEdge: "#8a6238",
+  roadRut: "rgba(120,85,45,0.32)",
 
-  slotClearing: "#2e4022",
-  slotStone: "#4a4557",
-  slotRuin: "#5a4d42",
-  slotMagic: "#3a2f5c",
+  slotClearing: "#8fce5a",
+  slotStone: "#c9bd9e",
+  slotRuin: "#b89468",
+  slotMagic: "#b980f0",
 
-  crystal: "#8ad9ff",
-  crystalWarm: "#c99bff",
-  fog: "rgba(150,140,200,0.05)",
-  vignette: "rgba(3,2,6,0.65)",
+  crystal: "#5ecdf5",
+  crystalWarm: "#ffb84a",
+  portal: "#c060f5",
+  torchFlame: "#ffa63a",
+  water: "#4fa8d8",
+  waterLight: "#a8e0f0",
+  fog: "rgba(255,248,225,0.07)",
+  vignette: "rgba(35,22,10,0.32)",
 
-  uiPanelBg: "rgba(13,10,20,0.93)",
-  uiPanelBorder: "#463a5e",
-  uiAccent: "#c9a8ff",
-  uiAccentBright: "#e9d9ff",
-  uiText: "#f1ecff",
-  uiTextDim: "#a99bc7",
-  gold: "#e8c15a",
-  danger: "#e2574a",
-  success: "#7be07b",
+  uiPanelBg: "rgba(43,29,18,0.94)",
+  uiPanelBorder: "#c9963f",
+  uiAccent: "#ffcf5e",
+  uiAccentBright: "#fff2c9",
+  uiText: "#fdf6e8",
+  uiTextDim: "#d3b98d",
+  gold: "#ffd257",
+  danger: "#e8503a",
+  success: "#7fd857",
 } as const;
 
 interface TowerTheme {
@@ -49,10 +59,10 @@ interface TowerTheme {
 }
 
 export const TOWER_THEME: Record<TowerType, TowerTheme> = {
-  IRONWOOD: { primary: "#6f9c4f", secondary: "#3c5e2c", accent: "#c8f0a0", glow: "rgba(140,220,110,0.55)" },
-  INFERNO: { primary: "#e2572b", secondary: "#7a2a12", accent: "#ffcf7a", glow: "rgba(255,130,50,0.6)" },
-  FROSTBORN: { primary: "#4fb3d9", secondary: "#1f4f66", accent: "#d5f4ff", glow: "rgba(140,220,255,0.55)" },
-  STORMCALLER: { primary: "#a05bd9", secondary: "#4a2166", accent: "#ecd6ff", glow: "rgba(200,150,255,0.6)" },
+  IRONWOOD: { primary: "#5fb83f", secondary: "#2f6b1f", accent: "#d4f79a", glow: "rgba(120,230,80,0.6)" },
+  INFERNO: { primary: "#ff6a2e", secondary: "#a8340f", accent: "#ffd875", glow: "rgba(255,140,50,0.65)" },
+  FROSTBORN: { primary: "#4ec4f0", secondary: "#1a6f96", accent: "#dcf9ff", glow: "rgba(120,220,255,0.6)" },
+  STORMCALLER: { primary: "#a860f0", secondary: "#5a2590", accent: "#ecd4ff", glow: "rgba(190,130,255,0.65)" },
 };
 
 interface EnemyTheme {
@@ -62,8 +72,8 @@ interface EnemyTheme {
 }
 
 export const ENEMY_THEME: Record<EnemyType, EnemyTheme> = {
-  CRAWLER: { body: "#5f8f4a", dark: "#33502a", accent: "#9fd97a" },
-  RUNNER: { body: "#d9c246", dark: "#7a6a20", accent: "#f5e896" },
-  BRUTE: { body: "#8a3a3a", dark: "#4a1c1c", accent: "#d97a7a" },
-  SHIELDBEARER: { body: "#5a6a8a", dark: "#2c3650", accent: "#a8bce0" },
+  CRAWLER: { body: "#7fc450", dark: "#3f7a28", accent: "#d4f79a" },
+  RUNNER: { body: "#f5d23a", dark: "#a8790f", accent: "#fff2a0" },
+  BRUTE: { body: "#c9432f", dark: "#7a2418", accent: "#f5a06a" },
+  SHIELDBEARER: { body: "#4a78c4", dark: "#1f3f7a", accent: "#b8d4f5" },
 };

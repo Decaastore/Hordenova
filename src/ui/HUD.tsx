@@ -51,7 +51,7 @@ export function HUD({ hud, onSetSpeed }: HUDProps) {
                 ...speedButtonStyle,
                 borderColor: active ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
                 color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-                background: active ? "rgba(201,168,255,0.15)" : "#17121f",
+                background: active ? "rgba(255,210,87,0.18)" : "#3a2a18",
                 boxShadow: active ? `0 0 10px ${PALETTE.uiAccent}66` : "none",
               }}
             >
@@ -91,7 +91,7 @@ const barStyle: CSSProperties = {
   justifyContent: "space-between",
   alignItems: "center",
   padding: "9px 22px",
-  background: `linear-gradient(180deg, ${PALETTE.uiPanelBg}, rgba(10,8,16,0.97))`,
+  background: `linear-gradient(180deg, ${PALETTE.uiPanelBg}, rgba(28,18,10,0.97))`,
   borderBottom: `1px solid ${PALETTE.uiPanelBorder}`,
   boxShadow: "0 2px 14px rgba(0,0,0,0.5)",
   gap: 18,
