@@ -145,7 +145,7 @@ export function drawDecorations(ctx: CanvasRenderingContext2D, biome: BiomeDefin
   }
 }
 
-function drawTree(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition): void {
+export function drawTree(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition): void {
   const p = biome.palette;
   ctx.fillStyle = "rgba(10,14,6,0.32)";
   ctx.beginPath();
@@ -526,31 +526,101 @@ export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]
   strokeSmoothedCenterline(ctx, fill.smoothed);
   ctx.setLineDash([]);
 
+  drawRoadSurfaceDetail(ctx, fill, biome);
   drawRoadEdgeGrowth(ctx, fill, biome);
 
   ctx.restore();
 }
 
 /**
- * Small rocks/roots planted straddling the road's edge at sparse,
+ * Worn dirt patches + fallen leaves scattered ON the road surface itself
+ * (clipped to the road polygon) — the difference between "a flat colored
+ * ribbon" and "a trail people/monsters have actually walked", per the
+ * direction's "pequenas áreas desgastadas" / "folhas" requirements.
+ */
+function drawRoadSurfaceDetail(ctx: CanvasRenderingContext2D, fill: OrganicRoad, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  ctx.save();
+  fillRibbon(ctx, fill.left, fill.right);
+  ctx.clip();
+
+  const step = 5;
+  for (let i = 2; i < fill.smoothed.length - 2; i += step) {
+    const left = fill.left[i]!;
+    const right = fill.right[i]!;
+    const h1 = hashPoint(i, 1, 21.7);
+    const h2 = hashPoint(i, 2, 33.1);
+    const h3 = hashPoint(i, 3, 47.9);
+
+    // Worn dirt patch — soft, irregular, darker than the road fill.
+    if (h1 > 0.62) {
+      const t = h2;
+      const px = left.x + (right.x - left.x) * t;
+      const py = left.y + (right.y - left.y) * t;
+      const r = 6 + h3 * 7;
+      const patch = ctx.createRadialGradient(px, py, 0, px, py, r);
+      patch.addColorStop(0, hexToRgba(p.roadEdge, 0.4));
+      patch.addColorStop(1, hexToRgba(p.roadEdge, 0));
+      ctx.fillStyle = patch;
+      ctx.beginPath();
+      ctx.arc(px, py, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // A fallen leaf, biome-colored, resting on the path.
+    if (h2 > 0.75) {
+      const t = h1;
+      const px = left.x + (right.x - left.x) * t;
+      const py = left.y + (right.y - left.y) * t;
+      const leafColors = [p.vegetationPrimary, p.vegetationSecondary, p.accentWarm];
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(h3 * Math.PI * 2);
+      ctx.fillStyle = leafColors[Math.floor(h3 * leafColors.length) % leafColors.length]!;
+      ctx.globalAlpha = 0.75;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 2.6, 1.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
+
+/**
+ * Small rocks/roots/grass planted straddling the road's edge at sparse,
  * deterministic points — this is what makes the path read as "terrain
  * with a trail worn through it" instead of "a road drawn on top of a
- * green rectangle".
+ * green rectangle". Grass tufts are nudged slightly INWARD onto the road
+ * fill itself (not just sitting beside it) so vegetation visibly
+ * encroaches on the trail in a few spots, per the direction's
+ * "vegetação invadindo algumas bordas".
  */
 function drawRoadEdgeGrowth(ctx: CanvasRenderingContext2D, road: OrganicRoad, biome: BiomeDefinition): void {
-  const step = 9;
+  const step = 7;
   for (let i = 4; i < road.smoothed.length - 4; i += step) {
     const side = i % (step * 2) < step ? "left" : "right";
     const edgePoint = side === "left" ? road.left[i]! : road.right[i]!;
+    const center = road.smoothed[i]!;
     const h = hashPoint(i, side === "left" ? 1 : 2, 8.3);
+    const kind = h > 0.68 ? "ROOT" : h > 0.4 ? "ROCK" : "GRASS";
+
     ctx.save();
-    ctx.translate(edgePoint.x, edgePoint.y);
-    ctx.rotate(h * Math.PI * 2);
-    ctx.scale(0.45 + h * 0.25, 0.45 + h * 0.25);
-    if (h > 0.5) {
-      drawRoot(ctx, biome);
+    if (kind === "GRASS") {
+      // Pull 30% of the way toward the road center — this tuft visibly
+      // grows onto the path surface, not just beside it.
+      const gx = edgePoint.x + (center.x - edgePoint.x) * 0.3;
+      const gy = edgePoint.y + (center.y - edgePoint.y) * 0.3;
+      ctx.translate(gx, gy);
+      ctx.rotate(h * Math.PI * 2);
+      ctx.scale(0.55 + h * 0.25, 0.55 + h * 0.25);
+      drawGrassTuft(ctx, biome);
     } else {
-      drawRock(ctx, { kind: "ROCK", position: { x: 0, y: 0 }, scale: 1, rotation: 0, variant: Math.floor(h * 2) }, biome);
+      ctx.translate(edgePoint.x, edgePoint.y);
+      ctx.rotate(h * Math.PI * 2);
+      ctx.scale(0.45 + h * 0.25, 0.45 + h * 0.25);
+      if (kind === "ROOT") drawRoot(ctx, biome);
+      else drawRock(ctx, { kind: "ROCK", position: { x: 0, y: 0 }, scale: 1, rotation: 0, variant: Math.floor(h * 2) }, biome);
     }
     ctx.restore();
   }
@@ -561,10 +631,10 @@ function drawRoadEdgeGrowth(ctx: CanvasRenderingContext2D, road: OrganicRoad, bi
  * start/end waypoints (not moved — just where the ornate set-piece is
  * drawn) so they stay comfortably inside frame on a "cover"-fit
  * cinematic background instead of getting clipped at the world's edge.
- * These two set-pieces keep a fixed, biome-independent magic identity
- * (violet portal, gold trim) since they're the game's own landmarks, not
- * terrain — but the gate's stonework now pulls from the biome's rock
- * tones so it still looks built from the local ground.
+ * The portal keeps a fixed, biome-independent magic identity (violet,
+ * gold trim) since it's the game's own landmark, not terrain — the
+ * fortress's stonework and vegetation pull from the biome so it still
+ * looks built from (and reclaimed by) the local ground.
  */
 const ENDPOINT_INSET = 130;
 
@@ -582,7 +652,7 @@ export function drawPathEndpoints(
   const end = path[path.length - 1]!;
   const prev = path[path.length - 2]!;
   const endDir = normalize(end.x - prev.x, end.y - prev.y);
-  drawFortressGate(ctx, { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, biome, timeMs);
+  drawFortress(ctx, { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, biome, timeMs, 1);
 }
 
 function normalize(x: number, y: number): Vector2 {
@@ -590,7 +660,7 @@ function normalize(x: number, y: number): Vector2 {
   return { x: x / length, y: y / length };
 }
 
-function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeMs: number): void {
+export function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeMs: number): void {
   ctx.save();
   ctx.translate(position.x, position.y);
 
@@ -631,78 +701,272 @@ function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeM
   ctx.restore();
 }
 
-function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, biome: BiomeDefinition, timeMs: number): void {
+/**
+ * An ancient fortress, half-reclaimed by the forest — the map's other
+ * major landmark alongside the portal, now built to actually earn that
+ * role (imposing scale, a tall rear keep, broken/weathered stonework,
+ * ivy climbing the walls, torchlight, banners). `scale` lets the same
+ * set piece serve both the small in-game endpoint (scale 1) and a much
+ * larger cinematic version in the main menu.
+ *
+ * Biome-driven (stone + vegetation colors), so this reads as "built from
+ * the local ground" in any biome without changing shape — a true
+ * per-biome fortress silhouette (e.g. obsidian spires for Terras
+ * Vulcânicas, ice-locked towers for Tundra) is a natural next step: swap
+ * this function for a `biome.id`-keyed dispatch the same way tower/enemy
+ * types already dispatch on `type`, without touching any caller.
+ */
+export function drawFortress(
+  ctx: CanvasRenderingContext2D,
+  position: Vector2,
+  biome: BiomeDefinition,
+  timeMs: number,
+  scale: number,
+): void {
   const p = biome.palette;
   ctx.save();
   ctx.translate(position.x, position.y);
+  ctx.scale(scale, scale);
 
-  ctx.fillStyle = "rgba(10,10,4,0.35)";
+  // Stone platform the fortress stands on, with roots breaking through cracks.
+  ctx.fillStyle = "rgba(8,8,3,0.4)";
   ctx.beginPath();
-  ctx.ellipse(0, 14, 46, 13, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 16, 58, 15, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = p.rock;
+  ctx.beginPath();
+  ctx.ellipse(0, 12, 54, 13, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 1;
+  for (const [sx, sy, ex, ey] of [
+    [-40, 10, -28, 16],
+    [22, 8, 36, 14],
+    [-6, 16, 4, 20],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = biome.palette.vegetationDark;
+  ctx.lineWidth = 2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-46, 14);
+  ctx.quadraticCurveTo(-52, 18, -58, 15);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(44, 13);
+  ctx.quadraticCurveTo(50, 17, 57, 14);
+  ctx.stroke();
 
-  const wallGradient = ctx.createLinearGradient(0, -46, 0, 20);
+  const wallGradient = ctx.createLinearGradient(0, -58, 0, 22);
   wallGradient.addColorStop(0, p.rock);
   wallGradient.addColorStop(1, p.rockDark);
 
-  for (const side of [-1, 1]) {
+  // --- Rear keep: a tall tower rising behind the gate, drawn first so the
+  // front walls occlude its base — this is what gives the fortress real
+  // height/grandeur instead of reading as a single flat gate. ---
+  ctx.save();
+  ctx.globalAlpha = 0.92;
+  const keepGradient = ctx.createLinearGradient(-14, -108, 14, -30);
+  keepGradient.addColorStop(0, p.rock);
+  keepGradient.addColorStop(1, p.rockDark);
+  ctx.fillStyle = keepGradient;
+  ctx.beginPath();
+  ctx.moveTo(-15, -28);
+  ctx.lineTo(-13, -95);
+  ctx.lineTo(0, -110);
+  ctx.lineTo(13, -95);
+  ctx.lineTo(15, -28);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = p.rock;
+  for (let i = -1; i <= 1; i++) ctx.fillRect(-11 + (i + 1) * 8 - 3, -92, 5, 7);
+  const keepFlicker = 0.55 + 0.4 * Math.sin(timeMs / 500);
+  ctx.fillStyle = `rgba(255,190,110,${keepFlicker})`;
+  ctx.beginPath();
+  ctx.arc(0, -60, 2.6, 0, Math.PI * 2);
+  ctx.fill();
+  drawBanner(ctx, 0, -110, biome, timeMs, 1.1);
+  ctx.restore();
+
+  // --- Two flanking towers, weathered — irregular crenellations instead
+  // of a uniform comb, so the silhouette reads as ancient/broken. ---
+  for (const side of [-1, 1] as const) {
     ctx.save();
-    ctx.translate(side * 30, 0);
+    ctx.translate(side * 34, 0);
+
     ctx.fillStyle = wallGradient;
-    ctx.fillRect(-11, -38, 22, 54);
+    ctx.fillRect(-12, -42, 24, 58);
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-12, -42, 24, 58);
+
+    // Broken crenellations: heights vary, one tooth missing entirely.
     ctx.fillStyle = p.rock;
-    for (let i = -1; i <= 1; i++) ctx.fillRect(-11 + (i + 1) * 7 - 3, -42, 5, 6);
+    const teeth = [7, 5, 0, 6, 7];
+    for (let i = 0; i < teeth.length; i++) {
+      const h = teeth[i]!;
+      if (h === 0) continue;
+      ctx.fillRect(-12 + i * 5, -42 - h, 4.2, h + 1);
+    }
+
     ctx.fillStyle = "#5a1f16";
     ctx.beginPath();
-    ctx.moveTo(-13, -38);
-    ctx.lineTo(0, -54);
-    ctx.lineTo(13, -38);
+    ctx.moveTo(-14, -42);
+    ctx.lineTo(0, -60);
+    ctx.lineTo(14, -42);
     ctx.closePath();
     ctx.fill();
+
     const flicker = 0.6 + 0.4 * Math.sin(timeMs / 400 + side);
-    ctx.fillStyle = `rgba(255,180,90,${flicker})`;
+    const torchGlow = ctx.createRadialGradient(0, -22, 0, 0, -22, 16);
+    torchGlow.addColorStop(0, `rgba(255,180,90,${0.5 * flicker})`);
+    torchGlow.addColorStop(1, "rgba(255,180,90,0)");
+    ctx.fillStyle = torchGlow;
     ctx.beginPath();
-    ctx.arc(0, -20, 3, 0, Math.PI * 2);
+    ctx.arc(0, -22, 16, 0, Math.PI * 2);
     ctx.fill();
+    ctx.fillStyle = `rgba(255,190,110,${flicker})`;
+    ctx.beginPath();
+    ctx.arc(0, -22, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // A second, lower window.
+    ctx.fillStyle = `rgba(255,170,80,${0.4 + 0.3 * Math.sin(timeMs / 350 + side * 2)})`;
+    ctx.beginPath();
+    ctx.arc(0, 2, 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawIvy(ctx, side, biome);
+    drawBanner(ctx, 0, -60, biome, timeMs, 0.85, side * 0.3);
+
     ctx.restore();
   }
 
+  // --- Central wall + gate arch. ---
   ctx.fillStyle = wallGradient;
-  ctx.fillRect(-19, -24, 38, 40);
+  ctx.fillRect(-22, -26, 44, 46);
+  ctx.strokeStyle = "rgba(0,0,0,0.25)";
+  ctx.lineWidth = 1;
+  ctx.strokeRect(-22, -26, 44, 46);
   ctx.fillStyle = p.rock;
-  for (let i = 0; i < 3; i++) ctx.fillRect(-19 + i * 13, -28, 8, 6);
+  for (let i = 0; i < 4; i++) ctx.fillRect(-22 + i * 11.5, -30, 8, 6);
 
-  const doorGradient = ctx.createLinearGradient(0, -18, 0, 16);
+  const doorGradient = ctx.createLinearGradient(0, -18, 0, 20);
   doorGradient.addColorStop(0, PALETTE.gold);
-  doorGradient.addColorStop(1, "#7a4a1a");
+  doorGradient.addColorStop(1, "#6a3f16");
   ctx.fillStyle = doorGradient;
   ctx.beginPath();
-  ctx.moveTo(-14, 16);
-  ctx.lineTo(-14, -4);
-  ctx.quadraticCurveTo(0, -20, 14, -4);
-  ctx.lineTo(14, 16);
+  ctx.moveTo(-15, 20);
+  ctx.lineTo(-15, -5);
+  ctx.quadraticCurveTo(0, -22, 15, -5);
+  ctx.lineTo(15, 20);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "#4a2c0f";
+  ctx.strokeStyle = "#3a220c";
   ctx.lineWidth = 1.5;
   ctx.stroke();
+  // Iron banding across the door.
+  ctx.strokeStyle = "rgba(30,25,20,0.6)";
+  ctx.lineWidth = 1.2;
+  for (const y of [-2, 8]) {
+    ctx.beginPath();
+    ctx.moveTo(-14, y);
+    ctx.lineTo(14, y);
+    ctx.stroke();
+  }
 
+  // Torch flanking the gate.
+  const gateFlicker = 0.6 + 0.4 * Math.sin(timeMs / 320);
+  const gateTorchGlow = ctx.createRadialGradient(0, -24, 0, 0, -24, 20);
+  gateTorchGlow.addColorStop(0, `rgba(255,180,90,${0.5 * gateFlicker})`);
+  gateTorchGlow.addColorStop(1, "rgba(255,180,90,0)");
+  ctx.fillStyle = gateTorchGlow;
+  ctx.beginPath();
+  ctx.arc(0, -24, 20, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Ivy climbing the central wall + moss at the base — the "reclaimed by
+  // the forest" cue the direction explicitly asked for.
+  ctx.strokeStyle = biome.palette.vegetationPrimary;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-20, 18);
+  ctx.quadraticCurveTo(-23, 4, -19, -10);
+  ctx.quadraticCurveTo(-16, -18, -19, -24);
+  ctx.stroke();
+  ctx.fillStyle = biome.palette.vegetationSecondary;
+  for (const [lx, ly] of [
+    [-22, 2],
+    [-18, -8],
+    [-20, -18],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(lx, ly, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  drawBanner(ctx, 0, -26, biome, timeMs, 1, 0);
+
+  ctx.restore();
+}
+
+/** A small vine climbing a tower's outer edge — reused on both flanking towers. */
+function drawIvy(ctx: CanvasRenderingContext2D, side: 1 | -1, biome: BiomeDefinition): void {
+  const edgeX = side * 11;
+  ctx.strokeStyle = biome.palette.vegetationPrimary;
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(edgeX, 14);
+  ctx.quadraticCurveTo(edgeX + side * 4, -4, edgeX, -20);
+  ctx.stroke();
+  ctx.fillStyle = biome.palette.vegetationSecondary;
+  for (const t of [0.15, 0.45, 0.7]) {
+    const ly = 14 - t * 34;
+    ctx.beginPath();
+    ctx.arc(edgeX + side * (1.5 + Math.sin(t * 10) * 1.5), ly, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/** A cloth banner with a gentle idle flutter, hung from a pole at `(x, topY)`. */
+function drawBanner(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  topY: number,
+  biome: BiomeDefinition,
+  timeMs: number,
+  scale: number,
+  phase = 0,
+): void {
+  const flutter = Math.sin(timeMs / 480 + phase * 6 + x) * 1.6;
+  ctx.save();
+  ctx.translate(x, topY);
+  ctx.scale(scale, scale);
+  ctx.strokeStyle = biome.palette.rockDark;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  ctx.moveTo(2, -6);
+  ctx.lineTo(2, 16);
+  ctx.stroke();
   ctx.fillStyle = "#8a2a22";
   ctx.beginPath();
-  ctx.moveTo(-2, -46);
-  ctx.lineTo(6, -46);
-  ctx.lineTo(6, -30);
-  ctx.lineTo(2, -34);
-  ctx.lineTo(-2, -30);
+  ctx.moveTo(2, -5);
+  ctx.lineTo(9 + flutter, -3);
+  ctx.lineTo(8 + flutter * 1.4, 5);
+  ctx.lineTo(9 + flutter, 12);
+  ctx.lineTo(2, 10);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = p.rockDark;
-  ctx.lineWidth = 1.5;
+  ctx.fillStyle = PALETTE.gold;
   ctx.beginPath();
-  ctx.moveTo(2, -52);
-  ctx.lineTo(2, -30);
-  ctx.stroke();
-
+  ctx.arc(5.5, 4, 1.6, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 }
 

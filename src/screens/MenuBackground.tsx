@@ -1,25 +1,12 @@
 import { useEffect, useRef } from "react";
-import { WORLD_SIZE } from "@/config/gameBalance";
-import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
-import { ACTIVE_BIOME } from "@/rendering/biomes";
-import {
-  drawAmbientParticles,
-  drawBackground,
-  drawDecorations,
-  drawDistantSilhouettes,
-  drawFog,
-  drawPath,
-  drawPathEndpoints,
-  drawVignette,
-} from "@/rendering/MapRenderer";
+import { drawMenuScene, MENU_SCENE_SIZE } from "@/rendering/MenuScene";
 
 /**
- * Full-bleed cinematic backdrop for the main menu — reuses the exact same
- * scenery primitives as the in-game map (forest, road, portal/gate, fog,
- * crystals, ambient motes) so the menu and the game read as one world
- * (Phase 2 spec section 12), just composed with a "cover" fit instead of
- * the gameplay canvas's "contain" fit since there is nothing here that
- * needs to stay click-accurate.
+ * Full-bleed cinematic backdrop for the main menu — a purpose-built scene
+ * (see rendering/MenuScene.ts), not the top-down gameplay map reused at a
+ * different zoom. "Cover" fit against a fixed virtual canvas size, plus a
+ * subtle, lerped pointer-parallax so the layered depth reads even before
+ * anything on screen animates on its own.
  */
 export function MenuBackground() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -31,6 +18,8 @@ export function MenuBackground() {
     if (!ctx) return;
 
     let rafId: number;
+    const targetPointer = { x: 0, y: 0 };
+    const pointer = { x: 0, y: 0 };
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -45,26 +34,28 @@ export function MenuBackground() {
     resize();
     window.addEventListener("resize", resize);
 
+    const handlePointerMove = (event: PointerEvent) => {
+      targetPointer.x = (event.clientX / window.innerWidth) * 2 - 1;
+      targetPointer.y = (event.clientY / window.innerHeight) * 2 - 1;
+    };
+    window.addEventListener("pointermove", handlePointerMove);
+
     const draw = (timestamp: number) => {
       const dpr = window.devicePixelRatio || 1;
       const cssWidth = canvas.width / dpr;
       const cssHeight = canvas.height / dpr;
-      const scale = Math.max(cssWidth / WORLD_SIZE.width, cssHeight / WORLD_SIZE.height) * 1.02;
-      const offsetX = (cssWidth - WORLD_SIZE.width * scale) / 2;
-      const offsetY = (cssHeight - WORLD_SIZE.height * scale) / 2 - 12 * scale;
+      const scale = Math.max(cssWidth / MENU_SCENE_SIZE.width, cssHeight / MENU_SCENE_SIZE.height) * 1.02;
+      const offsetX = (cssWidth - MENU_SCENE_SIZE.width * scale) / 2;
+      const offsetY = (cssHeight - MENU_SCENE_SIZE.height * scale) / 2;
+
+      pointer.x += (targetPointer.x - pointer.x) * 0.04;
+      pointer.y += (targetPointer.y - pointer.y) * 0.04;
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale * dpr, 0, 0, scale * dpr, offsetX * dpr, offsetY * dpr);
 
-      drawBackground(ctx, ACTIVE_BIOME);
-      drawDistantSilhouettes(ctx, timestamp);
-      drawDecorations(ctx, ACTIVE_BIOME, timestamp);
-      drawPath(ctx, ENEMY_PATH, ACTIVE_BIOME);
-      drawPathEndpoints(ctx, ENEMY_PATH, ACTIVE_BIOME, timestamp);
-      drawFog(ctx, ACTIVE_BIOME, timestamp);
-      drawAmbientParticles(ctx, ACTIVE_BIOME, timestamp);
-      drawVignette(ctx, ACTIVE_BIOME);
+      drawMenuScene(ctx, timestamp, pointer);
 
       rafId = requestAnimationFrame(draw);
     };
@@ -74,6 +65,7 @@ export function MenuBackground() {
     return () => {
       cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
+      window.removeEventListener("pointermove", handlePointerMove);
     };
   }, []);
 

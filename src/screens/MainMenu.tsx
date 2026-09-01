@@ -23,6 +23,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
 
   return (
     <div style={rootStyle}>
+      <style>{PULSE_KEYFRAMES}</style>
       <MenuBackground />
       <div style={scrimStyle} />
 
@@ -30,22 +31,26 @@ export function MainMenu({ onStart }: MainMenuProps) {
 
       <div style={contentStyle}>
         <div style={titleBlockStyle}>
+          <div style={titleGlowStyle} aria-hidden="true" />
           <div style={titleStyle}>HORDENOVA</div>
           <div style={subtitleStyle}>{t("menu.subtitle")}</div>
         </div>
 
-        <button
-          onClick={onStart}
-          onMouseEnter={() => setHover(true)}
-          onMouseLeave={() => setHover(false)}
-          style={{
-            ...buttonStyle,
-            transform: hover ? "translateY(-2px) scale(1.03)" : "translateY(0) scale(1)",
-            boxShadow: hover ? buttonShadowHover : buttonShadow,
-          }}
-        >
-          <span style={buttonLabelStyle}>{t("menu.play")}</span>
-        </button>
+        <div style={playWrapStyle}>
+          <div style={playHaloStyle} aria-hidden="true" />
+          <button
+            onClick={onStart}
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            style={{
+              ...buttonStyle,
+              transform: hover ? "translateY(-2px) scale(1.05)" : "translateY(0) scale(1)",
+              boxShadow: hover ? buttonShadowHover : buttonShadow,
+            }}
+          >
+            <span style={buttonLabelStyle}>{t("menu.play")}</span>
+          </button>
+        </div>
 
         <div style={bestWaveStyle}>
           <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
@@ -55,6 +60,13 @@ export function MainMenu({ onStart }: MainMenuProps) {
     </div>
   );
 }
+
+const PULSE_KEYFRAMES = `
+@keyframes hordenova-play-halo {
+  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.1); }
+}
+`;
 
 const rootStyle: CSSProperties = {
   position: "relative",
@@ -86,8 +98,22 @@ const contentStyle: CSSProperties = {
 };
 
 const titleBlockStyle: CSSProperties = {
+  position: "relative",
   textAlign: "center",
   marginBottom: "clamp(8px, 2vh, 20px)",
+};
+
+const titleGlowStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  width: "min(720px, 80vw)",
+  height: "min(320px, 40vh)",
+  background: "radial-gradient(ellipse at center, rgba(255,210,87,0.35), rgba(255,210,87,0) 70%)",
+  filter: "blur(6px)",
+  pointerEvents: "none",
+  zIndex: -1,
 };
 
 const titleStyle: CSSProperties = {
@@ -114,12 +140,31 @@ const subtitleStyle: CSSProperties = {
   textShadow: "0 2px 6px rgba(20,12,0,0.85)",
 };
 
+const playWrapStyle: CSSProperties = {
+  position: "relative",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+};
+
+const playHaloStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  width: "min(520px, 60vw)",
+  height: "min(220px, 26vh)",
+  background: "radial-gradient(ellipse at center, rgba(255,210,87,0.45), rgba(255,210,87,0) 68%)",
+  animation: "hordenova-play-halo 2.6s ease-in-out infinite",
+  pointerEvents: "none",
+};
+
 const buttonStyle: CSSProperties = {
-  padding: "clamp(14px, 2.2vh, 20px) clamp(38px, 6.5vw, 62px)",
-  fontSize: "clamp(15px, 1.9vw, 19px)",
+  position: "relative",
+  padding: "clamp(17px, 2.7vh, 24px) clamp(46px, 8vw, 76px)",
+  fontSize: "clamp(17px, 2.2vw, 22px)",
   fontWeight: 800,
   letterSpacing: "clamp(1.5px, 0.4vw, 3px)",
-  borderRadius: 14,
+  borderRadius: 16,
   border: `2px solid #8a5a1f`,
   background: `linear-gradient(180deg, #ffe9a0 0%, ${PALETTE.gold} 42%, #d98a2a 100%)`,
   color: "#4a2a08",

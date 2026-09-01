@@ -124,7 +124,7 @@ function glowBlob(
  * the renderer from a cooldown reset) and drives the short release flash
  * + recoil kick, independent of the slower charging tell.
  */
-function drawIronwood(
+export function drawIronwood(
   ctx: CanvasRenderingContext2D,
   theme: (typeof TOWER_THEME)["IRONWOOD"],
   level: number,
@@ -752,7 +752,7 @@ function roundedRect(
  * toxic-green glow at the eyes/mandible tips/joints, so the danger reads
  * through light, not through a friendly palette.
  */
-function drawCrawler(
+export function drawCrawler(
   ctx: CanvasRenderingContext2D,
   theme: (typeof ENEMY_THEME)["CRAWLER"],
   timeMs: number,
