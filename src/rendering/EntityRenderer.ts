@@ -56,7 +56,7 @@ export function drawTower(
     ctx.strokeStyle = "#ffe9a8";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, 19 * growth, 0, Math.PI * 2);
+    ctx.arc(0, 0, 27 * growth, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
@@ -64,7 +64,7 @@ export function drawTower(
   // Small, unobtrusive level badge — the main "it got stronger" signal is
   // the scale/glow growth above; this just gives an exact number on demand.
   ctx.save();
-  ctx.translate(tower.position.x + 12 * growth, tower.position.y + 12 * growth);
+  ctx.translate(tower.position.x + 17 * growth, tower.position.y + 18 * growth);
   ctx.beginPath();
   ctx.arc(0, 0, 7, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(43,29,18,0.88)";
@@ -81,9 +81,9 @@ export function drawTower(
 }
 
 function drawPlinth(ctx: CanvasRenderingContext2D): void {
-  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  ctx.fillStyle = "rgba(0,0,0,0.38)";
   ctx.beginPath();
-  ctx.ellipse(0, 10, 13, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 15, 19, 7, 0, 0, Math.PI * 2);
   ctx.fill();
 }
 
@@ -109,45 +109,100 @@ function drawIronwood(
   level: number,
   timeMs: number,
 ): void {
-  // Gnarled roots at the base.
-  ctx.strokeStyle = theme.secondary;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  for (const angle of [-2.4, -0.7, 0.7, 2.4]) {
-    ctx.beginPath();
-    ctx.moveTo(0, 6);
-    ctx.quadraticCurveTo(Math.cos(angle) * 6, 10, Math.cos(angle) * 13, 12);
-    ctx.stroke();
+  // Round timber deck — the tower's own base, distinct from the buildable
+  // platform beneath it.
+  const deckGradient = ctx.createLinearGradient(0, 6, 0, -4);
+  deckGradient.addColorStop(0, "#6b4a2f");
+  deckGradient.addColorStop(1, "#8a6238");
+  ctx.fillStyle = deckGradient;
+  ctx.beginPath();
+  ctx.ellipse(0, 2, 17, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#4a3018";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Four corner posts holding up a small watchtower canopy.
+  const sway = Math.sin(timeMs / 1600) * 0.04;
+  ctx.fillStyle = theme.secondary;
+  const postPositions: [number, number][] = [
+    [-13, 4],
+    [13, 4],
+    [-10, -6],
+    [10, -6],
+  ];
+  for (const [px, py] of postPositions) {
+    ctx.fillRect(px - 1.6, py - 20, 3.2, 22);
   }
 
-  // Trunk.
-  const trunkGradient = ctx.createLinearGradient(0, 8, 0, -16);
-  trunkGradient.addColorStop(0, theme.secondary);
-  trunkGradient.addColorStop(1, theme.primary);
-  ctx.fillStyle = trunkGradient;
+  // Living canopy roof — glows brighter and gains leaf clusters with level.
+  glowBlob(ctx, 0, -24, 15 + level * 1.1, theme.glow);
+  ctx.save();
+  ctx.rotate(sway);
+  ctx.fillStyle = theme.secondary;
   ctx.beginPath();
-  ctx.moveTo(-6, 8);
-  ctx.quadraticCurveTo(-8, -6, -3, -16);
-  ctx.lineTo(3, -16);
-  ctx.quadraticCurveTo(8, -6, 6, 8);
+  ctx.moveTo(0, -34 - level);
+  ctx.lineTo(17, -18);
+  ctx.lineTo(-17, -18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = theme.primary;
+  const clusters = 3 + Math.min(level, 5);
+  for (let i = 0; i < clusters; i++) {
+    const angle = (i / clusters) * Math.PI * 2 + timeMs / 3000;
+    const r = 5.5 + (i % 2) * 2;
+    ctx.beginPath();
+    ctx.arc(Math.cos(angle) * 15, -19 + Math.sin(angle) * 3, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.arc(0, -33 - level, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // The archer standing watch beneath the canopy — a simple top-down
+  // figure with a visible bow, not just a colored blob.
+  const bowSway = Math.sin(timeMs / 500) * 0.15;
+  ctx.save();
+  ctx.translate(0, -3);
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.ellipse(1, 6, 5, 2.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = theme.secondary;
+  ctx.beginPath();
+  ctx.moveTo(0, -9);
+  ctx.lineTo(5, 6);
+  ctx.lineTo(-5, 6);
   ctx.closePath();
   ctx.fill();
 
-  // Living canopy — glows brighter and gains extra leaf clusters with level.
-  glowBlob(ctx, 0, -18, 14 + level * 1.2, theme.glow);
-  ctx.fillStyle = theme.primary;
-  const clusters = 2 + Math.min(level, 5);
-  for (let i = 0; i < clusters; i++) {
-    const angle = (i / clusters) * Math.PI * 2 + timeMs / 3000;
-    const r = 6 + (i % 2) * 2;
-    ctx.beginPath();
-    ctx.arc(Math.cos(angle) * 6, -18 + Math.sin(angle) * 5, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = theme.accent;
+  ctx.fillStyle = "#e8c090";
   ctx.beginPath();
-  ctx.arc(0, -19, 4, 0, Math.PI * 2);
+  ctx.arc(0, -11, 3.4, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = theme.primary;
+  ctx.beginPath();
+  ctx.arc(0, -12.5, 3.6, Math.PI, 0);
+  ctx.fill();
+
+  ctx.save();
+  ctx.rotate(bowSway);
+  ctx.strokeStyle = "#c8a878";
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  ctx.arc(6, -3, 6, Math.PI * 0.65, Math.PI * 1.35);
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 0.6;
+  ctx.beginPath();
+  ctx.moveTo(6, -8.6);
+  ctx.lineTo(6, 2.6);
+  ctx.stroke();
+  ctx.restore();
+  ctx.restore();
 }
 
 function drawInferno(
@@ -156,47 +211,76 @@ function drawInferno(
   level: number,
   timeMs: number,
 ): void {
-  // Volcanic rock base.
-  ctx.fillStyle = theme.secondary;
+  // Round stone furnace ring.
+  const stoneGradient = ctx.createRadialGradient(-3, -4, 2, 0, 0, 18);
+  stoneGradient.addColorStop(0, "#8a7a62");
+  stoneGradient.addColorStop(1, theme.secondary);
+  ctx.fillStyle = stoneGradient;
   ctx.beginPath();
-  ctx.moveTo(-10, 8);
-  ctx.lineTo(-7, -4);
-  ctx.lineTo(-2, -8);
-  ctx.lineTo(3, -6);
-  ctx.lineTo(8, -2);
-  ctx.lineTo(9, 8);
-  ctx.closePath();
+  ctx.ellipse(0, 4, 17, 10, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#4a2410";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Glowing cracks across the stone.
+  ctx.strokeStyle = `rgba(255,140,50,${0.5 + 0.3 * Math.sin(timeMs / 260)})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-11, 3);
+  ctx.lineTo(-4, 6);
+  ctx.moveTo(9, 1);
+  ctx.lineTo(13, 6);
+  ctx.stroke();
+
+  // Furnace opening.
+  const openingGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 12);
+  openingGlow.addColorStop(0, "#fff0c0");
+  openingGlow.addColorStop(0.5, theme.primary);
+  openingGlow.addColorStop(1, theme.secondary);
+  ctx.fillStyle = openingGlow;
+  ctx.beginPath();
+  ctx.ellipse(0, 1, 10, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  glowBlob(ctx, 0, -12, 16 + level * 1.4, theme.glow);
+  glowBlob(ctx, 0, -14, 17 + level * 1.4, theme.glow);
 
   // Flickering flame plume.
-  const flicker = Math.sin(timeMs / 140) * 2;
+  const flicker = Math.sin(timeMs / 140) * 2.4;
   ctx.fillStyle = theme.primary;
   ctx.beginPath();
-  ctx.moveTo(-5, -6);
-  ctx.quadraticCurveTo(-6 + flicker, -16, 0, -24 - level);
-  ctx.quadraticCurveTo(6 - flicker, -16, 5, -6);
+  ctx.moveTo(-6, -2);
+  ctx.quadraticCurveTo(-7 + flicker, -18, 0, -30 - level * 1.2);
+  ctx.quadraticCurveTo(7 - flicker, -18, 6, -2);
   ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = theme.accent;
   ctx.beginPath();
-  ctx.moveTo(-2.5, -8);
-  ctx.quadraticCurveTo(-3 + flicker * 0.6, -14, 0, -19 - level * 0.6);
-  ctx.quadraticCurveTo(3 - flicker * 0.6, -14, 2.5, -8);
+  ctx.moveTo(-3, -4);
+  ctx.quadraticCurveTo(-3.5 + flicker * 0.6, -16, 0, -24 - level * 0.8);
+  ctx.quadraticCurveTo(3.5 - flicker * 0.6, -16, 3, -4);
   ctx.closePath();
   ctx.fill();
 
+  // Smoke wisps drifting up and away.
+  ctx.fillStyle = "rgba(140,130,120,0.28)";
+  for (let i = 0; i < 2; i++) {
+    const cycle = (timeMs / 2200 + i * 0.5) % 1;
+    ctx.beginPath();
+    ctx.arc(4 + i * 3 + cycle * 6, -26 - cycle * 16, 3 + cycle * 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   // Rising embers.
-  ctx.fillStyle = "rgba(255,180,90,0.8)";
+  ctx.fillStyle = "rgba(255,180,90,0.85)";
   for (let i = 0; i < 3 + Math.min(level, 3); i++) {
-    const cycle = ((timeMs / 900 + i * 0.33) % 1);
-    const y = -6 - cycle * 22;
-    const x = Math.sin(timeMs / 500 + i * 2) * (4 + cycle * 4);
+    const cycle = (timeMs / 900 + i * 0.33) % 1;
+    const y = -8 - cycle * 26;
+    const x = Math.sin(timeMs / 500 + i * 2) * (4 + cycle * 5);
     ctx.globalAlpha = 1 - cycle;
     ctx.beginPath();
-    ctx.arc(x, y, 1.4, 0, Math.PI * 2);
+    ctx.arc(x, y, 1.5, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -208,18 +292,53 @@ function drawFrostborn(
   level: number,
   timeMs: number,
 ): void {
-  ctx.fillStyle = "rgba(180,225,255,0.25)";
+  ctx.fillStyle = "rgba(180,225,255,0.3)";
   ctx.beginPath();
-  ctx.ellipse(0, 8, 12, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 8, 16, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  glowBlob(ctx, 0, -12, 15 + level * 1.2, theme.glow);
+  // Hexagonal ice pedestal.
+  const pedestalGradient = ctx.createLinearGradient(0, 6, 0, -6);
+  pedestalGradient.addColorStop(0, "#5a92b8");
+  pedestalGradient.addColorStop(1, "#a8dcf5");
+  ctx.fillStyle = pedestalGradient;
+  ctx.beginPath();
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
+    const px = Math.cos(angle) * 15;
+    const py = Math.sin(angle) * 9 + 2;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  glowBlob(ctx, 0, -16, 17 + level * 1.3, theme.glow);
 
   // Central spire + two smaller flanking crystals, taller with level.
-  const crystalHeight = 16 + level * 1.6;
-  drawCrystalShard(ctx, 0, -crystalHeight, 6, theme);
-  drawCrystalShard(ctx, -7, -6 - level, 4, theme);
-  drawCrystalShard(ctx, 7, -6 - level, 4, theme);
+  const crystalHeight = 22 + level * 2;
+  drawCrystalShard(ctx, 0, -crystalHeight, 8, theme);
+  drawCrystalShard(ctx, -9, -8 - level * 1.2, 5, theme);
+  drawCrystalShard(ctx, 9, -8 - level * 1.2, 5, theme);
+
+  // A small shard orbiting the cluster.
+  const orbitAngle = timeMs / 1400;
+  const ox = Math.cos(orbitAngle) * 13;
+  ctx.save();
+  ctx.translate(ox, -12 + Math.sin(orbitAngle) * 4);
+  ctx.rotate(orbitAngle * 2);
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.moveTo(0, -3);
+  ctx.lineTo(1.6, 0);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-1.6, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 
   // Sparkle twinkles.
   ctx.fillStyle = "#ffffff";
@@ -229,7 +348,7 @@ function drawFrostborn(
     const angle = i * 2.1;
     ctx.globalAlpha = (twinkle - 0.7) / 0.3;
     ctx.beginPath();
-    ctx.arc(Math.cos(angle) * 9, -10 + Math.sin(angle) * 8, 1.2, 0, Math.PI * 2);
+    ctx.arc(Math.cos(angle) * 11, -12 + Math.sin(angle) * 9, 1.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
@@ -242,7 +361,7 @@ function drawCrystalShard(
   width: number,
   theme: (typeof TOWER_THEME)["FROSTBORN"],
 ): void {
-  const baseY = 6;
+  const baseY = 4;
   const gradient = ctx.createLinearGradient(0, tipY, 0, baseY);
   gradient.addColorStop(0, theme.accent);
   gradient.addColorStop(1, theme.primary);
@@ -255,8 +374,8 @@ function drawCrystalShard(
   ctx.lineTo(x - width, (tipY + baseY) / 2);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
-  ctx.lineWidth = 0.7;
+  ctx.strokeStyle = "rgba(255,255,255,0.55)";
+  ctx.lineWidth = 0.8;
   ctx.stroke();
 }
 
@@ -266,37 +385,62 @@ function drawStormcaller(
   level: number,
   timeMs: number,
 ): void {
-  // Stone pillar with glowing rune bands.
+  // Two-tier stone plinth.
+  ctx.fillStyle = "#4a3f30";
+  ctx.beginPath();
+  ctx.ellipse(0, 7, 17, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = "#5a4a38";
-  ctx.fillRect(-5, -20, 10, 26);
+  ctx.beginPath();
+  ctx.ellipse(0, 3, 12, 6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Rune pillar.
+  ctx.fillStyle = "#5a4a38";
+  ctx.fillRect(-6, -26, 12, 30);
   ctx.fillStyle = theme.primary;
   for (let i = 0; i < 3; i++) {
     const bandPulse = 0.4 + 0.4 * Math.sin(timeMs / 500 + i * 1.4);
     ctx.globalAlpha = bandPulse;
-    ctx.fillRect(-5, -17 + i * 7, 10, 2);
+    ctx.fillRect(-6, -22 + i * 8, 12, 2.4);
   }
   ctx.globalAlpha = 1;
 
-  const orbY = -26 - level;
-  glowBlob(ctx, 0, orbY, 13 + level * 1.3, theme.glow);
+  const orbY = -32 - level * 1.4;
+  glowBlob(ctx, 0, orbY, 16 + level * 1.3, theme.glow);
+
+  // A rotating arcane ring around the orb (drawn as a squashed ellipse for
+  // a top-down "ring" read).
+  ctx.save();
+  ctx.translate(0, orbY);
+  ctx.rotate(timeMs / 2000);
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 1.3;
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 11, 4, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
   ctx.fillStyle = theme.accent;
   ctx.beginPath();
-  ctx.arc(0, orbY, 5, 0, Math.PI * 2);
+  ctx.arc(0, orbY, 6, 0, Math.PI * 2);
   ctx.fill();
 
   // Crackling arcs jumping between the orb and the pillar top.
   ctx.strokeStyle = theme.primary;
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = 1.3;
   const arcCount = 2 + Math.min(level, 3);
   for (let i = 0; i < arcCount; i++) {
     const seed = Math.floor(timeMs / 110) + i * 17;
-    const jitter = (n: number) => (((n * 9301 + 49297) % 233280) / 233280 - 0.5) * 10;
+    const jitter = (n: number) => (((n * 9301 + 49297) % 233280) / 233280 - 0.5) * 12;
     ctx.beginPath();
-    ctx.moveTo(0, orbY + 4);
+    ctx.moveTo(0, orbY + 5);
     const midX = jitter(seed);
-    const midY = orbY + (10 - orbY) / 2 + jitter(seed + 1) * 0.4;
+    const midY = orbY + (-24 - orbY) / 2 + jitter(seed + 1) * 0.4;
     ctx.lineTo(midX, midY);
-    ctx.lineTo(jitter(seed + 2) * 0.6, -18);
+    ctx.lineTo(jitter(seed + 2) * 0.6, -24);
     ctx.stroke();
   }
 }

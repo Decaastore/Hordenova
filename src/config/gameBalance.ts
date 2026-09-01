@@ -24,6 +24,6 @@ export const WORLD_SIZE = {
 };
 
 /** Visual/geometric width of the enemy path, used only for rendering thickness. */
-export const PATH_VISUAL_WIDTH = 34;
+export const PATH_VISUAL_WIDTH = 42;
 
 export const SAVE_STORAGE_KEY = "hordenova.save.v1";

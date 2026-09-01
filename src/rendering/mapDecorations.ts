@@ -40,8 +40,12 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-const MIN_DISTANCE_FROM_PATH = 26;
-const MIN_DISTANCE_FROM_SLOT = 34;
+// Pushed out further than a purely "don't overlap" minimum would require:
+// the goal is to keep the road + tower corridors visually clear so the
+// composition reads as path-and-defenses first, with scenery concentrated
+// toward the map's outer margins framing it — not sprinkled everywhere.
+const MIN_DISTANCE_FROM_PATH = 50;
+const MIN_DISTANCE_FROM_SLOT = 40;
 
 function isClearOfPlayArea(point: Vector2): boolean {
   if (distanceToPolyline(point, ENEMY_PATH) < MIN_DISTANCE_FROM_PATH) return false;
@@ -56,15 +60,15 @@ function generate(): Decoration[] {
   const decorations: Decoration[] = [];
 
   const counts: Record<DecorationKind, number> = {
-    TREE: 34,
-    ROCK: 16,
-    ROOT: 10,
+    TREE: 26,
+    ROCK: 12,
+    ROOT: 7,
     RUIN: 4,
     CRYSTAL: 6,
-    GRASS: 22,
-    FLOWER: 24,
+    GRASS: 14,
+    FLOWER: 16,
     WATER: 3,
-    TORCH: 9,
+    TORCH: 8,
   };
 
   (Object.entries(counts) as [DecorationKind, number][]).forEach(([kind, count]) => {

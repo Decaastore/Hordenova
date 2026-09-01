@@ -542,16 +542,20 @@ function drawFortressGate(ctx: CanvasRenderingContext2D, position: Vector2, time
 }
 
 // ---------------------------------------------------------------------------
-// Tower slots — each buildable position reads as a real platform, not a dot.
+// Tower slots — a small, deliberately modest buildable spot. The tower
+// built on it is the dominant element; the platform only has to read as
+// "you may build here", not compete with it.
 // ---------------------------------------------------------------------------
 
-type PlatformStyle = "CLEARING" | "STONE" | "RUIN" | "MAGIC";
+type PlatformStyle = "CLEARING" | "STONE" | "WOOD" | "RUIN" | "ALTAR" | "ELEVATED";
 
-function styleForSlot(slot: TowerSlotDefinition, index: number): PlatformStyle {
-  if (slot.distanceCategory === "CLOSE") return "CLEARING";
-  if (slot.distanceCategory === "MEDIUM") return "STONE";
-  return index % 2 === 0 ? "RUIN" : "MAGIC";
+const PLATFORM_STYLES: readonly PlatformStyle[] = ["CLEARING", "STONE", "WOOD", "RUIN", "ALTAR", "ELEVATED"];
+
+function styleForSlot(index: number): PlatformStyle {
+  return PLATFORM_STYLES[index % PLATFORM_STYLES.length]!;
 }
+
+const PLATFORM_RADIUS = 15;
 
 export function drawSlot(
   ctx: CanvasRenderingContext2D,
@@ -561,35 +565,30 @@ export function drawSlot(
   highlighted: boolean,
   timeMs: number,
 ): void {
-  const style = styleForSlot(slot, index);
+  const style = styleForSlot(index);
   ctx.save();
   ctx.translate(slot.position.x, slot.position.y);
 
-  ctx.fillStyle = "rgba(40,30,10,0.28)";
+  ctx.fillStyle = "rgba(40,30,10,0.25)";
   ctx.beginPath();
-  ctx.ellipse(0, 5, 24, 9, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 4, PLATFORM_RADIUS + 3, (PLATFORM_RADIUS + 3) * 0.42, 0, 0, Math.PI * 2);
   ctx.fill();
 
   if (style === "CLEARING") drawClearingPlatform(ctx);
   else if (style === "STONE") drawStonePlatform(ctx);
+  else if (style === "WOOD") drawWoodPlatform(ctx);
   else if (style === "RUIN") drawRuinPlatform(ctx);
-  else drawMagicPlatform(ctx, timeMs);
+  else if (style === "ALTAR") drawAltarPlatform(ctx, timeMs);
+  else drawElevatedPlatform(ctx);
 
   if (!occupied && highlighted) {
     ctx.strokeStyle = "rgba(255,210,87,0.9)";
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.arc(0, 0, PLATFORM_RADIUS + 6, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
-  }
-
-  if (occupied) {
-    ctx.fillStyle = "rgba(0,0,0,0.18)";
-    ctx.beginPath();
-    ctx.arc(0, 0, 21, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   ctx.restore();
@@ -598,77 +597,118 @@ export function drawSlot(
 function drawClearingPlatform(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = PALETTE.slotClearing;
   ctx.beginPath();
-  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = PALETTE.canopyDark;
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   drawGrassTuft(ctx);
-  drawFlower(ctx, 1);
 }
 
 function drawStonePlatform(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = PALETTE.slotStone;
   ctx.beginPath();
-  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#8a7a5a";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.strokeStyle = "rgba(120,105,75,0.4)";
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-10, -6);
-  ctx.lineTo(6, 4);
-  ctx.moveTo(-4, 10);
-  ctx.lineTo(4, -10);
+  ctx.moveTo(-7, -4);
+  ctx.lineTo(4, 3);
+  ctx.moveTo(-3, 7);
+  ctx.lineTo(3, -7);
   ctx.stroke();
+}
+
+function drawWoodPlatform(ctx: CanvasRenderingContext2D): void {
+  // Round wooden deck — cross-section log rings, like a cut tree stump base.
+  ctx.fillStyle = "#8a6238";
+  ctx.beginPath();
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#5a3f22";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.strokeStyle = "rgba(90,63,34,0.6)";
+  ctx.lineWidth = 1;
+  for (let r = PLATFORM_RADIUS - 4; r > 2; r -= 4) {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 function drawRuinPlatform(ctx: CanvasRenderingContext2D): void {
   ctx.fillStyle = PALETTE.slotRuin;
   ctx.beginPath();
-  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#8a6a42";
-  ctx.lineWidth = 2;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
   ctx.fillStyle = "rgba(110,180,80,0.35)";
   ctx.beginPath();
-  ctx.arc(-6, 5, 5, 0, Math.PI * 2);
+  ctx.arc(-4, 4, 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#5a4530";
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
-  ctx.moveTo(-14, -2);
-  ctx.lineTo(-6, -16);
+  ctx.moveTo(-9, -1);
+  ctx.lineTo(-4, -11);
   ctx.stroke();
 }
 
-function drawMagicPlatform(ctx: CanvasRenderingContext2D, timeMs: number): void {
+function drawAltarPlatform(ctx: CanvasRenderingContext2D, timeMs: number): void {
   ctx.fillStyle = PALETTE.slotMagic;
   ctx.beginPath();
-  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.fill();
 
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 800);
-  ctx.strokeStyle = `rgba(255,210,87,${0.45 + 0.35 * pulse})`;
-  ctx.lineWidth = 2;
+  ctx.strokeStyle = `rgba(255,210,87,${0.5 + 0.35 * pulse})`;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, 15, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(0, 0, 21, 0, Math.PI * 2);
+  ctx.arc(0, 0, PLATFORM_RADIUS, 0, Math.PI * 2);
   ctx.stroke();
 
   ctx.strokeStyle = `rgba(255,210,87,${0.6 + 0.3 * pulse})`;
   ctx.lineWidth = 1;
-  for (let i = 0; i < 6; i++) {
-    const angle = (i / 6) * Math.PI * 2 + timeMs / 4000;
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 + timeMs / 4000;
     ctx.beginPath();
-    ctx.moveTo(Math.cos(angle) * 15, Math.sin(angle) * 15);
-    ctx.lineTo(Math.cos(angle) * 21, Math.sin(angle) * 21);
+    ctx.moveTo(Math.cos(angle) * 6, Math.sin(angle) * 6);
+    ctx.lineTo(Math.cos(angle) * PLATFORM_RADIUS, Math.sin(angle) * PLATFORM_RADIUS);
     ctx.stroke();
+  }
+}
+
+function drawElevatedPlatform(ctx: CanvasRenderingContext2D): void {
+  // A small earthen mound with a rocky rim — reads as "raised ground".
+  ctx.fillStyle = "#7a6238";
+  ctx.beginPath();
+  ctx.ellipse(0, 2, PLATFORM_RADIUS + 2, PLATFORM_RADIUS * 0.55 + 2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  const moundGradient = ctx.createRadialGradient(0, -3, 2, 0, 0, PLATFORM_RADIUS);
+  moundGradient.addColorStop(0, "#9fc464");
+  moundGradient.addColorStop(1, "#6f9c40");
+  ctx.fillStyle = moundGradient;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, PLATFORM_RADIUS, PLATFORM_RADIUS * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = "#a89876";
+  for (const [px, py] of [
+    [-11, 3],
+    [10, 4],
+    [0, 8],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(px, py, 2.6, 0, Math.PI * 2);
+    ctx.fill();
   }
 }
 
