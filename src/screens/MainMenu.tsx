@@ -3,7 +3,7 @@ import { loadSave } from "@/engine/SaveSystem";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "@/ui/LanguageSelector";
-import { MenuBackground } from "./MenuBackground";
+import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
 
 interface MainMenuProps {
   onStart: () => void;
@@ -12,59 +12,86 @@ interface MainMenuProps {
 /**
  * Cinematic epic-fantasy title screen — bright forest, golden light,
  * imposing fortress, vibrant portal (art direction: colorful medieval
- * adventure, not dark-fantasy horror). The button below calls the same
- * `onStart` the app has always used to begin a run — no second start-logic
- * path.
+ * adventure, not dark-fantasy horror). Clicking PLAY doesn't cut straight
+ * to the game: it surges the portal, pulls the scene's magic motes toward
+ * it, flashes the screen, and gives the whole scene a small push-in zoom
+ * before `onStart` fires — "entering the world of HORDENOVA" rather than
+ * a plain screen swap.
  */
 export function MainMenu({ onStart }: MainMenuProps) {
   const save = loadSave();
   const [hover, setHover] = useState(false);
+  const [transitionAt, setTransitionAt] = useState<number | null>(null);
   const { t } = useLanguage();
+
+  const handlePlay = () => {
+    if (transitionAt !== null) return;
+    setTransitionAt(performance.now());
+    window.setTimeout(onStart, TRANSITION_DURATION_MS);
+  };
 
   return (
     <div style={rootStyle}>
-      <style>{PULSE_KEYFRAMES}</style>
-      <MenuBackground />
-      <div style={scrimStyle} />
+      <style>{SCENE_KEYFRAMES}</style>
+      <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.14)" : "scale(1)" }}>
+        <MenuBackground transitionAt={transitionAt} />
+        <div style={scrimStyle} />
+      </div>
 
-      <LanguageSelector />
+      <div
+        style={{
+          ...flashStyle,
+          opacity: transitionAt !== null ? 1 : 0,
+        }}
+        aria-hidden="true"
+      />
 
-      <div style={contentStyle}>
-        <div style={titleBlockStyle}>
-          <div style={titleGlowStyle} aria-hidden="true" />
-          <div style={titleStyle}>HORDENOVA</div>
-          <div style={subtitleStyle}>{t("menu.subtitle")}</div>
-        </div>
+      <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
+        <LanguageSelector />
 
-        <div style={playWrapStyle}>
-          <div style={playHaloStyle} aria-hidden="true" />
-          <button
-            onClick={onStart}
-            onMouseEnter={() => setHover(true)}
-            onMouseLeave={() => setHover(false)}
-            style={{
-              ...buttonStyle,
-              transform: hover ? "translateY(-2px) scale(1.05)" : "translateY(0) scale(1)",
-              boxShadow: hover ? buttonShadowHover : buttonShadow,
-            }}
-          >
-            <span style={buttonLabelStyle}>{t("menu.play")}</span>
-          </button>
-        </div>
+        <div style={contentStyle}>
+          <div style={titleBlockStyle}>
+            <div style={titleGlowStyle} aria-hidden="true" />
+            <div style={titleStyle}>HORDENOVA</div>
+            <div style={subtitleStyle}>{t("menu.subtitle")}</div>
+          </div>
 
-        <div style={bestWaveStyle}>
-          <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
-          <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
+          <div style={playWrapStyle}>
+            <div style={playHaloStyle} aria-hidden="true" />
+            <button
+              onClick={handlePlay}
+              onMouseEnter={() => setHover(true)}
+              onMouseLeave={() => setHover(false)}
+              disabled={transitionAt !== null}
+              style={{
+                ...buttonStyle,
+                transform: hover ? "translateY(-2px) scale(1.05)" : "translateY(0) scale(1)",
+                boxShadow: hover ? buttonShadowHover : buttonShadow,
+              }}
+            >
+              <span style={buttonLabelStyle}>{t("menu.play")}</span>
+              <span style={{ ...shimmerStyle, animationPlayState: hover ? "running" : "paused" }} aria-hidden="true" />
+            </button>
+          </div>
+
+          <div style={bestWaveStyle}>
+            <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
+            <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-const PULSE_KEYFRAMES = `
+const SCENE_KEYFRAMES = `
 @keyframes hordenova-play-halo {
   0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
   50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.1); }
+}
+@keyframes hordenova-play-shimmer {
+  0% { transform: translateX(-120%) skewX(-18deg); }
+  100% { transform: translateX(220%) skewX(-18deg); }
 }
 `;
 
@@ -76,6 +103,29 @@ const rootStyle: CSSProperties = {
   background: PALETTE.mapBackgroundFallback,
 };
 
+const zoomWrapStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  transition: `transform ${TRANSITION_DURATION_MS}ms ease-in`,
+};
+
+const flashStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  zIndex: 3,
+  pointerEvents: "none",
+  background: "radial-gradient(circle at 17% 74%, rgba(240,216,255,0.95), rgba(192,96,245,0.55) 45%, rgba(20,10,30,0.98) 100%)",
+  transition: `opacity ${TRANSITION_DURATION_MS}ms ease-in`,
+};
+
+const uiLayerStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
+  width: "100%",
+  height: "100%",
+  transition: "opacity 260ms ease-out",
+};
+
 const scrimStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
@@ -85,7 +135,6 @@ const scrimStyle: CSSProperties = {
 
 const contentStyle: CSSProperties = {
   position: "relative",
-  zIndex: 1,
   width: "100%",
   height: "100%",
   display: "flex",
@@ -160,6 +209,7 @@ const playHaloStyle: CSSProperties = {
 
 const buttonStyle: CSSProperties = {
   position: "relative",
+  overflow: "hidden",
   padding: "clamp(17px, 2.7vh, 24px) clamp(46px, 8vw, 76px)",
   fontSize: "clamp(17px, 2.2vw, 22px)",
   fontWeight: 800,
@@ -173,7 +223,19 @@ const buttonStyle: CSSProperties = {
 };
 
 const buttonLabelStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 1,
   textShadow: "0 1px 0 rgba(255,255,255,0.5)",
+};
+
+/** A diagonal light sweep across the PLAY button on hover — the "efeito de energia" the direction asked for. */
+const shimmerStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  background: "linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.75) 50%, transparent 60%)",
+  animation: "hordenova-play-shimmer 1.1s ease-in-out infinite",
+  animationPlayState: "paused",
+  pointerEvents: "none",
 };
 
 const buttonShadow =

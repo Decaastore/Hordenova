@@ -660,18 +660,29 @@ function normalize(x: number, y: number): Vector2 {
   return { x: x / length, y: y / length };
 }
 
-export function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2, timeMs: number): void {
+/**
+ * `boost` (0 = gameplay default, up to ~1.6 used by the menu's portal-surge
+ * moment and the click-to-play transition) scales glow radius/opacity and
+ * ring speed without changing the portal's identity colors.
+ */
+export function drawMagicPortal(
+  ctx: CanvasRenderingContext2D,
+  position: Vector2,
+  timeMs: number,
+  boost = 0,
+): void {
   ctx.save();
   ctx.translate(position.x, position.y);
 
-  const pulse = 0.75 + 0.25 * Math.sin(timeMs / 700);
-  const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 52);
-  glow.addColorStop(0, `rgba(192,96,245,${0.6 * pulse})`);
-  glow.addColorStop(0.6, `rgba(150,80,230,${0.25 * pulse})`);
+  const pulse = (0.75 + 0.25 * Math.sin(timeMs / 700)) * (1 + boost * 0.5);
+  const glowRadius = 52 + boost * 34;
+  const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, glowRadius);
+  glow.addColorStop(0, `rgba(192,96,245,${Math.min(1, 0.6 * pulse)})`);
+  glow.addColorStop(0.6, `rgba(150,80,230,${Math.min(1, 0.25 * pulse)})`);
   glow.addColorStop(1, "rgba(192,96,245,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, 52, 0, Math.PI * 2);
+  ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.strokeStyle = PALETTE.gold;
@@ -689,13 +700,14 @@ export function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2
   ctx.arc(0, 0, 21, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = `rgba(255,255,255,${0.55 * pulse})`;
+  const ringSpeed = 1 + boost * 1.8;
+  ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, 0.55 * pulse)})`;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(0, 0, 14, timeMs / 900, timeMs / 900 + Math.PI * 1.2);
+  ctx.arc(0, 0, 14, (timeMs / 900) * ringSpeed, (timeMs / 900) * ringSpeed + Math.PI * 1.2);
   ctx.stroke();
   ctx.beginPath();
-  ctx.arc(0, 0, 9, -timeMs / 700, -timeMs / 700 + Math.PI * 1.5);
+  ctx.arc(0, 0, 9, (-timeMs / 700) * ringSpeed, (-timeMs / 700) * ringSpeed + Math.PI * 1.5);
   ctx.stroke();
 
   ctx.restore();
@@ -716,13 +728,20 @@ export function drawMagicPortal(ctx: CanvasRenderingContext2D, position: Vector2
  * this function for a `biome.id`-keyed dispatch the same way tower/enemy
  * types already dispatch on `type`, without touching any caller.
  */
+export interface FortressAnchors {
+  /** Torch/flame positions in the fortress's own local space (pre translate+scale) — for callers that spawn extra effects (smoke, flare bursts) at exactly the same points the fortress draws its own flames. */
+  torches: readonly Vector2[];
+}
+
 export function drawFortress(
   ctx: CanvasRenderingContext2D,
   position: Vector2,
   biome: BiomeDefinition,
   timeMs: number,
   scale: number,
-): void {
+  /** 0 = calm (gameplay default). Above 0 exaggerates banner flutter — used by the menu's occasional "wind gust" moment. */
+  windIntensity = 0,
+): FortressAnchors {
   const p = biome.palette;
   ctx.save();
   ctx.translate(position.x, position.y);
@@ -789,7 +808,7 @@ export function drawFortress(
   ctx.beginPath();
   ctx.arc(0, -60, 2.6, 0, Math.PI * 2);
   ctx.fill();
-  drawBanner(ctx, 0, -110, biome, timeMs, 1.1);
+  drawBanner(ctx, 0, -110, biome, timeMs, 1.1, 0, windIntensity);
   ctx.restore();
 
   // --- Two flanking towers, weathered — irregular crenellations instead
@@ -841,7 +860,7 @@ export function drawFortress(
     ctx.fill();
 
     drawIvy(ctx, side, biome);
-    drawBanner(ctx, 0, -60, biome, timeMs, 0.85, side * 0.3);
+    drawBanner(ctx, 0, -60, biome, timeMs, 0.85, side * 0.3, windIntensity);
 
     ctx.restore();
   }
@@ -910,9 +929,18 @@ export function drawFortress(
     ctx.fill();
   }
 
-  drawBanner(ctx, 0, -26, biome, timeMs, 1, 0);
+  drawBanner(ctx, 0, -26, biome, timeMs, 1, 0, windIntensity);
 
   ctx.restore();
+
+  return {
+    torches: [
+      { x: 0, y: -60 },
+      { x: -34, y: -22 },
+      { x: 34, y: -22 },
+      { x: 0, y: -24 },
+    ],
+  };
 }
 
 /** A small vine climbing a tower's outer edge — reused on both flanking towers. */
@@ -943,8 +971,10 @@ function drawBanner(
   timeMs: number,
   scale: number,
   phase = 0,
+  windIntensity = 0,
 ): void {
-  const flutter = Math.sin(timeMs / 480 + phase * 6 + x) * 1.6;
+  const gustFreq = 480 / (1 + windIntensity * 1.6);
+  const flutter = Math.sin(timeMs / gustFreq + phase * 6 + x) * 1.6 * (1 + windIntensity * 2.2);
   ctx.save();
   ctx.translate(x, topY);
   ctx.scale(scale, scale);

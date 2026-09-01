@@ -757,10 +757,18 @@ export function drawCrawler(
   theme: (typeof ENEMY_THEME)["CRAWLER"],
   timeMs: number,
   hitFlashMs: number,
+  /**
+   * Scales mandible/eye motion beyond the normal gameplay idle — gameplay
+   * callers never pass this (default 1 = unchanged), so combat feel is
+   * untouched. Decorative contexts (the main menu hero scene) can push
+   * this above 1 for a more aggressive, restless idle without a second
+   * copy of the draw code.
+   */
+  intensity = 1,
 ): void {
   const legPhase = Math.sin(timeMs / 110);
   const bob = Math.sin(timeMs / 220) * 0.4;
-  const mandibleTwitch = Math.sin(timeMs / 260) * 0.15;
+  const mandibleTwitch = Math.sin(timeMs / (260 / intensity)) * 0.15 * intensity;
   const hitFlash = hitFlashMs < 120 ? 1 - hitFlashMs / 120 : 0;
 
   ctx.save();
@@ -862,9 +870,9 @@ export function drawCrawler(
 
   // Eye cluster — several small glowing points instead of one cute round
   // eye: reads as alien/insectile rather than a mascot's face.
-  const eyeFlicker = 0.65 + 0.35 * Math.sin(timeMs / 300);
+  const eyeFlicker = 0.65 + 0.35 * Math.sin(timeMs / (300 / intensity));
   ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = eyeFlicker;
+  ctx.globalAlpha = Math.min(1, eyeFlicker * (0.85 + 0.15 * intensity));
   for (const [ex, ey, er] of [
     [4.5, -2, 1.1],
     [5.5, 0, 1.3],
