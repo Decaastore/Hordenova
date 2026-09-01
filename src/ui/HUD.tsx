@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
@@ -9,14 +10,8 @@ interface HUDProps {
   onSetSpeed: (speed: GameSpeed) => void;
 }
 
-const PHASE_LABEL: Record<HudSnapshot["phase"], string> = {
-  PRE_RUN: "PRE-RUN",
-  RUNNING: "RUNNING",
-  WAVE_TRANSITION: "WAVE CLEARED",
-  DEFEAT: "FORTRESS FALLEN",
-};
-
 export function HUD({ hud, onSetSpeed }: HUDProps) {
+  const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
 
@@ -25,17 +20,22 @@ export function HUD({ hud, onSetSpeed }: HUDProps) {
       <div style={brandStyle}>HORDENOVA</div>
 
       <div style={groupStyle}>
-        <Stat icon={<WaveIcon color={PALETTE.uiAccent} />} label="WAVE" value={String(hud.wave)} />
+        <Stat icon={<WaveIcon color={PALETTE.uiAccent} />} label={t("hud.wave")} value={String(hud.wave)} />
         <Stat
           icon={<ShieldIcon color={hpColor} />}
-          label="BASE HP"
+          label={t("hud.baseHp")}
           value={`${Math.ceil(hud.baseHp)} / ${hud.maxBaseHp}`}
           valueColor={hpColor}
         />
-        <Stat icon={<CoinIcon color={PALETTE.gold} />} label="GOLD" value={String(hud.gold)} valueColor={PALETTE.gold} />
+        <Stat
+          icon={<CoinIcon color={PALETTE.gold} />}
+          label={t("hud.gold")}
+          value={String(hud.gold)}
+          valueColor={PALETTE.gold}
+        />
         <div style={{ textAlign: "center", minWidth: 100 }}>
-          <div style={labelStyle}>STATE</div>
-          <div style={{ ...valueStyle, fontSize: 13 }}>{PHASE_LABEL[hud.phase]}</div>
+          <div style={labelStyle}>{t("hud.state")}</div>
+          <div style={{ ...valueStyle, fontSize: 13 }}>{t(`hud.phase.${hud.phase}`)}</div>
         </div>
       </div>
 

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { SkullIcon } from "./icons";
 
 interface DefeatOverlayProps {
@@ -10,23 +11,24 @@ interface DefeatOverlayProps {
 }
 
 export function DefeatOverlay({ hud, onTryAgain, onExitToMenu }: DefeatOverlayProps) {
+  const { t } = useLanguage();
   return (
     <div style={overlayStyle}>
       <div style={cardStyle}>
         <SkullIcon size={34} color={PALETTE.danger} style={{ filter: `drop-shadow(0 0 10px ${PALETTE.danger}aa)` }} />
-        <h1 style={titleStyle}>FORTRESS FALLEN</h1>
+        <h1 style={titleStyle}>{t("defeat.title")}</h1>
         <div style={dividerStyle} />
         <div style={{ display: "flex", gap: 28, margin: "18px 0" }}>
-          <Stat label="Wave Reached" value={String(hud.wave)} />
-          <Stat label="Enemies Defeated" value={String(hud.enemiesDefeated)} />
-          <Stat label="Best Wave" value={String(hud.bestWave)} highlight />
+          <Stat label={t("defeat.waveReached")} value={String(hud.wave)} />
+          <Stat label={t("defeat.enemiesDefeated")} value={String(hud.enemiesDefeated)} />
+          <Stat label={t("defeat.bestWave")} value={String(hud.bestWave)} highlight />
         </div>
         <div style={{ display: "flex", gap: 12 }}>
           <button onClick={onTryAgain} style={primaryButtonStyle}>
-            TRY AGAIN
+            {t("defeat.tryAgain")}
           </button>
           <button onClick={onExitToMenu} style={secondaryButtonStyle}>
-            MAIN MENU
+            {t("defeat.mainMenu")}
           </button>
         </div>
       </div>

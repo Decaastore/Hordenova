@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import { getTowerStats, getTowerUpgradeCost } from "@/entities/Tower";
-import { MAX_TOWER_LEVEL, TOWER_DEFINITIONS } from "@/config/towerStats";
+import { MAX_TOWER_LEVEL } from "@/config/towerStats";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { CoinIcon } from "./icons";
 
 interface TowerInfoPanelProps {
@@ -13,7 +14,7 @@ interface TowerInfoPanelProps {
 }
 
 export function TowerInfoPanel({ tower, gold, onUpgrade, onClose }: TowerInfoPanelProps) {
-  const def = TOWER_DEFINITIONS[tower.type];
+  const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
   const stats = getTowerStats(tower);
   const upgradeCost = getTowerUpgradeCost(tower);
@@ -24,20 +25,22 @@ export function TowerInfoPanel({ tower, gold, onUpgrade, onClose }: TowerInfoPan
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ ...dotStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
-          <strong style={{ fontSize: 14, color: PALETTE.uiText, letterSpacing: 0.5 }}>{def.name}</strong>
+          <strong style={{ fontSize: 14, color: PALETTE.uiText, letterSpacing: 0.5 }}>
+            {t(`towers.${tower.type}.name`)}
+          </strong>
         </div>
         <button onClick={onClose} style={closeButtonStyle}>
           ×
         </button>
       </div>
       <div style={{ fontSize: 11, color: PALETTE.uiTextDim }}>
-        Level {stats.level} / {MAX_TOWER_LEVEL}
+        {t("towerInfo.level", { level: stats.level, max: MAX_TOWER_LEVEL })}
       </div>
       <div style={dividerStyle} />
-      <Row label="Damage" value={stats.damage.toFixed(1)} />
-      <Row label="Attack Speed" value={`${stats.attackSpeed.toFixed(2)}/s`} />
-      <Row label="Range" value={stats.range.toFixed(0)} />
-      <Row label="Special" value={def.role} />
+      <Row label={t("towerInfo.damage")} value={stats.damage.toFixed(1)} />
+      <Row label={t("towerInfo.attackSpeed")} value={`${stats.attackSpeed.toFixed(2)}/s`} />
+      <Row label={t("towerInfo.range")} value={stats.range.toFixed(0)} />
+      <Row label={t("towerInfo.special")} value={t(`towers.${tower.type}.role`)} />
       <button
         onClick={onUpgrade}
         disabled={upgradeCost === null || !canAfford}
@@ -48,10 +51,10 @@ export function TowerInfoPanel({ tower, gold, onUpgrade, onClose }: TowerInfoPan
         }}
       >
         {upgradeCost === null ? (
-          "MAX LEVEL"
+          t("towerInfo.maxLevel")
         ) : (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            UPGRADE <CoinIcon size={11} color={PALETTE.gold} /> {upgradeCost}
+            {t("towerInfo.upgrade")} <CoinIcon size={11} color={PALETTE.gold} /> {upgradeCost}
           </span>
         )}
       </button>

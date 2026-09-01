@@ -1,6 +1,8 @@
 import { useState, type CSSProperties } from "react";
 import { loadSave } from "@/engine/SaveSystem";
 import { PALETTE } from "@/rendering/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { LanguageSelector } from "@/ui/LanguageSelector";
 import { MenuBackground } from "./MenuBackground";
 
 interface MainMenuProps {
@@ -17,16 +19,19 @@ interface MainMenuProps {
 export function MainMenu({ onStart }: MainMenuProps) {
   const save = loadSave();
   const [hover, setHover] = useState(false);
+  const { t } = useLanguage();
 
   return (
     <div style={rootStyle}>
       <MenuBackground />
       <div style={scrimStyle} />
 
+      <LanguageSelector />
+
       <div style={contentStyle}>
         <div style={titleBlockStyle}>
           <div style={titleStyle}>HORDENOVA</div>
-          <div style={subtitleStyle}>BUILD. UPGRADE. SURVIVE.</div>
+          <div style={subtitleStyle}>{t("menu.subtitle")}</div>
         </div>
 
         <button
@@ -39,11 +44,11 @@ export function MainMenu({ onStart }: MainMenuProps) {
             boxShadow: hover ? buttonShadowHover : buttonShadow,
           }}
         >
-          <span style={buttonLabelStyle}>ENTER THE HORDE</span>
+          <span style={buttonLabelStyle}>{t("menu.play")}</span>
         </button>
 
         <div style={bestWaveStyle}>
-          <span style={{ opacity: 0.85 }}>BEST WAVE</span>
+          <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
           <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
         </div>
       </div>

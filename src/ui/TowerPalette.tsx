@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
+import { useLanguage } from "@/i18n/LanguageContext";
 import { CoinIcon } from "./icons";
 
 interface TowerPaletteProps {
@@ -10,6 +11,7 @@ interface TowerPaletteProps {
 }
 
 export function TowerPalette({ gold, pendingTowerType, onSelect }: TowerPaletteProps) {
+  const { t } = useLanguage();
   return (
     <div style={containerStyle}>
       {TOWER_TYPES.map((type) => {
@@ -22,7 +24,7 @@ export function TowerPalette({ gold, pendingTowerType, onSelect }: TowerPaletteP
             key={type}
             disabled={!affordable}
             onClick={() => onSelect(active ? null : type)}
-            title={def.description}
+            title={t(`towers.${type}.description`)}
             style={{
               ...cardStyle,
               borderColor: active ? theme.accent : PALETTE.uiPanelBorder,
@@ -32,8 +34,8 @@ export function TowerPalette({ gold, pendingTowerType, onSelect }: TowerPaletteP
           >
             <div style={{ ...swatchStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: PALETTE.uiText }}>{def.name}</div>
-              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim }}>{def.role}</div>
+              <div style={{ fontWeight: 700, fontSize: 13, color: PALETTE.uiText }}>{t(`towers.${type}.name`)}</div>
+              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim }}>{t(`towers.${type}.role`)}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 3 }}>
                 <CoinIcon size={10} color={PALETTE.gold} />
                 <span style={{ fontSize: 11, color: PALETTE.gold, fontWeight: 700 }}>{def.buildCost}</span>
