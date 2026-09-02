@@ -4,7 +4,9 @@ import { CanvasRenderer } from "@/rendering/CanvasRenderer";
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
-import { DefeatOverlay } from "@/ui/DefeatOverlay";
+import { ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
+import { BossBanner } from "@/ui/BossBanner";
+import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
 import type { TowerType } from "@/config/towerStats";
 
 interface GameScreenProps {
@@ -14,10 +16,19 @@ interface GameScreenProps {
 export function GameScreen({ onExitToMenu }: GameScreenProps) {
   const { engine, hud } = useGameEngine();
   const [pendingTowerType, setPendingTowerType] = useState<TowerType | null>(null);
+  // The diagnostic report can be dismissed to let the player upgrade towers
+  // on the map without retrying yet — engine phase itself doesn't change
+  // until retryPhase() is called, so visibility is tracked locally and
+  // re-armed whenever a fresh PROGRESSION_STOPPED report comes in.
+  const [reportDismissed, setReportDismissed] = useState(false);
 
   useEffect(() => {
     engine.startRun();
   }, [engine]);
+
+  useEffect(() => {
+    if (hud.phase === "PROGRESSION_STOPPED") setReportDismissed(false);
+  }, [hud.phase]);
 
   useEffect(() => {
     // Dev-only hook so end-to-end smoke tests can drive/inspect the engine
@@ -44,13 +55,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     setPendingTowerType(null);
   };
 
-  const handleTryAgain = () => {
-    engine.startRun();
-  };
-
   const selectedTower = hud.selectedTowerId
     ? engine.getRenderSnapshot().towers.find((t) => t.id === hud.selectedTowerId) ?? null
     : null;
+
+  const offlineSummary = hud.phase === "OFFLINE_RETURN" ? engine.getOfflineSummary() : null;
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
@@ -65,6 +74,8 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           onBackgroundClick={handleBackgroundClick}
         />
 
+        <BossBanner hud={hud} />
+
         {selectedTower && (
           <TowerInfoPanel
             tower={selectedTower}
@@ -74,8 +85,18 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           />
         )}
 
-        {hud.phase === "DEFEAT" && (
-          <DefeatOverlay hud={hud} onTryAgain={handleTryAgain} onExitToMenu={onExitToMenu} />
+        {hud.phase === "PROGRESSION_STOPPED" && !reportDismissed && (
+          <ProgressionStoppedOverlay
+            hud={hud}
+            report={engine.getFailureReport()}
+            onDismiss={() => setReportDismissed(true)}
+            onRetry={() => engine.retryPhase()}
+            onExitToMenu={onExitToMenu}
+          />
+        )}
+
+        {offlineSummary && (
+          <WelcomeBackOverlay summary={offlineSummary} onContinue={() => engine.dismissOfflineSummary()} />
         )}
       </div>
 

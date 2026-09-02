@@ -35,6 +35,19 @@ export function activateNextWave(state: WaveManagerState): void {
   state.spawnTimerMs = 0;
 }
 
+/**
+ * Re-arms the CURRENT wave (does NOT increment currentWave) — used when
+ * Active Idle progression stops and the player retries the same phase
+ * after upgrading towers/changing build, instead of restarting from Wave 1.
+ * Kept separate from `activateNextWave` (the sole wave-advancing entry
+ * point) so that invariant stays true for every other caller.
+ */
+export function retryCurrentWave(state: WaveManagerState): void {
+  state.spawnQueue = generateWaveSpawns(state.currentWave);
+  state.phase = "SPAWNING";
+  state.spawnTimerMs = 0;
+}
+
 export interface WaveTickResult {
   enemyTypeToSpawn: EnemyType | null;
   waveJustCleared: boolean;

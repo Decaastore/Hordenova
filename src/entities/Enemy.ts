@@ -12,6 +12,26 @@ export interface BurnEffect {
   remainingMs: number;
 }
 
+/**
+ * Optional boss/mini-boss metadata. Undefined for every regular enemy —
+ * bosses are otherwise a normal EnemyInstance (same movement, damage,
+ * status-effect pipeline), so combat/rendering code that doesn't care about
+ * bosses needs zero special-casing. See engine/BossManager.ts.
+ */
+export interface BossState {
+  bossId: string;
+  name: string;
+  isMainBoss: boolean;
+  ability: "SUMMON" | "SHIELD" | "NONE";
+  abilityIntervalMs: number;
+  /** The enemy's normal damageReduction, restored once a SHIELD window ends. */
+  baseDamageReduction: number;
+  /** World-clock (performance.now()) timestamp a SHIELD window ends, or null when inactive. */
+  shieldUntilMs: number | null;
+  /** World-clock timestamp the next ability trigger is due. */
+  nextAbilityAtMs: number;
+}
+
 export interface EnemyInstance {
   id: string;
   type: EnemyType;
@@ -26,6 +46,7 @@ export interface EnemyInstance {
   direction: Vector2;
   slow: SlowEffect | null;
   burn: BurnEffect | null;
+  boss?: BossState;
 }
 
 let nextEnemyId = 1;

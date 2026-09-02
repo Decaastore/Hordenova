@@ -611,17 +611,26 @@ function drawStormcaller(
 // Enemies.
 // ---------------------------------------------------------------------------
 
+/**
+ * `scale` lets boss/mini-boss enemies (see entities/Enemy.ts `boss` field)
+ * reuse the same silhouettes at a larger, more imposing size instead of
+ * needing dedicated art for this phase's one boss — CanvasRenderer passes
+ * a boss-specific scale + draws an aura ring behind it; every regular
+ * enemy call site keeps the default (1) and is visually unchanged.
+ */
 export function drawEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: EnemyInstance,
   timeMs: number,
   hitFlashMs = Infinity,
+  scale = 1,
 ): void {
   const theme = ENEMY_THEME[enemy.type];
   const angle = Math.atan2(enemy.direction.y, enemy.direction.x);
 
   ctx.save();
   ctx.translate(enemy.position.x, enemy.position.y);
+  if (scale !== 1) ctx.scale(scale, scale);
 
   // Contact shadow is cast in world space, drawn BEFORE the body rotates to
   // face its travel direction — otherwise the shadow would swing around
@@ -664,8 +673,33 @@ export function drawEnemy(
 
   ctx.restore();
 
+  if (enemy.boss) return; // boss HP is shown in a dedicated top-of-screen banner, not a floating bar.
   if (enemy.type === "CRAWLER") drawHpBarPremium(ctx, enemy);
   else drawHpBar(ctx, enemy);
+}
+
+/** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
+export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
+  if (!enemy.boss) return;
+  const pulse = 0.55 + 0.25 * Math.sin(timeMs / 400);
+  const radius = (enemy.boss.isMainBoss ? 30 : 20) * pulse;
+  const color = enemy.boss.isMainBoss ? "rgba(226,87,74,0.45)" : "rgba(255,180,80,0.4)";
+  const gradient = ctx.createRadialGradient(
+    enemy.position.x,
+    enemy.position.y,
+    0,
+    enemy.position.x,
+    enemy.position.y,
+    radius,
+  );
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.save();
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(enemy.position.x, enemy.position.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
 }
 
 function drawHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {

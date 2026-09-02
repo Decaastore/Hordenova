@@ -1,7 +1,7 @@
 /**
  * Central data table for every tower type. No tower number should exist
- * anywhere outside this file (runtime scaling formulas live in
- * entities/Tower.ts, but the raw values below are the single source of truth).
+ * anywhere outside this file (runtime scaling formulas live here too now —
+ * entities/Tower.ts only forwards into getTowerLevelStats()).
  */
 
 export type TowerType = "IRONWOOD" | "INFERNO" | "FROSTBORN" | "STORMCALLER";
@@ -13,15 +13,35 @@ export const TOWER_TYPES: readonly TowerType[] = [
   "STORMCALLER",
 ];
 
-export const MAX_TOWER_LEVEL = 5;
+/**
+ * 30 levels, not 5 — Core Gameplay + Progression spec section 3: upgrades
+ * must stay perceptible across a long build-and-strategize loop, not cap out
+ * after a handful of clicks. Growth is formula-based (see
+ * `levelGrowthMultiplier`) so it scales cleanly to any MAX_TOWER_LEVEL
+ * instead of needing a hand-authored table entry per level.
+ */
+export const MAX_TOWER_LEVEL = 30;
 
 /**
- * Per-level multipliers applied to base stats. Index 0 = Level 1 (100%).
- * Range growth follows the spec's target curve (100/110/120/130/145%).
+ * Levels at which a tower gets a step-change on top of its normal per-level
+ * growth — the spec's "not endless flat +1%/+2%, some levels should feel
+ * meaningfully different" requirement. Individual tower types also hang
+ * unique behavior unlocks off specific milestones (see
+ * `getTowerSpecialAtLevel` — e.g. Ironwood gains a second projectile at
+ * level 10).
  */
-const RANGE_MULTIPLIERS: readonly number[] = [1.0, 1.1, 1.2, 1.3, 1.45];
-const DAMAGE_MULTIPLIERS: readonly number[] = [1.0, 1.25, 1.55, 1.9, 2.3];
-const ATTACK_SPEED_MULTIPLIERS: readonly number[] = [1.0, 1.08, 1.16, 1.24, 1.35];
+const MILESTONE_LEVELS: readonly number[] = [5, 10, 15, 20, 25, 30];
+
+function milestonesPassed(level: number): number {
+  return MILESTONE_LEVELS.filter((milestone) => level >= milestone).length;
+}
+
+/** Smooth per-level growth plus a step bump at each milestone level. */
+function levelGrowthMultiplier(level: number): number {
+  const smooth = (level - 1) * 0.09;
+  const milestoneBump = milestonesPassed(level) * 0.15;
+  return 1 + smooth + milestoneBump;
+}
 
 export interface IronwoodSpecial {
   critChance: number; // 0..1
@@ -43,6 +63,12 @@ export interface StormcallerSpecial {
   chainTargets: number; // extra targets hit beyond the primary one
   chainFalloff: number; // damage multiplier applied per chain jump
 }
+
+export type TowerSpecial =
+  | ({ type: "IRONWOOD" } & IronwoodSpecial)
+  | ({ type: "INFERNO" } & InfernoSpecial)
+  | ({ type: "FROSTBORN" } & FrostbornSpecial)
+  | ({ type: "STORMCALLER" } & StormcallerSpecial);
 
 export interface TowerDefinition {
   type: TowerType;
@@ -103,6 +129,7 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
   },
 };
 
+/** Level-1 baseline for each tower's special behavior — the growth curves in `getTowerSpecialAtLevel` build on these. */
 export const TOWER_SPECIALS: {
   IRONWOOD: IronwoodSpecial;
   INFERNO: InfernoSpecial;
@@ -120,19 +147,84 @@ export interface TowerLevelStats {
   damage: number;
   attackSpeed: number;
   range: number;
+  /** Extra targets a single attack cycle can hit beyond the primary target. 1 = no bonus. */
+  projectileCount: number;
 }
 
 /** Level is 1-indexed (Level 1..MAX_TOWER_LEVEL). */
 export function getTowerLevelStats(type: TowerType, level: number): TowerLevelStats {
   const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
-  const index = clamped - 1;
   const def = TOWER_DEFINITIONS[type];
+  const growth = levelGrowthMultiplier(clamped) - 1;
+
+  // Damage grows fastest, range slowest — keeps "upgrade damage" the
+  // headline choice while range/attack-speed still meaningfully improve.
+  const damage = def.baseDamage * (1 + growth * 1.35);
+  const attackSpeed = def.baseAttackSpeed * (1 + growth * 0.55);
+  const range = def.baseRange * (1 + growth * 0.35);
+
+  let projectileCount = 1;
+  if (type === "IRONWOOD") {
+    if (clamped >= 20) projectileCount = 3;
+    else if (clamped >= 10) projectileCount = 2;
+  }
+
   return {
     level: clamped,
-    damage: round2(def.baseDamage * (DAMAGE_MULTIPLIERS[index] ?? 1)),
-    attackSpeed: round2(def.baseAttackSpeed * (ATTACK_SPEED_MULTIPLIERS[index] ?? 1)),
-    range: round2(def.baseRange * (RANGE_MULTIPLIERS[index] ?? 1)),
+    damage: round2(damage),
+    attackSpeed: round2(attackSpeed),
+    range: round2(range),
+    projectileCount,
   };
+}
+
+/**
+ * Level-scaled special behavior per tower type — the architectural proof
+ * that every tower's identity-defining stat (not just the generic
+ * damage/speed/range trio) can grow with level. Ironwood already got its
+ * new-behavior unlock (projectile count) via `getTowerLevelStats` above;
+ * this covers the "identifiable power growth" for its crit stats and for
+ * the other three towers' unique mechanics.
+ */
+export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpecial {
+  const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
+  const milestones = milestonesPassed(clamped);
+
+  switch (type) {
+    case "IRONWOOD": {
+      const base = TOWER_SPECIALS.IRONWOOD;
+      return {
+        type: "IRONWOOD",
+        critChance: round2(Math.min(0.6, base.critChance + (clamped - 1) * 0.012)),
+        critMultiplier: round2(base.critMultiplier + milestones * 0.25),
+      };
+    }
+    case "INFERNO": {
+      const base = TOWER_SPECIALS.INFERNO;
+      return {
+        type: "INFERNO",
+        aoeRadius: round2(base.aoeRadius + (clamped - 1) * 1.4 + milestones * 4),
+        burnDamagePerSecond: round2(base.burnDamagePerSecond + (clamped - 1) * 0.35),
+        burnDurationMs: base.burnDurationMs + milestones * 300,
+      };
+    }
+    case "FROSTBORN": {
+      const base = TOWER_SPECIALS.FROSTBORN;
+      return {
+        type: "FROSTBORN",
+        slowPercent: round2(Math.min(0.75, base.slowPercent + (clamped - 1) * 0.01)),
+        slowDurationMs: base.slowDurationMs + milestones * 250,
+      };
+    }
+    case "STORMCALLER": {
+      const base = TOWER_SPECIALS.STORMCALLER;
+      return {
+        type: "STORMCALLER",
+        chainTargets: base.chainTargets + Math.floor(clamped / 10),
+        chainFalloff: Math.min(0.85, base.chainFalloff + milestones * 0.04),
+      };
+    }
+  }
 }
 
 /** Gold cost to go from `currentLevel` to `currentLevel + 1`. Returns null at max level. */

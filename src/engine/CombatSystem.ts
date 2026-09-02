@@ -13,7 +13,7 @@ import {
   type EnemyInstance,
 } from "@/entities/Enemy";
 import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
-import { TOWER_SPECIALS } from "@/config/towerStats";
+import { getTowerSpecialAtLevel, type TowerType } from "@/config/towerStats";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -22,6 +22,21 @@ import { distance, type Vector2 } from "@/utils/geometry";
  * combat AND enemy movement (burn ticks also kill enemies) have both run,
  * so a kill is never attributed twice.
  */
+
+/** One instance of a tower dealing damage — feeds BattleDiagnostics' failure-report recommendations. */
+export interface DamageEvent {
+  towerId: string;
+  towerType: TowerType;
+  enemyId: string;
+  amount: number;
+  /** The target's damageReduction at the moment of the hit — flags "high resistance" fights for diagnostics. */
+  targetDamageReduction: number;
+}
+
+export interface CombatTickResult {
+  projectiles: ProjectileInstance[];
+  damageEvents: DamageEvent[];
+}
 
 /** The enemy furthest along the path within range — classic "first" TD targeting. */
 export function findPrimaryTarget(
@@ -62,8 +77,21 @@ export function tickCombat(
   towers: readonly TowerInstance[],
   enemies: readonly EnemyInstance[],
   dtMs: number,
-): ProjectileInstance[] {
+): CombatTickResult {
   const projectiles: ProjectileInstance[] = [];
+  const damageEvents: DamageEvent[] = [];
+
+  const dealDamage = (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number): void => {
+    const targetDamageReduction = enemy.damageReduction;
+    const actual = applyDamageToEnemy(enemy, rawDamage);
+    damageEvents.push({
+      towerId: tower.id,
+      towerType: tower.type,
+      enemyId: enemy.id,
+      amount: actual,
+      targetDamageReduction,
+    });
+  };
 
   for (const tower of towers) {
     tickTowerCooldown(tower, dtMs);
@@ -74,29 +102,39 @@ export function tickCombat(
     if (!target) continue;
 
     resetTowerCooldown(tower);
+    const special = getTowerSpecialAtLevel(tower.type, tower.level);
 
-    if (tower.type === "IRONWOOD") {
-      const special = TOWER_SPECIALS.IRONWOOD;
+    if (special.type === "IRONWOOD") {
       const isCrit = Math.random() < special.critChance;
-      applyDamageToEnemy(target, stats.damage * (isCrit ? special.critMultiplier : 1));
+      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1));
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
-    } else if (tower.type === "INFERNO") {
-      const special = TOWER_SPECIALS.INFERNO;
+
+      // Extra projectiles (unlocked at level 10/20, see towerStats.ts) hit
+      // additional nearby targets instead of piling more damage onto one —
+      // a real behavior change, not just a bigger number.
+      const alreadyHit = new Set<string>([target.id]);
+      for (let i = 1; i < stats.projectileCount; i++) {
+        const extra = findNearestUnhit(tower.position, stats.range, enemies, alreadyHit);
+        if (!extra) break;
+        const extraCrit = Math.random() < special.critChance;
+        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1));
+        projectiles.push(createProjectile(tower.type, tower.position, extra.position));
+        alreadyHit.add(extra.id);
+      }
+    } else if (special.type === "INFERNO") {
       for (const enemy of enemies) {
         if (isEnemyDead(enemy)) continue;
         if (distance(target.position, enemy.position) > special.aoeRadius) continue;
-        applyDamageToEnemy(enemy, stats.damage);
+        dealDamage(tower, enemy, stats.damage);
         applyBurn(enemy, special.burnDamagePerSecond, special.burnDurationMs);
       }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
-    } else if (tower.type === "FROSTBORN") {
-      const special = TOWER_SPECIALS.FROSTBORN;
-      applyDamageToEnemy(target, stats.damage);
+    } else if (special.type === "FROSTBORN") {
+      dealDamage(tower, target, stats.damage);
       applySlow(target, special.slowPercent, special.slowDurationMs);
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
-    } else if (tower.type === "STORMCALLER") {
-      const special = TOWER_SPECIALS.STORMCALLER;
-      applyDamageToEnemy(target, stats.damage);
+    } else if (special.type === "STORMCALLER") {
+      dealDamage(tower, target, stats.damage);
 
       const chainImpactPoints: Vector2[] = [];
       const alreadyHit = new Set<string>([target.id]);
@@ -107,7 +145,7 @@ export function tickCombat(
         chainDamage *= special.chainFalloff;
         const next = findNearestUnhit(chainOrigin.position, stats.range * 0.6, enemies, alreadyHit);
         if (!next) break;
-        applyDamageToEnemy(next, chainDamage);
+        dealDamage(tower, next, chainDamage);
         chainImpactPoints.push(next.position);
         alreadyHit.add(next.id);
         chainOrigin = next;
@@ -119,5 +157,5 @@ export function tickCombat(
     }
   }
 
-  return projectiles;
+  return { projectiles, damageEvents };
 }

@@ -18,7 +18,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
+import { drawBossAura, drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 
@@ -189,7 +189,8 @@ export function CanvasRenderer({
       for (const enemy of snapshot.enemies) {
         const hitFlashMs =
           enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
-        drawEnemy(ctx, enemy, timestamp, hitFlashMs);
+        if (enemy.boss) drawBossAura(ctx, enemy, timestamp);
+        drawEnemy(ctx, enemy, timestamp, hitFlashMs, enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : 1);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
 
