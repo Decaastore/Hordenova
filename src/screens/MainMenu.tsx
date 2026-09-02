@@ -33,7 +33,7 @@ export function MainMenu({ onStart }: MainMenuProps) {
   return (
     <div style={rootStyle}>
       <style>{SCENE_KEYFRAMES}</style>
-      <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.14)" : "scale(1)" }}>
+      <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.4)" : "scale(1)" }}>
         <MenuBackground transitionAt={transitionAt} />
         <div style={scrimStyle} />
       </div>
@@ -58,6 +58,27 @@ export function MainMenu({ onStart }: MainMenuProps) {
 
           <div style={playWrapStyle}>
             <div style={playHaloStyle} aria-hidden="true" />
+            <div style={{ ...playHoverGlowStyle, opacity: hover ? 1 : 0 }} aria-hidden="true" />
+            <div
+              style={{
+                ...playEnergyRingStyle,
+                animationPlayState: hover ? "running" : "paused",
+                visibility: hover ? "visible" : "hidden",
+              }}
+              aria-hidden="true"
+            />
+            {PLAY_PARTICLE_ANGLES.map((angle, i) => (
+              <div
+                key={angle}
+                aria-hidden="true"
+                style={{
+                  ...playParticleStyle,
+                  transitionDelay: `${i * 35}ms`,
+                  transform: `translate(-50%, -50%) rotate(${angle}deg) translateX(${hover ? 16 : 74}px)`,
+                  opacity: hover ? 0.85 : 0,
+                }}
+              />
+            ))}
             <button
               onClick={handlePlay}
               onMouseEnter={() => setHover(true)}
@@ -70,7 +91,14 @@ export function MainMenu({ onStart }: MainMenuProps) {
               }}
             >
               <span style={buttonLabelStyle}>{t("menu.play")}</span>
-              <span style={{ ...shimmerStyle, animationPlayState: hover ? "running" : "paused" }} aria-hidden="true" />
+              <span
+                style={{
+                  ...shimmerStyle,
+                  animationPlayState: hover ? "running" : "paused",
+                  visibility: hover ? "visible" : "hidden",
+                }}
+                aria-hidden="true"
+              />
             </button>
           </div>
 
@@ -93,7 +121,13 @@ const SCENE_KEYFRAMES = `
   0% { transform: translateX(-120%) skewX(-18deg); }
   100% { transform: translateX(220%) skewX(-18deg); }
 }
+@keyframes hordenova-play-ring {
+  0% { transform: translate(-50%, -50%) scale(0.75); opacity: 0.8; }
+  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+}
 `;
+
+const PLAY_PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
 
 const rootStyle: CSSProperties = {
   position: "relative",
@@ -106,7 +140,8 @@ const rootStyle: CSSProperties = {
 const zoomWrapStyle: CSSProperties = {
   position: "absolute",
   inset: 0,
-  transition: `transform ${TRANSITION_DURATION_MS}ms ease-in`,
+  transformOrigin: "17% 74%",
+  transition: `transform ${TRANSITION_DURATION_MS}ms cubic-bezier(0.5, 0, 0.85, 0.4)`,
 };
 
 const flashStyle: CSSProperties = {
@@ -114,8 +149,8 @@ const flashStyle: CSSProperties = {
   inset: 0,
   zIndex: 3,
   pointerEvents: "none",
-  background: "radial-gradient(circle at 17% 74%, rgba(240,216,255,0.95), rgba(192,96,245,0.55) 45%, rgba(20,10,30,0.98) 100%)",
-  transition: `opacity ${TRANSITION_DURATION_MS}ms ease-in`,
+  background: "radial-gradient(circle at 17% 74%, rgba(255,255,255,0.98), rgba(220,180,255,0.7) 40%, rgba(20,10,30,0.98) 100%)",
+  transition: `opacity ${TRANSITION_DURATION_MS}ms cubic-bezier(0.5, 0, 0.85, 0.4)`,
 };
 
 const uiLayerStyle: CSSProperties = {
@@ -204,6 +239,47 @@ const playHaloStyle: CSSProperties = {
   height: "min(220px, 26vh)",
   background: "radial-gradient(ellipse at center, rgba(255,210,87,0.45), rgba(255,210,87,0) 68%)",
   animation: "hordenova-play-halo 2.6s ease-in-out infinite",
+  pointerEvents: "none",
+};
+
+/** A stronger glow that grows in on hover — separate from the always-on halo since that one is CSS-keyframe-driven and can't take an inline opacity override. */
+const playHoverGlowStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  transform: "translate(-50%, -50%)",
+  width: "min(620px, 72vw)",
+  height: "min(280px, 32vh)",
+  background: "radial-gradient(ellipse at center, rgba(255,225,140,0.55), rgba(255,210,87,0) 65%)",
+  transition: "opacity 260ms ease-out",
+  pointerEvents: "none",
+};
+
+/** A ring of energy expanding outward, looping only while hovered — the "pequena onda de energia". */
+const playEnergyRingStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  width: "min(340px, 42vw)",
+  height: "min(150px, 18vh)",
+  borderRadius: "50%",
+  border: "2px solid rgba(255,232,180,0.85)",
+  animation: "hordenova-play-ring 1.15s ease-out infinite",
+  transition: "opacity 200ms ease-out",
+  pointerEvents: "none",
+};
+
+/** Small motes converging on the button when hovered — the "partículas discretas convergindo". */
+const playParticleStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  top: "50%",
+  width: 4,
+  height: 4,
+  borderRadius: "50%",
+  background: PALETTE.gold,
+  boxShadow: `0 0 6px ${PALETTE.gold}`,
+  transition: "transform 480ms ease-out, opacity 480ms ease-out",
   pointerEvents: "none",
 };
 

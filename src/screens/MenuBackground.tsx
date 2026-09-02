@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createSceneState, drawMenuScene, MENU_SCENE_SIZE } from "@/rendering/MenuScene";
 
-export const TRANSITION_DURATION_MS = 900;
+export const TRANSITION_DURATION_MS = 1500;
 
 interface MenuBackgroundProps {
   /** Timestamp (performance.now()) the click-to-play transition started, or null when idle. */
@@ -10,11 +10,12 @@ interface MenuBackgroundProps {
 
 /**
  * Full-bleed cinematic backdrop for the main menu — a purpose-built scene
- * (see rendering/MenuScene.ts) with constant ambient motion (fire, smoke,
- * mist, banners, sway, drifting motes) plus occasional randomized
- * "moments" it schedules itself. "Cover" fit against a fixed virtual
- * canvas size, a subtle lerped pointer-parallax, and pointer tracking in
- * scene-space so the portal/motes can react to cursor proximity.
+ * (see rendering/MenuScene.ts) with a restrained ambient baseline (smoke,
+ * mist, motes) plus three large choreographed hero events it schedules
+ * and rotates through itself (portal surge, creature pass, distant
+ * combat). "Cover" fit against a fixed virtual canvas size, a subtle
+ * lerped pointer-parallax, and pointer tracking in scene-space so the
+ * portal/motes can react to cursor proximity.
  */
 export function MenuBackground({ transitionAt }: MenuBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
