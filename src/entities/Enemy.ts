@@ -1,4 +1,4 @@
-import { getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
+import { ENEMY_DEFINITIONS, getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
 
@@ -22,9 +22,10 @@ export interface BurnEffect {
  */
 export interface BossState {
   bossId: string;
-  name: string;
+  /** i18n key (bosses.<nameKey>.name) — NOT a display string, see config/bossConfig.ts BossDefinition.i18nKey. */
+  nameKey: string;
   isMainBoss: boolean;
-  ability: "SUMMON" | "SHIELD" | "NONE";
+  ability: "SUMMON" | "SHIELD" | "REGEN" | "DISABLE" | "BERSERKER" | "NONE";
   abilityIntervalMs: number;
   /** The enemy's normal damageReduction, restored once a SHIELD window ends. */
   baseDamageReduction: number;
@@ -36,6 +37,11 @@ export interface BossState {
   enraged: boolean;
 }
 
+/** DISABLER-archetype enemies (regular or mini-boss) periodically jam the nearest tower — see CombatSystem.tickEnemyDisableAbilities. */
+export interface DisablerState {
+  nextTriggerAtMs: number;
+}
+
 export interface EnemyInstance {
   id: string;
   type: EnemyType;
@@ -45,18 +51,24 @@ export interface EnemyInstance {
   damageToBase: number;
   goldReward: number;
   damageReduction: number;
+  /** Fraction of maxHp healed per second while alive. 0 for most enemies (REGENERATOR archetype, some mini-bosses). */
+  regenPerSecond: number;
   distanceTraveled: number;
   position: Vector2;
   direction: Vector2;
   slow: SlowEffect | null;
   burn: BurnEffect | null;
   boss?: BossState;
+  disablerState?: DisablerState;
+  /** Elite modifier applied at spawn — see BossManager-style creation in GameEngine.maybeSpawnElite. Purely a marker for rendering/rewards; its stat bumps are already baked into hp/damageToBase/goldReward. */
+  elite?: boolean;
 }
 
 let nextEnemyId = 1;
 
 export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyInstance {
   const stats = getScaledEnemyStats(type, waveNumber);
+  const def = ENEMY_DEFINITIONS[type];
   const start = getPointAtDistance(ENEMY_PATH, 0);
   return {
     id: `enemy-${nextEnemyId++}`,
@@ -67,11 +79,13 @@ export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyI
     damageToBase: stats.damageToBase,
     goldReward: stats.goldReward,
     damageReduction: stats.damageReduction,
+    regenPerSecond: stats.regenPerSecond,
     distanceTraveled: 0,
     position: start.position,
     direction: start.direction,
     slow: null,
     burn: null,
+    disablerState: def.disablerIntervalMs !== undefined ? { nextTriggerAtMs: 0 } : undefined,
   };
 }
 
@@ -96,6 +110,10 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
     burnDamageDealt = tickDamage;
     enemy.burn.remainingMs -= dtMs;
     if (enemy.burn.remainingMs <= 0) enemy.burn = null;
+  }
+
+  if (enemy.regenPerSecond > 0 && enemy.hp > 0) {
+    enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regenPerSecond * dtSeconds);
   }
 
   if (enemy.slow) {
@@ -155,4 +173,31 @@ export function applyBurn(enemy: EnemyInstance, damagePerSecond: number, duratio
   } else {
     enemy.burn = { damagePerSecond, remainingMs: durationMs, stacks: 1 };
   }
+}
+
+/**
+ * Elite variant of a regular enemy — spec section 5: NOT just a bigger HP
+ * number. Stat multipliers are baked into the instance at creation (hp,
+ * speed, damage-to-base, gold reward); regen is the one "special ability"
+ * currently wired up, reusing the exact same passive-heal mechanism as the
+ * Regenerator archetype rather than inventing an elite-only system.
+ */
+export interface EliteModifier {
+  hpMultiplier: number;
+  speedMultiplier: number;
+  damageMultiplier: number;
+  rewardMultiplier: number;
+  regenPercentPerSecond: number;
+}
+
+export function createEliteEnemyInstance(type: EnemyType, waveNumber: number, modifier: EliteModifier): EnemyInstance {
+  const enemy = createEnemyInstance(type, waveNumber);
+  enemy.hp = Math.round(enemy.hp * modifier.hpMultiplier);
+  enemy.maxHp = enemy.hp;
+  enemy.baseSpeed *= modifier.speedMultiplier;
+  enemy.damageToBase = Math.round(enemy.damageToBase * modifier.damageMultiplier);
+  enemy.goldReward = Math.round(enemy.goldReward * modifier.rewardMultiplier);
+  enemy.regenPerSecond = enemy.maxHp * modifier.regenPercentPerSecond;
+  enemy.elite = true;
+  return enemy;
 }

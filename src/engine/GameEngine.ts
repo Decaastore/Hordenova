@@ -9,7 +9,9 @@ import {
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { isBossMilestone } from "@/config/waveConfig";
-import { isMiniBossWave, MAIN_BOSS, MINI_BOSS } from "@/config/bossConfig";
+import { isMiniBossWave, getMainBossForWave, getMiniBossForWave } from "@/config/bossConfig";
+import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
+import type { EnemyType } from "@/config/enemyStats";
 import {
   createTowerInstance,
   getTowerUpgradeCost,
@@ -17,9 +19,16 @@ import {
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import { advanceEnemy, createEnemyInstance, isEnemyDead, type EnemyInstance } from "@/entities/Enemy";
+import {
+  advanceEnemy,
+  createEliteEnemyInstance,
+  createEnemyInstance,
+  isEnemyDead,
+  type EliteModifier,
+  type EnemyInstance,
+} from "@/entities/Enemy";
 import { isProjectileExpired, tickProjectile, type ProjectileInstance } from "@/entities/Projectile";
-import { tickCombat } from "./CombatSystem";
+import { tickCombat, tickEnemyDisableAbilities } from "./CombatSystem";
 import {
   activateNextWave,
   createWaveManagerState,
@@ -43,9 +52,22 @@ import { computeOfflineCapacityMs, simulateOfflineDefense, type OfflineSimulatio
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
 
+/** Elite spec (section 5): real stat multipliers plus a passive-regen "special ability", not just a bigger HP number. */
+const ELITE_MODIFIER: EliteModifier = {
+  hpMultiplier: 1.4,
+  speedMultiplier: 1.2,
+  damageMultiplier: 1.25,
+  rewardMultiplier: 1.6,
+  regenPercentPerSecond: 0.015,
+};
+/** Elites are always built on the Brute silhouette — a consistent "this one's different" read across every phase without needing a bespoke archetype per elite. */
+const ELITE_BASE_TYPE: EnemyType = "BRUTE";
+
 export interface HudSnapshot {
   phase: RunPhase;
   wave: number;
+  /** Current phase's id (config/phaseConfig.ts) — also its i18n key (`phases.<phaseId>.name`) and its biome's registry key. */
+  phaseId: string;
   gold: number;
   baseHp: number;
   maxBaseHp: number;
@@ -53,12 +75,15 @@ export interface HudSnapshot {
   bestWave: number;
   enemiesDefeated: number;
   selectedTowerId: string | null;
-  bossName: string | null;
+  /** i18n key (bosses.<bossNameKey>.name) — NOT a display string. */
+  bossNameKey: string | null;
   bossHp: number | null;
   bossMaxHp: number | null;
   bossIntroRemainingMs: number | null;
   /** Set only while the VICTORY beat plays — the gold the just-defeated boss dropped. */
   bossLastReward: number | null;
+  /** The oldest not-yet-acknowledged newly-discovered enemy type, or null — see GameEngine.acknowledgeDiscovery. */
+  pendingDiscoveryType: EnemyType | null;
 }
 
 export interface RenderSnapshot {
@@ -67,12 +92,14 @@ export interface RenderSnapshot {
   enemies: readonly EnemyInstance[];
   projectiles: readonly ProjectileInstance[];
   selectedTowerId: string | null;
+  biomeId: string;
 }
 
 function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
   return (
     a.phase === b.phase &&
     a.wave === b.wave &&
+    a.phaseId === b.phaseId &&
     a.gold === b.gold &&
     a.baseHp === b.baseHp &&
     a.maxBaseHp === b.maxBaseHp &&
@@ -80,11 +107,12 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bestWave === b.bestWave &&
     a.enemiesDefeated === b.enemiesDefeated &&
     a.selectedTowerId === b.selectedTowerId &&
-    a.bossName === b.bossName &&
+    a.bossNameKey === b.bossNameKey &&
     a.bossHp === b.bossHp &&
     a.bossMaxHp === b.bossMaxHp &&
     a.bossIntroRemainingMs === b.bossIntroRemainingMs &&
-    a.bossLastReward === b.bossLastReward
+    a.bossLastReward === b.bossLastReward &&
+    a.pendingDiscoveryType === b.pendingDiscoveryType
   );
 }
 
@@ -100,6 +128,11 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
  * on startRun()/retryPhase(). Combat itself is fully automatic — nothing
  * in this class waits on a per-wave or per-target player action; the only
  * player-driven calls are build/upgrade decisions and retryPhase().
+ *
+ * Content Progression layer (phases/biomes/archetypes/elites) is entirely
+ * DATA-DRIVEN from config/phaseConfig.ts + config/bossConfig.ts — this
+ * class only asks "what wave is this / what spawns here", never encodes a
+ * wave range or a boss identity itself.
  */
 export class GameEngine {
   private phase: RunPhase = "PRE_RUN";
@@ -116,12 +149,18 @@ export class GameEngine {
   private bestWave = 0;
 
   private bossIntroRemainingMs = 0;
-  private bossIntroName: string | null = null;
+  private bossIntroNameKey: string | null = null;
   private victoryRemainingMs = 0;
   private activeBossId: string | null = null;
+  /** This attempt's own simulated clock (accumulates scaledDt, so it scales with game speed) — see update()'s comment. Boss/mini-boss ability timing reads this instead of a real wall-clock. */
+  private simClockMs = 0;
   private miniBossSpawnedForWave: number | null = null;
+  private eliteSpawnedForWave: number | null = null;
   /** Gold the main boss dropped, kept around through the VICTORY beat so the banner can show it after the boss enemy itself is gone. */
   private lastBossReward: number | null = null;
+
+  private discoveredEnemyTypes = new Set<EnemyType>();
+  private pendingDiscoveries: EnemyType[] = [];
 
   private battleStats: BattleStats = createBattleStats();
   private lastFailureReport: FailureReport | null = null;
@@ -156,6 +195,7 @@ export class GameEngine {
     this.bestWave = save.bestWave;
     this.gold = save.gold;
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
+    this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.wave = createWaveManagerState();
     this.resetAttemptState();
     this.wave.currentWave = save.currentWave;
@@ -221,9 +261,11 @@ export class GameEngine {
     this.battleStats = createBattleStats();
     this.lastFailureReport = null;
     this.miniBossSpawnedForWave = null;
+    this.eliteSpawnedForWave = null;
     this.activeBossId = null;
-    this.bossIntroName = null;
+    this.bossIntroNameKey = null;
     this.lastBossReward = null;
+    this.simClockMs = 0;
   }
 
   /** Starts Wave 1 (fresh save) or resumes/retries the current wave — intercepting into BOSS_INTRO if that wave is a main-boss milestone. */
@@ -244,7 +286,7 @@ export class GameEngine {
     this.wave.spawnQueue = [];
     this.phase = "BOSS_INTRO";
     this.bossIntroRemainingMs = BOSS_INTRO_DURATION_MS;
-    this.bossIntroName = MAIN_BOSS.name;
+    this.bossIntroNameKey = getMainBossForWave(waveNumber).i18nKey;
   }
 
   setSpeed(speed: GameSpeed): void {
@@ -308,12 +350,22 @@ export class GameEngine {
     if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED") return;
 
     const scaledDt = dtMs * this.speed;
-    const nowMs = performance.now();
+    // Boss/mini-boss ability cadence (Shield windows, Summon/Disable
+    // intervals, Enrage's own re-arm) must scale with game speed exactly
+    // like everything else in this tick — movement, tower cooldowns,
+    // status-effect durations. A real wall-clock reference (performance.now())
+    // would NOT scale with `speed`, silently making bosses relatively less
+    // dangerous at 2x/4x (found while writing a test for the mini-boss
+    // ability-ticking fix below: at zero real elapsed time between ticks,
+    // no ability ever fired). This accumulator is this attempt's own
+    // simulated clock instead — reset in resetAttemptState().
+    this.simClockMs += scaledDt;
+    const nowMs = this.simClockMs;
 
     if (this.phase === "BOSS_INTRO") {
       this.bossIntroRemainingMs -= scaledDt;
       if (this.bossIntroRemainingMs <= 0) {
-        const boss = createBossInstance(MAIN_BOSS, this.wave.currentWave, nowMs);
+        const boss = createBossInstance(getMainBossForWave(this.wave.currentWave), this.wave.currentWave, nowMs);
         this.activeBossId = boss.id;
         this.enemies.push(boss);
         this.phase = "BOSS_BATTLE";
@@ -334,13 +386,7 @@ export class GameEngine {
       return;
     }
 
-    if (this.phase === "BOSS_BATTLE") {
-      const boss = this.enemies.find((e) => e.id === this.activeBossId);
-      if (boss) {
-        const summons = tickBossAbilities(boss, nowMs, this.wave.currentWave);
-        this.enemies.push(...summons);
-      }
-    } else {
+    if (this.phase !== "BOSS_BATTLE") {
       // Boss-wave interception: about to auto-transition into a main-boss
       // milestone wave. Skip WaveManager entirely for this tick and hand
       // off to the boss ceremony instead — the next tick after VICTORY
@@ -359,9 +405,26 @@ export class GameEngine {
       const { enemyTypeToSpawn } = tickWaveManager(this.wave, scaledDt, this.enemies.length);
       if (enemyTypeToSpawn) {
         this.enemies.push(createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave));
+        this.maybeDiscover(enemyTypeToSpawn);
       }
       this.maybeSpawnMiniBoss(nowMs);
+      this.maybeSpawnElite();
     }
+
+    tickEnemyDisableAbilities(this.enemies, this.towers, nowMs);
+
+    // Tick every boss-tagged enemy's abilities — the main boss during
+    // BOSS_BATTLE, AND any mini-boss currently walking through a regular
+    // wave. Previously only the tracked main boss was ever ticked here, so
+    // a spawned mini-boss's ability (Shield/Summon/Disable/...) never
+    // actually fired after spawn — found while wiring up the new mini-boss
+    // roster. Fixed by ticking uniformly instead of special-casing the
+    // active boss.
+    const bossSummons: EnemyInstance[] = [];
+    for (const enemy of this.enemies) {
+      if (enemy.boss) bossSummons.push(...tickBossAbilities(enemy, nowMs, this.wave.currentWave, this.towers));
+    }
+    this.enemies.push(...bossSummons);
 
     const reachedBaseIds = new Set<string>();
     for (const enemy of this.enemies) {
@@ -404,7 +467,7 @@ export class GameEngine {
       if (bossDefeatedThisTick) {
         this.phase = "VICTORY";
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
-        this.bestWave = Math.max(this.bestWave, this.wave.currentWave);
+        this.advanceBestWave(this.wave.currentWave);
         this.persist();
       } else if (boss === null) {
         // The boss reached the base and was removed via the normal leak
@@ -416,14 +479,14 @@ export class GameEngine {
         // the base already paid for it in HP, so progression continues.
         this.activeBossId = null;
         activateNextWave(this.wave);
-        this.bestWave = Math.max(this.bestWave, this.wave.currentWave);
+        this.advanceBestWave(this.wave.currentWave);
         this.phase = "RUNNING";
         this.persist();
       }
     } else {
       this.phase = this.wave.phase === "TRANSITIONING" ? "WAVE_TRANSITION" : "RUNNING";
       if (this.wave.phase === "TRANSITIONING") {
-        this.bestWave = Math.max(this.bestWave, this.wave.currentWave);
+        this.advanceBestWave(this.wave.currentWave);
       }
     }
 
@@ -435,12 +498,42 @@ export class GameEngine {
     this.notify();
   }
 
+  /** Raises bestWave and, the first time THIS wave number is ever crossed, grants its milestone bonus (config/phaseConfig.ts) — spec section 12. */
+  private advanceBestWave(wave: number): void {
+    if (wave <= this.bestWave) return;
+    const bonus = getMilestoneBonus(wave);
+    if (bonus > 0) this.gold += bonus;
+    this.bestWave = wave;
+  }
+
   private maybeSpawnMiniBoss(nowMs: number): void {
     if (!isMiniBossWave(this.wave.currentWave)) return;
     if (this.miniBossSpawnedForWave === this.wave.currentWave) return;
     if (this.wave.phase !== "SPAWNING") return;
     this.miniBossSpawnedForWave = this.wave.currentWave;
-    this.enemies.push(createBossInstance(MINI_BOSS, this.wave.currentWave, nowMs));
+    this.enemies.push(createBossInstance(getMiniBossForWave(this.wave.currentWave), this.wave.currentWave, nowMs));
+  }
+
+  /** Elite Wave (spec section 4/5): one stat-and-ability-boosted enemy on top of the wave's normal composition, not a wave-wide change. */
+  private maybeSpawnElite(): void {
+    if (getWaveTag(this.wave.currentWave) !== "ELITE") return;
+    if (this.eliteSpawnedForWave === this.wave.currentWave) return;
+    if (this.wave.phase !== "SPAWNING") return;
+    this.eliteSpawnedForWave = this.wave.currentWave;
+    this.enemies.push(createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER));
+  }
+
+  private maybeDiscover(type: EnemyType): void {
+    if (this.discoveredEnemyTypes.has(type)) return;
+    this.discoveredEnemyTypes.add(type);
+    this.pendingDiscoveries.push(type);
+    this.persist();
+  }
+
+  /** Dismisses the currently-shown "NEW ENEMY" banner (see HudSnapshot.pendingDiscoveryType) so the next one, if any, can show. */
+  acknowledgeDiscovery(): void {
+    this.pendingDiscoveries.shift();
+    this.notify();
   }
 
   private stopProgression(): void {
@@ -462,6 +555,7 @@ export class GameEngine {
       gold: this.gold,
       currentWave: this.wave.currentWave,
       towerLoadout: this.towers.map((t) => ({ slotId: t.slotId, type: t.type, level: t.level })),
+      discoveredEnemyTypes: [...this.discoveredEnemyTypes],
     });
   }
 
@@ -477,6 +571,7 @@ export class GameEngine {
     const next: HudSnapshot = {
       phase: this.phase,
       wave: this.wave.currentWave,
+      phaseId: getPhaseForWave(this.wave.currentWave).id,
       gold: this.gold,
       baseHp: this.baseHp,
       maxBaseHp: this.maxBaseHp,
@@ -484,11 +579,12 @@ export class GameEngine {
       bestWave: this.bestWave,
       enemiesDefeated: this.enemiesDefeated,
       selectedTowerId: this.selectedTowerId,
-      bossName: boss?.boss?.name ?? this.bossIntroName,
+      bossNameKey: boss?.boss?.nameKey ?? this.bossIntroNameKey,
       bossHp: boss ? boss.hp : null,
       bossMaxHp: boss ? boss.maxHp : null,
       bossIntroRemainingMs: this.phase === "BOSS_INTRO" ? Math.max(0, this.bossIntroRemainingMs) : null,
       bossLastReward: this.phase === "VICTORY" ? this.lastBossReward : null,
+      pendingDiscoveryType: this.pendingDiscoveries[0] ?? null,
     };
 
     const prev = this.cachedHud;
@@ -505,6 +601,7 @@ export class GameEngine {
       enemies: this.enemies,
       projectiles: this.projectiles,
       selectedTowerId: this.selectedTowerId,
+      biomeId: getPhaseForWave(this.wave.currentWave).biomeId,
     };
   }
 }

@@ -32,7 +32,7 @@ describe("BattleDiagnostics", () => {
     boss.hp = boss.maxHp * 0.4;
     boss.boss = {
       bossId: "test-boss",
-      name: "Test Boss",
+      nameKey: "TEST_BOSS",
       isMainBoss: true,
       ability: "NONE",
       abilityIntervalMs: 1000,

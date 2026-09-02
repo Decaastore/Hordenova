@@ -171,4 +171,69 @@ describe("GameEngine — Active Idle progression", () => {
     expect(engine.getHudSnapshot().phase).toBe("PROGRESSION_STOPPED");
     expect(engine.getHudSnapshot().wave).toBeGreaterThan(30);
   });
+
+  it("a spawned mini-boss's ability actually fires (regression: it used to only tick the tracked main boss)", () => {
+    // Wave 21 is Ancient Forest's 3rd configured mini-boss wave, and the
+    // deterministic roster (wave % 6) resolves it to "gloom-jammer" —
+    // the DISABLE archetype, whose effect (a jammed tower) is directly
+    // observable. Before the fix, a mini-boss's ability never fired after
+    // spawn because only the BOSS_BATTLE-tracked main boss was ticked.
+    updateSave({ currentWave: 21, gold: 500, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD")).toBe(true);
+
+    let sawDisabledTower = false;
+    for (let i = 0; i < 4000 && !sawDisabledTower; i++) {
+      engine.update(100);
+      const tower = engine.getRenderSnapshot().towers[0];
+      if (tower && tower.disabledRemainingMs > 0) sawDisabledTower = true;
+    }
+
+    expect(sawDisabledTower).toBe(true);
+  });
+
+  it("spawns an Elite enemy on an ELITE-tagged wave", () => {
+    // Wave 18 is one of Ancient Forest's configured ELITE waves.
+    updateSave({ currentWave: 18, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+
+    let sawElite = false;
+    for (let i = 0; i < 200 && !sawElite; i++) {
+      engine.update(100);
+      if (engine.getRenderSnapshot().enemies.some((e) => e.elite)) sawElite = true;
+    }
+
+    expect(sawElite).toBe(true);
+  });
+
+  it("the render snapshot's biome changes with the current phase", () => {
+    const first = new GameEngine();
+    first.startRun();
+    expect(first.getRenderSnapshot().biomeId).toBe("ANCIENT_FOREST");
+
+    window.localStorage.clear();
+    updateSave({ currentWave: 31, gold: 0, towerLoadout: [] });
+    const second = new GameEngine();
+    second.startRun();
+    expect(second.getRenderSnapshot().biomeId).toBe("VOLCANIC_WASTES");
+  });
+
+  it("discovering a new enemy type surfaces it once via HudSnapshot.pendingDiscoveryType, then clears on acknowledgement, and never repeats after reload", () => {
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getHudSnapshot().pendingDiscoveryType).toBeNull();
+
+    engine.update(700); // enough for Wave 1's first Crawler to spawn
+    expect(engine.getHudSnapshot().pendingDiscoveryType).toBe("CRAWLER");
+
+    engine.acknowledgeDiscovery();
+    expect(engine.getHudSnapshot().pendingDiscoveryType).toBeNull();
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+    reloaded.update(700);
+    expect(reloaded.getHudSnapshot().pendingDiscoveryType).toBeNull();
+  });
 });

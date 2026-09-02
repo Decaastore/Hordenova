@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import type { TranslationKey } from "@/i18n/translate";
 
 interface BossBannerProps {
   hud: HudSnapshot;
@@ -21,15 +22,16 @@ export function BossBanner({ hud }: BossBannerProps) {
   const { t } = useLanguage();
   const victoryReward = hud.phase === "VICTORY" ? hud.bossLastReward : null;
   if (hud.phase !== "BOSS_INTRO" && hud.phase !== "BOSS_BATTLE" && victoryReward === null) return null;
-  if (!hud.bossName) return null;
+  if (!hud.bossNameKey) return null;
 
+  const bossName = t(`bosses.${hud.bossNameKey}.name` as TranslationKey);
   const hpRatio = hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1;
   const isEnraged = hud.phase === "BOSS_BATTLE" && hpRatio <= ENRAGE_HP_RATIO;
 
   if (victoryReward !== null) {
     return (
       <div style={containerStyle}>
-        <div style={nameStyle}>{t("boss.defeatedLine", { name: hud.bossName })}</div>
+        <div style={nameStyle}>{t("boss.defeatedLine", { name: bossName })}</div>
         <div style={{ ...subtitleStyle, color: PALETTE.gold }}>{t("boss.rewardLine", { amount: victoryReward })}</div>
       </div>
     );
@@ -37,7 +39,7 @@ export function BossBanner({ hud }: BossBannerProps) {
 
   return (
     <div style={containerStyle}>
-      <div style={nameStyle}>{t("boss.introLine", { name: hud.bossName })}</div>
+      <div style={nameStyle}>{t("boss.introLine", { name: bossName })}</div>
       {hud.phase === "BOSS_BATTLE" ? (
         <>
           {isEnraged && <div style={enragedTagStyle}>{t("boss.enraged")}</div>}

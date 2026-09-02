@@ -14,6 +14,8 @@ export interface TowerInstance {
   level: number;
   position: Vector2;
   cooldownRemainingMs: number;
+  /** >0 while jammed by a DISABLER-archetype enemy/mini-boss — see CombatSystem.tickEnemyDisableAbilities. */
+  disabledRemainingMs: number;
 }
 
 /**
@@ -42,6 +44,7 @@ export function createTowerInstance(
     level: Math.min(Math.max(initialLevel, 1), MAX_TOWER_LEVEL),
     position,
     cooldownRemainingMs: 0,
+    disabledRemainingMs: 0,
   };
 }
 
@@ -62,13 +65,19 @@ export function upgradeTower(tower: TowerInstance): void {
   if (canUpgradeTower(tower)) tower.level += 1;
 }
 
-/** Mutates `tower` in place, ticking its attack cooldown down. */
+/** Mutates `tower` in place, ticking its attack cooldown (and any active jam) down. */
 export function tickTowerCooldown(tower: TowerInstance, dtMs: number): void {
   tower.cooldownRemainingMs = Math.max(0, tower.cooldownRemainingMs - dtMs);
+  tower.disabledRemainingMs = Math.max(0, tower.disabledRemainingMs - dtMs);
 }
 
 export function isTowerReadyToAttack(tower: TowerInstance): boolean {
-  return tower.cooldownRemainingMs <= 0;
+  return tower.cooldownRemainingMs <= 0 && tower.disabledRemainingMs <= 0;
+}
+
+/** Jams the tower for `durationMs` (a DISABLER-archetype hit) — refreshes rather than stacks. */
+export function disableTower(tower: TowerInstance, durationMs: number): void {
+  tower.disabledRemainingMs = Math.max(tower.disabledRemainingMs, durationMs);
 }
 
 /** Resets the cooldown based on the tower's current attack speed (attacks/second). */

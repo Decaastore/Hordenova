@@ -1,5 +1,6 @@
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
+import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 
 /**
@@ -16,6 +17,9 @@ import type { TowerLoadoutEntry } from "@/entities/Tower";
  * spent/used anywhere (see config/essenceConfig.ts, config/blessingConfig.ts)
  * — they exist so a future phase can add the Eternal Tree, Relics/Runes/
  * Artifacts and cosmetic unlocks without another save-format migration.
+ * `xp` and `materials` follow the same pattern for Content Progression spec
+ * section 11's future per-phase reward types — carried, unused, gold-only
+ * rewards stay the real system for now.
  */
 export interface SaveData {
   version: number;
@@ -31,9 +35,15 @@ export interface SaveData {
   inventory: unknown[];
   /** Reserved for future skins/attack-effects/death-effects/castle cosmetics — always [] in this phase. */
   cosmetics: unknown[];
+  /** Reserved for a future XP/leveling system — always 0 in this phase. */
+  xp: number;
+  /** Reserved for future crafting/upgrade materials — always [] in this phase. */
+  materials: unknown[];
+  /** Enemy archetypes the player has ever encountered — drives the one-time "NEW ENEMY" discovery banner, see GameEngine.maybeDiscover. */
+  discoveredEnemyTypes: EnemyType[];
 }
 
-export const SAVE_DATA_VERSION = 2;
+export const SAVE_DATA_VERSION = 3;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -45,6 +55,9 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   towerLoadout: [],
   inventory: [],
   cosmetics: [],
+  xp: 0,
+  materials: [],
+  discoveredEnemyTypes: [],
 };
 
 function isStorageAvailable(): boolean {
@@ -77,12 +90,18 @@ function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
   return entries;
 }
 
+function parseDiscoveredEnemyTypes(raw: unknown): EnemyType[] {
+  if (!Array.isArray(raw)) return [];
+  const valid = new Set<EnemyType>(ENEMY_TYPES);
+  return raw.filter((entry): entry is EnemyType => valid.has(entry));
+}
+
 export function loadSave(): SaveData {
-  if (!isStorageAvailable()) return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [] };
+  if (!isStorageAvailable()) return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [], materials: [], discoveredEnemyTypes: [] };
 
   try {
     const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
-    if (!raw) return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [] };
+    if (!raw) return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [], materials: [], discoveredEnemyTypes: [] };
 
     const parsed = JSON.parse(raw) as Partial<SaveData>;
     return {
@@ -95,9 +114,12 @@ export function loadSave(): SaveData {
       towerLoadout: parseTowerLoadout(parsed.towerLoadout),
       inventory: Array.isArray(parsed.inventory) ? parsed.inventory : [],
       cosmetics: Array.isArray(parsed.cosmetics) ? parsed.cosmetics : [],
+      xp: typeof parsed.xp === "number" ? parsed.xp : 0,
+      materials: Array.isArray(parsed.materials) ? parsed.materials : [],
+      discoveredEnemyTypes: parseDiscoveredEnemyTypes(parsed.discoveredEnemyTypes),
     };
   } catch {
-    return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [] };
+    return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [], materials: [], discoveredEnemyTypes: [] };
   }
 }
 

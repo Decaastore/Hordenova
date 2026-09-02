@@ -1,50 +1,87 @@
 import type { EnemyType } from "./enemyStats";
+import { getPhaseForWave, getWaveTag, isMainBossWave } from "./phaseConfig";
 
 /**
  * Procedural wave composition. Nothing here is a hardcoded per-wave array —
- * waves are generated from a small set of tier rules so the system scales
- * indefinitely past wave 50, per spec section 13.
+ * waves are generated from a small set of tier rules, now filtered through
+ * the active phase's enemy pool (config/phaseConfig.ts) and nudged by that
+ * wave's tag (ELITE/SWARM) — so composition variety is phase-configurable,
+ * not hardcoded in the engine, per Content Progression spec section 4/9.
  *
- * Progression follows the spec:
+ * Base tier progression (applies inside whatever pool the current phase
+ * allows — a later phase's pool naturally re-weights these once its extra
+ * archetypes exist):
  *  1-5   Crawler only
- *  6-10  Crawler + Runner
- *  11-15 Brute introduced
- *  16-20 Shieldbearer introduced
- *  21-29 combinations
- *  30    marked as a boss milestone (combat not implemented yet, see below)
- *  31-49 harder combinations
- *  50    marked as a boss milestone (bigger)
- *  51+   continues scaling using the same tier-4 composition weights
+ *  6-10  + Runner
+ *  11-15 + Brute
+ *  16-20 + Shieldbearer
+ *  21-27 combinations
+ *  28+   + Ironclad/Regenerator/Disabler enter the mix (heavier, more varied)
  *
- * NOTE: Boss combat (Goliath) is intentionally NOT implemented in this
- * phase. `isBossMilestone` only marks the wave number so a future phase can
- * hook boss spawning in without touching this file's scaling logic.
+ * A SWARM-tagged wave heavily favors Swarmling and spawns more enemies
+ * (spec: "Wave: Armored + Swarm" style combinations come from stacking a
+ * tag on top of the tier weights, not a fully bespoke per-wave table).
  */
 
 type EnemyWeights = Partial<Record<EnemyType, number>>;
 
-function weightsForWave(waveNumber: number): EnemyWeights {
+function tierWeightsForWave(waveNumber: number): EnemyWeights {
   if (waveNumber <= 5) return { CRAWLER: 1 };
   if (waveNumber <= 10) return { CRAWLER: 0.7, RUNNER: 0.3 };
   if (waveNumber <= 15) return { CRAWLER: 0.55, RUNNER: 0.25, BRUTE: 0.2 };
-  if (waveNumber <= 20) {
-    return { CRAWLER: 0.4, RUNNER: 0.2, BRUTE: 0.2, SHIELDBEARER: 0.2 };
-  }
-  if (waveNumber <= 29) {
-    return { CRAWLER: 0.3, RUNNER: 0.25, BRUTE: 0.25, SHIELDBEARER: 0.2 };
-  }
-  // 30+ (including the 30/50 milestones): heavier, tankier mix.
-  return { CRAWLER: 0.2, RUNNER: 0.2, BRUTE: 0.3, SHIELDBEARER: 0.3 };
+  if (waveNumber <= 20) return { CRAWLER: 0.4, RUNNER: 0.2, BRUTE: 0.2, SHIELDBEARER: 0.2 };
+  if (waveNumber <= 27) return { CRAWLER: 0.3, RUNNER: 0.25, BRUTE: 0.25, SHIELDBEARER: 0.2 };
+  // 28+: the full archetype roster is in play — armored, regenerating and
+  // disabling threats mixed in with the originals, forcing real build
+  // decisions instead of just "more of the same, higher HP".
+  return {
+    CRAWLER: 0.14,
+    RUNNER: 0.16,
+    BRUTE: 0.18,
+    SHIELDBEARER: 0.16,
+    IRONCLAD: 0.14,
+    REGENERATOR: 0.12,
+    DISABLER: 0.1,
+  };
 }
 
-/** Total enemy count for a wave — grows steadily, capped for performance. */
+/** Restricts + renormalizes tier weights to whatever archetypes the current phase's pool allows. */
+function weightsForWave(waveNumber: number): EnemyWeights {
+  const pool = new Set(getPhaseForWave(waveNumber).enemyPool);
+  const tag = getWaveTag(waveNumber);
+
+  if (tag === "SWARM" && pool.has("SWARMLING")) {
+    // A Swarm wave is mostly Swarmlings with a thin backbone of whatever
+    // else the phase allows, so it isn't literally invulnerable to non-AoE.
+    const base = tierWeightsForWave(waveNumber);
+    const thinned: EnemyWeights = {};
+    for (const [type, weight] of Object.entries(base) as [EnemyType, number][]) {
+      if (pool.has(type)) thinned[type] = weight * 0.25;
+    }
+    return { ...thinned, SWARMLING: 3 };
+  }
+
+  const tiered = tierWeightsForWave(waveNumber);
+  const restricted: EnemyWeights = {};
+  let total = 0;
+  for (const [type, weight] of Object.entries(tiered) as [EnemyType, number][]) {
+    if (!pool.has(type)) continue;
+    restricted[type] = weight;
+    total += weight;
+  }
+  if (total === 0) return { CRAWLER: 1 }; // safety net — never return an empty pool
+  return restricted;
+}
+
+/** Total enemy count for a wave — grows steadily, capped for performance. A Swarm wave gets a real numbers spike on top. */
 function enemyCountForWave(waveNumber: number): number {
   const raw = 6 + Math.floor(waveNumber * 0.8);
-  return Math.min(raw, 26);
+  const base = Math.min(raw, 26);
+  return getWaveTag(waveNumber) === "SWARM" ? Math.round(base * 1.6) : base;
 }
 
 export function isBossMilestone(waveNumber: number): boolean {
-  return waveNumber === 30 || (waveNumber >= 50 && waveNumber % 20 === 10);
+  return isMainBossWave(waveNumber);
 }
 
 /** Deterministic per-wave PRNG so a given wave's composition is reproducible. */

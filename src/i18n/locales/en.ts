@@ -127,7 +127,8 @@ export const en = {
       bossSurvived: "The boss survived with health remaining when your base fell.",
       overwhelmedByNumbers: "Too many enemies reached the base at once — your defense couldn't cover the volume.",
       tankyEnemiesLeaked: "High-HP enemies (Brutes) broke through your defense.",
-      armoredEnemiesLeaked: "Armored enemies (Shieldbearers) shrugged off your damage and reached the base.",
+      armoredEnemiesLeaked: "Armored enemies (Shieldbearers/Ironclads) shrugged off your damage and reached the base.",
+      regeneratingEnemiesLeaked: "Enemies that heal over time (Regenerators) outlasted your chip damage and reached the base.",
       lowDps: "Your overall damage output is too low for this phase's enemies.",
     },
     continueBuilding: "UPGRADE TOWERS",
@@ -145,6 +146,77 @@ export const en = {
     currentProgression: "CURRENT PROGRESSION",
     phaseLabel: "Phase {phase}",
     continueButton: "CONTINUE",
+  },
+  phaseBanner: {
+    entering: "Entering",
+  },
+  discovery: {
+    newEnemy: "New Enemy",
+    weakness: "Weakness",
+  },
+  phases: {
+    ANCIENT_FOREST: { name: "Ancient Forest", tagline: "Corrupted roots and restless creatures" },
+    VOLCANIC_WASTES: { name: "Volcanic Wastes", tagline: "Ash, cinder, and creatures that thrive in the heat" },
+    FROZEN_TUNDRA: { name: "Frozen Tundra", tagline: "Bone-deep cold that slows everything but the enemy" },
+    CURSED_DESERT: { name: "Cursed Desert", tagline: "Buried ruins and magic gone wrong" },
+    DARK_RUINS: { name: "Dark Ruins", tagline: "Fallen stone, and the dead that still walk it" },
+    ABYSS: { name: "Abyss", tagline: "Whatever's left, in its most extreme form" },
+  },
+  enemies: {
+    CRAWLER: {
+      name: "Crawler",
+      description: "A basic scuttling threat with balanced stats.",
+      weakness: "No particular weakness — a fair fight for any tower.",
+    },
+    RUNNER: {
+      name: "Runner",
+      description: "Very fast and fragile, built to slip past slow-firing towers.",
+      weakness: "Slow / Crowd Control",
+    },
+    BRUTE: {
+      name: "Brute",
+      description: "High HP and slow — a straightforward test of sustained damage.",
+      weakness: "Single Target / Boss Damage",
+    },
+    SHIELDBEARER: {
+      name: "Shieldbearer",
+      description: "A flat damage shield blunts every hit it takes.",
+      weakness: "Magic / Armor Penetration",
+    },
+    SWARMLING: {
+      name: "Swarmling",
+      description: "Tiny and cheap, but arrives in overwhelming numbers.",
+      weakness: "Area Damage / Splash",
+    },
+    REGENERATOR: {
+      name: "Regenerator",
+      description: "Steadily heals while alive — chip damage barely dents it.",
+      weakness: "Burst Damage / Critical Hits",
+    },
+    IRONCLAD: {
+      name: "Ironclad",
+      description: "Heavy armor greatly reduces physical damage.",
+      weakness: "Magic / Armor Penetration",
+    },
+    DISABLER: {
+      name: "Disabler",
+      description: "Periodically jams the nearest tower, silencing it for a moment.",
+      weakness: "Redundant coverage — losing one tower to a jam shouldn't matter",
+    },
+  },
+  bosses: {
+    HOLLOW_WARDEN: { name: "The Hollow Warden" },
+    MOLTEN_COLOSSUS: { name: "The Molten Colossus" },
+    GLACIAL_SOVEREIGN: { name: "The Glacial Sovereign" },
+    SAND_DEVOURER: { name: "The Sand Devourer" },
+    GRAVE_TYRANT: { name: "The Grave Tyrant" },
+    ABYSSAL_MAW: { name: "The Abyssal Maw" },
+    ASHFEN_WARLORD: { name: "Ashfen Warlord" },
+    BRIAR_SUMMONER: { name: "Briar Summoner" },
+    MOSSBACK_REGENERATOR: { name: "Mossback Regenerator" },
+    GLOOM_JAMMER: { name: "Gloom Jammer" },
+    STONEBOUND_SENTINEL: { name: "Stonebound Sentinel" },
+    FEROCIOUS_BERSERKER: { name: "Ferocious Berserker" },
   },
 } as const;
 

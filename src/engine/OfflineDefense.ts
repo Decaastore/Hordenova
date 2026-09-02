@@ -2,8 +2,12 @@ import type { TowerLoadoutEntry } from "@/entities/Tower";
 import { getTowerLevelStats } from "@/config/towerStats";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 import { generateWaveSpawns, isBossMilestone } from "@/config/waveConfig";
-import { isMiniBossWave, MAIN_BOSS, MINI_BOSS } from "@/config/bossConfig";
+import { isMiniBossWave, getMainBossForWave, getMiniBossForWave } from "@/config/bossConfig";
+import { getWaveTag } from "@/config/phaseConfig";
 import { ENEMY_SPAWN_INTERVAL_MS, WAVE_TRANSITION_DURATION_MS } from "@/config/gameBalance";
+
+/** Coarse elite-wave difficulty bump for the offline threat estimate — matches GameEngine's ELITE_MODIFIER.hpMultiplier without needing to simulate the elite enemy itself. */
+const ELITE_WAVE_HP_MULTIPLIER = 1.4;
 
 /**
  * Offline Defense — spec section 11. A SEPARATE architecture from Active
@@ -65,9 +69,10 @@ interface WaveThreat {
 function estimateWaveThreat(waveNumber: number): WaveThreat {
   if (isBossMilestone(waveNumber)) {
     const bruteHp = getScaledEnemyStats("BRUTE", waveNumber).hp;
+    const mainBoss = getMainBossForWave(waveNumber);
     return {
-      totalHp: bruteHp * MAIN_BOSS.hpMultiplierVsBrute,
-      goldReward: MAIN_BOSS.goldReward,
+      totalHp: bruteHp * mainBoss.hpMultiplierVsBrute,
+      goldReward: mainBoss.goldReward,
       durationBudgetMs: BOSS_FIGHT_BUDGET_MS,
       isMainBoss: true,
       isMiniBoss: false,
@@ -86,8 +91,17 @@ function estimateWaveThreat(waveNumber: number): WaveThreat {
   const miniBoss = isMiniBossWave(waveNumber);
   if (miniBoss) {
     const bruteHp = getScaledEnemyStats("BRUTE", waveNumber).hp;
-    totalHp += bruteHp * MINI_BOSS.hpMultiplierVsBrute;
-    goldReward += MINI_BOSS.goldReward;
+    const miniBossDef = getMiniBossForWave(waveNumber);
+    totalHp += bruteHp * miniBossDef.hpMultiplierVsBrute;
+    goldReward += miniBossDef.goldReward;
+  }
+
+  // Elite Waves add one stat-boosted enemy on top of the normal
+  // composition (see GameEngine.maybeSpawnElite) — approximate its extra
+  // threat coarsely rather than simulating the elite spawn itself.
+  if (getWaveTag(waveNumber) === "ELITE") {
+    const bruteHp = getScaledEnemyStats("BRUTE", waveNumber).hp;
+    totalHp += bruteHp * ELITE_WAVE_HP_MULTIPLIER;
   }
 
   const durationBudgetMs = spawns.length * ENEMY_SPAWN_INTERVAL_MS + WAVE_TRANSITION_DURATION_MS;

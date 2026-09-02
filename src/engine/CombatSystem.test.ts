@@ -140,7 +140,7 @@ describe("CombatSystem", () => {
       regularTarget.position = { x: 20, y: 0 };
       bossTarget.boss = {
         bossId: "test",
-        name: "Test Boss",
+        nameKey: "TEST_BOSS",
         isMainBoss: true,
         ability: "NONE",
         abilityIntervalMs: 1000,
@@ -172,7 +172,7 @@ describe("CombatSystem", () => {
       regularTarget.position = { x: 20, y: 0 };
       bossTarget.boss = {
         bossId: "test",
-        name: "Test Boss",
+        nameKey: "TEST_BOSS",
         isMainBoss: true,
         ability: "NONE",
         abilityIntervalMs: 1000,

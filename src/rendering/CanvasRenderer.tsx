@@ -6,7 +6,7 @@ import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ENEMY_THEME } from "./theme";
-import { ACTIVE_BIOME } from "./biomes";
+import { getBiome } from "./biomes";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -18,7 +18,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawBossAura, drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
+import { drawBossAura, drawEliteAura, drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 
@@ -157,15 +157,17 @@ export function CanvasRenderer({
       prevGold = hud.gold;
       vfx.update(frameDt);
 
+      const biome = getBiome(snapshot.biomeId);
+
       const { scale, offsetX, offsetY } = transformRef.current;
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
 
-      drawBackground(ctx, ACTIVE_BIOME);
-      drawDecorations(ctx, ACTIVE_BIOME, timestamp);
-      drawPath(ctx, ENEMY_PATH, ACTIVE_BIOME);
-      drawPathEndpoints(ctx, ENEMY_PATH, ACTIVE_BIOME, timestamp);
+      drawBackground(ctx, biome);
+      drawDecorations(ctx, biome, timestamp);
+      drawPath(ctx, ENEMY_PATH, biome);
+      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
@@ -175,7 +177,7 @@ export function CanvasRenderer({
           index,
           occupiedSlotIds.has(slot.id),
           pendingTowerTypeRef.current !== null,
-          ACTIVE_BIOME,
+          biome,
           timestamp,
         );
       });
@@ -193,15 +195,18 @@ export function CanvasRenderer({
         const hitFlashMs =
           enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
         if (enemy.boss) drawBossAura(ctx, enemy, timestamp);
-        drawEnemy(ctx, enemy, timestamp, hitFlashMs, enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : 1);
+        else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
+        const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;
+        const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
+        drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
 
       vfx.draw(ctx);
 
-      drawFog(ctx, ACTIVE_BIOME, timestamp);
-      drawAmbientParticles(ctx, ACTIVE_BIOME, timestamp);
-      drawVignette(ctx, ACTIVE_BIOME);
+      drawFog(ctx, biome, timestamp);
+      drawAmbientParticles(ctx, biome, timestamp);
+      drawVignette(ctx, biome);
 
       rafId = requestAnimationFrame(draw);
     };

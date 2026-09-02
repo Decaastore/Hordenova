@@ -3,6 +3,7 @@ import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import type { TranslationKey } from "@/i18n/translate";
 import { BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
@@ -20,7 +21,12 @@ export function HUD({ hud, onSetSpeed }: HUDProps) {
       <div style={brandStyle}>HORDENOVA</div>
 
       <div style={groupStyle}>
-        <Stat icon={<WaveIcon color={PALETTE.uiAccent} />} label={t("hud.wave")} value={String(hud.wave)} />
+        <Stat
+          icon={<WaveIcon color={PALETTE.uiAccent} />}
+          label={t("hud.wave")}
+          value={String(hud.wave)}
+          sublabel={t(`phases.${hud.phaseId}.name` as TranslationKey)}
+        />
         <Stat
           icon={<ShieldIcon color={hpColor} />}
           label={t("hud.baseHp")}
@@ -69,11 +75,14 @@ function Stat({
   label,
   value,
   valueColor,
+  sublabel,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   valueColor?: string;
+  /** Small caption under the value — used for the current phase/biome name under the wave counter. */
+  sublabel?: string;
 }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 92 }}>
@@ -81,6 +90,7 @@ function Stat({
       <div>
         <div style={labelStyle}>{label}</div>
         <div style={{ ...valueStyle, color: valueColor ?? valueStyle.color }}>{value}</div>
+        {sublabel && <div style={sublabelStyle}>{sublabel}</div>}
       </div>
     </div>
   );
@@ -123,6 +133,14 @@ const labelStyle: CSSProperties = {
   letterSpacing: 1.4,
   color: PALETTE.uiTextDim,
   textTransform: "uppercase",
+};
+
+const sublabelStyle: CSSProperties = {
+  fontSize: 9.5,
+  color: PALETTE.uiAccent,
+  letterSpacing: 0.3,
+  marginTop: 1,
+  whiteSpace: "nowrap",
 };
 
 const valueStyle: CSSProperties = {

@@ -58,6 +58,14 @@ export const ENEMY_THEME: Record<EnemyType, EnemyTheme> = {
   RUNNER: { body: "#f5d23a", dark: "#a8790f", accent: "#fff2a0" },
   BRUTE: { body: "#c9432f", dark: "#7a2418", accent: "#f5a06a" },
   SHIELDBEARER: { body: "#4a78c4", dark: "#1f3f7a", accent: "#b8d4f5" },
+  // Four Content Progression archetypes — reuse the closest existing
+  // silhouette (see EntityRenderer.drawEnemy's switch) but with their own
+  // distinct color identity, so they read as different threats at a
+  // glance even without bespoke geometry yet.
+  SWARMLING: { body: "#3a4a2a", dark: "#1a220f", accent: "#d4ff8a" }, // pale, washed-out — reads as individually weak
+  REGENERATOR: { body: "#2a4a2e", dark: "#12220f", accent: "#5aff8a" }, // healing green glow
+  IRONCLAD: { body: "#5a5a62", dark: "#26262c", accent: "#ffb84a" }, // dull steel with a warm rivet glow
+  DISABLER: { body: "#3a2a4a", dark: "#180f22", accent: "#c88aff" }, // interference violet
 };
 
 /**

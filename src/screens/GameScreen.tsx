@@ -7,6 +7,8 @@ import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
 import { ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
 import { BossBanner } from "@/ui/BossBanner";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
+import { PhaseBanner } from "@/ui/PhaseBanner";
+import { EnemyDiscoveryBanner } from "@/ui/EnemyDiscoveryBanner";
 import type { TowerType } from "@/config/towerStats";
 
 interface GameScreenProps {
@@ -75,6 +77,10 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         />
 
         <BossBanner hud={hud} />
+        <PhaseBanner phaseId={hud.phaseId} />
+        {hud.pendingDiscoveryType && (
+          <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={() => engine.acknowledgeDiscovery()} />
+        )}
 
         {selectedTower && (
           <TowerInfoPanel

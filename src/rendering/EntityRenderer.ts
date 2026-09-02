@@ -653,6 +653,22 @@ export function drawEnemy(
     case "SHIELDBEARER":
       drawShieldbearer(ctx, theme);
       break;
+    // Four Content Progression archetypes reuse the closest existing
+    // silhouette — their own theme color (see theme.ts) plus the
+    // type-based scale CanvasRenderer applies is what differentiates them
+    // for now, ahead of any bespoke art.
+    case "SWARMLING":
+      drawCrawler(ctx, theme, timeMs, hitFlashMs);
+      break;
+    case "REGENERATOR":
+      drawBrute(ctx, theme);
+      break;
+    case "IRONCLAD":
+      drawShieldbearer(ctx, theme);
+      break;
+    case "DISABLER":
+      drawRunner(ctx, theme, timeMs);
+      break;
   }
   ctx.restore();
 
@@ -711,8 +727,31 @@ export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance
   ctx.restore();
 }
 
+/** Pulsing golden aura marking an Elite spawn (spec section 5) — a consistent "this one's different" cue independent of its base archetype's own theme color. */
+export function drawEliteAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
+  if (!enemy.elite) return;
+  const pulse = 0.5 + 0.3 * Math.sin(timeMs / 260);
+  const radius = 22 * pulse;
+  const gradient = ctx.createRadialGradient(
+    enemy.position.x,
+    enemy.position.y,
+    0,
+    enemy.position.x,
+    enemy.position.y,
+    radius,
+  );
+  gradient.addColorStop(0, "rgba(255,214,90,0.55)");
+  gradient.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.save();
+  ctx.fillStyle = gradient;
+  ctx.beginPath();
+  ctx.arc(enemy.position.x, enemy.position.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {
-  const radius = enemy.type === "BRUTE" ? 13 : enemy.type === "SHIELDBEARER" ? 11 : 9;
+  const radius = enemy.type === "BRUTE" || enemy.type === "REGENERATOR" ? 13 : enemy.type === "SHIELDBEARER" || enemy.type === "IRONCLAD" ? 11 : 9;
   const hpRatio = Math.max(enemy.hp / enemy.maxHp, 0);
   const barWidth = radius * 2.2;
   const barX = enemy.position.x - barWidth / 2;

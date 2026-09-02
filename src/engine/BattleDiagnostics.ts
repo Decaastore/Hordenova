@@ -17,7 +17,7 @@ export interface BattleStats {
   enemiesReachedBaseByType: Partial<Record<EnemyType, number>>;
   totalBaseDamageTaken: number;
   bossEncountered: boolean;
-  bossName: string | null;
+  bossNameKey: string | null;
   bossHpPercentRemaining: number | null;
   highResistanceHits: number;
   totalHits: number;
@@ -32,7 +32,7 @@ export function createBattleStats(): BattleStats {
     enemiesReachedBaseByType: {},
     totalBaseDamageTaken: 0,
     bossEncountered: false,
-    bossName: null,
+    bossNameKey: null,
     bossHpPercentRemaining: null,
     highResistanceHits: 0,
     totalHits: 0,
@@ -63,7 +63,7 @@ export function recordBaseHit(stats: BattleStats, enemy: EnemyInstance): void {
 export function recordBossSnapshot(stats: BattleStats, boss: EnemyInstance | null): void {
   if (!boss?.boss) return;
   stats.bossEncountered = true;
-  stats.bossName = boss.boss.name;
+  stats.bossNameKey = boss.boss.nameKey;
   stats.bossHpPercentRemaining = boss.maxHp > 0 ? boss.hp / boss.maxHp : 0;
 }
 
@@ -82,6 +82,7 @@ export type RecommendationReasonKey =
   | "overwhelmedByNumbers"
   | "tankyEnemiesLeaked"
   | "armoredEnemiesLeaked"
+  | "regeneratingEnemiesLeaked"
   | "lowDps";
 
 export interface UpgradeRecommendation {
@@ -160,8 +161,11 @@ export function generateFailureReport(
   };
 
   const fastLeaks = stats.enemiesReachedBaseByType.RUNNER ?? 0;
-  const armoredLeaks = stats.enemiesReachedBaseByType.SHIELDBEARER ?? 0;
+  // Shieldbearer (flat reduction) and Ironclad (heavier flat reduction) are
+  // both "armored" from the build's perspective — same fix either way.
+  const armoredLeaks = (stats.enemiesReachedBaseByType.SHIELDBEARER ?? 0) + (stats.enemiesReachedBaseByType.IRONCLAD ?? 0);
   const heavyLeaks = stats.enemiesReachedBaseByType.BRUTE ?? 0;
+  const regeneratingLeaks = stats.enemiesReachedBaseByType.REGENERATOR ?? 0;
   const totalLeaks = Object.values(stats.enemiesReachedBaseByType).reduce((sum, count) => sum + (count ?? 0), 0);
   const resistanceRatio = stats.totalHits > 0 ? stats.highResistanceHits / stats.totalHits : 0;
   const totalDamageDealt = Object.values(stats.damageDealtByTowerType).reduce((sum, amount) => sum + amount, 0);
@@ -194,6 +198,13 @@ export function generateFailureReport(
   if (heavyLeaks > 0) {
     reasonKeys.push("tankyEnemiesLeaked");
     addRecommendation("IRONWOOD", "tankyEnemiesLeaked");
+  }
+
+  // Regenerator heals through chip damage — the fix is a bigger hit per
+  // shot (Ironwood's crit/multi-shot burst), not more attacks per second.
+  if (regeneratingLeaks > 0) {
+    reasonKeys.push("regeneratingEnemiesLeaked");
+    addRecommendation("IRONWOOD", "regeneratingEnemiesLeaked");
   }
 
   if (totalLeaks >= 4) {

@@ -1,4 +1,5 @@
 import {
+  disableTower,
   getTowerStats,
   isTowerReadyToAttack,
   resetTowerCooldown,
@@ -14,6 +15,7 @@ import {
 } from "@/entities/Enemy";
 import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
 import { getTowerSpecialAtLevel, type TowerType } from "@/config/towerStats";
+import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -71,6 +73,47 @@ function findNearestUnhit(
     }
   }
   return best;
+}
+
+/**
+ * DISABLER-archetype enemies (regular type or a mini-boss with the DISABLE
+ * ability) periodically jam the nearest tower — spec section 3's "the
+ * enemy interferes with the build itself, not just its own stats". Shared
+ * by both call sites (GameEngine, per regular DISABLER enemy) and
+ * BossManager's DISABLE ability case) so there's one implementation of
+ * "find and jam the nearest tower", not two.
+ */
+export function tryDisableNearestTower(
+  origin: Vector2,
+  radius: number,
+  durationMs: number,
+  towers: readonly TowerInstance[],
+): void {
+  let nearest: TowerInstance | null = null;
+  let nearestDistance = Infinity;
+  for (const tower of towers) {
+    const d = distance(origin, tower.position);
+    if (d > radius || d >= nearestDistance) continue;
+    nearest = tower;
+    nearestDistance = d;
+  }
+  if (nearest) disableTower(nearest, durationMs);
+}
+
+/** Ticks every regular DISABLER-type enemy's jam cooldown, triggering `tryDisableNearestTower` when due. Mini-boss DISABLE is handled separately by BossManager (it already has its own ability-cadence ticking). */
+export function tickEnemyDisableAbilities(
+  enemies: readonly EnemyInstance[],
+  towers: readonly TowerInstance[],
+  nowMs: number,
+): void {
+  for (const enemy of enemies) {
+    if (enemy.type !== "DISABLER" || !enemy.disablerState || isEnemyDead(enemy)) continue;
+    if (nowMs < enemy.disablerState.nextTriggerAtMs) continue;
+
+    const def = ENEMY_DEFINITIONS.DISABLER;
+    enemy.disablerState.nextTriggerAtMs = nowMs + (def.disablerIntervalMs ?? 4000);
+    tryDisableNearestTower(enemy.position, def.disablerRadius ?? 260, def.disablerDurationMs ?? 1500, towers);
+  }
 }
 
 export function tickCombat(
