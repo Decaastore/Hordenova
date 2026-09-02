@@ -46,6 +46,8 @@ interface PrevEnemyState {
   direction: Vector2;
   /** World-clock timestamp (rAF time) this enemy was last hit — drives the Crawler hit-flash. */
   lastHitTimestamp: number;
+  /** A boss/mini-boss death gets the same premium burst treatment as the Crawler proof piece — an event, not a routine kill. */
+  isBoss: boolean;
 }
 
 /**
@@ -146,6 +148,7 @@ export function CanvasRenderer({
               type: e.type,
               direction: e.direction,
               lastHitTimestamp: hit ? timestamp : (prior?.lastHitTimestamp ?? -Infinity),
+              isBoss: e.boss !== undefined,
             },
           ];
         }),
@@ -291,7 +294,7 @@ function detectVfxEvents(
   for (const [id, prev] of prevEnemies) {
     if (currentIds.has(id)) continue;
     if (prev.hp <= 0.01) {
-      const premium = prev.type === "CRAWLER";
+      const premium = prev.type === "CRAWLER" || prev.isBoss;
       vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
       killPositionsThisFrame.push(prev.position);
     } else {

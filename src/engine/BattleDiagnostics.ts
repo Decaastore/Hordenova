@@ -81,6 +81,7 @@ export type RecommendationReasonKey =
   | "bossSurvived"
   | "overwhelmedByNumbers"
   | "tankyEnemiesLeaked"
+  | "armoredEnemiesLeaked"
   | "lowDps";
 
 export interface UpgradeRecommendation {
@@ -159,7 +160,8 @@ export function generateFailureReport(
   };
 
   const fastLeaks = stats.enemiesReachedBaseByType.RUNNER ?? 0;
-  const tankyLeaks = (stats.enemiesReachedBaseByType.BRUTE ?? 0) + (stats.enemiesReachedBaseByType.SHIELDBEARER ?? 0);
+  const armoredLeaks = stats.enemiesReachedBaseByType.SHIELDBEARER ?? 0;
+  const heavyLeaks = stats.enemiesReachedBaseByType.BRUTE ?? 0;
   const totalLeaks = Object.values(stats.enemiesReachedBaseByType).reduce((sum, count) => sum + (count ?? 0), 0);
   const resistanceRatio = stats.totalHits > 0 ? stats.highResistanceHits / stats.totalHits : 0;
   const totalDamageDealt = Object.values(stats.damageDealtByTowerType).reduce((sum, amount) => sum + amount, 0);
@@ -174,12 +176,22 @@ export function generateFailureReport(
     addRecommendation("IRONWOOD", "bossSurvived");
   }
 
-  if (resistanceRatio > 0.3) {
-    reasonKeys.push("highResistance");
-    addRecommendation("IRONWOOD", "highResistance");
+  // Armored enemies (Shieldbearer's flat damage reduction) and a high
+  // ratio of hits landing on heavily-armored targets both point at the
+  // same fix: Stormcaller's Arcane Surge is the only tower that actually
+  // ignores armor — Ironwood/Inferno/Frostborn hit just as hard whether or
+  // not the target is armored, so recommending them here wouldn't help.
+  if (armoredLeaks > 0) {
+    reasonKeys.push("armoredEnemiesLeaked");
+    addRecommendation("STORMCALLER", "armoredEnemiesLeaked");
   }
 
-  if (tankyLeaks > 0) {
+  if (resistanceRatio > 0.3) {
+    reasonKeys.push("highResistance");
+    addRecommendation("STORMCALLER", "highResistance");
+  }
+
+  if (heavyLeaks > 0) {
     reasonKeys.push("tankyEnemiesLeaked");
     addRecommendation("IRONWOOD", "tankyEnemiesLeaked");
   }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
-import { loadSave } from "./SaveSystem";
+import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 const TICK_MS = 50;
@@ -141,5 +141,34 @@ describe("GameEngine — Active Idle progression", () => {
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
     expect(loadSave().lastPlayedAt).not.toBeNull();
+  });
+
+  it("a main boss that reaches the base without dying does not soft-lock BOSS_BATTLE (regression)", () => {
+    // Seed a save exactly at the Wave 30 boss milestone with an empty
+    // build, so the boss takes zero damage and is guaranteed to walk to
+    // the base and "escape" (removed via the leak path, not isEnemyDead)
+    // instead of ever dying — the exact scenario a balance simulation
+    // found could permanently soft-lock BOSS_BATTLE before this was fixed.
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_INTRO");
+
+    let sawBossBattle = false;
+    let iterations = 0;
+    const maxIterations = 20_000; // 2000s simulated — the boss crossing the path takes well under 200s
+    while (engine.getHudSnapshot().phase !== "PROGRESSION_STOPPED" && iterations < maxIterations) {
+      if (engine.getHudSnapshot().phase === "BOSS_BATTLE") sawBossBattle = true;
+      engine.update(100);
+      iterations++;
+    }
+
+    expect(sawBossBattle).toBe(true);
+    // Must have resolved (either fell through to more undefended waves and
+    // stopped, or otherwise moved on) well within the tick budget — never
+    // stuck at wave 30 in BOSS_BATTLE forever.
+    expect(iterations).toBeLessThan(maxIterations);
+    expect(engine.getHudSnapshot().phase).toBe("PROGRESSION_STOPPED");
+    expect(engine.getHudSnapshot().wave).toBeGreaterThan(30);
   });
 });

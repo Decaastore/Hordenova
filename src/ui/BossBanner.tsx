@@ -7,25 +7,44 @@ interface BossBannerProps {
   hud: HudSnapshot;
 }
 
+/** Below this HP fraction the boss is enraged (see BossManager) — the banner flags it so the escalation reads as intentional, not a glitch. */
+const ENRAGE_HP_RATIO = 0.3;
+
 /**
- * Boss structure per spec section 7: name + HP bar shown while a main boss
- * fight is in progress, plus a brief cinematic "boss approaching" beat
- * during BOSS_INTRO before the boss itself has even spawned.
+ * Boss structure per spec section 9: name + HP bar during the fight, a
+ * "boss approaching" beat during BOSS_INTRO before it has even spawned,
+ * an ENRAGED tag once it crosses the low-HP threshold, and a defeated +
+ * reward beat during the VICTORY pause — the full entrance-to-reward arc
+ * in one small always-present readout instead of leaving VICTORY silent.
  */
 export function BossBanner({ hud }: BossBannerProps) {
   const { t } = useLanguage();
-  if (hud.phase !== "BOSS_INTRO" && hud.phase !== "BOSS_BATTLE") return null;
+  const victoryReward = hud.phase === "VICTORY" ? hud.bossLastReward : null;
+  if (hud.phase !== "BOSS_INTRO" && hud.phase !== "BOSS_BATTLE" && victoryReward === null) return null;
   if (!hud.bossName) return null;
 
   const hpRatio = hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1;
+  const isEnraged = hud.phase === "BOSS_BATTLE" && hpRatio <= ENRAGE_HP_RATIO;
+
+  if (victoryReward !== null) {
+    return (
+      <div style={containerStyle}>
+        <div style={nameStyle}>{t("boss.defeatedLine", { name: hud.bossName })}</div>
+        <div style={{ ...subtitleStyle, color: PALETTE.gold }}>{t("boss.rewardLine", { amount: victoryReward })}</div>
+      </div>
+    );
+  }
 
   return (
     <div style={containerStyle}>
       <div style={nameStyle}>{t("boss.introLine", { name: hud.bossName })}</div>
       {hud.phase === "BOSS_BATTLE" ? (
-        <div style={barTrackStyle}>
-          <div style={{ ...barFillStyle, width: `${hpRatio * 100}%` }} />
-        </div>
+        <>
+          {isEnraged && <div style={enragedTagStyle}>{t("boss.enraged")}</div>}
+          <div style={barTrackStyle}>
+            <div style={{ ...barFillStyle, width: `${hpRatio * 100}%`, background: isEnraged ? enragedGradient : barFillStyle.background }} />
+          </div>
+        </>
       ) : (
         <div style={subtitleStyle}>{t("boss.getReady")}</div>
       )}
@@ -76,4 +95,14 @@ const barFillStyle: CSSProperties = {
   background: `linear-gradient(90deg, ${PALETTE.danger}, #ff9a6a)`,
   boxShadow: `0 0 10px ${PALETTE.danger}aa`,
   transition: "width 150ms ease",
+};
+
+const enragedGradient = "linear-gradient(90deg, #ff2e2e, #ffb347)";
+
+const enragedTagStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: 1.5,
+  color: "#ff6a4a",
+  textShadow: "0 0 8px rgba(255,60,30,0.8)",
 };

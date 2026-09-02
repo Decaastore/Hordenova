@@ -681,9 +681,18 @@ export function drawEnemy(
 /** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
 export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
   if (!enemy.boss) return;
-  const pulse = 0.55 + 0.25 * Math.sin(timeMs / 400);
-  const radius = (enemy.boss.isMainBoss ? 30 : 20) * pulse;
-  const color = enemy.boss.isMainBoss ? "rgba(226,87,74,0.45)" : "rgba(255,180,80,0.4)";
+  // Enraged (below 30% HP, main boss only — see BossManager) reads through
+  // the aura itself: faster pulse, hotter color — no extra state needed,
+  // this is derived straight from hp/maxHp the renderer already has.
+  const isEnraged = enemy.boss.isMainBoss && enemy.maxHp > 0 && enemy.hp / enemy.maxHp <= 0.3;
+  const pulseSpeed = isEnraged ? 160 : 400;
+  const pulse = 0.55 + 0.25 * Math.sin(timeMs / pulseSpeed);
+  const radius = (enemy.boss.isMainBoss ? 30 : 20) * pulse * (isEnraged ? 1.15 : 1);
+  const color = isEnraged
+    ? "rgba(255,60,20,0.6)"
+    : enemy.boss.isMainBoss
+      ? "rgba(226,87,74,0.45)"
+      : "rgba(255,180,80,0.4)";
   const gradient = ctx.createRadialGradient(
     enemy.position.x,
     enemy.position.y,

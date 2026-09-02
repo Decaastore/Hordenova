@@ -70,8 +70,23 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
   },
 };
 
-/** Growth applied per wave number to HP only — enemies get tougher, not just more numerous. */
+/** Linear growth applied per wave number to HP — the dominant term early/mid-game. */
 const HP_GROWTH_PER_WAVE = 0.06;
+/**
+ * Small COMPOUNDING growth stacked on top of the linear term. Negligible
+ * for the first ~50 waves (early game must stay easy to learn on), but by
+ * wave ~150-250 it starts meaningfully outpacing even a fully-leveled
+ * (MAX_TOWER_LEVEL-capped) army's fixed maximum DPS, and keeps
+ * accelerating from there — without it, HP grows purely linearly forever
+ * while tower power is capped, so a maxed build's DPS never actually gets
+ * caught: a balance simulation (see BalanceSim.manual.test.ts, not
+ * committed) showed a fully-upgraded 12-tower army still cruising past
+ * wave 850 with zero real pressure, i.e. "leave it on forever and never
+ * need to improve" — exactly what Active Idle must NOT be. This term is
+ * what actually produces the "the build eventually stops" wall the whole
+ * PROGRESSION_STOPPED/upgrade loop is built around.
+ */
+const HP_COMPOUND_PER_WAVE = 0.006;
 /** Small reward growth so later waves stay worth playing. */
 const GOLD_GROWTH_PER_WAVE = 0.03;
 
@@ -86,7 +101,7 @@ export interface ScaledEnemyStats {
 export function getScaledEnemyStats(type: EnemyType, waveNumber: number): ScaledEnemyStats {
   const def = ENEMY_DEFINITIONS[type];
   const waveIndex = Math.max(waveNumber - 1, 0);
-  const hpMultiplier = 1 + waveIndex * HP_GROWTH_PER_WAVE;
+  const hpMultiplier = (1 + waveIndex * HP_GROWTH_PER_WAVE) * Math.pow(1 + HP_COMPOUND_PER_WAVE, waveIndex);
   const goldMultiplier = 1 + waveIndex * GOLD_GROWTH_PER_WAVE;
   return {
     hp: Math.round(def.baseHp * hpMultiplier),

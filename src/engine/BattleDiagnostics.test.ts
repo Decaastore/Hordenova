@@ -39,6 +39,7 @@ describe("BattleDiagnostics", () => {
       baseDamageReduction: 0,
       shieldUntilMs: null,
       nextAbilityAtMs: 0,
+      enraged: false,
     };
     recordBossSnapshot(stats, boss);
 

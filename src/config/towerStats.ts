@@ -27,8 +27,8 @@ export const MAX_TOWER_LEVEL = 30;
  * growth — the spec's "not endless flat +1%/+2%, some levels should feel
  * meaningfully different" requirement. Individual tower types also hang
  * unique behavior unlocks off specific milestones (see
- * `getTowerSpecialAtLevel` — e.g. Ironwood gains a second projectile at
- * level 10).
+ * `getTowerSpecialAtLevel` and `MILESTONE_UNLOCKS` below — e.g. Ironwood
+ * gains a second projectile at level 10).
  */
 const MILESTONE_LEVELS: readonly number[] = [5, 10, 15, 20, 25, 30];
 
@@ -46,22 +46,31 @@ function levelGrowthMultiplier(level: number): number {
 export interface IronwoodSpecial {
   critChance: number; // 0..1
   critMultiplier: number;
+  /** Extra multiplier applied only when the target is a boss/mini-boss. 1 = no bonus. Unlocks at level 15 ("Giant Slayer"). */
+  bossDamageMultiplier: number;
 }
 
 export interface InfernoSpecial {
   aoeRadius: number;
   burnDamagePerSecond: number;
   burnDurationMs: number;
+  /** How many overlapping burn applications can stack their DPS on the same target. 1 = no stacking. Unlocks at level 10 ("Wildfire"). */
+  burnMaxStacks: number;
 }
 
 export interface FrostbornSpecial {
   slowPercent: number; // 0..1, fraction of speed removed
   slowDurationMs: number;
+  /** Chance per hit to fully stop the target (a slow of 100%) instead of the normal partial slow. 0 = never. Unlocks at level 10 ("Deep Freeze"). */
+  freezeChance: number;
+  freezeDurationMs: number;
 }
 
 export interface StormcallerSpecial {
   chainTargets: number; // extra targets hit beyond the primary one
   chainFalloff: number; // damage multiplier applied per chain jump
+  /** Fraction of the target's damage reduction ignored on every hit. 0 = none. Unlocks at level 10 ("Arcane Surge") — Stormcaller's answer to armored enemies. */
+  armorPenetration: number;
 }
 
 export type TowerSpecial =
@@ -86,8 +95,8 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
   IRONWOOD: {
     type: "IRONWOOD",
     name: "Ironwood",
-    role: "Single Target / Critical",
-    description: "High single-target damage with a chance to land critical hits.",
+    role: "Single Target / Critical / Boss Damage",
+    description: "High single-target burst with a chance to crit. Gains extra projectiles and a bonus vs bosses as it levels — the tower to lean on when a boss just won't die.",
     buildCost: 50,
     baseDamage: 18,
     baseAttackSpeed: 1.0,
@@ -97,8 +106,8 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
   INFERNO: {
     type: "INFERNO",
     name: "Inferno",
-    role: "Area Damage / Burn",
-    description: "Short-to-medium range splash damage that burns everything it hits.",
+    role: "Area Damage / Sustained Burn",
+    description: "Splash damage that ignites everything it hits. Burn stacks at higher levels, turning a crowded lane into a sustained damage field — built for when too many enemies pile up at once.",
     buildCost: 60,
     baseDamage: 10,
     baseAttackSpeed: 0.9,
@@ -108,8 +117,8 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
   FROSTBORN: {
     type: "FROSTBORN",
     name: "Frostborn",
-    role: "Slow / Crowd Control",
-    description: "Moderate damage; every hit slows the target down.",
+    role: "Slow / Crowd Control / Freeze",
+    description: "Every hit slows its target, and higher levels add a chance to freeze it solid. The answer when fast enemies keep slipping past before your other towers can finish them.",
     buildCost: 55,
     baseDamage: 8,
     baseAttackSpeed: 1.1,
@@ -119,8 +128,8 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
   STORMCALLER: {
     type: "STORMCALLER",
     name: "Stormcaller",
-    role: "Long Range / Chain Damage",
-    description: "Long range lightning that arcs to nearby enemies; attacks slowly.",
+    role: "Magic / Chain Damage / Armor Penetration",
+    description: "Long-range arcane lightning that arcs between enemies and, at higher levels, tears straight through armor. The tower that keeps working when heavily armored enemies shrug off everything else.",
     buildCost: 70,
     baseDamage: 14,
     baseAttackSpeed: 0.6,
@@ -136,10 +145,10 @@ export const TOWER_SPECIALS: {
   FROSTBORN: FrostbornSpecial;
   STORMCALLER: StormcallerSpecial;
 } = {
-  IRONWOOD: { critChance: 0.15, critMultiplier: 2.0 },
-  INFERNO: { aoeRadius: 55, burnDamagePerSecond: 3, burnDurationMs: 3000 },
-  FROSTBORN: { slowPercent: 0.25, slowDurationMs: 2000 },
-  STORMCALLER: { chainTargets: 2, chainFalloff: 0.5 },
+  IRONWOOD: { critChance: 0.15, critMultiplier: 2.0, bossDamageMultiplier: 1 },
+  INFERNO: { aoeRadius: 55, burnDamagePerSecond: 3, burnDurationMs: 3000, burnMaxStacks: 1 },
+  FROSTBORN: { slowPercent: 0.25, slowDurationMs: 2000, freezeChance: 0, freezeDurationMs: 900 },
+  STORMCALLER: { chainTargets: 2, chainFalloff: 0.5, armorPenetration: 0 },
 };
 
 export interface TowerLevelStats {
@@ -181,10 +190,12 @@ export function getTowerLevelStats(type: TowerType, level: number): TowerLevelSt
 /**
  * Level-scaled special behavior per tower type — the architectural proof
  * that every tower's identity-defining stat (not just the generic
- * damage/speed/range trio) can grow with level. Ironwood already got its
- * new-behavior unlock (projectile count) via `getTowerLevelStats` above;
- * this covers the "identifiable power growth" for its crit stats and for
- * the other three towers' unique mechanics.
+ * damage/speed/range trio) can grow with level, AND that towers diverge
+ * from each other rather than just getting bigger versions of the same
+ * numbers. Each tower gets one real new behavior unlocked at level 10 (see
+ * `MILESTONE_UNLOCKS` below for the matching UI callout), which is what
+ * actually makes a build decision matter — not just "which tower has the
+ * biggest number."
  */
 export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpecial {
   const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
@@ -197,6 +208,8 @@ export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpe
         type: "IRONWOOD",
         critChance: round2(Math.min(0.6, base.critChance + (clamped - 1) * 0.012)),
         critMultiplier: round2(base.critMultiplier + milestones * 0.25),
+        // "Giant Slayer" — unlocks at 15, scales further at 25 (both milestone levels).
+        bossDamageMultiplier: clamped >= 15 ? round2(1.25 + (clamped >= 25 ? 0.25 : 0)) : 1,
       };
     }
     case "INFERNO": {
@@ -206,25 +219,82 @@ export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpe
         aoeRadius: round2(base.aoeRadius + (clamped - 1) * 1.4 + milestones * 4),
         burnDamagePerSecond: round2(base.burnDamagePerSecond + (clamped - 1) * 0.35),
         burnDurationMs: base.burnDurationMs + milestones * 300,
+        // "Wildfire" — burn starts stacking at 10, a third stack unlocks at 20.
+        burnMaxStacks: clamped >= 20 ? 3 : clamped >= 10 ? 2 : 1,
       };
     }
     case "FROSTBORN": {
       const base = TOWER_SPECIALS.FROSTBORN;
+      // "Deep Freeze" — a genuine full-stop proc unlocks at 10, "Permafrost" raises its odds at 20.
+      const freezeChance = clamped >= 20 ? 0.3 : clamped >= 10 ? 0.15 : 0;
       return {
         type: "FROSTBORN",
         slowPercent: round2(Math.min(0.75, base.slowPercent + (clamped - 1) * 0.01)),
         slowDurationMs: base.slowDurationMs + milestones * 250,
+        freezeChance,
+        freezeDurationMs: base.freezeDurationMs + (clamped >= 20 ? 400 : 0),
       };
     }
     case "STORMCALLER": {
       const base = TOWER_SPECIALS.STORMCALLER;
+      // "Arcane Surge" — armor penetration unlocks at 10, "Storm Breaker" raises it further at 20.
+      const armorPenetration = clamped >= 20 ? 0.55 : clamped >= 10 ? 0.3 : 0;
       return {
         type: "STORMCALLER",
         chainTargets: base.chainTargets + Math.floor(clamped / 10),
         chainFalloff: Math.min(0.85, base.chainFalloff + milestones * 0.04),
+        armorPenetration,
       };
     }
   }
+}
+
+export interface TowerMilestoneUnlock {
+  level: number;
+  /** i18n key under towerInfo.unlocks.<key>.name / .description */
+  key: TowerMilestoneUnlockKey;
+}
+
+export type TowerMilestoneUnlockKey =
+  | "multiShot"
+  | "giantSlayer"
+  | "tripleShot"
+  | "wildfire"
+  | "infernoCore"
+  | "deepFreeze"
+  | "permafrost"
+  | "arcaneSurge"
+  | "stormBreaker";
+
+/**
+ * Named behavior unlocks shown in the upgrade UI ("LEVEL 10 UNLOCK:
+ * MULTI-SHOT") so a milestone reads as a real event, not just a bigger
+ * number — spec section 7. Purely descriptive metadata; the actual
+ * mechanics live in `getTowerLevelStats`/`getTowerSpecialAtLevel` above.
+ */
+const MILESTONE_UNLOCKS: Record<TowerType, TowerMilestoneUnlock[]> = {
+  IRONWOOD: [
+    { level: 10, key: "multiShot" },
+    { level: 15, key: "giantSlayer" },
+    { level: 20, key: "tripleShot" },
+  ],
+  INFERNO: [
+    { level: 10, key: "wildfire" },
+    { level: 20, key: "infernoCore" },
+  ],
+  FROSTBORN: [
+    { level: 10, key: "deepFreeze" },
+    { level: 20, key: "permafrost" },
+  ],
+  STORMCALLER: [
+    { level: 10, key: "arcaneSurge" },
+    { level: 20, key: "stormBreaker" },
+  ],
+};
+
+/** Returns the named unlock landing exactly at `level` for this tower type, or null if that level is a plain numeric upgrade. */
+export function getMilestoneUnlockForLevel(type: TowerType, level: number): TowerMilestoneUnlock | null {
+  return MILESTONE_UNLOCKS[type].find((unlock) => unlock.level === level) ?? null;
 }
 
 /** Gold cost to go from `currentLevel` to `currentLevel + 1`. Returns null at max level. */

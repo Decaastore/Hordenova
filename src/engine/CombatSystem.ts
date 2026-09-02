@@ -81,9 +81,14 @@ export function tickCombat(
   const projectiles: ProjectileInstance[] = [];
   const damageEvents: DamageEvent[] = [];
 
-  const dealDamage = (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number): void => {
+  const dealDamage = (
+    tower: TowerInstance,
+    enemy: EnemyInstance,
+    rawDamage: number,
+    armorPenetration = 0,
+  ): void => {
     const targetDamageReduction = enemy.damageReduction;
-    const actual = applyDamageToEnemy(enemy, rawDamage);
+    const actual = applyDamageToEnemy(enemy, rawDamage, armorPenetration);
     damageEvents.push({
       towerId: tower.id,
       towerType: tower.type,
@@ -105,8 +110,9 @@ export function tickCombat(
     const special = getTowerSpecialAtLevel(tower.type, tower.level);
 
     if (special.type === "IRONWOOD") {
+      const bossMult = (enemy: EnemyInstance) => (enemy.boss ? special.bossDamageMultiplier : 1);
       const isCrit = Math.random() < special.critChance;
-      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1));
+      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target));
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
 
       // Extra projectiles (unlocked at level 10/20, see towerStats.ts) hit
@@ -117,7 +123,7 @@ export function tickCombat(
         const extra = findNearestUnhit(tower.position, stats.range, enemies, alreadyHit);
         if (!extra) break;
         const extraCrit = Math.random() < special.critChance;
-        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1));
+        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra));
         projectiles.push(createProjectile(tower.type, tower.position, extra.position));
         alreadyHit.add(extra.id);
       }
@@ -126,15 +132,23 @@ export function tickCombat(
         if (isEnemyDead(enemy)) continue;
         if (distance(target.position, enemy.position) > special.aoeRadius) continue;
         dealDamage(tower, enemy, stats.damage);
-        applyBurn(enemy, special.burnDamagePerSecond, special.burnDurationMs);
+        applyBurn(enemy, special.burnDamagePerSecond, special.burnDurationMs, special.burnMaxStacks);
       }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
     } else if (special.type === "FROSTBORN") {
       dealDamage(tower, target, stats.damage);
-      applySlow(target, special.slowPercent, special.slowDurationMs);
+      // Deep Freeze (unlocked at level 10): a chance to fully stop the
+      // target instead of the normal partial slow — reuses the exact same
+      // slow-effect plumbing (100% = a freeze), no new status type needed.
+      const isFreeze = special.freezeChance > 0 && Math.random() < special.freezeChance;
+      if (isFreeze) {
+        applySlow(target, 1, special.freezeDurationMs);
+      } else {
+        applySlow(target, special.slowPercent, special.slowDurationMs);
+      }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
     } else if (special.type === "STORMCALLER") {
-      dealDamage(tower, target, stats.damage);
+      dealDamage(tower, target, stats.damage, special.armorPenetration);
 
       const chainImpactPoints: Vector2[] = [];
       const alreadyHit = new Set<string>([target.id]);
@@ -145,7 +159,7 @@ export function tickCombat(
         chainDamage *= special.chainFalloff;
         const next = findNearestUnhit(chainOrigin.position, stats.range * 0.6, enemies, alreadyHit);
         if (!next) break;
-        dealDamage(tower, next, chainDamage);
+        dealDamage(tower, next, chainDamage, special.armorPenetration);
         chainImpactPoints.push(next.position);
         alreadyHit.add(next.id);
         chainOrigin = next;

@@ -57,6 +57,8 @@ export interface HudSnapshot {
   bossHp: number | null;
   bossMaxHp: number | null;
   bossIntroRemainingMs: number | null;
+  /** Set only while the VICTORY beat plays — the gold the just-defeated boss dropped. */
+  bossLastReward: number | null;
 }
 
 export interface RenderSnapshot {
@@ -81,7 +83,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bossName === b.bossName &&
     a.bossHp === b.bossHp &&
     a.bossMaxHp === b.bossMaxHp &&
-    a.bossIntroRemainingMs === b.bossIntroRemainingMs
+    a.bossIntroRemainingMs === b.bossIntroRemainingMs &&
+    a.bossLastReward === b.bossLastReward
   );
 }
 
@@ -117,6 +120,8 @@ export class GameEngine {
   private victoryRemainingMs = 0;
   private activeBossId: string | null = null;
   private miniBossSpawnedForWave: number | null = null;
+  /** Gold the main boss dropped, kept around through the VICTORY beat so the banner can show it after the boss enemy itself is gone. */
+  private lastBossReward: number | null = null;
 
   private battleStats: BattleStats = createBattleStats();
   private lastFailureReport: FailureReport | null = null;
@@ -218,6 +223,7 @@ export class GameEngine {
     this.miniBossSpawnedForWave = null;
     this.activeBossId = null;
     this.bossIntroName = null;
+    this.lastBossReward = null;
   }
 
   /** Starts Wave 1 (fresh save) or resumes/retries the current wave — intercepting into BOSS_INTRO if that wave is a main-boss milestone. */
@@ -382,7 +388,10 @@ export class GameEngine {
         this.gold += enemy.goldReward;
         this.enemiesDefeated += 1;
         recordKill(this.battleStats, enemy);
-        if (enemy.id === this.activeBossId) bossDefeatedThisTick = true;
+        if (enemy.id === this.activeBossId) {
+          bossDefeatedThisTick = true;
+          this.lastBossReward = enemy.goldReward;
+        }
         continue; // removed, killed by towers/burn
       }
       survivors.push(enemy);
@@ -396,6 +405,19 @@ export class GameEngine {
         this.phase = "VICTORY";
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
         this.bestWave = Math.max(this.bestWave, this.wave.currentWave);
+        this.persist();
+      } else if (boss === null) {
+        // The boss reached the base and was removed via the normal leak
+        // path (reachedBaseIds) instead of dying — it "escaped" rather
+        // than being defeated. Found via balance simulation: without this
+        // branch the engine has no way to leave BOSS_BATTLE once its one
+        // tracked enemy is gone, permanently soft-locking the run. No
+        // reward (it wasn't killed), but Active Idle must never stall —
+        // the base already paid for it in HP, so progression continues.
+        this.activeBossId = null;
+        activateNextWave(this.wave);
+        this.bestWave = Math.max(this.bestWave, this.wave.currentWave);
+        this.phase = "RUNNING";
         this.persist();
       }
     } else {
@@ -466,6 +488,7 @@ export class GameEngine {
       bossHp: boss ? boss.hp : null,
       bossMaxHp: boss ? boss.maxHp : null,
       bossIntroRemainingMs: this.phase === "BOSS_INTRO" ? Math.max(0, this.bossIntroRemainingMs) : null,
+      bossLastReward: this.phase === "VICTORY" ? this.lastBossReward : null,
     };
 
     const prev = this.cachedHud;
