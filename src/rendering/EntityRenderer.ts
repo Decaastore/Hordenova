@@ -2,8 +2,12 @@ import type { TowerInstance } from "@/entities/Tower";
 import type { EnemyInstance } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
+import { MAX_TOWER_LEVEL } from "@/config/towerStats";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawMagicCore, rimHighlight } from "./lighting";
+
+/** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
+const TOWER_MAX_GROWTH = 0.35;
 
 /**
  * Each tower/enemy is drawn as several layered shapes with a thematic
@@ -27,7 +31,7 @@ export function drawTower(
 ): void {
   const stats = getTowerStats(tower);
   const theme = TOWER_THEME[tower.type];
-  const growth = 1 + (stats.level - 1) * 0.09; // subtle scale growth per level
+  const growth = 1 + ((stats.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
   const cooldownTotalMs = 1000 / stats.attackSpeed;
   const readiness = 1 - Math.max(0, Math.min(1, tower.cooldownRemainingMs / cooldownTotalMs));
 
