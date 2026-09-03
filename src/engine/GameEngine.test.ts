@@ -114,6 +114,67 @@ describe("GameEngine — Active Idle progression", () => {
     expect(second.getHudSnapshot().gold).toBe(goldAfterBuild);
   });
 
+  it("F5/reload persistence (spec scenario): Phase 14 + 4 towers at different levels + gold + inventory + playerId all survive a fresh engine instance exactly, with no duplication and no false defeat", () => {
+    // This is the EXACT worked scenario from the persistence spec: seed a
+    // save at a specific phase with specific tower levels (not all maxed,
+    // not all the same — so a bug that only shows up with mixed levels or
+    // partial upgrades can't hide), plus real gold and a real owned item,
+    // then verify a brand-new GameEngine instance (== what a page reload
+    // produces) restores every one of them from the save, not from any
+    // hardcoded/default value.
+    const seededItem = {
+      instanceId: "item-seed-1",
+      itemDefinitionId: "ancient_core",
+      ownerId: "player-seed-1",
+      acquiredAt: 1000,
+      source: { type: "BOSS_DROP" as const, refId: "hollow-warden" },
+      tradable: true,
+      pendingTrade: false,
+      history: [{ timestamp: 1000, event: "ACQUIRED" as const, fromOwner: null, toOwner: "player-seed-1" }],
+    };
+    updateSave({
+      currentWave: 14,
+      bestWave: 14,
+      gold: 733,
+      towerLoadout: [
+        { slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 8 },
+        { slotId: TOWER_SLOTS[1]!.id, type: "INFERNO", level: 10 },
+        { slotId: TOWER_SLOTS[2]!.id, type: "FROSTBORN", level: 6 },
+        { slotId: TOWER_SLOTS[3]!.id, type: "STORMCALLER", level: 7 },
+      ],
+      inventory: [seededItem],
+      playerId: "player-seed-1",
+      bossesDefeatedTotal: 3,
+      miniBossesDefeatedTotal: 2,
+    });
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+
+    const hud = reloaded.getHudSnapshot();
+    expect(hud.wave).toBe(14);
+    expect(hud.gold).toBe(733);
+    expect(hud.phase).not.toBe("PROGRESSION_STOPPED"); // reload must never register a defeat
+
+    const towersByType = Object.fromEntries(reloaded.getRenderSnapshot().towers.map((t) => [t.type, t.level]));
+    expect(towersByType).toEqual({ IRONWOOD: 8, INFERNO: 10, FROSTBORN: 6, STORMCALLER: 7 });
+
+    const inventory = reloaded.getInventory();
+    expect(inventory).toHaveLength(1); // not duplicated
+    expect(inventory[0]).toEqual(seededItem); // same instanceId, same ownerId, untouched
+    expect(reloaded.getPlayerId()).toBe("player-seed-1"); // no new playerId minted on reload
+    expect(reloaded.getLocalEconomyTotals()).toEqual({ bossesDefeatedTotal: 3, miniBossesDefeatedTotal: 2 });
+
+    // And it survives a SECOND reload too (rules out a save that only
+    // looks correct once before something silently overwrites it).
+    const reloadedAgain = new GameEngine();
+    reloadedAgain.startRun();
+    expect(reloadedAgain.getHudSnapshot().wave).toBe(14);
+    expect(reloadedAgain.getHudSnapshot().gold).toBe(733);
+    expect(reloadedAgain.getInventory()).toHaveLength(1);
+    expect(reloadedAgain.getPlayerId()).toBe("player-seed-1");
+  });
+
   it("higher speed advances the simulation faster for the same number of real-time ticks", () => {
     const slow = new GameEngine();
     slow.startRun();
@@ -302,5 +363,145 @@ describe("GameEngine — Active Idle progression", () => {
 
     expect(engine.getInventory()).toHaveLength(0);
     expect(engine.getLocalEconomyTotals().miniBossesDefeatedTotal).toBe(1);
+  });
+});
+
+describe("GameEngine — audio events (Audio spec section 18)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  /** Ticks `engine` up to `maxIterations` times, draining audioEvents every tick so nothing is lost between drains, stopping early once `stop` returns true. */
+  function runDrainingAudio(engine: GameEngine, stop: () => boolean, maxIterations = 20_000): string[] {
+    const types: string[] = [];
+    let iterations = 0;
+    while (!stop() && iterations < maxIterations) {
+      engine.update(100);
+      for (const event of engine.drainAudioEvents()) types.push(event.type);
+      iterations++;
+    }
+    return types;
+  }
+
+  it("7. boss_enrage fires exactly once, even though the boss stays enraged for many subsequent ticks", () => {
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+
+    const types = runDrainingAudio(engine, () => engine.getHudSnapshot().phase === "BOSS_BATTLE", 400);
+    const boss = engine.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss)!;
+    expect(boss).toBeTruthy();
+    boss.hp = boss.maxHp * 0.29; // below the 30% enrage threshold
+
+    // Enough ticks for the ability-cadence check to fire AND stay enraged afterward.
+    for (let i = 0; i < 50; i++) {
+      engine.update(100);
+      for (const event of engine.drainAudioEvents()) types.push(event.type);
+    }
+
+    expect(types.filter((t) => t === "boss_enrage")).toHaveLength(1);
+  });
+
+  it("8/10. boss_death and victory each fire exactly once when the main boss is killed", () => {
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+
+    const types = runDrainingAudio(engine, () => engine.getHudSnapshot().phase === "BOSS_BATTLE", 400);
+    const boss = engine.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss)!;
+    boss.hp = 0;
+    engine.update(50);
+    types.push(...engine.drainAudioEvents().map((e) => e.type));
+    // A couple more ticks in case anything re-fires after the kill.
+    for (let i = 0; i < 5; i++) {
+      engine.update(50);
+      types.push(...engine.drainAudioEvents().map((e) => e.type));
+    }
+
+    expect(types.filter((t) => t === "boss_death")).toHaveLength(1);
+    expect(types.filter((t) => t === "victory")).toHaveLength(1);
+  });
+
+  it("9. defeat fires exactly once for a full run to PROGRESSION_STOPPED", () => {
+    const engine = new GameEngine();
+    engine.startRun();
+    const types = runDrainingAudio(engine, () => engine.getHudSnapshot().phase === "PROGRESSION_STOPPED");
+    expect(types.filter((t) => t === "defeat")).toHaveLength(1);
+  });
+
+  it("11. castle_damage is aggregated per-tick, not fired once per enemy that breaches", () => {
+    const engine = new GameEngine();
+    engine.startRun();
+    let castleDamageEvents = 0;
+    let iterations = 0;
+    while (engine.getHudSnapshot().phase !== "PROGRESSION_STOPPED" && iterations < 20_000) {
+      engine.update(100);
+      castleDamageEvents += engine.drainAudioEvents().filter((e) => e.type === "castle_damage").length;
+      iterations++;
+    }
+    // An undefended run leaks well over a dozen enemies into the base by
+    // the time it stops — far more than the number of castle_damage EVENTS
+    // if (and only if) breaches are aggregated per tick as designed.
+    const report = engine.getFailureReport();
+    expect(report).not.toBeNull();
+    expect(castleDamageEvents).toBeGreaterThan(0);
+    expect(castleDamageEvents).toBeLessThan(report!.waveReached + 50); // sanity bound, not exact
+  });
+
+  it("13. draining (or not draining) audio events never changes simulation outcome", () => {
+    updateSave({ currentWave: 1, gold: 500, towerLoadout: [] });
+    const withDrain = new GameEngine();
+    withDrain.startRun();
+    withDrain.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
+    for (let i = 0; i < 500; i++) {
+      withDrain.update(50);
+      withDrain.drainAudioEvents();
+    }
+
+    window.localStorage.clear();
+    updateSave({ currentWave: 1, gold: 500, towerLoadout: [] });
+    const withoutDrain = new GameEngine();
+    withoutDrain.startRun();
+    withoutDrain.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
+    for (let i = 0; i < 500; i++) withoutDrain.update(50); // never touches audioEvents
+
+    expect(withoutDrain.getHudSnapshot().wave).toBe(withDrain.getHudSnapshot().wave);
+    expect(withoutDrain.getHudSnapshot().gold).toBe(withDrain.getHudSnapshot().gold);
+    expect(withoutDrain.getHudSnapshot().baseHp).toBe(withDrain.getHudSnapshot().baseHp);
+  });
+
+  it("15. retryPhase() never registers a duplicate subscriber — a single subscribe() still fires exactly once per notify after several retries", () => {
+    const engine = new GameEngine();
+    engine.startRun();
+    let calls = 0;
+    engine.subscribe(() => {
+      calls++;
+    });
+
+    for (let retry = 0; retry < 3; retry++) {
+      runDrainingAudio(engine, () => engine.getHudSnapshot().phase === "PROGRESSION_STOPPED");
+      engine.retryPhase();
+    }
+
+    calls = 0;
+    engine.update(50);
+    expect(calls).toBe(1); // not 2, not 4 — exactly one listener firing once
+  });
+
+  it("16. unsubscribing (what GameScreen's cleanup does on unmount / Home) stops further audio-event delivery immediately", () => {
+    const engine = new GameEngine();
+    engine.startRun();
+    let calls = 0;
+    const unsubscribe = engine.subscribe(() => {
+      calls++;
+    });
+
+    engine.update(50);
+    expect(calls).toBeGreaterThan(0);
+
+    unsubscribe();
+    calls = 0;
+    for (let i = 0; i < 20; i++) engine.update(50);
+    expect(calls).toBe(0); // the old battle is no longer reaching this listener at all
   });
 });

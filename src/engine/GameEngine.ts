@@ -57,6 +57,8 @@ import {
 import { computeOfflineCapacityMs, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
+import { getMilestoneUnlockForLevel } from "@/config/towerStats";
+import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 
 /** Elite spec (section 5): real stat multipliers plus a passive-regen "special ability", not just a bigger HP number. */
 const ELITE_MODIFIER: EliteModifier = {
@@ -179,6 +181,11 @@ export class GameEngine {
   private localFirstDiscoveries: LocalFirstDiscoveries = {};
   private pendingItemRewards: ItemInstance[] = [];
 
+  /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
+  private audioEvents: GameAudioEvent[] = [];
+  private waveCompleteAudioFiredForWave: number | null = null;
+  private enrageAudioFired = new Set<string>();
+
   private battleStats: BattleStats = createBattleStats();
   private lastFailureReport: FailureReport | null = null;
   private offlineSummary: OfflineSimulationResult | null = null;
@@ -288,6 +295,8 @@ export class GameEngine {
     this.bossIntroNameKey = null;
     this.lastBossReward = null;
     this.simClockMs = 0;
+    this.waveCompleteAudioFiredForWave = null;
+    this.enrageAudioFired = new Set();
   }
 
   /** Starts Wave 1 (fresh save) or resumes/retries the current wave — intercepting into BOSS_INTRO if that wave is a main-boss milestone. */
@@ -300,6 +309,7 @@ export class GameEngine {
     if (this.wave.currentWave === 0) activateNextWave(this.wave);
     else retryCurrentWave(this.wave);
     this.phase = "RUNNING";
+    this.emitAudio({ type: "wave_start" });
   }
 
   private enterBossIntro(waveNumber: number): void {
@@ -309,6 +319,7 @@ export class GameEngine {
     this.phase = "BOSS_INTRO";
     this.bossIntroRemainingMs = BOSS_INTRO_DURATION_MS;
     this.bossIntroNameKey = getMainBossForWave(waveNumber).i18nKey;
+    this.emitAudio({ type: "boss_intro" });
   }
 
   setSpeed(speed: GameSpeed): void {
@@ -363,6 +374,8 @@ export class GameEngine {
 
     this.gold -= cost;
     upgradeTowerEntity(tower);
+    const unlock = getMilestoneUnlockForLevel(tower.type, tower.level);
+    this.emitAudio(unlock ? { type: "level_unlock" } : { type: "tower_upgrade" });
     this.persist();
     this.notify();
     return true;
@@ -402,6 +415,7 @@ export class GameEngine {
         this.activeBossId = null;
         activateNextWave(this.wave);
         this.phase = "RUNNING";
+        this.emitAudio({ type: "wave_start" });
         this.persist();
       }
       this.notify();
@@ -445,6 +459,13 @@ export class GameEngine {
     const bossSummons: EnemyInstance[] = [];
     for (const enemy of this.enemies) {
       if (enemy.boss) bossSummons.push(...tickBossAbilities(enemy, nowMs, this.wave.currentWave, this.towers));
+      // Enrage SFX fires exactly once per boss instance (spec section 9) —
+      // `enraged` never resets once true, so a Set of "already announced"
+      // ids is all that's needed, mirroring eliteSpawnedForWave's pattern.
+      if (enemy.boss?.enraged && !this.enrageAudioFired.has(enemy.id)) {
+        this.enrageAudioFired.add(enemy.id);
+        this.emitAudio({ type: "boss_enrage" });
+      }
     }
     this.enemies.push(...bossSummons);
 
@@ -457,6 +478,25 @@ export class GameEngine {
     const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt);
     this.projectiles.push(...newProjectiles);
     recordDamageEvents(this.battleStats, damageEvents);
+
+    // Real-event audio derivation (Audio spec sections 2/3) — read directly
+    // off what CombatSystem actually decided this tick, never re-simulated
+    // or fabricated. `this.enemies` still holds every enemy hit this tick
+    // (the kill loop that removes the dead hasn't run yet), so tier lookup
+    // here sees the true pre-kill roster.
+    for (const projectile of newProjectiles) {
+      this.emitAudio({ type: "tower_attack", towerType: projectile.towerType });
+      if (projectile.towerType === "STORMCALLER" && projectile.chainTargets.length > 0) {
+        this.emitAudio({ type: "stormcaller_chain" });
+      }
+    }
+    for (const damageEvent of damageEvents) {
+      const target = this.enemies.find((e) => e.id === damageEvent.enemyId);
+      if (target) {
+        this.emitAudio({ type: "enemy_hit", towerType: damageEvent.towerType, tier: this.classifyEnemyTier(target) });
+      }
+      if (damageEvent.isFreeze) this.emitAudio({ type: "frostborn_freeze" });
+    }
 
     for (const projectile of this.projectiles) tickProjectile(projectile, scaledDt);
     this.projectiles = this.projectiles.filter((p) => !isProjectileExpired(p));
@@ -473,6 +513,10 @@ export class GameEngine {
         this.gold += enemy.goldReward;
         this.enemiesDefeated += 1;
         recordKill(this.battleStats, enemy);
+        const tier = this.classifyEnemyTier(enemy);
+        const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
+        this.emitAudio({ type: "enemy_death", tier, flavor });
+        if (tier === "boss") this.emitAudio({ type: "boss_death" });
         if (enemy.id === this.activeBossId) {
           bossDefeatedThisTick = true;
           this.lastBossReward = enemy.goldReward;
@@ -483,6 +527,11 @@ export class GameEngine {
       survivors.push(enemy);
     }
     this.enemies = survivors;
+    // One event for the whole tick, however many enemies breached at once
+    // (spec section 7: "se vários inimigos chegarem juntos, controlar o
+    // número de sons") — AudioManager's own cooldown throttles this
+    // further across consecutive ticks.
+    if (reachedBaseIds.size > 0) this.emitAudio({ type: "castle_damage", count: reachedBaseIds.size });
 
     if (this.phase === "BOSS_BATTLE") {
       const boss = this.enemies.find((e) => e.id === this.activeBossId) ?? null;
@@ -490,6 +539,7 @@ export class GameEngine {
       if (bossDefeatedThisTick) {
         this.phase = "VICTORY";
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
+        this.emitAudio({ type: "victory" });
         this.advanceBestWave(this.wave.currentWave);
         this.persist();
       } else if (boss === null) {
@@ -510,6 +560,10 @@ export class GameEngine {
       this.phase = this.wave.phase === "TRANSITIONING" ? "WAVE_TRANSITION" : "RUNNING";
       if (this.wave.phase === "TRANSITIONING") {
         this.advanceBestWave(this.wave.currentWave);
+        if (this.waveCompleteAudioFiredForWave !== this.wave.currentWave) {
+          this.waveCompleteAudioFiredForWave = this.wave.currentWave;
+          this.emitAudio({ type: "wave_complete" });
+        }
       }
     }
 
@@ -634,8 +688,27 @@ export class GameEngine {
     const finalized = finalizeBattleStats(this.battleStats, this.wave.currentWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
     this.bestWave = recordRunResult(this.wave.currentWave).bestWave;
+    this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();
+  }
+
+  private classifyEnemyTier(enemy: EnemyInstance): EnemyAudioTier {
+    if (enemy.boss?.isMainBoss) return "boss";
+    if (enemy.boss) return "mini_boss";
+    if (enemy.elite) return "elite";
+    return "regular";
+  }
+
+  private emitAudio(event: GameAudioEvent): void {
+    this.audioEvents.push(event);
+  }
+
+  /** Audio spec section 16 — the ONLY way anything outside this class observes what happened audio-wise. Called once per real tick by audio/GameAudioBridge.ts, never from inside a render loop. */
+  drainAudioEvents(): GameAudioEvent[] {
+    const events = this.audioEvents;
+    this.audioEvents = [];
+    return events;
   }
 
   getFailureReport(): FailureReport | null {

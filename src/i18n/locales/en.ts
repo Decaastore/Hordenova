@@ -10,6 +10,10 @@ export const en = {
     en: "English",
     ptBR: "Português (Brasil)",
   },
+  audio: {
+    sfxVolume: "SFX Volume",
+    muteSfx: "Mute SFX",
+  },
   menu: {
     subtitle: "BUILD. UPGRADE. SURVIVE.",
     play: "ENTER THE HORDE",

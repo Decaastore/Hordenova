@@ -11,6 +11,10 @@ export const ptBR: TranslationSchema = {
     en: "English",
     ptBR: "Português (Brasil)",
   },
+  audio: {
+    sfxVolume: "Volume dos Efeitos",
+    muteSfx: "Silenciar Efeitos",
+  },
   menu: {
     subtitle: "CONSTRUA. EVOLUA. SOBREVIVA.",
     play: "ENFRENTAR A HORDA",

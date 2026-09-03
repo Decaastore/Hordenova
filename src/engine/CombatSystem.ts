@@ -33,6 +33,8 @@ export interface DamageEvent {
   amount: number;
   /** The target's damageReduction at the moment of the hit — flags "high resistance" fights for diagnostics. */
   targetDamageReduction: number;
+  /** True only for the hit that just froze the target (100% slow, not a partial one) — purely descriptive, read by GameEngine's audio layer to fire the "real freeze" SFX exactly once per freeze (Audio spec section 3), never derived from damage math. */
+  isFreeze?: boolean;
 }
 
 export interface CombatTickResult {
@@ -129,16 +131,18 @@ export function tickCombat(
     enemy: EnemyInstance,
     rawDamage: number,
     armorPenetration = 0,
-  ): void => {
+  ): DamageEvent => {
     const targetDamageReduction = enemy.damageReduction;
     const actual = applyDamageToEnemy(enemy, rawDamage, armorPenetration);
-    damageEvents.push({
+    const event: DamageEvent = {
       towerId: tower.id,
       towerType: tower.type,
       enemyId: enemy.id,
       amount: actual,
       targetDamageReduction,
-    });
+    };
+    damageEvents.push(event);
+    return event;
   };
 
   for (const tower of towers) {
@@ -179,13 +183,14 @@ export function tickCombat(
       }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
     } else if (special.type === "FROSTBORN") {
-      dealDamage(tower, target, stats.damage);
+      const event = dealDamage(tower, target, stats.damage);
       // Deep Freeze (unlocked at level 10): a chance to fully stop the
       // target instead of the normal partial slow — reuses the exact same
       // slow-effect plumbing (100% = a freeze), no new status type needed.
       const isFreeze = special.freezeChance > 0 && Math.random() < special.freezeChance;
       if (isFreeze) {
         applySlow(target, 1, special.freezeDurationMs);
+        event.isFreeze = true;
       } else {
         applySlow(target, special.slowPercent, special.slowDurationMs);
       }

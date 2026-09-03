@@ -1,10 +1,11 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { BagIcon, BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
+import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
+import { BagIcon, BoltIcon, CoinIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -70,7 +71,37 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           <BagIcon size={13} />
           {t("inventory.button")}
         </button>
+        <SfxControl />
       </div>
+    </div>
+  );
+}
+
+/** Audio spec section 13 — SFX Volume (0/25/50/75/100%) + a separate Mute toggle, persisted via audio/audioSettings.ts. No music control — none exists yet. */
+function SfxControl() {
+  const [volume, setVolume] = useState(getSfxVolume);
+  const [muted, setMuted] = useState(isSfxMuted);
+  const { t } = useLanguage();
+
+  const cycleVolume = () => {
+    const currentIndex = SFX_VOLUME_STEPS.indexOf(volume as (typeof SFX_VOLUME_STEPS)[number]);
+    const next = SFX_VOLUME_STEPS[(currentIndex + 1) % SFX_VOLUME_STEPS.length]!;
+    setSfxVolume(next);
+    setVolume(next);
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+      <button
+        onClick={() => setMuted(toggleSfxMuted())}
+        title={t("audio.muteSfx")}
+        style={{ ...inventoryButtonStyle, marginLeft: 0, padding: "5px 8px" }}
+      >
+        <SpeakerIcon size={13} muted={muted} />
+      </button>
+      <button onClick={cycleVolume} title={t("audio.sfxVolume")} style={{ ...inventoryButtonStyle, marginLeft: 0 }}>
+        {Math.round(volume * 100)}%
+      </button>
     </div>
   );
 }

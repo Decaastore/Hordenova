@@ -4,6 +4,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "@/ui/LanguageSelector";
 import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
+import { audioManager } from "@/audio/AudioManager";
 
 interface MainMenuProps {
   onStart: () => void;
@@ -26,6 +27,10 @@ export function MainMenu({ onStart }: MainMenuProps) {
 
   const handlePlay = () => {
     if (transitionAt !== null) return;
+    // Audio spec section 12: unlock synchronously inside the real click
+    // handler (not a later setTimeout callback) — this is exactly the
+    // user-gesture browsers require before allowing programmatic audio.
+    audioManager.unlock();
     setTransitionAt(performance.now());
     window.setTimeout(onStart, TRANSITION_DURATION_MS);
   };

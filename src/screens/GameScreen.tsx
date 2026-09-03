@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
+import { useGameAudio } from "@/hooks/useGameAudio";
+import { audioManager } from "@/audio/AudioManager";
 import { CanvasRenderer } from "@/rendering/CanvasRenderer";
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
@@ -19,6 +21,7 @@ interface GameScreenProps {
 
 export function GameScreen({ onExitToMenu }: GameScreenProps) {
   const { engine, hud } = useGameEngine();
+  useGameAudio(engine);
   const [pendingTowerType, setPendingTowerType] = useState<TowerType | null>(null);
   // The diagnostic report can be dismissed to let the player upgrade towers
   // on the map without retrying yet — engine phase itself doesn't change
@@ -41,6 +44,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     // eliminated from production builds (import.meta.env.DEV is false).
     if (import.meta.env.DEV) {
       (window as unknown as { __hordenovaEngine?: typeof engine }).__hordenovaEngine = engine;
+      (window as unknown as { __hordenovaAudio?: typeof audioManager }).__hordenovaAudio = audioManager;
     }
   }, [engine]);
 

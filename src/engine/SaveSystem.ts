@@ -51,9 +51,12 @@ export interface SaveData {
   miniBossesDefeatedTotal: number;
   /** itemDefinitionId -> the record for the first copy THIS save ever obtained — see engine/WorldFirst.ts for why this is a LOCAL, not global, "first". */
   localFirstDiscoveries: LocalFirstDiscoveries;
+  /** Audio spec section 13 — 0..1, but only ever set to one of the 5 discrete UI steps (0/0.25/0.5/0.75/1). */
+  sfxVolume: number;
+  sfxMuted: boolean;
 }
 
-export const SAVE_DATA_VERSION = 4;
+export const SAVE_DATA_VERSION = 5;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -76,7 +79,11 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   bossesDefeatedTotal: 0,
   miniBossesDefeatedTotal: 0,
   localFirstDiscoveries: {},
+  sfxVolume: 1,
+  sfxMuted: false,
 };
+
+const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
 
 function isStorageAvailable(): boolean {
   try {
@@ -187,6 +194,8 @@ export function loadSave(): SaveData {
       bossesDefeatedTotal: typeof parsed.bossesDefeatedTotal === "number" ? parsed.bossesDefeatedTotal : 0,
       miniBossesDefeatedTotal: typeof parsed.miniBossesDefeatedTotal === "number" ? parsed.miniBossesDefeatedTotal : 0,
       localFirstDiscoveries: parseLocalFirstDiscoveries(parsed.localFirstDiscoveries),
+      sfxVolume: typeof parsed.sfxVolume === "number" && VALID_SFX_VOLUME_STEPS.has(parsed.sfxVolume) ? parsed.sfxVolume : 1,
+      sfxMuted: typeof parsed.sfxMuted === "boolean" ? parsed.sfxMuted : false,
     };
     if (result.playerId !== parsed.playerId) writeSave(result);
     return result;

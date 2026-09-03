@@ -70,6 +70,19 @@ export function BagIcon({ size = 14, color = "currentColor", style }: IconProps)
   );
 }
 
+export function SpeakerIcon({ size = 14, color = "currentColor", style, muted = false }: IconProps & { muted?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M4 9v6h4l5 4V5L8 9H4Z" fill={color} />
+      {muted ? (
+        <path d="M16 9l5 6M21 9l-5 6" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      ) : (
+        <path d="M16.5 8.5a5 5 0 0 1 0 7" stroke={color} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      )}
+    </svg>
+  );
+}
+
 export function SkullIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
