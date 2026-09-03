@@ -32,6 +32,8 @@ export interface BossDefinition {
   regenPercentPerSecond: number;
   /** Extra flat damage-reduction baseline on top of the archetype default — a "resists physical" flavor knob. */
   resistance: number;
+  /** config/dropTables.ts DropTable.id this boss rolls on death, or null for a boss with no item drops yet (Item System spec section 25 — "não é necessário implementar dezenas agora"). */
+  dropTableId: string | null;
 }
 
 function boss(overrides: Partial<BossDefinition> & Pick<BossDefinition, "id" | "i18nKey" | "isMainBoss">): BossDefinition {
@@ -44,6 +46,7 @@ function boss(overrides: Partial<BossDefinition> & Pick<BossDefinition, "id" | "
     abilityIntervalMs: 6000,
     regenPercentPerSecond: 0,
     resistance: 0,
+    dropTableId: null,
     ...overrides,
   };
 }
@@ -71,6 +74,7 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     ability: "SUMMON",
     abilityIntervalMs: 8000,
     resistance: 0.1,
+    dropTableId: "hollow-warden",
   }),
   "molten-colossus": boss({
     id: "molten-colossus",
@@ -238,6 +242,11 @@ export function getMainBossForWave(waveNumber: number): BossDefinition {
 export function getMiniBossForWave(waveNumber: number): BossDefinition {
   const id = getMiniBossIdForWave(waveNumber);
   return MINI_BOSSES[id]!;
+}
+
+/** Looks up any boss (main or mini) by its BossState.bossId — used at kill time to resolve which DropTable to roll, without the caller needing to know which roster it came from. */
+export function getBossDefinitionById(bossId: string): BossDefinition | null {
+  return MAIN_BOSSES[bossId] ?? MINI_BOSSES[bossId] ?? null;
 }
 
 /** Re-exported under the established name so GameEngine's existing `import { isMiniBossWave } from "@/config/bossConfig"` doesn't need to change. */

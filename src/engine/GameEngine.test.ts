@@ -236,4 +236,71 @@ describe("GameEngine — Active Idle progression", () => {
     reloaded.update(700);
     expect(reloaded.getHudSnapshot().pendingDiscoveryType).toBeNull();
   });
+
+  it("a defeated main boss with a configured DropTable grants an item, records it in inventory, and surfaces a pendingItemReward banner", () => {
+    // Wave 30 is Ancient Forest's boss wave (Hollow Warden), the only boss
+    // with a dropTableId wired up so far — Item System spec sections 12/25.
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_INTRO");
+
+    for (let i = 0; i < 200 && engine.getHudSnapshot().phase === "BOSS_INTRO"; i++) engine.update(100);
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_BATTLE");
+
+    const boss = engine.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss);
+    expect(boss).toBeTruthy();
+    boss!.hp = 0; // force the kill on the next tick instead of simulating real combat
+
+    engine.update(50);
+
+    expect(engine.getHudSnapshot().phase).toBe("VICTORY");
+    const pending = engine.getHudSnapshot().pendingItemReward;
+    expect(pending).not.toBeNull();
+    expect(engine.getInventory()).toHaveLength(1);
+    expect(engine.getInventory()[0]!.itemDefinitionId).toBe(pending!.itemDefinitionId);
+    expect(engine.getInventory()[0]!.ownerId).toBe(engine.getPlayerId());
+    expect(engine.getLocalEconomyTotals().bossesDefeatedTotal).toBe(1);
+
+    engine.acknowledgeItemReward();
+    expect(engine.getHudSnapshot().pendingItemReward).toBeNull();
+    // The item itself is NOT removed by acknowledging the banner — only the notification is dismissed.
+    expect(engine.getInventory()).toHaveLength(1);
+  });
+
+  it("the granted item survives a reload (persisted immediately, not just on the next unrelated save)", () => {
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
+    const first = new GameEngine();
+    first.startRun();
+    for (let i = 0; i < 200 && first.getHudSnapshot().phase === "BOSS_INTRO"; i++) first.update(100);
+    const boss = first.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss);
+    boss!.hp = 0;
+    first.update(50); // grants the drop and persists — no explicit save call needed
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+    expect(reloaded.getInventory()).toHaveLength(1);
+    expect(reloaded.getInventory()[0]!.instanceId).toBe(first.getInventory()[0]!.instanceId);
+    expect(reloaded.getPlayerId()).toBe(first.getPlayerId());
+  });
+
+  it("a mini-boss with no configured DropTable increments the local counter but grants no item (honest — no placeholder loot)", () => {
+    // Wave 21 is one of Ancient Forest's mini-boss waves; none of the six
+    // mini-boss archetypes have a dropTableId wired up in this first slice.
+    updateSave({ currentWave: 21, gold: 0, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+
+    let miniBoss = null;
+    for (let i = 0; i < 300 && !miniBoss; i++) {
+      engine.update(100);
+      miniBoss = engine.getRenderSnapshot().enemies.find((e) => e.boss && !e.boss.isMainBoss) ?? null;
+    }
+    expect(miniBoss).toBeTruthy();
+    miniBoss!.hp = 0;
+    engine.update(50);
+
+    expect(engine.getInventory()).toHaveLength(0);
+    expect(engine.getLocalEconomyTotals().miniBossesDefeatedTotal).toBe(1);
+  });
 });

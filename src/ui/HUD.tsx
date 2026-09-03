@@ -9,9 +9,10 @@ import { BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
 interface HUDProps {
   hud: HudSnapshot;
   onSetSpeed: (speed: GameSpeed) => void;
+  onOpenInventory: () => void;
 }
 
-export function HUD({ hud, onSetSpeed }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -65,6 +66,9 @@ export function HUD({ hud, onSetSpeed }: HUDProps) {
             </button>
           );
         })}
+        <button onClick={onOpenInventory} style={inventoryButtonStyle}>
+          {t("inventory.button")}
+        </button>
       </div>
     </div>
   );
@@ -148,6 +152,19 @@ const valueStyle: CSSProperties = {
   fontWeight: 700,
   color: PALETTE.uiText,
   lineHeight: 1.3,
+};
+
+const inventoryButtonStyle: CSSProperties = {
+  marginLeft: 6,
+  padding: "5px 11px",
+  borderRadius: 6,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "#3a2a18",
+  color: PALETTE.uiTextDim,
+  fontWeight: 700,
+  fontSize: 10.5,
+  letterSpacing: 0.6,
+  cursor: "pointer",
 };
 
 const speedButtonStyle: CSSProperties = {

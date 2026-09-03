@@ -9,9 +9,14 @@ import {
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { isBossMilestone } from "@/config/waveConfig";
-import { isMiniBossWave, getMainBossForWave, getMiniBossForWave } from "@/config/bossConfig";
+import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
 import type { EnemyType } from "@/config/enemyStats";
+import { getDropTable, rollDropTable } from "@/config/dropTables";
+import { createItemInstance, type ItemInstance } from "@/entities/Item";
+import { addItem } from "./InventoryManager";
+import { appendLedgerEvent } from "./EconomyLedger";
+import { checkLocalFirst, type LocalFirstDiscoveries } from "./WorldFirst";
 import {
   createTowerInstance,
   getTowerUpgradeCost,
@@ -24,6 +29,7 @@ import {
   createEliteEnemyInstance,
   createEnemyInstance,
   isEnemyDead,
+  type BossState,
   type EliteModifier,
   type EnemyInstance,
 } from "@/entities/Enemy";
@@ -84,6 +90,8 @@ export interface HudSnapshot {
   bossLastReward: number | null;
   /** The oldest not-yet-acknowledged newly-discovered enemy type, or null — see GameEngine.acknowledgeDiscovery. */
   pendingDiscoveryType: EnemyType | null;
+  /** The most recent still-unacknowledged item drop, or null — see GameEngine.acknowledgeItemReward. Item System spec section 25/32. */
+  pendingItemReward: { instanceId: string; itemDefinitionId: string } | null;
 }
 
 export interface RenderSnapshot {
@@ -112,7 +120,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bossMaxHp === b.bossMaxHp &&
     a.bossIntroRemainingMs === b.bossIntroRemainingMs &&
     a.bossLastReward === b.bossLastReward &&
-    a.pendingDiscoveryType === b.pendingDiscoveryType
+    a.pendingDiscoveryType === b.pendingDiscoveryType &&
+    a.pendingItemReward?.instanceId === b.pendingItemReward?.instanceId
   );
 }
 
@@ -162,6 +171,14 @@ export class GameEngine {
   private discoveredEnemyTypes = new Set<EnemyType>();
   private pendingDiscoveries: EnemyType[] = [];
 
+  /** This save's stable local identity — see SaveSystem.SaveData.playerId. */
+  private playerId = "";
+  private inventory: ItemInstance[] = [];
+  private bossesDefeatedTotal = 0;
+  private miniBossesDefeatedTotal = 0;
+  private localFirstDiscoveries: LocalFirstDiscoveries = {};
+  private pendingItemRewards: ItemInstance[] = [];
+
   private battleStats: BattleStats = createBattleStats();
   private lastFailureReport: FailureReport | null = null;
   private offlineSummary: OfflineSimulationResult | null = null;
@@ -196,6 +213,11 @@ export class GameEngine {
     this.gold = save.gold;
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
+    this.playerId = save.playerId;
+    this.inventory = save.inventory;
+    this.bossesDefeatedTotal = save.bossesDefeatedTotal;
+    this.miniBossesDefeatedTotal = save.miniBossesDefeatedTotal;
+    this.localFirstDiscoveries = save.localFirstDiscoveries;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
     this.wave.currentWave = save.currentWave;
@@ -455,6 +477,7 @@ export class GameEngine {
           bossDefeatedThisTick = true;
           this.lastBossReward = enemy.goldReward;
         }
+        if (enemy.boss) this.grantBossDrop(enemy.boss);
         continue; // removed, killed by towers/burn
       }
       survivors.push(enemy);
@@ -536,6 +559,76 @@ export class GameEngine {
     this.notify();
   }
 
+  /**
+   * Item System spec section 25: any boss OR mini-boss that dies rolls its
+   * DropTable (config/dropTables.ts, keyed off BossDefinition.dropTableId
+   * via BossState.bossId — see config/bossConfig.ts.getBossDefinitionById)
+   * exactly once. A boss with no dropTableId yet (every biome past Ancient
+   * Forest, for now) simply grants nothing — no placeholder loot, per spec
+   * section 25's "não criar dezenas de itens agora".
+   */
+  private grantBossDrop(boss: BossState): void {
+    if (boss.isMainBoss) this.bossesDefeatedTotal += 1;
+    else this.miniBossesDefeatedTotal += 1;
+
+    const def = getBossDefinitionById(boss.bossId);
+    if (!def || !def.dropTableId) return;
+    const table = getDropTable(def.dropTableId);
+    if (!table) return;
+
+    const itemDefinitionId = rollDropTable(table);
+    const item = createItemInstance(itemDefinitionId, this.playerId, {
+      type: boss.isMainBoss ? "BOSS_DROP" : "MINI_BOSS_DROP",
+      refId: def.id,
+    });
+    this.inventory = addItem(this.inventory, item);
+    this.pendingItemRewards.push(item);
+
+    const ledgerBase = {
+      itemInstanceId: item.instanceId,
+      itemDefinitionId: item.itemDefinitionId,
+      source: def.id,
+    };
+    appendLedgerEvent({ ...ledgerBase, eventType: "ITEM_CREATED", fromOwner: null, toOwner: this.playerId });
+    appendLedgerEvent({ ...ledgerBase, eventType: "ITEM_DROPPED", fromOwner: null, toOwner: this.playerId });
+    appendLedgerEvent({ ...ledgerBase, eventType: "ITEM_ACQUIRED", fromOwner: null, toOwner: this.playerId });
+
+    const firstRecord = checkLocalFirst(this.localFirstDiscoveries, item.itemDefinitionId, item.instanceId, this.playerId);
+    if (firstRecord) {
+      this.localFirstDiscoveries = { ...this.localFirstDiscoveries, [item.itemDefinitionId]: firstRecord };
+    }
+
+    // Persisted immediately rather than waiting for the tick's own
+    // conditional persist() (e.g. a mini-boss killed mid-wave doesn't
+    // otherwise save until the next wave transition) — a granted item is
+    // exactly the kind of state that must never be lost to a reload that
+    // happens to land between this drop and some later save point.
+    this.persist();
+  }
+
+  /** Dismisses the currently-shown item-reward banner (see HudSnapshot.pendingItemReward) so the next one, if any, can show. */
+  acknowledgeItemReward(): void {
+    this.pendingItemRewards.shift();
+    this.persist();
+    this.notify();
+  }
+
+  getInventory(): readonly ItemInstance[] {
+    return this.inventory;
+  }
+
+  getPlayerId(): string {
+    return this.playerId;
+  }
+
+  getLocalFirstDiscoveries(): LocalFirstDiscoveries {
+    return this.localFirstDiscoveries;
+  }
+
+  getLocalEconomyTotals(): { bossesDefeatedTotal: number; miniBossesDefeatedTotal: number } {
+    return { bossesDefeatedTotal: this.bossesDefeatedTotal, miniBossesDefeatedTotal: this.miniBossesDefeatedTotal };
+  }
+
   private stopProgression(): void {
     this.phase = "PROGRESSION_STOPPED";
     const finalized = finalizeBattleStats(this.battleStats, this.wave.currentWave);
@@ -556,6 +649,11 @@ export class GameEngine {
       currentWave: this.wave.currentWave,
       towerLoadout: this.towers.map((t) => ({ slotId: t.slotId, type: t.type, level: t.level })),
       discoveredEnemyTypes: [...this.discoveredEnemyTypes],
+      inventory: this.inventory,
+      playerId: this.playerId,
+      bossesDefeatedTotal: this.bossesDefeatedTotal,
+      miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,
+      localFirstDiscoveries: this.localFirstDiscoveries,
     });
   }
 
@@ -585,6 +683,9 @@ export class GameEngine {
       bossIntroRemainingMs: this.phase === "BOSS_INTRO" ? Math.max(0, this.bossIntroRemainingMs) : null,
       bossLastReward: this.phase === "VICTORY" ? this.lastBossReward : null,
       pendingDiscoveryType: this.pendingDiscoveries[0] ?? null,
+      pendingItemReward: this.pendingItemRewards[0]
+        ? { instanceId: this.pendingItemRewards[0].instanceId, itemDefinitionId: this.pendingItemRewards[0].itemDefinitionId }
+        : null,
     };
 
     const prev = this.cachedHud;

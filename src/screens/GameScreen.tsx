@@ -9,6 +9,8 @@ import { BossBanner } from "@/ui/BossBanner";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
 import { PhaseBanner } from "@/ui/PhaseBanner";
 import { EnemyDiscoveryBanner } from "@/ui/EnemyDiscoveryBanner";
+import { ItemRewardBanner } from "@/ui/ItemRewardBanner";
+import { InventoryPanel } from "@/ui/InventoryPanel";
 import type { TowerType } from "@/config/towerStats";
 
 interface GameScreenProps {
@@ -23,6 +25,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // until retryPhase() is called, so visibility is tracked locally and
   // re-armed whenever a fresh PROGRESSION_STOPPED report comes in.
   const [reportDismissed, setReportDismissed] = useState(false);
+  const [inventoryOpen, setInventoryOpen] = useState(false);
 
   useEffect(() => {
     engine.startRun();
@@ -65,7 +68,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen(true)} />
 
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <CanvasRenderer
@@ -80,6 +83,13 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         <PhaseBanner phaseId={hud.phaseId} />
         {hud.pendingDiscoveryType && (
           <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={() => engine.acknowledgeDiscovery()} />
+        )}
+        {hud.pendingItemReward && (
+          <ItemRewardBanner
+            itemDefinitionId={hud.pendingItemReward.itemDefinitionId}
+            onAcknowledge={() => engine.acknowledgeItemReward()}
+            onOpenInventory={() => setInventoryOpen(true)}
+          />
         )}
 
         {selectedTower && (
@@ -103,6 +113,14 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
         {offlineSummary && (
           <WelcomeBackOverlay summary={offlineSummary} onContinue={() => engine.dismissOfflineSummary()} />
+        )}
+
+        {inventoryOpen && (
+          <InventoryPanel
+            inventory={engine.getInventory()}
+            localEconomyTotals={engine.getLocalEconomyTotals()}
+            onClose={() => setInventoryOpen(false)}
+          />
         )}
       </div>
 
