@@ -572,8 +572,14 @@ function drawStormcaller(
   }
   ctx.globalAlpha = 1;
 
-  const orbY = -32 - level * 1.4;
-  glowBlob(ctx, 0, orbY, 16 + level * 1.3, theme.glow);
+  // Same runaway-per-level bug as the tower's overall scale: the orb's
+  // rise and glow radius were unbounded (level * 1.4 / level * 1.3), so a
+  // maxed Stormcaller's orb drifted ~74px above its plinth with a 55px
+  // glow — high enough to visually sit on top of the enemy path. Capped to
+  // a fixed total budget across the level range instead.
+  const levelProgress = (level - 1) / (MAX_TOWER_LEVEL - 1);
+  const orbY = -32 - levelProgress * 16;
+  glowBlob(ctx, 0, orbY, 16 + levelProgress * 8, theme.glow);
 
   // A rotating arcane ring around the orb (drawn as a squashed ellipse for
   // a top-down "ring" read).
