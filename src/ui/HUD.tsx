@@ -4,7 +4,7 @@ import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, CoinIcon, ShieldIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -67,6 +67,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           );
         })}
         <button onClick={onOpenInventory} style={inventoryButtonStyle}>
+          <BagIcon size={13} />
           {t("inventory.button")}
         </button>
       </div>
@@ -156,6 +157,9 @@ const valueStyle: CSSProperties = {
 
 const inventoryButtonStyle: CSSProperties = {
   marginLeft: 6,
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
   padding: "5px 11px",
   borderRadius: 6,
   border: `1px solid ${PALETTE.uiPanelBorder}`,

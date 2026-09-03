@@ -68,7 +68,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen(true)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} />
 
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <CanvasRenderer

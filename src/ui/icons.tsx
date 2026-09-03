@@ -61,6 +61,15 @@ export function BoltIcon({ size = 14, color = "currentColor", style }: IconProps
   );
 }
 
+export function BagIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M6 8h12l-1.2 12.4a2 2 0 0 1-2 1.6H9.2a2 2 0 0 1-2-1.6L6 8Z" stroke={color} strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 export function SkullIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

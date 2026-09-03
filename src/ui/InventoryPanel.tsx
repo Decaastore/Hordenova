@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -18,11 +18,32 @@ interface InventoryPanelProps {
 
 type Tab = "items" | "trade" | "stats";
 
-/** Item System spec section 32 — the one entry point for Inventory / Item Details / Drop Table / Trade / Stats, opened from a single HUD button so combat never gets cluttered by default. */
+/**
+ * Item System spec section 32 — the one entry point for Inventory / Item
+ * Details / Drop Table / Trade / Stats, opened from a single HUD button.
+ *
+ * This is a PURE UI OVERLAY: it renders on top of GameScreen while the
+ * engine keeps running underneath exactly as it would with the panel
+ * closed. Nothing here reads or writes engine state beyond the read-only
+ * `inventory`/`localEconomyTotals` props GameScreen passes in — opening or
+ * closing it can never reset a wave, an enemy, a tower, a boss, a timer,
+ * or Active Idle progression, because it has no way to touch any of that.
+ * Closes via the X button, the same HUD toggle, clicking the backdrop, or
+ * Escape (LanguageSelector is the only other Escape listener in the app,
+ * and it's scoped to the main menu, so there's no conflict here).
+ */
 export function InventoryPanel({ inventory, localEconomyTotals, onClose }: InventoryPanelProps) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
 
   const selectedItem = selectedInstanceId ? inventory.find((i) => i.instanceId === selectedInstanceId) ?? null : null;
 
