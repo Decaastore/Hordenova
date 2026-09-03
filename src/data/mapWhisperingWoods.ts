@@ -52,7 +52,11 @@ interface SlotSeed {
 const SLOT_SEEDS: readonly SlotSeed[] = [
   { id: "slot-1", segmentIndex: 0, t: 0.12, distanceFromPath: 40, side: 1, distanceCategory: "CLOSE" },
   { id: "slot-2", segmentIndex: 0, t: 0.35, distanceFromPath: 75, side: 1, distanceCategory: "FAR" },
-  { id: "slot-3", segmentIndex: 0, t: 0.65, distanceFromPath: 45, side: -1, distanceCategory: "CLOSE" },
+  // 45 used to place this right where the road's soft edge sits, since
+  // Stormcaller's wide stone plinth reaches further from its anchor than
+  // the other towers' bases — pushed out to keep every tower's footprint
+  // clear of the path regardless of which type occupies the slot.
+  { id: "slot-3", segmentIndex: 0, t: 0.65, distanceFromPath: 65, side: -1, distanceCategory: "CLOSE" },
   { id: "slot-4", segmentIndex: 1, t: 0.5, distanceFromPath: 55, side: 1, distanceCategory: "MEDIUM" },
   { id: "slot-5", segmentIndex: 2, t: 0.2, distanceFromPath: 80, side: 1, distanceCategory: "FAR" },
   { id: "slot-6", segmentIndex: 2, t: 0.5, distanceFromPath: 40, side: -1, distanceCategory: "CLOSE" },
