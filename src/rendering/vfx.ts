@@ -1,5 +1,6 @@
 import type { Vector2 } from "@/utils/geometry";
 import { drawMagicCore } from "./lighting";
+import type { CastleHpTier } from "@/config/castleConfig";
 
 /**
  * Purely cosmetic "game feel" layer (Phase 2 spec section 10): damage
@@ -50,6 +51,9 @@ export class VfxManager {
   private floatingTexts: FloatingText[] = [];
   private bursts: Burst[] = [];
   private rings: Ring[] = [];
+  private shakeRemainingMs = 0;
+  private shakeTotalMs = 0;
+  private shakeMagnitude = 0;
 
   spawnDamageNumber(position: Vector2, amount: number, isCrit: boolean): void {
     if (amount < 0.5) return;
@@ -116,6 +120,53 @@ export class VfxManager {
   }
 
   /**
+   * Castle Damage Event VFX (Progression 2.0 spec section 12/13): the
+   * central "an enemy just breached the base" moment, driven by the same
+   * instant GameEngine already flags via the `castle_damage` audio event
+   * (see engine/GameEngine.ts's `emitAudio({ type: "castle_damage" })`).
+   * Escalates with `tier` (config/castleConfig.ts) so a hit at low HP reads
+   * as more dangerous than a scratch at full HP — more debris, a stronger
+   * shake — without needing a second, duplicate damage system.
+   */
+  spawnCastleImpact(position: Vector2, tier: CastleHpTier): void {
+    const severity = Math.min(4, tier); // tier 5 (0%) reuses tier 4's intensity — the defeat overlay takes over immediately after.
+    const particleCount = 5 + severity * 2;
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: severity >= 3 ? "#ff6a3a" : "#e2574a",
+      remainingMs: 260 + severity * 40,
+      totalMs: 260 + severity * 40,
+      hotCore: severity >= 3,
+      particles: Array.from({ length: particleCount }, (_, i) => ({
+        angle: (i / particleCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3,
+        speed: 22 + severity * 8 + Math.random() * 16,
+        curve: (Math.random() - 0.5) * 1.2,
+      })),
+    });
+    this.triggerShake(1.5 + severity * 1.3, 140 + severity * 40);
+  }
+
+  /** Bounded, additive camera shake — a new trigger while one is active just refreshes toward the stronger of the two rather than stacking indefinitely. */
+  triggerShake(magnitude: number, durationMs: number): void {
+    if (magnitude < this.shakeMagnitude && this.shakeRemainingMs > 0) return;
+    this.shakeMagnitude = magnitude;
+    this.shakeRemainingMs = durationMs;
+    this.shakeTotalMs = durationMs;
+  }
+
+  /** World-space jitter offset for the current frame — CanvasRenderer applies this to its world->canvas transform. {0,0} when no shake is active. */
+  getShakeOffset(): Vector2 {
+    if (this.shakeRemainingMs <= 0) return { x: 0, y: 0 };
+    const progress = this.shakeRemainingMs / this.shakeTotalMs;
+    const amount = this.shakeMagnitude * progress;
+    return {
+      x: (Math.random() - 0.5) * 2 * amount,
+      y: (Math.random() - 0.5) * 2 * amount,
+    };
+  }
+
+  /**
    * Premium-tier hit impact (Etapa 4): white-hot core + colored halo at the
    * strike point plus a few sparks kicked back along the incoming shot's
    * direction, with curved trails. Currently only spawned for hits landing
@@ -176,6 +227,7 @@ export class VfxManager {
     this.floatingTexts = this.floatingTexts.filter((t) => t.remainingMs > 0);
     this.bursts = this.bursts.filter((b) => b.remainingMs > 0);
     this.rings = this.rings.filter((r) => r.remainingMs > 0);
+    if (this.shakeRemainingMs > 0) this.shakeRemainingMs = Math.max(0, this.shakeRemainingMs - dtMs);
   }
 
   draw(ctx: CanvasRenderingContext2D): void {

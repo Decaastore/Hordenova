@@ -2,7 +2,8 @@ import type { TowerInstance } from "@/entities/Tower";
 import type { EnemyInstance } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
-import { MAX_TOWER_LEVEL } from "@/config/towerStats";
+import { getTowerVisualStage, MAX_TOWER_LEVEL } from "@/config/towerStats";
+import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawMagicCore, rimHighlight } from "./lighting";
 
@@ -30,7 +31,15 @@ export function drawTower(
   attackFlashMs = Infinity,
 ): void {
   const stats = getTowerStats(tower);
-  const theme = TOWER_THEME[tower.type];
+  // Tower Skin architecture (Progression 2.0 spec section 10/11): a skin
+  // only ever overrides these 4 palette fields, merged over the base
+  // theme right here — nothing downstream (combat, stats, save) ever sees
+  // or reads a skin, so equipping one is structurally incapable of
+  // touching gameplay. See config/towerSkins.ts.
+  const baseTheme = TOWER_THEME[tower.type];
+  const skin = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId) : null;
+  const theme = skin ? { ...baseTheme, ...skin.paletteOverride } : baseTheme;
+  const visualStage = getTowerVisualStage(stats.level);
   const growth = 1 + ((stats.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
   const cooldownTotalMs = 1000 / stats.attackSpeed;
   const readiness = 1 - Math.max(0, Math.min(1, tower.cooldownRemainingMs / cooldownTotalMs));
@@ -43,16 +52,16 @@ export function drawTower(
 
   switch (tower.type) {
     case "IRONWOOD":
-      drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness);
+      drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage);
       break;
     case "INFERNO":
-      drawInferno(ctx, theme, stats.level, timeMs);
+      drawInferno(ctx, theme, stats.level, timeMs, visualStage);
       break;
     case "FROSTBORN":
-      drawFrostborn(ctx, theme, stats.level, timeMs);
+      drawFrostborn(ctx, theme, stats.level, timeMs, visualStage);
       break;
     case "STORMCALLER":
-      drawStormcaller(ctx, theme, stats.level, timeMs);
+      drawStormcaller(ctx, theme, stats.level, timeMs, visualStage);
       break;
   }
 
@@ -135,6 +144,8 @@ export function drawIronwood(
   timeMs: number,
   attackFlashMs: number,
   readiness: number,
+  /** Tower Visual Evolution (spec section 9) — 1..TOWER_VISUAL_STAGE_COUNT, see config/towerStats.getTowerVisualStage. Gates real structural additions below, not just scale. */
+  visualStage = 1,
 ): void {
   drawContactShadow(ctx, 20, 9, 0.42);
 
@@ -190,6 +201,27 @@ export function drawIronwood(
   ctx.quadraticCurveTo(22, 9, 26, 7);
   ctx.stroke();
 
+  // Visual Evolution stage 2+: jagged iron spikes driven into the mound —
+  // a real added part, not a scale bump.
+  if (visualStage >= 2) {
+    ctx.fillStyle = "#33363a";
+    for (const [sx, sy, rot] of [
+      [-12, 2, -0.3],
+      [11, 3, 0.3],
+    ] as const) {
+      ctx.save();
+      ctx.translate(sx, sy);
+      ctx.rotate(rot);
+      ctx.beginPath();
+      ctx.moveTo(-1.5, 3);
+      ctx.lineTo(0, -6);
+      ctx.lineTo(1.5, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   // --- Trunk: thick, twisted, wrapped in iron bands. ---
   const sway = Math.sin(timeMs / 2200) * 0.022;
   ctx.save();
@@ -228,6 +260,26 @@ export function drawIronwood(
     ctx.fillRect(-8.5, bandY, 17, 1);
     ctx.fillStyle = "#161719";
     ctx.fillRect(-8.5, bandY + 2, 17, 1);
+  }
+
+  // Visual Evolution stage 3+: a heavy chain wraps the trunk, hanging
+  // slightly loose — reinforcement befitting a veteran structure.
+  if (visualStage >= 3) {
+    ctx.strokeStyle = "rgba(60,64,70,0.9)";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-8, -4);
+    ctx.quadraticCurveTo(0, 2, 8, -4);
+    ctx.quadraticCurveTo(0, -1, -8, -4);
+    ctx.stroke();
+    for (let i = 0; i < 5; i++) {
+      const t = i / 4;
+      const cx = -8 + t * 16;
+      const cy = -4 + Math.sin(t * Math.PI) * 4.5;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 1, 0, Math.PI * 2);
+      ctx.stroke();
+    }
   }
 
   // Carved rune — the only strong saturated color on the whole structure,
@@ -325,6 +377,25 @@ export function drawIronwood(
 
   ctx.restore();
 
+  // Visual Evolution stage 4+: a secondary curved blade mounted on the
+  // mechanism's flank — a real added weapon part, escalating the
+  // structure's silhouette beyond the base ballista.
+  if (visualStage >= 4) {
+    ctx.save();
+    ctx.translate(0, mountY);
+    ctx.fillStyle = "#4a4d52";
+    ctx.beginPath();
+    ctx.moveTo(9, 2);
+    ctx.quadraticCurveTo(15, -4, 13, -10);
+    ctx.quadraticCurveTo(10, -3, 6, 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // --- Hooded operator, crouched behind the mechanism — small, part of
   // the structure rather than the tower's focal point. No visible face:
   // just a dark hood with two glowing points, more ominous than a face. ---
@@ -368,6 +439,38 @@ export function drawIronwood(
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  // Visual Evolution stage 5+: a faint carved rune circle glows on the
+  // ground around the base — the structure has grown its own ambient
+  // power field, not just a bigger silhouette.
+  if (visualStage >= 5) {
+    ctx.save();
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(timeMs / 700);
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(0, 7, 20, 7, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  // Visual Evolution stage 6 (final form): a trophy skull hangs from the
+  // mount — the veteran-structure payoff at max level.
+  if (visualStage >= 6) {
+    ctx.save();
+    ctx.translate(-11, mountY + 10);
+    ctx.fillStyle = "#e8e2d0";
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#1a1309";
+    ctx.beginPath();
+    ctx.arc(-1, -0.5, 0.6, 0, Math.PI * 2);
+    ctx.arc(1, -0.5, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -376,6 +479,7 @@ function drawInferno(
   theme: (typeof TOWER_THEME)["INFERNO"],
   level: number,
   timeMs: number,
+  visualStage = 1,
 ): void {
   // Round stone furnace ring.
   const stoneGradient = ctx.createRadialGradient(-3, -4, 2, 0, 0, 18);
@@ -398,6 +502,18 @@ function drawInferno(
   ctx.moveTo(9, 1);
   ctx.lineTo(13, 6);
   ctx.stroke();
+
+  // Visual Evolution stage 2+: two small side vents venting their own
+  // embers — a real added structural part on the furnace ring.
+  if (visualStage >= 2) {
+    for (const vx of [-14, 14]) {
+      const ventFlicker = 0.5 + 0.4 * Math.sin(timeMs / 220 + vx);
+      ctx.fillStyle = `rgba(255,150,60,${ventFlicker})`;
+      ctx.beginPath();
+      ctx.ellipse(vx, 5, 2.2, 3.2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // Furnace opening.
   const openingGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 12);
@@ -429,6 +545,20 @@ function drawInferno(
   ctx.closePath();
   ctx.fill();
 
+  // Visual Evolution stage 4+: secondary flame horns flanking the main
+  // plume — the structure has outgrown a single central flame.
+  if (visualStage >= 4) {
+    for (const hx of [-9, 9]) {
+      ctx.fillStyle = theme.primary;
+      ctx.beginPath();
+      ctx.moveTo(hx - 2, -2);
+      ctx.quadraticCurveTo(hx + Math.sin(timeMs / 260) * 1.5, -14 - level * 0.3, hx, -18 - level * 0.4);
+      ctx.quadraticCurveTo(hx - Math.sin(timeMs / 260) * 1.5, -10, hx + 2, -2);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
   // Smoke wisps drifting up and away.
   ctx.fillStyle = "rgba(140,130,120,0.28)";
   for (let i = 0; i < 2; i++) {
@@ -450,6 +580,20 @@ function drawInferno(
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // Visual Evolution stage 6 (final form): a molten ring orbits the base —
+  // the furnace has grown its own ambient heat field.
+  if (visualStage >= 6) {
+    ctx.save();
+    ctx.globalAlpha = 0.5 + 0.25 * Math.sin(timeMs / 400);
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.ellipse(0, 5, 21, 8, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 }
 
 function drawFrostborn(
@@ -457,6 +601,7 @@ function drawFrostborn(
   theme: (typeof TOWER_THEME)["FROSTBORN"],
   level: number,
   timeMs: number,
+  visualStage = 1,
 ): void {
   ctx.fillStyle = "rgba(180,225,255,0.3)";
   ctx.beginPath();
@@ -481,6 +626,30 @@ function drawFrostborn(
   ctx.strokeStyle = "rgba(255,255,255,0.5)";
   ctx.lineWidth = 1.2;
   ctx.stroke();
+
+  // Visual Evolution stage 2+: small crystal outcrops breaking through the
+  // pedestal's edge — real added geometry, not a bigger main spire.
+  if (visualStage >= 2) {
+    for (const [cx, cy] of [
+      [-13, 5],
+      [13, 4],
+    ] as const) {
+      drawCrystalShard(ctx, cx, cy - 7, 2.6, theme);
+    }
+  }
+
+  // Visual Evolution stage 4+: a low ground-hugging frost mist ring —
+  // the structure now radiates cold beyond its own footprint.
+  if (visualStage >= 4) {
+    ctx.save();
+    ctx.globalAlpha = 0.22 + 0.08 * Math.sin(timeMs / 900);
+    ctx.fillStyle = "#cdf3ff";
+    ctx.beginPath();
+    ctx.ellipse(0, 9, 22, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 
   glowBlob(ctx, 0, -16, 17 + level * 1.3, theme.glow);
 
@@ -518,6 +687,16 @@ function drawFrostborn(
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // Visual Evolution stage 6 (final form): a crown of small shards atop
+  // the central spire's tip.
+  if (visualStage >= 6) {
+    const crownY = -(22 + level * 2);
+    for (let i = 0; i < 4; i++) {
+      const angle = (i / 4) * Math.PI * 2;
+      drawCrystalShard(ctx, Math.cos(angle) * 5, crownY + Math.sin(angle) * 2.5, 2, theme);
+    }
+  }
 }
 
 function drawCrystalShard(
@@ -550,6 +729,7 @@ function drawStormcaller(
   theme: (typeof TOWER_THEME)["STORMCALLER"],
   level: number,
   timeMs: number,
+  visualStage = 1,
 ): void {
   // Two-tier stone plinth.
   ctx.fillStyle = "#4a3f30";
@@ -571,6 +751,23 @@ function drawStormcaller(
     ctx.fillRect(-6, -22 + i * 8, 12, 2.4);
   }
   ctx.globalAlpha = 1;
+
+  // Visual Evolution stage 2+: two small carved rune stones flanking the
+  // pillar's base — a real added part, not just a brighter pillar.
+  if (visualStage >= 2) {
+    for (const sx of [-9, 9]) {
+      ctx.save();
+      ctx.translate(sx, 5);
+      ctx.rotate(sx > 0 ? 0.15 : -0.15);
+      ctx.fillStyle = "#4a3f30";
+      ctx.fillRect(-2, -5, 4, 8);
+      ctx.fillStyle = theme.accent;
+      ctx.globalAlpha = 0.4 + 0.3 * Math.sin(timeMs / 450 + sx);
+      ctx.fillRect(-1, -3, 2, 4);
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
 
   // Same runaway-per-level bug as the tower's overall scale: the orb's
   // rise and glow radius were unbounded (level * 1.4 / level * 1.3), so a
@@ -600,6 +797,18 @@ function drawStormcaller(
   ctx.arc(0, orbY, 6, 0, Math.PI * 2);
   ctx.fill();
 
+  // Visual Evolution stage 4+: a second, smaller orb orbits the main one —
+  // the structure now channels more than one focus of power.
+  if (visualStage >= 4) {
+    const secondaryAngle = timeMs / 900;
+    ctx.fillStyle = theme.accent;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(Math.cos(secondaryAngle) * 12, orbY + Math.sin(secondaryAngle) * 5, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
   // Crackling arcs jumping between the orb and the pillar top.
   ctx.strokeStyle = theme.primary;
   ctx.lineWidth = 1.3;
@@ -614,6 +823,19 @@ function drawStormcaller(
     ctx.lineTo(midX, midY);
     ctx.lineTo(jitter(seed + 2) * 0.6, -24);
     ctx.stroke();
+  }
+
+  // Visual Evolution stage 6 (final form): a faint storm-cloud halo hangs
+  // above the orb, echoed by slow drifting sparks.
+  if (visualStage >= 6) {
+    ctx.save();
+    ctx.globalAlpha = 0.22 + 0.1 * Math.sin(timeMs / 600);
+    ctx.fillStyle = theme.primary;
+    ctx.beginPath();
+    ctx.ellipse(0, orbY - 14, 16, 6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 }
 

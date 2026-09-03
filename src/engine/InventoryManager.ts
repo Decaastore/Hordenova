@@ -15,6 +15,42 @@ export function addItem(inventory: readonly ItemInstance[], item: ItemInstance):
   return [...inventory, item];
 }
 
+/**
+ * Inventory Capacity + Overflow (Progression 2.0 spec section 36/39): the
+ * default save has DEFAULT_INVENTORY_CAPACITY (20) usable inventory slots
+ * — a real limit, in preparation for a future paid Gem expansion (spec
+ * section 36's "+10 slots"). A drop that arrives at a full inventory is
+ * NEVER silently deleted (spec: "não deletar itens silenciosamente") — it
+ * goes into `overflow`, a waiting area with no cap of its own, until the
+ * player frees a slot or buys more capacity.
+ */
+export const DEFAULT_INVENTORY_CAPACITY = 20;
+
+export function addItemWithCapacity(
+  inventory: readonly ItemInstance[],
+  overflow: readonly ItemInstance[],
+  item: ItemInstance,
+  capacity: number,
+): { inventory: ItemInstance[]; overflow: ItemInstance[] } {
+  if (inventory.length < capacity) {
+    return { inventory: [...inventory, item], overflow: [...overflow] };
+  }
+  return { inventory: [...inventory], overflow: [...overflow, item] };
+}
+
+/** Moves one item out of the overflow waiting area into the main inventory, if there's room. A no-op (same contents, new array references) if the inventory is still full or the item isn't in overflow. */
+export function claimFromOverflow(
+  inventory: readonly ItemInstance[],
+  overflow: readonly ItemInstance[],
+  instanceId: string,
+  capacity: number,
+): { inventory: ItemInstance[]; overflow: ItemInstance[] } {
+  if (inventory.length >= capacity) return { inventory: [...inventory], overflow: [...overflow] };
+  const item = overflow.find((i) => i.instanceId === instanceId);
+  if (!item) return { inventory: [...inventory], overflow: [...overflow] };
+  return { inventory: [...inventory, item], overflow: overflow.filter((i) => i.instanceId !== instanceId) };
+}
+
 export function removeItem(inventory: readonly ItemInstance[], instanceId: string): ItemInstance[] {
   return inventory.filter((item) => item.instanceId !== instanceId);
 }

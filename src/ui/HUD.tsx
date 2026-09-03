@@ -5,7 +5,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
-import { BagIcon, BoltIcon, CoinIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, CoinIcon, GemIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -40,6 +40,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           label={t("hud.gold")}
           value={String(hud.gold)}
           valueColor={PALETTE.gold}
+        />
+        <Stat
+          icon={<GemIcon color="#c88aff" />}
+          label={t("hud.gems")}
+          value={hud.gemShards > 0 ? `${hud.gems} (+${hud.gemShards})` : String(hud.gems)}
+          valueColor="#c88aff"
         />
         <div style={{ textAlign: "center", minWidth: 100 }}>
           <div style={labelStyle}>{t("hud.state")}</div>

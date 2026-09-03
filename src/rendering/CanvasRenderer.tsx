@@ -21,6 +21,7 @@ import {
 import { drawBossAura, drawEliteAura, drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
+import { getCastleHpTier } from "@/config/castleConfig";
 
 const SLOT_HIT_RADIUS = 22;
 const TOWER_HIT_RADIUS = 20;
@@ -121,7 +122,8 @@ export function CanvasRenderer({
       const hud = engine.getHudSnapshot();
       latestSnapshotRef.current = snapshot;
 
-      detectVfxEvents(snapshot, hud.gold, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
+      const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
+      detectVfxEvents(snapshot, hud.gold, castleHpPercent, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
 
       // Attack detection: a tower's cooldown only ever counts down during
       // normal play — it can only go UP when an attack just reset it. That
@@ -160,14 +162,15 @@ export function CanvasRenderer({
       const biome = getBiome(snapshot.biomeId);
 
       const { scale, offsetX, offsetY } = transformRef.current;
+      const shake = vfx.getShakeOffset();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.setTransform(scale, 0, 0, scale, offsetX, offsetY);
+      ctx.setTransform(scale, 0, 0, scale, offsetX + shake.x * scale, offsetY + shake.y * scale);
 
       drawBackground(ctx, biome);
       drawDecorations(ctx, biome, timestamp);
       drawPath(ctx, ENEMY_PATH, biome);
-      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp);
+      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
@@ -271,6 +274,7 @@ export function CanvasRenderer({
 function detectVfxEvents(
   snapshot: RenderSnapshot,
   gold: number,
+  castleHpPercent: number,
   vfx: VfxManager,
   prevEnemies: Map<string, PrevEnemyState>,
   prevTowerLevels: Map<string, number>,
@@ -303,7 +307,11 @@ function detectVfxEvents(
       vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
       killPositionsThisFrame.push(prev.position);
     } else {
-      vfx.spawnBaseHitFlash(gatePosition);
+      // Castle Damage Event VFX (spec section 12/13) — the same "reached
+      // the base" instant GameEngine already flags for audio, escalated by
+      // the castle's current HP tier (config/castleConfig.ts) so a hit at
+      // low HP reads as more dangerous than a scratch at full HP.
+      vfx.spawnCastleImpact(gatePosition, getCastleHpTier(castleHpPercent));
     }
   }
 

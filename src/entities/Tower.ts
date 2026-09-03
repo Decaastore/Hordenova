@@ -5,6 +5,14 @@ import {
   type TowerLevelStats,
   type TowerType,
 } from "@/config/towerStats";
+import {
+  getSpecializationUpgradeCost,
+  isSpecializationForTower,
+  MAX_SPECIALIZATION_LEVEL,
+  SPECIALIZATION_UNLOCK_TOWER_LEVEL,
+  type SpecializationId,
+} from "@/config/specializations";
+import { getTowerSkinDefinition } from "@/config/towerSkins";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -16,6 +24,12 @@ export interface TowerInstance {
   cooldownRemainingMs: number;
   /** >0 while jammed by a DISABLER-archetype enemy/mini-boss — see CombatSystem.tickEnemyDisableAbilities. */
   disabledRemainingMs: number;
+  /** Progression 2.0 — the player's chosen build-identity path, null until chosen. Permanent once set (see chooseSpecialization). */
+  specializationId: SpecializationId | null;
+  /** 0 = not chosen yet. 1..MAX_SPECIALIZATION_LEVEL once chosen — a second, independent gold-sink track from the tower's own level. */
+  specializationLevel: number;
+  /** Progression 2.0 — cosmetic-only equipped skin id, or null for the default look. Never read by combat code. */
+  equippedSkinId: string | null;
 }
 
 /**
@@ -27,6 +41,10 @@ export interface TowerLoadoutEntry {
   slotId: string;
   type: TowerType;
   level: number;
+  /** Optional so existing fixtures/tests written before Progression 2.0 still typecheck — SaveSystem.parseTowerLoadout and GameEngine.persist() always populate these on real data. */
+  specializationId?: SpecializationId | null;
+  specializationLevel?: number;
+  equippedSkinId?: string | null;
 }
 
 let nextTowerId = 1;
@@ -36,6 +54,9 @@ export function createTowerInstance(
   type: TowerType,
   position: Vector2,
   initialLevel = 1,
+  specializationId: SpecializationId | null = null,
+  specializationLevel = 0,
+  equippedSkinId: string | null = null,
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -45,6 +66,9 @@ export function createTowerInstance(
     position,
     cooldownRemainingMs: 0,
     disabledRemainingMs: 0,
+    specializationId,
+    specializationLevel,
+    equippedSkinId,
   };
 }
 
@@ -84,4 +108,55 @@ export function disableTower(tower: TowerInstance, durationMs: number): void {
 export function resetTowerCooldown(tower: TowerInstance): void {
   const stats = getTowerStats(tower);
   tower.cooldownRemainingMs = 1000 / stats.attackSpeed;
+}
+
+// ---------------------------------------------------------------------------
+// Progression 2.0 — Specialization / Upgrade Slot.
+// ---------------------------------------------------------------------------
+
+export function canChooseSpecialization(tower: TowerInstance): boolean {
+  return tower.specializationId === null && tower.level >= SPECIALIZATION_UNLOCK_TOWER_LEVEL;
+}
+
+/** Mutates `tower` in place. A no-op if a specialization is already chosen, the tower isn't high enough level yet, or `id` doesn't belong to this tower's type. Caller owns gold deduction (choosing costs the level-0->1 specialization price). */
+export function chooseSpecialization(tower: TowerInstance, id: SpecializationId): boolean {
+  if (!canChooseSpecialization(tower)) return false;
+  if (!isSpecializationForTower(id, tower.type)) return false;
+  tower.specializationId = id;
+  tower.specializationLevel = 1;
+  return true;
+}
+
+export function canUpgradeSpecialization(tower: TowerInstance): boolean {
+  return tower.specializationId !== null && tower.specializationLevel < MAX_SPECIALIZATION_LEVEL;
+}
+
+export function getSpecializationUpgradeCostFor(tower: TowerInstance): number | null {
+  if (!tower.specializationId) return null;
+  return getSpecializationUpgradeCost(tower.type, tower.specializationLevel);
+}
+
+/** Mutates `tower` in place, incrementing its specialization level (caller owns gold deduction). */
+export function upgradeSpecialization(tower: TowerInstance): void {
+  if (canUpgradeSpecialization(tower)) tower.specializationLevel += 1;
+}
+
+// ---------------------------------------------------------------------------
+// Progression 2.0 — Skins (cosmetic only, never read by combat code).
+// ---------------------------------------------------------------------------
+
+export function canEquipSkin(tower: TowerInstance, skinId: string): boolean {
+  const def = getTowerSkinDefinition(skinId);
+  return !!def && def.towerType === tower.type && tower.level >= def.unlockLevel;
+}
+
+/** Mutates `tower` in place. `skinId` of null clears back to the default look. Purely cosmetic — never touches level/specialization/stats. */
+export function equipSkin(tower: TowerInstance, skinId: string | null): boolean {
+  if (skinId === null) {
+    tower.equippedSkinId = null;
+    return true;
+  }
+  if (!canEquipSkin(tower, skinId)) return false;
+  tower.equippedSkinId = skinId;
+  return true;
 }

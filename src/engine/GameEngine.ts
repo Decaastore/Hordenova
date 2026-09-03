@@ -14,16 +14,23 @@ import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseCo
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
-import { addItem } from "./InventoryManager";
+import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { checkLocalFirst, type LocalFirstDiscoveries } from "./WorldFirst";
 import {
   createTowerInstance,
   getTowerUpgradeCost,
   upgradeTower as upgradeTowerEntity,
+  canChooseSpecialization,
+  chooseSpecialization as chooseSpecializationEntity,
+  canUpgradeSpecialization,
+  getSpecializationUpgradeCostFor,
+  upgradeSpecialization as upgradeSpecializationEntity,
+  equipSkin as equipSkinEntity,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
+import type { SpecializationId } from "@/config/specializations";
 import {
   advanceEnemy,
   createEliteEnemyInstance,
@@ -77,6 +84,9 @@ export interface HudSnapshot {
   /** Current phase's id (config/phaseConfig.ts) — also its i18n key (`phases.<phaseId>.name`) and its biome's registry key. */
   phaseId: string;
   gold: number;
+  /** Progression 2.0 — the convenience/cosmetics currency (spec section 33). Shown in the HUD, never spendable on power. */
+  gems: number;
+  gemShards: number;
   baseHp: number;
   maxBaseHp: number;
   speed: GameSpeed;
@@ -111,6 +121,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.wave === b.wave &&
     a.phaseId === b.phaseId &&
     a.gold === b.gold &&
+    a.gems === b.gems &&
+    a.gemShards === b.gemShards &&
     a.baseHp === b.baseHp &&
     a.maxBaseHp === b.maxBaseHp &&
     a.speed === b.speed &&
@@ -181,6 +193,18 @@ export class GameEngine {
   private localFirstDiscoveries: LocalFirstDiscoveries = {};
   private pendingItemRewards: ItemInstance[] = [];
 
+  // Progression 2.0 — Gem Economy (spec sections 33-40). `gems`/`gemShards`
+  // are private exactly like `gold` above: every read/write goes through
+  // this class's own methods (getGemBalance/addGems/spendGems/
+  // convertGemShards below), which is what satisfies spec section 37's
+  // "GemManager... não pode permitir player.gems += 100 direto na UI" —
+  // there simply is no path from UI code to these fields except through
+  // those methods, the same guarantee `gold` already has.
+  private gems = 0;
+  private gemShards = 0;
+  private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
+  private overflowInventory: ItemInstance[] = [];
+
   /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
   private audioEvents: GameAudioEvent[] = [];
   private waveCompleteAudioFiredForWave: number | null = null;
@@ -225,6 +249,10 @@ export class GameEngine {
     this.bossesDefeatedTotal = save.bossesDefeatedTotal;
     this.miniBossesDefeatedTotal = save.miniBossesDefeatedTotal;
     this.localFirstDiscoveries = save.localFirstDiscoveries;
+    this.gems = save.gems;
+    this.gemShards = save.gemShards;
+    this.inventoryCapacity = save.inventoryCapacity;
+    this.overflowInventory = save.overflowInventory;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
     this.wave.currentWave = save.currentWave;
@@ -339,7 +367,15 @@ export class GameEngine {
 
   private instantiateTowerFromLoadout(entry: TowerLoadoutEntry): TowerInstance {
     const slot = TOWER_SLOTS.find((s) => s.id === entry.slotId);
-    return createTowerInstance(entry.slotId, entry.type, slot ? slot.position : { x: 0, y: 0 }, entry.level);
+    return createTowerInstance(
+      entry.slotId,
+      entry.type,
+      slot ? slot.position : { x: 0, y: 0 },
+      entry.level,
+      entry.specializationId,
+      entry.specializationLevel,
+      entry.equippedSkinId,
+    );
   }
 
   placeTower(slotId: string, type: TowerType): boolean {
@@ -379,6 +415,154 @@ export class GameEngine {
     this.persist();
     this.notify();
     return true;
+  }
+
+  // -------------------------------------------------------------------
+  // Progression 2.0 — Specialization / Upgrade Slot (spec section 5/6).
+  // The fix for "reaches phase 46 in 20 minutes": a genuine, player-chosen
+  // gold sink that keeps mattering well past MAX_TOWER_LEVEL. See
+  // config/specializations.ts for the full design rationale.
+  // -------------------------------------------------------------------
+
+  canChooseSpecializationForSelectedTower(): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    return !!tower && canChooseSpecialization(tower);
+  }
+
+  /** Costs the level-0->1 specialization price (config/specializations.getSpecializationUpgradeCost). Permanent once chosen — no re-spec in this pass, matching the spec's "escolha real". */
+  chooseTowerSpecialization(specializationId: SpecializationId): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canChooseSpecialization(tower)) return false;
+
+    const cost = getSpecializationUpgradeCostFor({ ...tower, specializationId, specializationLevel: 0 });
+    if (cost === null || this.gold < cost) return false;
+
+    this.gold -= cost;
+    const applied = chooseSpecializationEntity(tower, specializationId);
+    if (!applied) {
+      this.gold += cost; // Roll back — id didn't belong to this tower type or another guard failed.
+      return false;
+    }
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  upgradeSelectedTowerSpecialization(): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canUpgradeSpecialization(tower)) return false;
+
+    const cost = getSpecializationUpgradeCostFor(tower);
+    if (cost === null || this.gold < cost) return false;
+
+    this.gold -= cost;
+    upgradeSpecializationEntity(tower);
+    this.emitAudio({ type: "tower_upgrade" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // Progression 2.0 — Tower Skins (spec section 10/11). Purely cosmetic:
+  // never touches gold, level, specialization, or combat.
+  // -------------------------------------------------------------------
+
+  equipSkinOnSelectedTower(skinId: string | null): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    const applied = equipSkinEntity(tower, skinId);
+    if (applied) {
+      this.persist();
+      this.notify();
+    }
+    return applied;
+  }
+
+  // -------------------------------------------------------------------
+  // Progression 2.0 — Gem Economy (spec section 33-40). Every mutation
+  // routes through here and appends a ledger event (engine/EconomyLedger.ts)
+  // — see the field-level comment on `gems`/`gemShards` above for why this
+  // already satisfies the "no direct UI mutation" requirement.
+  // -------------------------------------------------------------------
+
+  getGemBalance(): number {
+    return this.gems;
+  }
+
+  getGemShardBalance(): number {
+    return this.gemShards;
+  }
+
+  private addGems(amount: number, source: string): void {
+    if (amount <= 0) return;
+    this.gems += amount;
+    appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount });
+  }
+
+  private addGemShards(amount: number, source: string): void {
+    if (amount <= 0) return;
+    this.gemShards += amount;
+    appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount });
+  }
+
+  canAffordGems(amount: number): boolean {
+    return this.gems >= amount;
+  }
+
+  /** Never called by anything gameplay-affecting in this pass (spec section 35: Gems must never be pay-to-win) — reserved for future cosmetic/convenience purchases (inventory expansion, skin unlocks) that ARE allowed to cost Gems. */
+  spendGems(amount: number, reason: string): boolean {
+    if (amount <= 0 || this.gems < amount) return false;
+    this.gems -= amount;
+    appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: this.playerId, toOwner: null, source: reason, amount });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Gem Shards -> Gems conversion (spec section 34: "se a conversão não fizer sentido, deixe a arquitetura preparada sem inventar uma economia arbitrária"). A conservative fixed rate, player-triggered — never automatic. */
+  static readonly GEM_SHARD_TO_GEM_RATE = 10;
+
+  convertGemShards(): boolean {
+    const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
+    if (this.gemShards < rate) return false;
+    const shardsToConvert = Math.floor(this.gemShards / rate) * rate;
+    const gemsGained = shardsToConvert / rate;
+    this.gemShards -= shardsToConvert;
+    this.addGems(gemsGained, "gem_shard_conversion");
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // Progression 2.0 — Inventory Capacity + Overflow (spec section 36/39).
+  // -------------------------------------------------------------------
+
+  getInventoryCapacity(): number {
+    return this.inventoryCapacity;
+  }
+
+  getOverflowInventory(): readonly ItemInstance[] {
+    return this.overflowInventory;
+  }
+
+  /** Moves one item from the overflow waiting area into the usable inventory, if there's room. Never deletes anything either way. */
+  claimOverflowItem(instanceId: string): boolean {
+    const before = this.inventory.length;
+    const result = claimFromOverflow(this.inventory, this.overflowInventory, instanceId, this.inventoryCapacity);
+    this.inventory = result.inventory;
+    this.overflowInventory = result.overflow;
+    const claimed = this.inventory.length > before;
+    if (claimed) {
+      this.persist();
+      this.notify();
+    }
+    return claimed;
   }
 
   update(dtMs: number): void {
@@ -579,7 +763,13 @@ export class GameEngine {
   private advanceBestWave(wave: number): void {
     if (wave <= this.bestWave) return;
     const bonus = getMilestoneBonus(wave);
-    if (bonus > 0) this.gold += bonus;
+    if (bonus > 0) {
+      this.gold += bonus;
+      // Gem Shards (spec section 34: "obtidos via... milestones") — a
+      // small amount scaled off the SAME milestone bonus gold already
+      // computed above, not an invented parallel number.
+      this.addGemShards(Math.max(1, Math.round(bonus / 150)), `milestone_wave_${wave}`);
+    }
     this.bestWave = wave;
   }
 
@@ -625,6 +815,13 @@ export class GameEngine {
     if (boss.isMainBoss) this.bossesDefeatedTotal += 1;
     else this.miniBossesDefeatedTotal += 1;
 
+    // Gem Shards (spec section 34: "obtidos via... bosses"): every boss
+    // kill grants a small amount regardless of whether it also has a
+    // dropTableId — this is the ONE gem-adjacent reward already wired to a
+    // real, non-arbitrary event (a boss actually dying), independent of
+    // the item-drop system below.
+    this.addGemShards(boss.isMainBoss ? 5 : 2, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
+
     const def = getBossDefinitionById(boss.bossId);
     if (!def || !def.dropTableId) return;
     const table = getDropTable(def.dropTableId);
@@ -635,7 +832,12 @@ export class GameEngine {
       type: boss.isMainBoss ? "BOSS_DROP" : "MINI_BOSS_DROP",
       refId: def.id,
     });
-    this.inventory = addItem(this.inventory, item);
+    // Inventory Capacity + Overflow (spec section 36/39): a full inventory
+    // never silently drops this reward — it lands in the overflow waiting
+    // area instead, still visible in the reward banner either way.
+    const result = addItemWithCapacity(this.inventory, this.overflowInventory, item, this.inventoryCapacity);
+    this.inventory = result.inventory;
+    this.overflowInventory = result.overflow;
     this.pendingItemRewards.push(item);
 
     const ledgerBase = {
@@ -720,13 +922,24 @@ export class GameEngine {
       bestWave: this.bestWave,
       gold: this.gold,
       currentWave: this.wave.currentWave,
-      towerLoadout: this.towers.map((t) => ({ slotId: t.slotId, type: t.type, level: t.level })),
+      towerLoadout: this.towers.map((t) => ({
+        slotId: t.slotId,
+        type: t.type,
+        level: t.level,
+        specializationId: t.specializationId,
+        specializationLevel: t.specializationLevel,
+        equippedSkinId: t.equippedSkinId,
+      })),
       discoveredEnemyTypes: [...this.discoveredEnemyTypes],
       inventory: this.inventory,
       playerId: this.playerId,
       bossesDefeatedTotal: this.bossesDefeatedTotal,
       miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,
       localFirstDiscoveries: this.localFirstDiscoveries,
+      gems: this.gems,
+      gemShards: this.gemShards,
+      inventoryCapacity: this.inventoryCapacity,
+      overflowInventory: this.overflowInventory,
     });
   }
 
@@ -744,6 +957,8 @@ export class GameEngine {
       wave: this.wave.currentWave,
       phaseId: getPhaseForWave(this.wave.currentWave).id,
       gold: this.gold,
+      gems: this.gems,
+      gemShards: this.gemShards,
       baseHp: this.baseHp,
       maxBaseHp: this.maxBaseHp,
       speed: this.speed,

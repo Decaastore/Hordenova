@@ -102,6 +102,9 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             gold={hud.gold}
             onUpgrade={() => engine.upgradeSelectedTower()}
             onClose={() => engine.selectTower(null)}
+            onChooseSpecialization={(id) => engine.chooseTowerSpecialization(id)}
+            onUpgradeSpecialization={() => engine.upgradeSelectedTowerSpecialization()}
+            onEquipSkin={(skinId) => engine.equipSkinOnSelectedTower(skinId)}
           />
         )}
 
@@ -124,6 +127,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             inventory={engine.getInventory()}
             localEconomyTotals={engine.getLocalEconomyTotals()}
             onClose={() => setInventoryOpen(false)}
+            inventoryCapacity={engine.getInventoryCapacity()}
+            overflowInventory={engine.getOverflowInventory()}
+            onClaimOverflowItem={(instanceId) => engine.claimOverflowItem(instanceId)}
+            gemShards={hud.gemShards}
+            onConvertGemShards={() => engine.convertGemShards()}
           />
         )}
       </div>

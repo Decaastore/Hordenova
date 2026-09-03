@@ -21,18 +21,29 @@ export type LedgerEventType =
   | "ITEM_TRADED"
   | "ITEM_CONSUMED"
   | "ITEM_DESTROYED"
-  | "ITEM_BOUND";
+  | "ITEM_BOUND"
+  // Gem Economy (Progression 2.0 spec section 38) — reuses this SAME
+  // ledger rather than a parallel log, per "Integrar ao Economy Ledger
+  // existente". These events carry `amount` instead of item fields.
+  | "GEMS_EARNED"
+  | "GEMS_SPENT"
+  | "GEM_SHARDS_EARNED"
+  | "INVENTORY_EXPANSION_PURCHASED"
+  | "COSMETIC_PURCHASED";
 
 export interface LedgerEvent {
   eventId: string;
   timestamp: number;
   eventType: LedgerEventType;
-  itemInstanceId: string;
-  itemDefinitionId: string;
+  /** Present for ITEM_* events, absent for the Gem Economy event types (GEMS_EARNED, GEMS_SPENT, GEM_SHARDS_EARNED, INVENTORY_EXPANSION_PURCHASED, COSMETIC_PURCHASED). */
+  itemInstanceId?: string;
+  itemDefinitionId?: string;
   fromOwner: string | null;
   toOwner: string | null;
-  /** Free-form provenance string — a boss id, "trade:<sessionId>", etc. */
+  /** Free-form provenance string — a boss id, "trade:<sessionId>", a milestone wave number, "specialization:<id>", etc. */
   source: string;
+  /** Present for GEMS_EARNED/GEMS_SPENT/GEM_SHARDS_EARNED — the gold-equivalent quantity, and for COSMETIC_PURCHASED/INVENTORY_EXPANSION_PURCHASED the gem cost paid. Absent for ITEM_* events. */
+  amount?: number;
 }
 
 const LEDGER_STORAGE_KEY = "hordenova.ledger.v1";
@@ -53,9 +64,10 @@ function isValidEvent(raw: unknown): raw is LedgerEvent {
     typeof e.eventId === "string" &&
     typeof e.timestamp === "number" &&
     typeof e.eventType === "string" &&
-    typeof e.itemInstanceId === "string" &&
-    typeof e.itemDefinitionId === "string" &&
-    typeof e.source === "string"
+    typeof e.source === "string" &&
+    (e.itemInstanceId === undefined || typeof e.itemInstanceId === "string") &&
+    (e.itemDefinitionId === undefined || typeof e.itemDefinitionId === "string") &&
+    (e.amount === undefined || typeof e.amount === "number")
   );
 }
 

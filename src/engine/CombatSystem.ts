@@ -15,6 +15,7 @@ import {
 } from "@/entities/Enemy";
 import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
 import { getTowerSpecialAtLevel, type TowerType } from "@/config/towerStats";
+import { applySpecializationToSpecial } from "@/config/specializations";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { distance, type Vector2 } from "@/utils/geometry";
 
@@ -154,36 +155,51 @@ export function tickCombat(
     if (!target) continue;
 
     resetTowerCooldown(tower);
-    const special = getTowerSpecialAtLevel(tower.type, tower.level);
+    const special = applySpecializationToSpecial(
+      getTowerSpecialAtLevel(tower.type, tower.level),
+      tower.specializationId,
+      tower.specializationLevel,
+    );
 
     if (special.type === "IRONWOOD") {
       const bossMult = (enemy: EnemyInstance) => (enemy.boss ? special.bossDamageMultiplier : 1);
+      const armorPen = special.bonusArmorPenetration ?? 0;
       const isCrit = Math.random() < special.critChance;
-      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target));
+      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target), armorPen);
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
 
-      // Extra projectiles (unlocked at level 10/20, see towerStats.ts) hit
-      // additional nearby targets instead of piling more damage onto one —
-      // a real behavior change, not just a bigger number.
+      // Extra projectiles (unlocked at level 10/20, see towerStats.ts, plus
+      // an optional specialization bonus — see config/specializations.ts)
+      // hit additional nearby targets instead of piling more damage onto
+      // one — a real behavior change, not just a bigger number.
       const alreadyHit = new Set<string>([target.id]);
-      for (let i = 1; i < stats.projectileCount; i++) {
+      const totalProjectiles = stats.projectileCount + (special.bonusProjectiles ?? 0);
+      for (let i = 1; i < totalProjectiles; i++) {
         const extra = findNearestUnhit(tower.position, stats.range, enemies, alreadyHit);
         if (!extra) break;
         const extraCrit = Math.random() < special.critChance;
-        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra));
+        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra), armorPen);
         projectiles.push(createProjectile(tower.type, tower.position, extra.position));
         alreadyHit.add(extra.id);
       }
     } else if (special.type === "INFERNO") {
+      const comboMult = special.burningComboDamageMultiplier ?? 0;
       for (const enemy of enemies) {
         if (isEnemyDead(enemy)) continue;
         if (distance(target.position, enemy.position) > special.aoeRadius) continue;
-        dealDamage(tower, enemy, stats.damage);
+        // Detonator specialization: a hit landing on an already-burning
+        // target deals bonus impact damage — an "explosion" flavor that
+        // reuses the existing burn-flag check instead of a new kill-time hook.
+        const mult = enemy.burn ? 1 + comboMult : 1;
+        dealDamage(tower, enemy, stats.damage * mult);
         applyBurn(enemy, special.burnDamagePerSecond, special.burnDurationMs, special.burnMaxStacks);
       }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
     } else if (special.type === "FROSTBORN") {
-      const event = dealDamage(tower, target, stats.damage);
+      // Shatter specialization: bonus damage against a target that's
+      // already fully frozen (a 100% slow) rather than the normal partial one.
+      const frozenMult = target.slow?.percent === 1 ? 1 + (special.frozenBonusDamageMultiplier ?? 0) : 1;
+      const event = dealDamage(tower, target, stats.damage * frozenMult);
       // Deep Freeze (unlocked at level 10): a chance to fully stop the
       // target instead of the normal partial slow — reuses the exact same
       // slow-effect plumbing (100% = a freeze), no new status type needed.
@@ -196,12 +212,13 @@ export function tickCombat(
       }
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
     } else if (special.type === "STORMCALLER") {
-      dealDamage(tower, target, stats.damage, special.armorPenetration);
+      const bonusFlat = special.bonusFlatDamage ?? 0;
+      dealDamage(tower, target, stats.damage + bonusFlat, special.armorPenetration);
 
       const chainImpactPoints: Vector2[] = [];
       const alreadyHit = new Set<string>([target.id]);
       let chainOrigin = target;
-      let chainDamage = stats.damage;
+      let chainDamage = stats.damage + bonusFlat;
 
       for (let i = 0; i < special.chainTargets; i++) {
         chainDamage *= special.chainFalloff;

@@ -53,6 +53,15 @@ export function CoinIcon({ size = 14, color = "currentColor", style }: IconProps
   );
 }
 
+export function GemIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M6 4h12l4 6-10 10L2 10Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M2 10h20M9 4l-2 6 5 10 5-10-2-6" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.75" />
+    </svg>
+  );
+}
+
 export function BoltIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

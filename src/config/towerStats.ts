@@ -48,6 +48,10 @@ export interface IronwoodSpecial {
   critMultiplier: number;
   /** Extra multiplier applied only when the target is a boss/mini-boss. 1 = no bonus. Unlocks at level 15 ("Giant Slayer"). */
   bossDamageMultiplier: number;
+  /** Specialization-only bonus (Progression 2.0 — see config/specializations.ts): extra targets on top of the level-driven projectileCount. 0 when no specialization is chosen. */
+  bonusProjectiles?: number;
+  /** Specialization-only bonus: additional armor-penetration fraction applied to every hit. 0 when no specialization is chosen. */
+  bonusArmorPenetration?: number;
 }
 
 export interface InfernoSpecial {
@@ -56,6 +60,8 @@ export interface InfernoSpecial {
   burnDurationMs: number;
   /** How many overlapping burn applications can stack their DPS on the same target. 1 = no stacking. Unlocks at level 10 ("Wildfire"). */
   burnMaxStacks: number;
+  /** Specialization-only bonus: extra damage multiplier applied to a hit landing on an already-burning target ("Detonator" path). 0 when no specialization is chosen. */
+  burningComboDamageMultiplier?: number;
 }
 
 export interface FrostbornSpecial {
@@ -64,6 +70,8 @@ export interface FrostbornSpecial {
   /** Chance per hit to fully stop the target (a slow of 100%) instead of the normal partial slow. 0 = never. Unlocks at level 10 ("Deep Freeze"). */
   freezeChance: number;
   freezeDurationMs: number;
+  /** Specialization-only bonus: extra damage multiplier applied to a hit landing on a fully-frozen target ("Shatter" path). 0 when no specialization is chosen. */
+  frozenBonusDamageMultiplier?: number;
 }
 
 export interface StormcallerSpecial {
@@ -71,6 +79,8 @@ export interface StormcallerSpecial {
   chainFalloff: number; // damage multiplier applied per chain jump
   /** Fraction of the target's damage reduction ignored on every hit. 0 = none. Unlocks at level 10 ("Arcane Surge") — Stormcaller's answer to armored enemies. */
   armorPenetration: number;
+  /** Specialization-only bonus: flat magic damage added to every hit ("Arcane Surge" specialization path). 0 when no specialization is chosen. */
+  bonusFlatDamage?: number;
 }
 
 export type TowerSpecial =
@@ -307,4 +317,20 @@ export function getUpgradeCost(type: TowerType, currentLevel: number): number | 
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
+}
+
+/**
+ * Tower Visual Evolution (spec section 9) — how many levels each stage
+ * spans. A tower's structure gains new physical parts at each boundary
+ * (see rendering/EntityRenderer.ts's stage-gated draw additions), not just
+ * a bigger scale. Six stages across 30 levels mirrors the spec's own
+ * example brackets (1-5/6-10/11-15/16-20/21-25/26-30).
+ */
+const VISUAL_STAGE_LEVEL_SPAN = 5;
+export const TOWER_VISUAL_STAGE_COUNT = Math.ceil(MAX_TOWER_LEVEL / VISUAL_STAGE_LEVEL_SPAN);
+
+/** Level 1..MAX_TOWER_LEVEL -> visual stage 1..TOWER_VISUAL_STAGE_COUNT. Pure function of level, so rendering never needs anything beyond TowerInstance.level to pick a stage. */
+export function getTowerVisualStage(level: number): number {
+  const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
+  return Math.min(TOWER_VISUAL_STAGE_COUNT, Math.ceil(clamped / VISUAL_STAGE_LEVEL_SPAN));
 }

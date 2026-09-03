@@ -1,6 +1,9 @@
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
+import { SPECIALIZATIONS_BY_TOWER, type SpecializationId } from "@/config/specializations";
+import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 import type { ItemInstance } from "@/entities/Item";
 import type { LocalFirstDiscoveries } from "./WorldFirst";
@@ -54,9 +57,17 @@ export interface SaveData {
   /** Audio spec section 13 — 0..1, but only ever set to one of the 5 discrete UI steps (0/0.25/0.5/0.75/1). */
   sfxVolume: number;
   sfxMuted: boolean;
+  /** Progression 2.0 spec section 33/37 — the convenience/cosmetics currency. Never a combat-power lever, see engine/GameEngine.ts's GemManager-pattern methods. */
+  gems: number;
+  /** Progression 2.0 spec section 34 — earned from bosses/milestones, manually convertible to Gems at a fixed rate (see GameEngine.convertGemShards). */
+  gemShards: number;
+  /** Progression 2.0 spec section 36/39 — usable inventory slots. Starts at DEFAULT_INVENTORY_CAPACITY; a future Gem-purchased expansion raises this. */
+  inventoryCapacity: number;
+  /** Progression 2.0 spec section 39 — items that arrived while the inventory was full. Never deleted; the player reclaims them by freeing a slot. */
+  overflowInventory: ItemInstance[];
 }
 
-export const SAVE_DATA_VERSION = 5;
+export const SAVE_DATA_VERSION = 6;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -81,6 +92,10 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   localFirstDiscoveries: {},
   sfxVolume: 1,
   sfxMuted: false,
+  gems: 0,
+  gemShards: 0,
+  inventoryCapacity: DEFAULT_INVENTORY_CAPACITY,
+  overflowInventory: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -105,10 +120,23 @@ function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
       validTypes.has((item as TowerLoadoutEntry).type) &&
       typeof (item as TowerLoadoutEntry).level === "number"
     ) {
+      const entry = item as Partial<TowerLoadoutEntry> & { type: TowerType };
+      // Self-healing: a specializationId that doesn't belong to this
+      // tower's own type (corrupted save, or a save from before this
+      // field existed) is dropped back to null rather than trusted as-is.
+      const validSpecIds = new Set<SpecializationId>(SPECIALIZATIONS_BY_TOWER[entry.type].map((s) => s.id));
+      const specializationId =
+        typeof entry.specializationId === "string" && validSpecIds.has(entry.specializationId as SpecializationId)
+          ? (entry.specializationId as SpecializationId)
+          : null;
+      const skinDef = typeof entry.equippedSkinId === "string" ? getTowerSkinDefinition(entry.equippedSkinId) : null;
       entries.push({
-        slotId: (item as TowerLoadoutEntry).slotId,
-        type: (item as TowerLoadoutEntry).type,
-        level: (item as TowerLoadoutEntry).level,
+        slotId: entry.slotId as string,
+        type: entry.type,
+        level: entry.level as number,
+        specializationId,
+        specializationLevel: specializationId && typeof entry.specializationLevel === "number" ? entry.specializationLevel : 0,
+        equippedSkinId: skinDef && skinDef.towerType === entry.type ? skinDef.id : null,
       });
     }
   }
@@ -158,7 +186,16 @@ function parseLocalFirstDiscoveries(raw: unknown): LocalFirstDiscoveries {
 }
 
 function emptySaveData(): SaveData {
-  return { ...DEFAULT_SAVE_DATA, towerLoadout: [], inventory: [], cosmetics: [], materials: [], discoveredEnemyTypes: [], localFirstDiscoveries: {} };
+  return {
+    ...DEFAULT_SAVE_DATA,
+    towerLoadout: [],
+    inventory: [],
+    cosmetics: [],
+    materials: [],
+    discoveredEnemyTypes: [],
+    localFirstDiscoveries: {},
+    overflowInventory: [],
+  };
 }
 
 export function loadSave(): SaveData {
@@ -196,6 +233,19 @@ export function loadSave(): SaveData {
       localFirstDiscoveries: parseLocalFirstDiscoveries(parsed.localFirstDiscoveries),
       sfxVolume: typeof parsed.sfxVolume === "number" && VALID_SFX_VOLUME_STEPS.has(parsed.sfxVolume) ? parsed.sfxVolume : 1,
       sfxMuted: typeof parsed.sfxMuted === "boolean" ? parsed.sfxMuted : false,
+      // Progression 2.0 (save v5 -> v6) — every field below is brand new,
+      // so any save written before this migration simply gets the
+      // DEFAULT_SAVE_DATA value here rather than needing a special
+      // migration branch: "gems: 0 / gemShards: 0 / a full-size fresh
+      // inventoryCapacity / an empty overflow" is exactly what a save that
+      // never had a Gem economy SHOULD start at.
+      gems: typeof parsed.gems === "number" && parsed.gems >= 0 ? parsed.gems : 0,
+      gemShards: typeof parsed.gemShards === "number" && parsed.gemShards >= 0 ? parsed.gemShards : 0,
+      inventoryCapacity:
+        typeof parsed.inventoryCapacity === "number" && parsed.inventoryCapacity > 0
+          ? parsed.inventoryCapacity
+          : DEFAULT_INVENTORY_CAPACITY,
+      overflowInventory: parseInventory(parsed.overflowInventory),
     };
     if (result.playerId !== parsed.playerId) writeSave(result);
     return result;

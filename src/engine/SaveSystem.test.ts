@@ -28,7 +28,19 @@ describe("SaveSystem", () => {
     const loaded = loadSave();
     expect(loaded.currentWave).toBe(12);
     expect(loaded.gold).toBe(340);
-    expect(loaded.towerLoadout).toEqual([{ slotId: "slot-1", type: "IRONWOOD", level: 3 }]);
+    // Progression 2.0 self-heals a pre-existing entry missing the new
+    // specialization/skin fields to their "never chosen" defaults, rather
+    // than dropping it — see parseTowerLoadout in SaveSystem.ts.
+    expect(loaded.towerLoadout).toEqual([
+      {
+        slotId: "slot-1",
+        type: "IRONWOOD",
+        level: 3,
+        specializationId: null,
+        specializationLevel: 0,
+        equippedSkinId: null,
+      },
+    ]);
   });
 
   it("recordRunResult only raises bestWave, never lowers it", () => {

@@ -1,6 +1,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
-import { getTowerStats, getTowerUpgradeCost } from "@/entities/Tower";
+import {
+  canChooseSpecialization,
+  canEquipSkin,
+  canUpgradeSpecialization,
+  getSpecializationUpgradeCostFor,
+  getTowerStats,
+  getTowerUpgradeCost,
+} from "@/entities/Tower";
 import {
   getMilestoneUnlockForLevel,
   getTowerLevelStats,
@@ -8,8 +15,11 @@ import {
   MAX_TOWER_LEVEL,
   type TowerType,
 } from "@/config/towerStats";
+import { getSpecializationsForTower, MAX_SPECIALIZATION_LEVEL, SPECIALIZATION_UNLOCK_TOWER_LEVEL, type SpecializationId } from "@/config/specializations";
+import { getSkinsForTower } from "@/config/towerSkins";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import type { TranslationKey } from "@/i18n/translate";
 import { CoinIcon } from "./icons";
 
 interface TowerInfoPanelProps {
@@ -17,6 +27,9 @@ interface TowerInfoPanelProps {
   gold: number;
   onUpgrade: () => void;
   onClose: () => void;
+  onChooseSpecialization: (id: SpecializationId) => void;
+  onUpgradeSpecialization: () => void;
+  onEquipSkin: (skinId: string | null) => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -28,7 +41,15 @@ type Translate = ReturnType<typeof useLanguage>["t"];
  * MILESTONE_UNLOCKS), a highlighted banner instead of just another number —
  * that's the moment meant to create expectation.
  */
-export function TowerInfoPanel({ tower, gold, onUpgrade, onClose }: TowerInfoPanelProps) {
+export function TowerInfoPanel({
+  tower,
+  gold,
+  onUpgrade,
+  onClose,
+  onChooseSpecialization,
+  onUpgradeSpecialization,
+  onEquipSkin,
+}: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
   const stats = getTowerStats(tower);
@@ -112,7 +133,176 @@ export function TowerInfoPanel({ tower, gold, onUpgrade, onClose }: TowerInfoPan
           {t("towerInfo.maxLevel")}
         </button>
       )}
+
+      <SpecializationSection
+        tower={tower}
+        gold={gold}
+        theme={theme}
+        t={t}
+        onChoose={onChooseSpecialization}
+        onUpgrade={onUpgradeSpecialization}
+      />
+
+      <SkinSection tower={tower} theme={theme} t={t} onEquip={onEquipSkin} />
     </div>
+  );
+}
+
+/**
+ * Progression 2.0 — Specialization / Upgrade Slot (spec section 5/6). A
+ * second, independent gold sink from the tower's own level: once unlocked,
+ * the player permanently picks ONE path (a real, mutually-exclusive
+ * decision — see entities/Tower.chooseSpecialization) and can then keep
+ * investing gold into it, well past MAX_TOWER_LEVEL.
+ */
+function SpecializationSection({
+  tower,
+  gold,
+  theme,
+  t,
+  onChoose,
+  onUpgrade,
+}: {
+  tower: TowerInstance;
+  gold: number;
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  onChoose: (id: SpecializationId) => void;
+  onUpgrade: () => void;
+}) {
+  if (!tower.specializationId) {
+    if (!canChooseSpecialization(tower)) {
+      if (tower.level >= SPECIALIZATION_UNLOCK_TOWER_LEVEL) return null; // already chosen elsewhere / shouldn't happen
+      return (
+        <>
+          <div style={dividerStyle} />
+          <div style={sectionLabelStyle}>{t("towerInfo.specializationSection")}</div>
+          <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, fontStyle: "italic" }}>
+            {t("towerInfo.specializationLocked", { level: SPECIALIZATION_UNLOCK_TOWER_LEVEL })}
+          </div>
+        </>
+      );
+    }
+
+    const options = getSpecializationsForTower(tower.type);
+    return (
+      <>
+        <div style={dividerStyle} />
+        <div style={sectionLabelStyle}>{t("towerInfo.specializationSection")}</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+          {options.map((option) => {
+            const cost = getSpecializationUpgradeCostFor({ ...tower, specializationId: option.id, specializationLevel: 0 });
+            const affordable = cost !== null && gold >= cost;
+            return (
+              <button
+                key={option.id}
+                onClick={() => onChoose(option.id)}
+                disabled={!affordable}
+                style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+              >
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
+                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
+                  {t(`specializations.${option.id}.description`)}
+                </div>
+                <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {t("towerInfo.specializationChoose")} · <CoinIcon size={10} color={PALETTE.gold} /> {cost}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
+
+  const specCost = getSpecializationUpgradeCostFor(tower);
+  const specAffordable = specCost !== null && gold >= specCost;
+  const canUpgrade = canUpgradeSpecialization(tower);
+
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.specializationSection")}</div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: theme.accent }}>{t(`specializations.${tower.specializationId}.name`)}</div>
+      <div style={{ fontSize: 10, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
+        {t(`specializations.${tower.specializationId}.description`)}
+      </div>
+      <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 2 }}>
+        {t("towerInfo.specializationLevel", { level: tower.specializationLevel, max: MAX_SPECIALIZATION_LEVEL })}
+      </div>
+      {canUpgrade ? (
+        <button
+          onClick={onUpgrade}
+          disabled={!specAffordable}
+          style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: specAffordable ? 1 : 0.5 }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {t("towerInfo.specializationUpgrade")}
+            <span style={{ opacity: 0.6 }}>·</span>
+            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {specCost}
+          </span>
+        </button>
+      ) : (
+        <button disabled style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: 0.5 }}>
+          {t("towerInfo.specializationMax")}
+        </button>
+      )}
+    </>
+  );
+}
+
+/** Progression 2.0 — Tower Skins (spec section 10/11). Cosmetic only: equipping/clearing never appears in this component's gold math. */
+function SkinSection({
+  tower,
+  theme,
+  t,
+  onEquip,
+}: {
+  tower: TowerInstance;
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  onEquip: (skinId: string | null) => void;
+}) {
+  const skins = getSkinsForTower(tower.type);
+  if (skins.length === 0) return null;
+
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.skinSection")}</div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+        <button
+          onClick={() => onEquip(null)}
+          style={{
+            ...skinChipStyle,
+            borderColor: tower.equippedSkinId === null ? theme.accent : PALETTE.uiPanelBorder,
+            opacity: 1,
+          }}
+        >
+          {t("towerInfo.skinDefault")}
+        </button>
+        {skins.map((skin) => {
+          const unlocked = canEquipSkin(tower, skin.id) || tower.equippedSkinId === skin.id;
+          const equipped = tower.equippedSkinId === skin.id;
+          return (
+            <button
+              key={skin.id}
+              onClick={() => unlocked && onEquip(skin.id)}
+              disabled={!unlocked}
+              title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
+              style={{
+                ...skinChipStyle,
+                borderColor: equipped ? theme.accent : PALETTE.uiPanelBorder,
+                opacity: unlocked ? 1 : 0.45,
+              }}
+            >
+              {t(`towerSkins.${skin.id}.name` as TranslationKey)}
+              {!unlocked && <span style={{ marginLeft: 4, opacity: 0.7 }}>({t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })})</span>}
+            </button>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
@@ -251,4 +441,25 @@ const unlockBannerStyle: CSSProperties = {
   borderRadius: 8,
   border: "1px solid",
   background: "rgba(255,210,87,0.1)",
+};
+
+const specOptionButtonStyle: CSSProperties = {
+  padding: "7px 9px",
+  borderRadius: 7,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.04)",
+  color: PALETTE.uiText,
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const skinChipStyle: CSSProperties = {
+  padding: "5px 9px",
+  borderRadius: 999,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.04)",
+  color: PALETTE.uiText,
+  fontSize: 10.5,
+  fontWeight: 600,
+  cursor: "pointer",
 };

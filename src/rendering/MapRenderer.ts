@@ -1,6 +1,7 @@
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
+import { getCastleHpTier } from "@/config/castleConfig";
 import { PALETTE } from "./theme";
 import type { BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration } from "./mapDecorations";
@@ -643,6 +644,8 @@ export function drawPathEndpoints(
   path: readonly Vector2[],
   biome: BiomeDefinition,
   timeMs: number,
+  /** 0..1 — baseHp/maxBaseHp for the current attempt. Defaults to 1 (pristine) for callers with no gameplay HP concept (e.g. the main menu). */
+  hpPercent = 1,
 ): void {
   if (path.length < 2) return;
   const start = path[0]!;
@@ -652,7 +655,15 @@ export function drawPathEndpoints(
   const end = path[path.length - 1]!;
   const prev = path[path.length - 2]!;
   const endDir = normalize(end.x - prev.x, end.y - prev.y);
-  drawFortress(ctx, { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, biome, timeMs, 1);
+  drawFortress(
+    ctx,
+    { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET },
+    biome,
+    timeMs,
+    1,
+    0,
+    hpPercent,
+  );
 }
 
 function normalize(x: number, y: number): Vector2 {
@@ -741,6 +752,8 @@ export function drawFortress(
   scale: number,
   /** 0 = calm (gameplay default). Above 0 exaggerates banner flutter — used by the menu's occasional "wind gust" moment. */
   windIntensity = 0,
+  /** 0..1 — baseHp/maxBaseHp. Drives the Castle Visual State damage overlay (config/castleConfig.ts). Defaults to 1 (pristine) so every existing caller (the menu's cinematic fortress) is visually unchanged. */
+  hpPercent = 1,
 ): FortressAnchors {
   const p = biome.palette;
   ctx.save();
@@ -931,6 +944,8 @@ export function drawFortress(
 
   drawBanner(ctx, 0, -26, biome, timeMs, 1, 0, windIntensity);
 
+  drawFortressDamageOverlay(ctx, timeMs, hpPercent);
+
   ctx.restore();
 
   return {
@@ -941,6 +956,125 @@ export function drawFortress(
       { x: 0, y: -24 },
     ],
   };
+}
+
+/**
+ * Castle Visual State (Progression 2.0 spec section 12-15) — additive
+ * damage read layered on TOP of the fortress' normal draw, gated purely by
+ * `getCastleHpTier(hpPercent)`. Never touches the base geometry above (so
+ * it works unmodified for any future castle skin, per section 15), only
+ * paints cracks/smoke/embers/danger-lighting over it. Called from inside
+ * drawFortress's own translate+scale block, so coordinates here are local
+ * fortress space, matching every other draw call in that function.
+ */
+function drawFortressDamageOverlay(ctx: CanvasRenderingContext2D, timeMs: number, hpPercent: number): void {
+  const tier = getCastleHpTier(hpPercent);
+  if (tier === 1) return; // 100-75%: mostly intact, no overlay needed.
+
+  // Cracks across the central wall — present from tier 2 (75-50%) onward,
+  // getting darker/more numerous as HP drops.
+  ctx.save();
+  ctx.strokeStyle = "rgba(10,8,6,0.55)";
+  ctx.lineWidth = 1;
+  const crackSets: readonly (readonly [number, number, number, number][])[] = [
+    [[-10, -20, -6, 4]],
+    [
+      [-10, -20, -6, 4],
+      [8, -24, 14, -4],
+    ],
+    [
+      [-10, -20, -6, 4],
+      [8, -24, 14, -4],
+      [-2, -30, 2, -8],
+      [-30, -6, -18, 6],
+    ],
+  ];
+  const crackTier = Math.min(tier - 2, crackSets.length - 1);
+  if (crackTier >= 0) {
+    for (const [x1, y1, x2, y2] of crackSets[crackTier]!) {
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo((x1 + x2) / 2 + 2, (y1 + y2) / 2);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  if (tier === 2) return;
+
+  // Tier 3+ (50-25% and below): a broken chunk out of the left flanking
+  // tower plus a real smoke plume — "partes quebradas" from the spec.
+  ctx.save();
+  ctx.fillStyle = "rgba(6,5,4,0.9)";
+  ctx.beginPath();
+  ctx.moveTo(-46, -30);
+  ctx.lineTo(-38, -38);
+  ctx.lineTo(-30, -28);
+  ctx.lineTo(-36, -20);
+  ctx.closePath();
+  ctx.fill();
+
+  for (let i = 0; i < (tier >= 4 ? 4 : 2); i++) {
+    const cycle = (timeMs / 2400 + i * 0.4) % 1;
+    const smokeX = -38 + Math.sin(timeMs / 900 + i) * 5 + cycle * 4;
+    const smokeY = -42 - cycle * 30;
+    ctx.globalAlpha = (1 - cycle) * 0.4;
+    ctx.fillStyle = tier >= 4 ? "rgba(60,20,14,1)" : "rgba(90,86,80,1)";
+    ctx.beginPath();
+    ctx.arc(smokeX, smokeY, 4 + cycle * 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+
+  if (tier === 3) return;
+
+  // Tier 4 (25-1%): critical — fire licking from the broken tower, a
+  // pulsing danger-red rim light across the whole structure, more debris.
+  ctx.save();
+  const flicker = 0.5 + 0.5 * Math.sin(timeMs / 130);
+  const fireGradient = ctx.createRadialGradient(-38, -26, 0, -38, -26, 14);
+  fireGradient.addColorStop(0, `rgba(255,150,60,${0.7 * flicker})`);
+  fireGradient.addColorStop(1, "rgba(255,90,30,0)");
+  ctx.fillStyle = fireGradient;
+  ctx.beginPath();
+  ctx.arc(-38, -26, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (tier >= 4) {
+    ctx.globalAlpha = 0.16 + 0.1 * flicker;
+    ctx.fillStyle = "#ff2e2e";
+    ctx.beginPath();
+    ctx.ellipse(0, -30, 62, 90, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.fillStyle = "rgba(20,16,12,0.85)";
+  ctx.beginPath();
+  ctx.moveTo(30, -6);
+  ctx.lineTo(38, -12);
+  ctx.lineTo(44, -4);
+  ctx.lineTo(36, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  if (tier < 5) return;
+
+  // Tier 5 (0%): destruction — a heavy smoke column, everything dimmed
+  // toward embers. The engine hands off to the existing defeat overlay the
+  // instant baseHp hits 0, so this state is only ever visible for at most
+  // one render frame — still implemented for correctness/completeness.
+  ctx.save();
+  ctx.globalAlpha = 0.5;
+  ctx.fillStyle = "#0a0806";
+  ctx.beginPath();
+  ctx.ellipse(0, -20, 70, 100, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.restore();
 }
 
 /** A small vine climbing a tower's outer edge — reused on both flanking towers. */

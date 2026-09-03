@@ -23,6 +23,8 @@ export const en = {
     wave: "PHASE",
     baseHp: "BASE HP",
     gold: "GOLD",
+    gems: "GEMS",
+    gemShards: "SHARDS",
     state: "STATE",
     phase: {
       PRE_RUN: "PRE-RUN",
@@ -101,6 +103,35 @@ export const en = {
       arcaneSurge: { name: "ARCANE SURGE", description: "Hits now ignore part of the target's armor." },
       stormBreaker: { name: "STORM BREAKER", description: "Armor penetration increases even further." },
     },
+    specializationSection: "SPECIALIZATION PATH",
+    specializationLocked: "Choose a path at Lv.{level}",
+    specializationChoose: "CHOOSE PATH",
+    specializationLevel: "Path Lv.{level}/{max}",
+    specializationUpgrade: "UPGRADE PATH",
+    specializationMax: "PATH MAXED",
+    skinSection: "SKIN",
+    skinDefault: "Default",
+    skinLockedUntil: "Unlocks Lv.{level}",
+  },
+  specializations: {
+    IRONWOOD_EXECUTIONER: { name: "Executioner", description: "Every point invested sharpens critical strikes and boss damage further." },
+    IRONWOOD_BREAKER: { name: "Breaker", description: "Every hit ignores a growing share of the target's armor." },
+    IRONWOOD_VANGUARD: { name: "Vanguard", description: "Raises crit chance and adds an extra projectile at higher path levels." },
+    INFERNO_WILDFIRE: { name: "Wildfire", description: "Burn damage grows sharply, and a 4th burn stack unlocks at path level 4." },
+    INFERNO_CORE: { name: "Inferno Core", description: "The blast radius grows with every path level." },
+    INFERNO_DETONATOR: { name: "Detonator", description: "Hits landing on an already-burning target deal a bonus impact burst." },
+    FROSTBORN_DEEP_FREEZE: { name: "Deep Freeze", description: "Freeze chance and duration both climb with the path." },
+    FROSTBORN_PERMAFROST: { name: "Permafrost", description: "The base slow effect grows stronger and lasts longer." },
+    FROSTBORN_SHATTER: { name: "Shatter", description: "Bonus damage against any target that's fully frozen." },
+    STORMCALLER_CHAINBREAKER: { name: "Chainbreaker", description: "Chains reach an extra target and lose less damage per jump." },
+    STORMCALLER_ARCANE_SURGE: { name: "Arcane Surge", description: "Adds flat magic damage to every hit." },
+    STORMCALLER_STORMLORD: { name: "Stormlord", description: "Armor penetration keeps climbing well past the level-20 cap." },
+  },
+  towerSkins: {
+    IRONWOOD_WARDEN_OF_THE_ABYSS: { name: "Warden of the Abyss", description: "Black stone and abyssal energy replace the bark-and-iron look. Purely cosmetic." },
+    INFERNO_ASHEN_TYRANT: { name: "Ashen Tyrant", description: "A charred, ember-red furnace wreathed in deeper flame. Purely cosmetic." },
+    FROSTBORN_ANCIENT_GUARDIAN: { name: "Ancient Guardian", description: "Weathered stone and pale crystal, older than the frost itself. Purely cosmetic." },
+    STORMCALLER_VOID: { name: "Void", description: "A black structure channeling void-purple energy instead of arcane light. Purely cosmetic." },
   },
   defeat: {
     title: "FORTRESS FALLEN",
@@ -296,6 +327,10 @@ export const en = {
     historyTraded: "Traded to {owner}",
     viewDropTable: "VIEW DROP TABLE",
     close: "Close",
+    capacity: "{used} / {capacity} slots",
+    overflowTitle: "OVERFLOW",
+    overflowHint: "Your inventory was full when these arrived — nothing was deleted. Free a slot to claim them.",
+    claim: "CLAIM",
   },
   dropTable: {
     title: "DROP TABLE",
@@ -321,6 +356,10 @@ export const en = {
   },
   worldFirst: {
     badge: "FIRST TIME YOU FOUND THIS",
+  },
+  gems: {
+    convert: "CONVERT",
+    convertHint: "{rate} Shards = 1 Gem",
   },
 } as const;
 

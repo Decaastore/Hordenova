@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
@@ -371,6 +371,10 @@ describe("GameEngine — audio events (Audio spec section 18)", () => {
     window.localStorage.clear();
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   /** Ticks `engine` up to `maxIterations` times, draining audioEvents every tick so nothing is lost between drains, stopping early once `stop` returns true. */
   function runDrainingAudio(engine: GameEngine, stop: () => boolean, maxIterations = 20_000): string[] {
     const types: string[] = [];
@@ -449,6 +453,21 @@ describe("GameEngine — audio events (Audio spec section 18)", () => {
   });
 
   it("13. draining (or not draining) audio events never changes simulation outcome", () => {
+    // Combat rolls crit/freeze chances off the real, global Math.random()
+    // (see engine/CombatSystem.ts) — running two engines back-to-back in
+    // the same process means the second one starts from wherever the
+    // first left the shared random stream, which is a pre-existing source
+    // of flakiness in this test unrelated to what it actually checks
+    // (that drainAudioEvents() itself is side-effect-free). Pinning both
+    // runs to the SAME deterministic sequence, reset between them, is
+    // what actually isolates that one variable.
+    let seed = 1;
+    const seededRandom = () => {
+      seed = (seed * 16807) % 2147483647;
+      return (seed - 1) / 2147483646;
+    };
+    vi.spyOn(Math, "random").mockImplementation(seededRandom);
+
     updateSave({ currentWave: 1, gold: 500, towerLoadout: [] });
     const withDrain = new GameEngine();
     withDrain.startRun();
@@ -458,6 +477,7 @@ describe("GameEngine — audio events (Audio spec section 18)", () => {
       withDrain.drainAudioEvents();
     }
 
+    seed = 1; // reset the deterministic stream for a fair comparison
     window.localStorage.clear();
     updateSave({ currentWave: 1, gold: 500, towerLoadout: [] });
     const withoutDrain = new GameEngine();

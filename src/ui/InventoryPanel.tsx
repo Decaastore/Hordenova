@@ -14,6 +14,13 @@ interface InventoryPanelProps {
   inventory: readonly ItemInstance[];
   localEconomyTotals: { bossesDefeatedTotal: number; miniBossesDefeatedTotal: number };
   onClose: () => void;
+  /** Progression 2.0 spec section 36/39 — usable slots and the never-deletes-anything overflow waiting area. */
+  inventoryCapacity: number;
+  overflowInventory: readonly ItemInstance[];
+  onClaimOverflowItem: (instanceId: string) => void;
+  /** Progression 2.0 spec section 34 — manual, player-triggered Shards -> Gems conversion. */
+  gemShards: number;
+  onConvertGemShards: () => void;
 }
 
 type Tab = "items" | "trade" | "stats";
@@ -32,7 +39,16 @@ type Tab = "items" | "trade" | "stats";
  * Escape (LanguageSelector is the only other Escape listener in the app,
  * and it's scoped to the main menu, so there's no conflict here).
  */
-export function InventoryPanel({ inventory, localEconomyTotals, onClose }: InventoryPanelProps) {
+export function InventoryPanel({
+  inventory,
+  localEconomyTotals,
+  onClose,
+  inventoryCapacity,
+  overflowInventory,
+  onClaimOverflowItem,
+  gemShards,
+  onConvertGemShards,
+}: InventoryPanelProps) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
@@ -61,16 +77,40 @@ export function InventoryPanel({ inventory, localEconomyTotals, onClose }: Inven
           <TabButton active={tab === "stats"} onClick={() => setTab("stats")} label={t("inventory.tabs.stats")} />
         </div>
 
-        {tab === "items" &&
-          (inventory.length === 0 ? (
-            <div style={emptyStyle}>{t("inventory.empty")}</div>
-          ) : (
-            <div style={gridStyle}>
-              {inventory.map((item) => (
-                <ItemTile key={item.instanceId} item={item} onClick={() => setSelectedInstanceId(item.instanceId)} />
-              ))}
+        {tab === "items" && (
+          <>
+            <div style={capacityRowStyle}>
+              <span>{t("inventory.capacity", { used: inventory.length, capacity: inventoryCapacity })}</span>
+              {gemShards > 0 && (
+                <button onClick={onConvertGemShards} style={convertButtonStyle}>
+                  {t("gems.convert")} ({gemShards})
+                </button>
+              )}
             </div>
-          ))}
+
+            {inventory.length === 0 ? (
+              <div style={emptyStyle}>{t("inventory.empty")}</div>
+            ) : (
+              <div style={gridStyle}>
+                {inventory.map((item) => (
+                  <ItemTile key={item.instanceId} item={item} onClick={() => setSelectedInstanceId(item.instanceId)} />
+                ))}
+              </div>
+            )}
+
+            {overflowInventory.length > 0 && (
+              <>
+                <div style={overflowTitleStyle}>{t("inventory.overflowTitle")}</div>
+                <div style={overflowHintStyle}>{t("inventory.overflowHint")}</div>
+                <div style={gridStyle}>
+                  {overflowInventory.map((item) => (
+                    <OverflowItemTile key={item.instanceId} item={item} onClaim={() => onClaimOverflowItem(item.instanceId)} />
+                  ))}
+                </div>
+              </>
+            )}
+          </>
+        )}
 
         {tab === "trade" && <TradeScreen />}
 
@@ -120,6 +160,21 @@ function ItemTile({ item, onClick }: { item: ItemInstance; onClick: () => void }
     >
       <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
       <RarityBadge rarity={def.rarity} />
+    </button>
+  );
+}
+
+function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () => void }) {
+  const { t } = useLanguage();
+  const def = getItemDefinition(item.itemDefinitionId);
+  if (!def) return null;
+  const rarityDef = getRarityDefinition(def.rarity);
+
+  return (
+    <button onClick={onClaim} style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85 }}>
+      <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+      <RarityBadge rarity={def.rarity} />
+      <span style={claimLabelStyle}>{t("inventory.claim")}</span>
     </button>
   );
 }
@@ -215,4 +270,48 @@ const emptyStyle: CSSProperties = {
   fontStyle: "italic",
   padding: "20px 0",
   textAlign: "center",
+};
+
+const capacityRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  fontSize: 11,
+  color: PALETTE.uiTextDim,
+  marginBottom: 10,
+};
+
+const convertButtonStyle: CSSProperties = {
+  padding: "5px 10px",
+  borderRadius: 6,
+  border: `1px solid #c88aff`,
+  background: "rgba(200,138,255,0.12)",
+  color: "#e8d4ff",
+  fontWeight: 700,
+  fontSize: 10.5,
+  cursor: "pointer",
+};
+
+const overflowTitleStyle: CSSProperties = {
+  fontSize: 11,
+  letterSpacing: 1,
+  textTransform: "uppercase",
+  fontWeight: 700,
+  color: PALETTE.danger,
+  marginTop: 16,
+  marginBottom: 3,
+};
+
+const overflowHintStyle: CSSProperties = {
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+  marginBottom: 10,
+  lineHeight: 1.4,
+};
+
+const claimLabelStyle: CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  color: PALETTE.uiAccent,
+  letterSpacing: 0.4,
 };
