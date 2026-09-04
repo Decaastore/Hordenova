@@ -118,7 +118,7 @@ export interface SaveData {
   unlockedCastleSkinIds: string[];
 }
 
-export const SAVE_DATA_VERSION = 9;
+export const SAVE_DATA_VERSION = 10;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -197,6 +197,7 @@ function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
         specializationId,
         specializationLevel: specializationId && typeof entry.specializationLevel === "number" ? entry.specializationLevel : 0,
         equippedSkinId: skinDef && skinDef.towerType === entry.type ? skinDef.id : null,
+        masteryLevel: typeof entry.masteryLevel === "number" && entry.masteryLevel >= 0 ? entry.masteryLevel : 0,
       });
     }
   }

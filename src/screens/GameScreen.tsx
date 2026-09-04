@@ -123,6 +123,7 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
             onChooseSpecialization={(id) => engine.chooseTowerSpecialization(id)}
             onUpgradeSpecialization={() => engine.upgradeSelectedTowerSpecialization()}
             onEquipSkin={(skinId) => engine.equipSkinOnSelectedTower(skinId)}
+            onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
           />
         )}
 

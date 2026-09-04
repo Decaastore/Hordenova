@@ -39,6 +39,7 @@ describe("SaveSystem", () => {
         specializationId: null,
         specializationLevel: 0,
         equippedSkinId: null,
+        masteryLevel: 0,
       },
     ]);
   });

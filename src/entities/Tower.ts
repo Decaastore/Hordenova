@@ -14,6 +14,7 @@ import {
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
+import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "@/config/towerMastery";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -43,6 +44,8 @@ export interface TowerInstance {
   specializationLevel: number;
   /** Progression 2.0 — cosmetic-only equipped skin id, or null for the default look. Never read by combat code. */
   equippedSkinId: string | null;
+  /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. 0 = never invested. See config/towerMastery.ts for the bonus/cost formulas. */
+  masteryLevel: number;
 }
 
 /**
@@ -58,6 +61,8 @@ export interface TowerLoadoutEntry {
   specializationId?: SpecializationId | null;
   specializationLevel?: number;
   equippedSkinId?: string | null;
+  /** Optional for the same reason as the specialization fields above — self-heals to 0 on load for a save written before Mastery existed. */
+  masteryLevel?: number;
 }
 
 let nextTowerId = 1;
@@ -70,6 +75,7 @@ export function createTowerInstance(
   specializationId: SpecializationId | null = null,
   specializationLevel = 0,
   equippedSkinId: string | null = null,
+  masteryLevel = 0,
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -89,11 +95,53 @@ export function createTowerInstance(
     specializationId,
     specializationLevel,
     equippedSkinId,
+    masteryLevel,
   };
 }
 
+/**
+ * The single choke point every combat call site reads a tower's effective
+ * damage/attack-speed/range from (CombatSystem.ts's resolveNormalAttack,
+ * resolveSpecialAttack, and every chain/crit/frozen-bonus damage
+ * calculation) — which is exactly why layering Mastery's bonus multiplier
+ * here, rather than in each of those call sites individually, is both the
+ * lowest-risk integration AND the one place it can never be forgotten for
+ * a future combat formula. See config/towerMastery.ts for why this stays a
+ * uniform multiplier rather than touching any tower's identity-defining
+ * special (crit/burn/freeze/chain) formulas.
+ */
 export function getTowerStats(tower: TowerInstance): TowerLevelStats {
-  return getTowerLevelStats(tower.type, tower.level);
+  const levelStats = getTowerLevelStats(tower.type, tower.level);
+  if (tower.masteryLevel <= 0) return levelStats;
+  const mastery = getMasteryBonusMultipliers(tower.masteryLevel);
+  return {
+    ...levelStats,
+    damage: round2(levelStats.damage * mastery.damage),
+    attackSpeed: round2(levelStats.attackSpeed * mastery.attackSpeed),
+    range: round2(levelStats.range * mastery.range),
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+// ---------------------------------------------------------------------------
+// Master Implementation Pass spec sections 3-6 — Tower Mastery.
+// ---------------------------------------------------------------------------
+
+/** Always purchasable — no max level (spec: "SEM CAP REAL"). */
+export function canUpgradeMastery(): boolean {
+  return true;
+}
+
+export function getMasteryUpgradeCostFor(tower: TowerInstance): number {
+  return getMasteryUpgradeCost(tower.type, tower.masteryLevel);
+}
+
+/** Mutates `tower` in place, incrementing its mastery level (caller owns gold deduction, exactly like upgradeTower above). */
+export function upgradeMastery(tower: TowerInstance): void {
+  tower.masteryLevel += 1;
 }
 
 export function canUpgradeTower(tower: TowerInstance): boolean {

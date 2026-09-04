@@ -4,10 +4,12 @@ import {
   canChooseSpecialization,
   canEquipSkin,
   canUpgradeSpecialization,
+  getMasteryUpgradeCostFor,
   getSpecializationUpgradeCostFor,
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
+import { getMasteryBonusMultipliers } from "@/config/towerMastery";
 import {
   getMilestoneUnlockForLevel,
   getTowerLevelStats,
@@ -37,6 +39,8 @@ interface TowerInfoPanelProps {
   onChooseSpecialization: (id: SpecializationId) => void;
   onUpgradeSpecialization: () => void;
   onEquipSkin: (skinId: string | null) => void;
+  /** Master Implementation Pass spec sections 3-6 — Tower Mastery, the uncapped gold sink past MAX_TOWER_LEVEL. */
+  onUpgradeMastery: () => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -57,6 +61,7 @@ export function TowerInfoPanel({
   onChooseSpecialization,
   onUpgradeSpecialization,
   onEquipSkin,
+  onUpgradeMastery,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -142,6 +147,8 @@ export function TowerInfoPanel({
         </button>
       )}
 
+      <MasterySection tower={tower} gold={gold} theme={theme} t={t} onUpgrade={onUpgradeMastery} />
+
       <SpecializationSection
         tower={tower}
         gold={gold}
@@ -154,6 +161,55 @@ export function TowerInfoPanel({
 
       <SkinSection tower={tower} theme={theme} t={t} onEquip={onEquipSkin} />
     </div>
+  );
+}
+
+/**
+ * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the gold
+ * sink past MAX_TOWER_LEVEL. Always shown (not gated behind level 30) —
+ * a player is free to start investing early if they'd rather spread
+ * spending out, exactly like Specialization already allows once its own
+ * level gate passes.
+ */
+function MasterySection({
+  tower,
+  gold,
+  theme,
+  t,
+  onUpgrade,
+}: {
+  tower: TowerInstance;
+  gold: number;
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  onUpgrade: () => void;
+}) {
+  const cost = getMasteryUpgradeCostFor(tower);
+  const affordable = gold >= cost;
+  const bonus = getMasteryBonusMultipliers(tower.masteryLevel);
+
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
+      <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{t("towerInfo.masteryLevel", { level: tower.masteryLevel })}</div>
+      {tower.masteryLevel > 0 && (
+        <div style={{ fontSize: 10, color: theme.accent, marginTop: 1 }}>
+          {t("towerInfo.masteryBonus", { damage: Math.round((bonus.damage - 1) * 100) })}
+        </div>
+      )}
+      <button
+        onClick={onUpgrade}
+        disabled={!affordable}
+        style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+      >
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          {t("towerInfo.masteryUpgrade")}
+          <span style={{ opacity: 0.6 }}>·</span>
+          {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
+        </span>
+      </button>
+    </>
   );
 }
 

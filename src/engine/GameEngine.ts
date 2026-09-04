@@ -37,6 +37,8 @@ import {
   getSpecializationUpgradeCostFor,
   upgradeSpecialization as upgradeSpecializationEntity,
   equipSkin as equipSkinEntity,
+  getMasteryUpgradeCostFor,
+  upgradeMastery as upgradeMasteryEntity,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
@@ -432,6 +434,7 @@ export class GameEngine {
       entry.specializationId,
       entry.specializationLevel,
       entry.equippedSkinId,
+      entry.masteryLevel,
     );
   }
 
@@ -469,6 +472,30 @@ export class GameEngine {
     upgradeTowerEntity(tower);
     const unlock = getMilestoneUnlockForLevel(tower.type, tower.level);
     this.emitAudio(unlock ? { type: "level_unlock" } : { type: "tower_upgrade" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /**
+   * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the gold
+   * sink past MAX_TOWER_LEVEL. Deliberately available at ANY tower level
+   * (not gated behind level 30) — a player free to invest gold into
+   * Mastery earlier if they'd rather spread spending out, exactly like
+   * Specialization already works once its own level gate is passed. Same
+   * "caller owns gold deduction" shape as upgradeSelectedTower above.
+   */
+  upgradeSelectedTowerMastery(): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+
+    const cost = getMasteryUpgradeCostFor(tower);
+    if (this.gold < cost) return false;
+
+    this.gold -= cost;
+    upgradeMasteryEntity(tower);
+    this.emitAudio({ type: "tower_upgrade" });
     this.persist();
     this.notify();
     return true;
@@ -1048,6 +1075,7 @@ export class GameEngine {
           specializationId: t.specializationId,
           specializationLevel: t.specializationLevel,
           equippedSkinId: t.equippedSkinId,
+          masteryLevel: t.masteryLevel,
         })),
         discoveredEnemyTypes: [...this.discoveredEnemyTypes],
         inventory: this.inventory,
