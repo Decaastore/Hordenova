@@ -103,9 +103,22 @@ export interface SaveData {
   ownedCosmetics: string[];
   /** Full provenance record (spec section 24: SeasonId/PlayerId/RewardId/RewardType/Rank/GrantedAt) for every individual reward ever granted, Gems included — permanent, append-only, never trimmed. See config/ascension.ts's SeasonRewardRecord doc comment for why this exists alongside (not instead of) ownedCosmetics. */
   seasonRewardRecords: SeasonRewardRecord[];
+
+  // -----------------------------------------------------------------------
+  // Master Implementation spec sections 46-48 — the every-10-wave Roulette
+  // (config/roulette.ts). Both fields are PERMANENT: a Castle HP bump or a
+  // won Castle Skin is a real, lasting reward, never wiped by a retry after
+  // PROGRESSION_STOPPED (see GameEngine.ts's resetAttemptState, which resets
+  // baseHp to maxBaseHp — itself now RUN_START.baseHp + castleHpBonus, not a
+  // fixed constant).
+  // -----------------------------------------------------------------------
+  /** Cumulative permanent bonus to max Castle HP, from every CASTLE_HP_* roulette win ever landed — never decreases. */
+  castleHpBonus: number;
+  /** config/castleSkins.ts CastleSkinDefinition ids this save has unlocked via the Roulette's CASTLE_SKIN outcome — permanent, non-consumable, never removed (spec section 48: "deve ser permanente... nunca desaparecer"). */
+  unlockedCastleSkinIds: string[];
 }
 
-export const SAVE_DATA_VERSION = 8;
+export const SAVE_DATA_VERSION = 9;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -141,6 +154,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ascensionTop5: 0,
   ownedCosmetics: [],
   seasonRewardRecords: [],
+  castleHpBonus: 0,
+  unlockedCastleSkinIds: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -243,6 +258,7 @@ function emptySaveData(): SaveData {
     ascensionHistory: [],
     ownedCosmetics: [],
     seasonRewardRecords: [],
+    unlockedCastleSkinIds: [],
   };
 }
 
@@ -287,6 +303,11 @@ function isValidSeasonRewardRecord(raw: unknown): raw is SeasonRewardRecord {
 function parseSeasonRewardRecords(raw: unknown): SeasonRewardRecord[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter(isValidSeasonRewardRecord);
+}
+
+function parseUnlockedCastleSkinIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is string => typeof entry === "string");
 }
 
 /** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
@@ -357,6 +378,9 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // sensible empty default for a pre-existing save" pattern as
       // ascensionLastSyncedSeason above.
       seasonRewardRecords: parseSeasonRewardRecords(parsed.seasonRewardRecords),
+      // Master Implementation (save v8 -> v9) — same pattern once more.
+      castleHpBonus: typeof parsed.castleHpBonus === "number" && parsed.castleHpBonus >= 0 ? parsed.castleHpBonus : 0,
+      unlockedCastleSkinIds: parseUnlockedCastleSkinIds(parsed.unlockedCastleSkinIds),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

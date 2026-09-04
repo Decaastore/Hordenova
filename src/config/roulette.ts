@@ -1,0 +1,68 @@
+/**
+ * Master Implementation spec sections 46-48 — the every-10-wave milestone
+ * Roulette. Mirrors config/dropTables.ts's proven pattern exactly (same
+ * "SE O JOGO MOSTRA UMA CHANCE, ESSA CHANCE É REAL" contract spec section
+ * 47 restates: "não pode haver: resultado pré-determinado escondido, sistema
+ * de pity oculto, animação manipulada, sensação de quase-vitória falsa"):
+ * `weightPercent` on each entry IS the weight `rollRoulette` uses, there is
+ * no hidden multiplier or per-player modifier anywhere in this file, and a
+ * UI's "spin" animation is free to take however long it wants to feel good
+ * — but the result it lands on must always be the one `rollRoulette` really
+ * produced, never a value chosen to manufacture a near-miss.
+ *
+ * Test values only (spec section 47: "não finais, sujeitos a ajuste após
+ * simulação") — tune here, nowhere else.
+ */
+
+export type RouletteRewardType = "CASTLE_HP_5" | "CASTLE_HP_10" | "CASTLE_HP_20" | "GEM" | "CASTLE_SKIN";
+
+/** Spec section 46: "a cada 10 níveis" — reuses the codebase's existing "wave" vocabulary (config/phaseConfig.ts's PHASE_MILESTONE_BONUSES is keyed the same way) since HORDENOVA has no separate "nível" concept from "wave". */
+export const ROULETTE_MILESTONE_INTERVAL = 10;
+
+export interface RouletteEntry {
+  type: RouletteRewardType;
+  /** The real probability, in percent (0-100) — the exact number a Roulette UI must display. */
+  weightPercent: number;
+}
+
+export const ROULETTE_ENTRIES: readonly RouletteEntry[] = [
+  { type: "CASTLE_HP_5", weightPercent: 55 },
+  { type: "CASTLE_HP_10", weightPercent: 25 },
+  { type: "CASTLE_HP_20", weightPercent: 10 },
+  { type: "GEM", weightPercent: 9 },
+  { type: "CASTLE_SKIN", weightPercent: 1 },
+];
+
+/** How much permanent max Castle HP each HP-flavored reward grants — 0 for the non-HP outcomes. */
+export function castleHpForReward(type: RouletteRewardType): number {
+  if (type === "CASTLE_HP_5") return 5;
+  if (type === "CASTLE_HP_10") return 10;
+  if (type === "CASTLE_HP_20") return 20;
+  return 0;
+}
+
+/** Gems granted directly by the GEM outcome (the CASTLE_SKIN outcome's own Gem fallback is a separate constant below, since it's a substitution, not this reward's own value). */
+export const ROULETTE_GEM_REWARD_AMOUNT = 1;
+
+/** Spec sections 20/48: a rare cosmetic reward must "genuinely carry that exclusivity value" — if every real Castle Skin is already owned (nothing left to unlock), landing on CASTLE_SKIN falls back to this many Gems instead of silently doing nothing, so the 1%-rarity roll is never wasted. */
+export const ROULETTE_CASTLE_SKIN_FALLBACK_GEMS = 25;
+
+/**
+ * Weighted single-outcome roll — identical shape/contract to
+ * dropTables.ts's rollDropTable. `rng` defaults to Math.random but is
+ * injectable so tests can drive exact outcomes deterministically.
+ */
+export function rollRoulette(rng: () => number = Math.random): RouletteRewardType {
+  const roll = rng() * 100;
+  let cumulative = 0;
+  for (const entry of ROULETTE_ENTRIES) {
+    cumulative += entry.weightPercent;
+    if (roll < cumulative) return entry.type;
+  }
+  return ROULETTE_ENTRIES[ROULETTE_ENTRIES.length - 1]!.type;
+}
+
+/** Sum of all weights — roulette.test.ts asserts this is exactly 100, same discipline as dropTables.test.ts's totalWeightPercent check. */
+export function totalRouletteWeightPercent(): number {
+  return ROULETTE_ENTRIES.reduce((sum, entry) => sum + entry.weightPercent, 0);
+}

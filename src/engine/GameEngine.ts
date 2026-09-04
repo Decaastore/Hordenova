@@ -12,6 +12,15 @@ import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { isBossMilestone } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
+import {
+  castleHpForReward,
+  rollRoulette,
+  ROULETTE_CASTLE_SKIN_FALLBACK_GEMS,
+  ROULETTE_GEM_REWARD_AMOUNT,
+  ROULETTE_MILESTONE_INTERVAL,
+  type RouletteRewardType,
+} from "@/config/roulette";
+import { CASTLE_SKINS } from "@/config/castleSkins";
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
@@ -105,6 +114,26 @@ export interface HudSnapshot {
   pendingDiscoveryType: EnemyType | null;
   /** The most recent still-unacknowledged item drop, or null — see GameEngine.acknowledgeItemReward. Item System spec section 25/32. */
   pendingItemReward: { instanceId: string; itemDefinitionId: string } | null;
+  /** The most recent still-unacknowledged Roulette spin, or null — see GameEngine.acknowledgeRouletteResult. Master Implementation spec section 46-48. */
+  pendingRouletteResult: RouletteResult | null;
+}
+
+/**
+ * One resolved Roulette spin (spec sections 46-48) — the reward was already
+ * genuinely rolled (config/roulette.ts's real weighted rollRoulette) and
+ * already granted (Castle HP raised / Gems added / skin unlocked) by the
+ * time this exists; a UI's "spin" animation only ever reveals this value,
+ * never determines it, per spec section 47's anti-fake-pity requirement.
+ */
+export interface RouletteResult {
+  wave: number;
+  rewardType: RouletteRewardType;
+  /** > 0 only for a CASTLE_HP_* outcome. */
+  castleHpGranted: number;
+  /** > 0 for the GEM outcome, or for a CASTLE_SKIN roll that fell back to Gems because every real skin was already owned. */
+  gemsGranted: number;
+  /** Set only when a real, previously-unowned Castle Skin was granted. */
+  castleSkinId: string | null;
 }
 
 export interface RenderSnapshot {
@@ -136,7 +165,9 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bossIntroRemainingMs === b.bossIntroRemainingMs &&
     a.bossLastReward === b.bossLastReward &&
     a.pendingDiscoveryType === b.pendingDiscoveryType &&
-    a.pendingItemReward?.instanceId === b.pendingItemReward?.instanceId
+    a.pendingItemReward?.instanceId === b.pendingItemReward?.instanceId &&
+    a.pendingRouletteResult?.wave === b.pendingRouletteResult?.wave &&
+    a.pendingRouletteResult?.rewardType === b.pendingRouletteResult?.rewardType
   );
 }
 
@@ -163,7 +194,8 @@ export class GameEngine {
   private speed: GameSpeed = GAME_SPEEDS[0];
   private gold = 0;
   private baseHp = RUN_START.baseHp;
-  private readonly maxBaseHp = RUN_START.baseHp;
+  /** RUN_START.baseHp plus every permanent CASTLE_HP_* Roulette win ever landed (this.castleHpBonus) — no longer a fixed constant, see triggerRouletteSpin. */
+  private maxBaseHp = RUN_START.baseHp;
   private wave: WaveManagerState = createWaveManagerState();
   private towers: TowerInstance[] = [];
   private enemies: EnemyInstance[] = [];
@@ -205,6 +237,16 @@ export class GameEngine {
   private gemShards = 0;
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
+
+  // Master Implementation spec sections 46-48 — the every-10-wave Roulette.
+  // `castleHpBonus`/`unlockedCastleSkinIds` are the persistent halves (see
+  // SaveSystem.ts); `pendingRouletteResults` is a purely in-memory display
+  // queue exactly like `pendingItemRewards` above — the reward itself is
+  // already granted and persisted by the time an entry lands here, so
+  // losing this queue to a reload loses only the banner, never the reward.
+  private castleHpBonus = 0;
+  private unlockedCastleSkinIds: string[] = [];
+  private pendingRouletteResults: RouletteResult[] = [];
 
   /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
   private audioEvents: GameAudioEvent[] = [];
@@ -265,6 +307,9 @@ export class GameEngine {
     this.gemShards = save.gemShards;
     this.inventoryCapacity = save.inventoryCapacity;
     this.overflowInventory = save.overflowInventory;
+    this.castleHpBonus = save.castleHpBonus;
+    this.unlockedCastleSkinIds = save.unlockedCastleSkinIds;
+    this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
     this.wave.currentWave = save.currentWave;
@@ -782,7 +827,7 @@ export class GameEngine {
     this.notify();
   }
 
-  /** Raises bestWave and, the first time THIS wave number is ever crossed, grants its milestone bonus (config/phaseConfig.ts) — spec section 12. */
+  /** Raises bestWave and, the first time THIS wave number is ever crossed, grants its milestone bonus (config/phaseConfig.ts) — spec section 12 — and, every ROULETTE_MILESTONE_INTERVAL waves, spins the Roulette (spec section 46). */
   private advanceBestWave(wave: number): void {
     if (wave <= this.bestWave) return;
     const bonus = getMilestoneBonus(wave);
@@ -794,6 +839,52 @@ export class GameEngine {
       this.addGemShards(Math.max(1, Math.round(bonus / 150)), `milestone_wave_${wave}`);
     }
     this.bestWave = wave;
+    if (wave % ROULETTE_MILESTONE_INTERVAL === 0) this.triggerRouletteSpin(wave);
+  }
+
+  /**
+   * Spec sections 46-48: every 10th wave, a real weighted roll
+   * (config/roulette.ts) is resolved and its reward granted immediately —
+   * before any UI ever renders a "spin". Persisted synchronously in the same
+   * call (like grantBossDrop's item drop above) so the reward can never be
+   * lost to a reload landing between the roll and the tick's own conditional
+   * persist().
+   */
+  private triggerRouletteSpin(wave: number): void {
+    const rewardType = rollRoulette();
+    const castleHpGranted = castleHpForReward(rewardType);
+    let gemsGranted = 0;
+    let castleSkinId: string | null = null;
+
+    if (castleHpGranted > 0) {
+      this.castleHpBonus += castleHpGranted;
+      this.maxBaseHp += castleHpGranted;
+      this.baseHp += castleHpGranted;
+    } else if (rewardType === "GEM") {
+      gemsGranted = ROULETTE_GEM_REWARD_AMOUNT;
+      this.addGems(gemsGranted, `roulette_wave_${wave}`);
+    } else {
+      // CASTLE_SKIN — grant the first real skin this save doesn't already
+      // own; if every real Castle Skin is already unlocked, the 1%-rarity
+      // roll falls back to Gems rather than doing nothing (spec section 48).
+      const unowned = CASTLE_SKINS.find((s) => !this.unlockedCastleSkinIds.includes(s.id));
+      if (unowned) {
+        castleSkinId = unowned.id;
+        this.unlockedCastleSkinIds = [...this.unlockedCastleSkinIds, unowned.id];
+      } else {
+        gemsGranted = ROULETTE_CASTLE_SKIN_FALLBACK_GEMS;
+        this.addGems(gemsGranted, `roulette_wave_${wave}_skin_fallback`);
+      }
+    }
+
+    this.pendingRouletteResults.push({ wave, rewardType, castleHpGranted, gemsGranted, castleSkinId });
+    this.persist();
+  }
+
+  /** Dismisses the currently-shown Roulette result banner (see HudSnapshot.pendingRouletteResult) so the next one, if any, can show. */
+  acknowledgeRouletteResult(): void {
+    this.pendingRouletteResults.shift();
+    this.notify();
   }
 
   private maybeSpawnMiniBoss(nowMs: number): void {
@@ -896,6 +987,10 @@ export class GameEngine {
     return this.inventory;
   }
 
+  getUnlockedCastleSkinIds(): readonly string[] {
+    return this.unlockedCastleSkinIds;
+  }
+
   getPlayerId(): string {
     return this.playerId;
   }
@@ -964,6 +1059,8 @@ export class GameEngine {
         gemShards: this.gemShards,
         inventoryCapacity: this.inventoryCapacity,
         overflowInventory: this.overflowInventory,
+        castleHpBonus: this.castleHpBonus,
+        unlockedCastleSkinIds: this.unlockedCastleSkinIds,
       },
       this.storageKey,
     );
@@ -1000,6 +1097,7 @@ export class GameEngine {
       pendingItemReward: this.pendingItemRewards[0]
         ? { instanceId: this.pendingItemRewards[0].instanceId, itemDefinitionId: this.pendingItemRewards[0].itemDefinitionId }
         : null,
+      pendingRouletteResult: this.pendingRouletteResults[0] ?? null,
     };
 
     const prev = this.cachedHud;
