@@ -62,6 +62,22 @@ export function GemIcon({ size = 14, color = "currentColor", style }: IconProps)
   );
 }
 
+/**
+ * Deliberately distinct from GemIcon (a whole, single large gem) — this is
+ * a cluster of small broken shards, so the two are never visually
+ * confusable even at a glance. See HUD.tsx's Gems/Gem Shards split (P2 UX
+ * fix: 10 Gem Shards = 1 Gem, and the two must never look interchangeable).
+ */
+export function GemShardIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M5 6h6l2.5 4L9 17 3 10Z" stroke={color} strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M15 3h5l3 4.5-4.5 6L14 8Z" stroke={color} strokeWidth="1.3" strokeLinejoin="round" opacity="0.75" />
+      <path d="M12 15l3 3-2 4-3.5-2.5Z" stroke={color} strokeWidth="1.2" strokeLinejoin="round" opacity="0.6" />
+    </svg>
+  );
+}
+
 export function BoltIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

@@ -5,7 +5,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
-import { BagIcon, BoltIcon, CoinIcon, GemIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -46,12 +46,29 @@ export function HUD({ hud, mode, onSetSpeed, onOpenInventory }: HUDProps) {
           value={String(hud.gold)}
           valueColor={PALETTE.gold}
         />
+        {/*
+         * P2 UX fix — Gems and Gem Shards used to share ONE stat (`${gems}
+         * (+${shards})`), so a "+5" that was actually 5 Gem Shards (see
+         * config/gemSinks.ts's GEM_SHARDS_PER_GEM = 10) read as if 5 more
+         * Gems had just been granted. Two separate stats, two separate
+         * icons/labels, and a tooltip stating the real conversion rate make
+         * the two currencies impossible to conflate at a glance.
+         */}
         <Stat
           icon={<GemIcon color={PALETTE.gem} />}
           label={t("hud.gems")}
-          value={hud.gemShards > 0 ? `${hud.gems} (+${hud.gemShards})` : String(hud.gems)}
+          value={String(hud.gems)}
           valueColor={PALETTE.gem}
         />
+        {hud.gemShards > 0 && (
+          <Stat
+            icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
+            label={t("hud.gemShards")}
+            value={`+${hud.gemShards}`}
+            valueColor={PALETTE.uiTextDim}
+            title={t("hud.gemShardsTooltip")}
+          />
+        )}
         <div style={{ textAlign: "center", minWidth: 100 }}>
           <div style={labelStyle}>{t("hud.state")}</div>
           <div style={{ ...valueStyle, fontSize: 13 }}>{t(`hud.phase.${hud.phase}`)}</div>
@@ -123,6 +140,7 @@ function Stat({
   value,
   valueColor,
   sublabel,
+  title,
 }: {
   icon: ReactNode;
   label: string;
@@ -130,9 +148,11 @@ function Stat({
   valueColor?: string;
   /** Small caption under the value — used for the current phase/biome name under the wave counter. */
   sublabel?: string;
+  /** Native browser tooltip on hover — used to spell out the Gem Shard conversion rate without cluttering the stat itself. */
+  title?: string;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 92 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 92 }} title={title}>
       <span style={{ opacity: 0.85, display: "flex" }}>{icon}</span>
       <div>
         <div style={labelStyle}>{label}</div>

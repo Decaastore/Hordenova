@@ -25,6 +25,7 @@ export const en = {
     gold: "GOLD",
     gems: "GEMS",
     gemShards: "SHARDS",
+    gemShardsTooltip: "Gem Shards — 10 Shards can be converted into 1 Gem (see Inventory).",
     state: "STATE",
     phase: {
       PRE_RUN: "PRE-RUN",

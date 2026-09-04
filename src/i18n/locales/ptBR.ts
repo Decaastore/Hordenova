@@ -26,6 +26,7 @@ export const ptBR: TranslationSchema = {
     gold: "OURO",
     gems: "GEMAS",
     gemShards: "FRAGMENTOS",
+    gemShardsTooltip: "Fragmentos de Gema — 10 Fragmentos podem ser convertidos em 1 Gema (veja o Inventário).",
     state: "ESTADO",
     phase: {
       PRE_RUN: "PRÉ-JOGO",
