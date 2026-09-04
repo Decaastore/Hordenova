@@ -108,6 +108,18 @@ export function SpeakerIcon({ size = 14, color = "currentColor", style, muted = 
   );
 }
 
+/** Home screen ambient-music control (see MusicControl.tsx) — a musical note distinct from SpeakerIcon (which is reserved for in-game SFX) so the two audio controls are never visually confused. */
+export function NoteIcon({ size = 14, color = "currentColor", style, muted = false }: IconProps & { muted?: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M9 17V5l10-2v12" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6.5" cy="17" r="2.5" stroke={color} strokeWidth="1.6" />
+      <circle cx="16.5" cy="15" r="2.5" stroke={color} strokeWidth="1.6" />
+      {muted && <path d="M3 3l18 18" stroke={color} strokeWidth="1.8" strokeLinecap="round" />}
+    </svg>
+  );
+}
+
 export function SkullIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

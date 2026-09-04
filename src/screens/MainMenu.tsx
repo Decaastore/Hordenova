@@ -1,13 +1,16 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { loadSave } from "@/engine/SaveSystem";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "@/ui/LanguageSelector";
+import { MusicControl } from "@/ui/MusicControl";
 import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
 import { audioManager } from "@/audio/AudioManager";
 
 interface MainMenuProps {
   onStart: () => void;
+  onOpenWiki: () => void;
+  onOpenNovidades: () => void;
 }
 
 /**
@@ -19,11 +22,32 @@ interface MainMenuProps {
  * before `onStart` fires — "entering the world of HORDENOVA" rather than
  * a plain screen swap.
  */
-export function MainMenu({ onStart }: MainMenuProps) {
+export function MainMenu({ onStart, onOpenWiki, onOpenNovidades }: MainMenuProps) {
   const save = loadSave();
   const [hover, setHover] = useState(false);
   const [transitionAt, setTransitionAt] = useState<number | null>(null);
   const { t } = useLanguage();
+
+  // Ambient music (spec: "iniciar após interação do usuário, se bloqueado,
+  // nunca lançar erro") — browsers block AudioContext until a genuine user
+  // gesture, so this attaches a one-time listener for the FIRST interaction
+  // anywhere on the page rather than requiring the player to specifically
+  // find a "play music" button. playAmbientMusic()/unlock() never throw
+  // even if Web Audio is unavailable (see AudioManager.ts). Scoped to the
+  // Home screen only — stops the moment the player navigates away.
+  useEffect(() => {
+    const startMusic = () => {
+      audioManager.unlock();
+      audioManager.playAmbientMusic();
+    };
+    window.addEventListener("pointerdown", startMusic, { once: true });
+    window.addEventListener("keydown", startMusic, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", startMusic);
+      window.removeEventListener("keydown", startMusic);
+      audioManager.stopMusic();
+    };
+  }, []);
 
   const handlePlay = () => {
     if (transitionAt !== null) return;
@@ -53,12 +77,16 @@ export function MainMenu({ onStart }: MainMenuProps) {
 
       <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
         <LanguageSelector />
+        <div style={musicControlWrapStyle}>
+          <MusicControl />
+        </div>
 
         <div style={contentStyle}>
           <div style={titleBlockStyle}>
             <div style={titleGlowStyle} aria-hidden="true" />
             <div style={titleStyle}>HORDENOVA</div>
             <div style={subtitleStyle}>{t("menu.subtitle")}</div>
+            <div style={descriptionStyle}>{t("menu.description")}</div>
           </div>
 
           <div style={playWrapStyle}>
@@ -110,6 +138,18 @@ export function MainMenu({ onStart }: MainMenuProps) {
           <div style={bestWaveStyle}>
             <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
             <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
+          </div>
+
+          <div style={secondaryLinksStyle}>
+            <button style={secondaryLinkStyle} onClick={onOpenWiki}>
+              {t("menu.wikiLink")}
+            </button>
+            <span style={secondaryLinkDividerStyle} aria-hidden="true">
+              ·
+            </span>
+            <button style={secondaryLinkStyle} onClick={onOpenNovidades}>
+              {t("menu.novidadesLink")}
+            </button>
           </div>
         </div>
       </div>
@@ -227,6 +267,50 @@ const subtitleStyle: CSSProperties = {
   letterSpacing: "clamp(2px, 0.6vw, 5px)",
   color: PALETTE.uiText,
   textShadow: "0 2px 6px rgba(20,12,0,0.85)",
+};
+
+/** Mirrors LanguageSelector's own absolute top-right positioning, at top-left. */
+const musicControlWrapStyle: CSSProperties = {
+  position: "absolute",
+  top: "clamp(12px, 2.4vh, 20px)",
+  left: "clamp(12px, 2.4vw, 22px)",
+  zIndex: 2,
+};
+
+/** A short, honest one-line pitch — spec: Home must sell the adventure, not just be a menu. */
+const descriptionStyle: CSSProperties = {
+  marginTop: "clamp(6px, 1.2vh, 12px)",
+  maxWidth: "min(520px, 80vw)",
+  marginLeft: "auto",
+  marginRight: "auto",
+  fontSize: "clamp(11px, 1.3vw, 13px)",
+  lineHeight: 1.5,
+  color: PALETTE.uiTextDim,
+  textShadow: "0 2px 6px rgba(20,12,0,0.85)",
+};
+
+const secondaryLinksStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  fontSize: "clamp(10px, 1.1vw, 11.5px)",
+};
+
+const secondaryLinkStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontWeight: 700,
+  letterSpacing: 0.6,
+  color: PALETTE.uiTextDim,
+  textDecoration: "underline",
+  textUnderlineOffset: 3,
+  padding: 0,
+};
+
+const secondaryLinkDividerStyle: CSSProperties = {
+  color: PALETTE.uiTextDim,
+  opacity: 0.6,
 };
 
 const playWrapStyle: CSSProperties = {

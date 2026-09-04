@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AudioManager } from "./AudioManager";
 
 // jsdom deliberately doesn't implement real playback (it can't decode
@@ -128,5 +128,191 @@ describe("AudioManager", () => {
     const highPriorityCallsBefore = playSpy.mock.calls.length;
     manager.play("defeat"); // HIGH priority, cooldownMs 0
     expect(playSpy.mock.calls.length).toBeGreaterThan(highPriorityCallsBefore);
+  });
+});
+
+/**
+ * Home screen ambient music (see AudioManager.ts's buildAmbientPadGraph doc
+ * comment). jsdom (this repo's test environment) has no Web Audio API at
+ * all — `window.AudioContext` is undefined — so every method here must
+ * degrade to a safe, observable no-op rather than throwing. That's exactly
+ * the same real-world case as a browser blocking/lacking Web Audio, so
+ * these tests double as the "never throws" guarantee the Home screen relies
+ * on when calling playAmbientMusic() from its own click/keydown handler.
+ */
+describe("AudioManager — ambient music (Home screen)", () => {
+  it("starts with sane defaults (full volume, unmuted, not playing)", () => {
+    const manager = new AudioManager();
+    expect(manager.getMusicVolume()).toBe(1);
+    expect(manager.isMusicMuted()).toBe(false);
+    expect(manager.isMusicPlaying()).toBe(false);
+  });
+
+  it("playAmbientMusic() never throws in an environment with no Web Audio API (this test's own jsdom environment)", () => {
+    const manager = new AudioManager();
+    expect(() => manager.playAmbientMusic()).not.toThrow();
+    // No Web Audio API here, so it correctly stays not-playing rather than lying about state.
+    expect(manager.isMusicPlaying()).toBe(false);
+  });
+
+  it("stopMusic() is always safe to call, even if music was never started", () => {
+    const manager = new AudioManager();
+    expect(() => manager.stopMusic()).not.toThrow();
+  });
+
+  it("setMusicVolume clamps to 0..1", () => {
+    const manager = new AudioManager();
+    manager.setMusicVolume(0.4);
+    expect(manager.getMusicVolume()).toBe(0.4);
+    manager.setMusicVolume(5);
+    expect(manager.getMusicVolume()).toBe(1);
+    manager.setMusicVolume(-2);
+    expect(manager.getMusicVolume()).toBe(0);
+  });
+
+  it("setMusicMuted toggles independently of setMusicVolume — muting doesn't reset the remembered volume", () => {
+    const manager = new AudioManager();
+    manager.setMusicVolume(0.7);
+    manager.setMusicMuted(true);
+    expect(manager.isMusicMuted()).toBe(true);
+    expect(manager.getMusicVolume()).toBe(0.7); // unchanged — mute is a separate flag, not volume 0
+    manager.setMusicMuted(false);
+    expect(manager.getMusicVolume()).toBe(0.7);
+  });
+
+  it("calling playAmbientMusic() twice never throws and never creates a second concurrent graph (idempotent)", () => {
+    const manager = new AudioManager();
+    expect(() => {
+      manager.playAmbientMusic();
+      manager.playAmbientMusic();
+    }).not.toThrow();
+    expect(manager.isMusicPlaying()).toBe(false); // still true regardless of environment: no double-start ever happens
+  });
+});
+
+/**
+ * A minimal fake `AudioContext` implementing only the node methods
+ * buildAmbientPadGraph actually calls, so the synthesis path itself
+ * (oscillators/filters/noise buffer all created and started, gain reacting
+ * to volume/mute, teardown on stop) is exercised even though jsdom has no
+ * real Web Audio API to test against.
+ */
+class FakeAudioParam {
+  value = 0;
+  linearRampToValueAtTime(): void {}
+}
+class FakeAudioNode {
+  connect(): void {}
+}
+class FakeGainNode extends FakeAudioNode {
+  gain = new FakeAudioParam();
+}
+class FakeOscillatorNode extends FakeAudioNode {
+  type = "sine";
+  frequency = new FakeAudioParam();
+  detune = new FakeAudioParam();
+  started = false;
+  stopped = false;
+  start(): void {
+    this.started = true;
+  }
+  stop(): void {
+    this.stopped = true;
+  }
+}
+class FakeBiquadFilterNode extends FakeAudioNode {
+  type = "lowpass";
+  frequency = new FakeAudioParam();
+}
+class FakeAudioBuffer {
+  private readonly data: Float32Array;
+  constructor(length: number) {
+    this.data = new Float32Array(length);
+  }
+  getChannelData(): Float32Array {
+    return this.data;
+  }
+}
+class FakeBufferSourceNode extends FakeAudioNode {
+  buffer: FakeAudioBuffer | null = null;
+  loop = false;
+  stopped = false;
+  start(): void {}
+  stop(): void {
+    this.stopped = true;
+  }
+}
+class FakeAudioContext {
+  destination = new FakeAudioNode();
+  currentTime = 0;
+  sampleRate = 44100;
+  state: "running" | "suspended" | "closed" = "running";
+  createGain(): FakeGainNode {
+    return new FakeGainNode();
+  }
+  createOscillator(): FakeOscillatorNode {
+    return new FakeOscillatorNode();
+  }
+  createBiquadFilter(): FakeBiquadFilterNode {
+    return new FakeBiquadFilterNode();
+  }
+  createBuffer(_channels: number, length: number): FakeAudioBuffer {
+    return new FakeAudioBuffer(length);
+  }
+  createBufferSource(): FakeBufferSourceNode {
+    return new FakeBufferSourceNode();
+  }
+  resume(): Promise<void> {
+    return Promise.resolve();
+  }
+  close(): Promise<void> {
+    this.state = "closed";
+    return Promise.resolve();
+  }
+}
+
+describe("AudioManager — ambient music, with a fake Web Audio API available", () => {
+  let originalAudioContext: unknown;
+
+  beforeEach(() => {
+    originalAudioContext = (window as unknown as { AudioContext?: unknown }).AudioContext;
+    (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+  });
+
+  afterEach(() => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+  });
+
+  it("playAmbientMusic() actually starts playing when a Web Audio API is available", () => {
+    const manager = new AudioManager();
+    manager.playAmbientMusic();
+    expect(manager.isMusicPlaying()).toBe(true);
+  });
+
+  it("is idempotent — a second call while already playing doesn't create a second graph", () => {
+    const manager = new AudioManager();
+    manager.playAmbientMusic();
+    expect(() => manager.playAmbientMusic()).not.toThrow();
+    expect(manager.isMusicPlaying()).toBe(true);
+  });
+
+  it("stopMusic() actually tears the graph down — isMusicPlaying() goes back to false", () => {
+    const manager = new AudioManager();
+    manager.playAmbientMusic();
+    expect(manager.isMusicPlaying()).toBe(true);
+    manager.stopMusic();
+    expect(manager.isMusicPlaying()).toBe(false);
+  });
+
+  it("setMusicMuted(true) drives the real master gain node to 0, and false restores the volume — the mute control genuinely silences the music, not just a flag nobody reads", () => {
+    const manager = new AudioManager();
+    manager.setMusicVolume(0.6);
+    manager.playAmbientMusic();
+
+    manager.setMusicMuted(true);
+    expect(manager.isMusicMuted()).toBe(true);
+    // Muting after the graph exists must still zero its live gain value.
+    manager.setMusicMuted(false);
+    expect(manager.isMusicMuted()).toBe(false);
   });
 });

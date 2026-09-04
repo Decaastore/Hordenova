@@ -8,9 +8,9 @@ import { SFX_ASSETS, type SfxId, type SfxPriority } from "./sfxCatalog";
  * audio/GameAudioBridge.ts translates into calls here. That indirection
  * is what keeps "add a new SFX" from ever touching engine code.
  *
- * No music. This class is deliberately shaped so a future `playMusic`/
- * `crossfadeMusic` could be added alongside `play()` without restructuring
- * anything — but that's explicitly NOT built yet.
+ * Home screen ambient music (see playAmbientMusic below) lives here too —
+ * this is still "the one place that touches audio", it just also owns a
+ * Web Audio API graph alongside the HTMLAudioElement SFX pools.
  *
  * Performance (section 15): a small pool of reusable HTMLAudioElements per
  * sound id, not a fresh `new Audio()` per play — this runs for hours in an
@@ -18,6 +18,105 @@ import { SFX_ASSETS, type SfxId, type SfxPriority } from "./sfxCatalog";
  */
 const MAX_GLOBAL_VOICES = 10;
 const PRIORITY_RANK: Record<SfxPriority, number> = { LOW: 0, MEDIUM: 1, HIGH: 2 };
+
+/** Web Audio API global constructor, prefixed on old Safari. Absent in the vitest/jsdom test environment — every music method below degrades to a silent no-op there, never a thrown error. */
+function getAudioContextConstructor(): typeof AudioContext | null {
+  const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
+  return w.AudioContext ?? w.webkitAudioContext ?? null;
+}
+
+interface MusicGraph {
+  ctx: AudioContext;
+  masterGain: GainNode;
+  stop: () => void;
+}
+
+/**
+ * A slow, wholly original, procedurally-generated ambient pad — never a
+ * recording, never based on or resembling any existing game's soundtrack
+ * (explicitly not Zelda or any other IP). Built from four sustained
+ * detuned sine/triangle tones (a D-minor-ish drone: D2/A2/D3/F3) each
+ * slowly wobbled by its own slow LFO on detune for gentle movement, plus a
+ * soft filtered-noise layer for a "wind/fog" texture — no melody, no
+ * rhythm, nothing recognizable to copy or be copied. Because it's
+ * synthesized live rather than a looping file, there's no seam/loop-point
+ * to ever click or repeat noticeably.
+ */
+function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGraph {
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = initialGain;
+  masterGain.connect(ctx.destination);
+
+  const voiceFreqs = [73.42, 110.0, 146.83, 174.61]; // D2, A2, D3, F3
+  const stopFns: Array<() => void> = [];
+
+  for (const freq of voiceFreqs) {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+
+    const voiceGain = ctx.createGain();
+    voiceGain.gain.value = 0;
+    voiceGain.gain.linearRampToValueAtTime(1 / voiceFreqs.length, ctx.currentTime + 3); // slow fade-in, no jarring onset
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 800;
+
+    // A slow LFO on detune (a few cents, well under a semitone) gives the
+    // pad gentle, organic movement instead of a static, robotic drone.
+    const lfo = ctx.createOscillator();
+    lfo.type = "sine";
+    lfo.frequency.value = 0.05 + Math.random() * 0.05;
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 4;
+    lfo.connect(lfoGain);
+    lfoGain.connect(osc.detune);
+
+    osc.connect(filter);
+    filter.connect(voiceGain);
+    voiceGain.connect(masterGain);
+
+    osc.start();
+    lfo.start();
+    stopFns.push(() => {
+      osc.stop();
+      lfo.stop();
+    });
+  }
+
+  // Soft filtered white noise — a distant "wind/fog" texture under the pad.
+  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const data = noiseBuffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const noise = ctx.createBufferSource();
+  noise.buffer = noiseBuffer;
+  noise.loop = true;
+  const noiseFilter = ctx.createBiquadFilter();
+  noiseFilter.type = "lowpass";
+  noiseFilter.frequency.value = 400;
+  const noiseGain = ctx.createGain();
+  noiseGain.gain.value = 0.03;
+  noise.connect(noiseFilter);
+  noiseFilter.connect(noiseGain);
+  noiseGain.connect(masterGain);
+  noise.start();
+  stopFns.push(() => noise.stop());
+
+  return {
+    ctx,
+    masterGain,
+    stop: () => {
+      for (const stop of stopFns) {
+        try {
+          stop();
+        } catch {
+          // Already stopped — never throw during teardown.
+        }
+      }
+    },
+  };
+}
 
 export interface PlayOptions {
   /** Extra playback-rate multiplier on top of the asset's own random pitch variance — e.g. a lower pitch for a heavier/bigger enemy reusing the generic hit sound. */
@@ -39,6 +138,10 @@ export class AudioManager {
   private readonly pools = new Map<SfxId, HTMLAudioElement[]>();
   private readonly lastPlayedAt = new Map<SfxId, number>();
   private readonly activeVoices = new Map<HTMLAudioElement, VoiceMeta>();
+
+  private musicVolume = 1;
+  private musicMuted = false;
+  private musicGraph: MusicGraph | null = null;
 
   constructor(private readonly now: () => number = Date.now) {}
 
@@ -70,6 +173,72 @@ export class AudioManager {
 
   isMuted(): boolean {
     return this.muted;
+  }
+
+  private effectiveMusicGain(): number {
+    return this.musicMuted ? 0 : this.musicVolume;
+  }
+
+  /**
+   * Starts the Home screen's ambient pad (see buildAmbientPadGraph above).
+   * Idempotent — calling this while already playing is a no-op rather than
+   * layering a second graph. Like `unlock()`, this must be called from a
+   * real user-gesture handler (a click, a keydown) — browsers block
+   * `AudioContext` creation/resume otherwise. Never throws: an unsupported
+   * environment (no Web Audio API, e.g. this repo's vitest/jsdom tests) or
+   * a blocked/suspended context both just result in silence.
+   */
+  playAmbientMusic(): void {
+    if (this.musicGraph) return;
+    const Ctor = getAudioContextConstructor();
+    if (!Ctor) return;
+
+    try {
+      const ctx = new Ctor();
+      this.musicGraph = buildAmbientPadGraph(ctx, this.effectiveMusicGain());
+      if (ctx.state === "suspended") {
+        ctx.resume().catch(() => {
+          // Still blocked — stays silent until the next user gesture calls this again.
+        });
+      }
+    } catch {
+      this.musicGraph = null;
+    }
+  }
+
+  /** Stops and fully tears down the ambient pad graph (oscillators, filters, the AudioContext itself). Safe to call even if music was never started. */
+  stopMusic(): void {
+    if (!this.musicGraph) return;
+    const graph = this.musicGraph;
+    this.musicGraph = null;
+    try {
+      graph.stop();
+      graph.ctx.close().catch(() => {});
+    } catch {
+      // Already torn down — never throw.
+    }
+  }
+
+  isMusicPlaying(): boolean {
+    return this.musicGraph !== null;
+  }
+
+  setMusicVolume(volume: number): void {
+    this.musicVolume = Math.max(0, Math.min(1, volume));
+    if (this.musicGraph) this.musicGraph.masterGain.gain.value = this.effectiveMusicGain();
+  }
+
+  getMusicVolume(): number {
+    return this.musicVolume;
+  }
+
+  setMusicMuted(muted: boolean): void {
+    this.musicMuted = muted;
+    if (this.musicGraph) this.musicGraph.masterGain.gain.value = this.effectiveMusicGain();
+  }
+
+  isMusicMuted(): boolean {
+    return this.musicMuted;
   }
 
   private getPooledElement(id: SfxId, url: string, maxSimultaneous: number): HTMLAudioElement | null {
