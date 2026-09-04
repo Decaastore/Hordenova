@@ -61,7 +61,7 @@ export function drawTower(
       drawFrostborn(ctx, theme, stats.level, timeMs, visualStage);
       break;
     case "STORMCALLER":
-      drawStormcaller(ctx, theme, stats.level, timeMs, visualStage);
+      drawStormcaller(ctx, theme, stats.level, timeMs, visualStage, readiness, attackFlashMs);
       break;
   }
 
@@ -297,6 +297,37 @@ export function drawIronwood(
   ctx.globalAlpha = 1;
   ctx.restore();
 
+  // --- Support platform: a crossed-beam wooden deck lashed to the trunk
+  // just below the mount — reads as "built structure carrying a weapon,"
+  // not "weapon balanced on top of a tree" (spec section 10: platform +
+  // support structure as identifiable parts in their own right). ---
+  const platformY = -30 - level * 0.6;
+  ctx.save();
+  ctx.translate(0, platformY);
+  ctx.strokeStyle = "#241a10";
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-9, 4);
+  ctx.lineTo(9, -3);
+  ctx.moveTo(-9, -3);
+  ctx.lineTo(9, 4);
+  ctx.stroke();
+  ctx.fillStyle = "#3a2c1a";
+  ctx.fillRect(-10, -1.5, 20, 3);
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 0.7;
+  ctx.strokeRect(-10, -1.5, 20, 3);
+  // Rope lashing at each end, binding the platform to the trunk.
+  ctx.strokeStyle = "rgba(200,180,140,0.7)";
+  ctx.lineWidth = 1;
+  for (const rx of [-8.5, 8.5]) {
+    ctx.beginPath();
+    ctx.arc(rx, 0, 2, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
   // --- Ballista mount: heavy, horizontal silhouette — the tower's identity. ---
   const mountY = -34 - level * 0.6;
   const firing = attackFlashMs < 160;
@@ -474,6 +505,17 @@ export function drawIronwood(
   ctx.restore();
 }
 
+/**
+ * INFERNO — REBUILT (Visual Overhaul spec section 7): an infernal
+ * forge/war-machine, not a campfire in a stone bowl. Angular basalt
+ * platform, a riveted iron furnace BODY with a forward-facing furnace
+ * mouth as its "weapon", a rear chimney (the silhouette element that
+ * reads "forge" at a glance, distinct from every other tower's shape),
+ * and — from stage 3 on — a working bellows arm. Contrast is the
+ * governing rule: dark metal/basalt/carbon dominate the mass, saturated
+ * fire color is reserved for the furnace mouth, cracks, embers and smoke
+ * tint, never the whole structure.
+ */
 function drawInferno(
   ctx: CanvasRenderingContext2D,
   theme: (typeof TOWER_THEME)["INFERNO"],
@@ -481,98 +523,221 @@ function drawInferno(
   timeMs: number,
   visualStage = 1,
 ): void {
-  // Round stone furnace ring.
-  const stoneGradient = ctx.createRadialGradient(-3, -4, 2, 0, 0, 18);
-  stoneGradient.addColorStop(0, "#8a7a62");
-  stoneGradient.addColorStop(1, theme.secondary);
-  ctx.fillStyle = stoneGradient;
-  ctx.beginPath();
-  ctx.ellipse(0, 4, 17, 10, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "#4a2410";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
+  const bodyScale = 1 + Math.min(visualStage - 1, 5) * 0.045; // structural growth on top of the tower's own scale — the forge itself gets more massive, not just brighter
 
-  // Glowing cracks across the stone.
-  ctx.strokeStyle = `rgba(255,140,50,${0.5 + 0.3 * Math.sin(timeMs / 260)})`;
+  drawContactShadow(ctx, 20, 9, 0.42);
+
+  // --- Angular basalt platform (replaces the old round stone ring). ---
+  ctx.fillStyle = "#1a1512";
+  ctx.beginPath();
+  ctx.moveTo(-19, 9);
+  ctx.lineTo(-14, 3);
+  ctx.lineTo(14, 3);
+  ctx.lineTo(19, 9);
+  ctx.lineTo(13, 13);
+  ctx.lineTo(-13, 13);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#0a0806";
   ctx.lineWidth = 1.2;
+  ctx.stroke();
+  // Molten seams between the basalt slabs.
+  ctx.strokeStyle = `rgba(255,120,40,${0.35 + 0.25 * pulse})`;
+  ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(-11, 3);
-  ctx.lineTo(-4, 6);
-  ctx.moveTo(9, 1);
-  ctx.lineTo(13, 6);
+  ctx.moveTo(-13, 8);
+  ctx.lineTo(-4, 10);
+  ctx.moveTo(6, 10);
+  ctx.lineTo(14, 7);
   ctx.stroke();
 
-  // Visual Evolution stage 2+: two small side vents venting their own
-  // embers — a real added structural part on the furnace ring.
-  if (visualStage >= 2) {
-    for (const vx of [-14, 14]) {
-      const ventFlicker = 0.5 + 0.4 * Math.sin(timeMs / 220 + vx);
-      ctx.fillStyle = `rgba(255,150,60,${ventFlicker})`;
-      ctx.beginPath();
-      ctx.ellipse(vx, 5, 2.2, 3.2, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
+  ctx.save();
+  ctx.scale(bodyScale, bodyScale);
 
-  // Furnace opening.
-  const openingGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, 12);
-  openingGlow.addColorStop(0, "#fff0c0");
-  openingGlow.addColorStop(0.5, theme.primary);
-  openingGlow.addColorStop(1, theme.secondary);
-  ctx.fillStyle = openingGlow;
+  // --- Rear chimney: the one silhouette element that reads "forge" even
+  // in shadow. Grows taller/thicker with visual stage. ---
+  const chimneyH = 14 + Math.min(visualStage, 6) * 2.4;
+  ctx.fillStyle = "#26201c";
   ctx.beginPath();
-  ctx.ellipse(0, 1, 10, 6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  glowBlob(ctx, 0, -14, 17 + level * 1.4, theme.glow);
-
-  // Flickering flame plume.
-  const flicker = Math.sin(timeMs / 140) * 2.4;
-  ctx.fillStyle = theme.primary;
-  ctx.beginPath();
-  ctx.moveTo(-6, -2);
-  ctx.quadraticCurveTo(-7 + flicker, -18, 0, -30 - level * 1.2);
-  ctx.quadraticCurveTo(7 - flicker, -18, 6, -2);
+  ctx.moveTo(9, 2);
+  ctx.lineTo(8, 2 - chimneyH);
+  ctx.lineTo(13, 2 - chimneyH);
+  ctx.lineTo(13.5, 2);
   ctx.closePath();
   ctx.fill();
-
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.moveTo(-3, -4);
-  ctx.quadraticCurveTo(-3.5 + flicker * 0.6, -16, 0, -24 - level * 0.8);
-  ctx.quadraticCurveTo(3.5 - flicker * 0.6, -16, 3, -4);
-  ctx.closePath();
-  ctx.fill();
-
-  // Visual Evolution stage 4+: secondary flame horns flanking the main
-  // plume — the structure has outgrown a single central flame.
-  if (visualStage >= 4) {
-    for (const hx of [-9, 9]) {
-      ctx.fillStyle = theme.primary;
-      ctx.beginPath();
-      ctx.moveTo(hx - 2, -2);
-      ctx.quadraticCurveTo(hx + Math.sin(timeMs / 260) * 1.5, -14 - level * 0.3, hx, -18 - level * 0.4);
-      ctx.quadraticCurveTo(hx - Math.sin(timeMs / 260) * 1.5, -10, hx + 2, -2);
-      ctx.closePath();
-      ctx.fill();
-    }
-  }
-
-  // Smoke wisps drifting up and away.
-  ctx.fillStyle = "rgba(140,130,120,0.28)";
-  for (let i = 0; i < 2; i++) {
-    const cycle = (timeMs / 2200 + i * 0.5) % 1;
+  ctx.strokeStyle = "#100c0a";
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+  ctx.fillStyle = "#3a322b";
+  ctx.fillRect(7.3, 1.5 - chimneyH, 6.2, 2.2); // chimney cap rim
+  // Smoke rising from the chimney — thin at low stages, a real dark plume by the final form.
+  const smokeCount = 2 + Math.floor(visualStage / 2);
+  ctx.fillStyle = "rgba(70,64,58,0.32)";
+  for (let i = 0; i < smokeCount; i++) {
+    const cycle = (timeMs / 2600 + i * (1 / smokeCount)) % 1;
+    const sx = 10.5 + Math.sin(timeMs / 900 + i * 2) * (3 + cycle * 4);
+    const sy = 2 - chimneyH - cycle * 22;
+    ctx.globalAlpha = (1 - cycle) * 0.6;
     ctx.beginPath();
-    ctx.arc(4 + i * 3 + cycle * 6, -26 - cycle * 16, 3 + cycle * 3, 0, Math.PI * 2);
+    ctx.arc(sx, sy, 2.5 + cycle * 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // --- Furnace body: a squat trapezoidal iron-plated block. ---
+  const bodyGrad = ctx.createLinearGradient(-13, -14, 13, 6);
+  bodyGrad.addColorStop(0, "#4a423a");
+  bodyGrad.addColorStop(0.55, "#241d18");
+  bodyGrad.addColorStop(1, "#120e0b");
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(-12, 2);
+  ctx.lineTo(-10, -13);
+  ctx.lineTo(10, -13);
+  ctx.lineTo(12, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#0a0806";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Riveted iron plating seams.
+  ctx.strokeStyle = "rgba(10,8,6,0.55)";
+  ctx.lineWidth = 0.8;
+  for (const px of [-6, 0, 6]) {
+    ctx.beginPath();
+    ctx.moveTo(px * 0.95, -12.5);
+    ctx.lineTo(px, 1.5);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#5a5148";
+  for (const [rx, ry] of [
+    [-9, -10],
+    [9, -10],
+    [-9, -1],
+    [9, -1],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(rx, ry, 0.9, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Rising embers.
+  // Visual Evolution stage 2+: reinforcement plates bolted over the base
+  // shell — a real added part, not just a bigger furnace.
+  if (visualStage >= 2) {
+    ctx.fillStyle = "#332a22";
+    ctx.fillRect(-11.5, -8, 5.5, 7);
+    ctx.fillRect(6, -8, 5.5, 7);
+    ctx.strokeStyle = "#0a0806";
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(-11.5, -8, 5.5, 7);
+    ctx.strokeRect(6, -8, 5.5, 7);
+  }
+
+  // --- Furnace mouth: the "weapon" — an arched, metal-framed opening
+  // with the incandescent core inside it. ---
+  glowBlob(ctx, 0, -6, 15 + level * 1.1, theme.glow);
+  ctx.fillStyle = "#1a1310";
+  ctx.beginPath();
+  ctx.moveTo(-7.5, 1);
+  ctx.quadraticCurveTo(-8, -11, 0, -12);
+  ctx.quadraticCurveTo(8, -11, 7.5, 1);
+  ctx.closePath();
+  ctx.fill();
+  const mouthGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 8);
+  mouthGrad.addColorStop(0, `rgba(255,240,190,${0.85 + 0.15 * pulse})`);
+  mouthGrad.addColorStop(0.55, theme.primary);
+  mouthGrad.addColorStop(1, theme.secondary);
+  ctx.fillStyle = mouthGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, -4, 5.6, 7.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Muzzle ring — a distinct metal collar around the opening (stage 3+, "arma mais sofisticada").
+  if (visualStage >= 3) {
+    ctx.strokeStyle = "#6a5f52";
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.ellipse(0, -4, 6.6, 8.2, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Visual Evolution stage 3+: a working bellows arm on the flank — the
+  // war-machine mechanism, animated via a slow pump cycle.
+  if (visualStage >= 3) {
+    const pump = 0.5 + 0.5 * Math.sin(timeMs / 700);
+    ctx.save();
+    ctx.translate(-12.5, -6);
+    ctx.strokeStyle = "#3a322b";
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, 6 - pump * 2.5);
+    ctx.lineTo(-6, 2 - pump * 1.5);
+    ctx.stroke();
+    ctx.fillStyle = "#241d18";
+    ctx.beginPath();
+    ctx.ellipse(-6, 2 - pump * 1.5, 3.2, 2.4, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Visual Evolution stage 4+: a suspended crucible/cauldron of molten
+  // metal hanging off the opposite flank — heavy, "loaded" war-machine mass.
+  if (visualStage >= 4) {
+    ctx.save();
+    ctx.translate(12, -2);
+    ctx.strokeStyle = "#2a231d";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-1, -8);
+    ctx.lineTo(0, -2);
+    ctx.moveTo(1.5, -8);
+    ctx.lineTo(1.2, -2);
+    ctx.stroke();
+    ctx.fillStyle = "#241d18";
+    ctx.beginPath();
+    ctx.ellipse(0.3, 0, 3.6, 2.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const crucibleGlow = ctx.createRadialGradient(0.3, -0.5, 0, 0.3, -0.5, 3);
+    crucibleGlow.addColorStop(0, `rgba(255,180,90,${0.6 + 0.3 * pulse})`);
+    crucibleGlow.addColorStop(1, "rgba(255,120,40,0)");
+    ctx.fillStyle = crucibleGlow;
+    ctx.beginPath();
+    ctx.ellipse(0.3, -0.5, 3, 1.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Visual Evolution stage 5+: runic engravings glowing across the plating.
+  if (visualStage >= 5) {
+    ctx.save();
+    ctx.globalAlpha = 0.4 + 0.35 * pulse;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1;
+    for (const [rx, ry, r] of [
+      [-9, -3, 1.6],
+      [9, -3, 1.6],
+    ] as const) {
+      ctx.beginPath();
+      ctx.moveTo(rx - r, ry);
+      ctx.lineTo(rx, ry - r);
+      ctx.lineTo(rx + r, ry);
+      ctx.lineTo(rx, ry + r);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  ctx.restore(); // end bodyScale
+
+  // Rising embers — density scales with level, independent of visual stage
+  // structural additions (a continuous "power" read, same as before).
   ctx.fillStyle = "rgba(255,180,90,0.85)";
-  for (let i = 0; i < 3 + Math.min(level, 3); i++) {
+  for (let i = 0; i < 3 + Math.min(level, 4); i++) {
     const cycle = (timeMs / 900 + i * 0.33) % 1;
-    const y = -8 - cycle * 26;
+    const y = -12 - cycle * 24;
     const x = Math.sin(timeMs / 500 + i * 2) * (4 + cycle * 5);
     ctx.globalAlpha = 1 - cycle;
     ctx.beginPath();
@@ -581,21 +746,45 @@ function drawInferno(
   }
   ctx.globalAlpha = 1;
 
-  // Visual Evolution stage 6 (final form): a molten ring orbits the base —
-  // the furnace has grown its own ambient heat field.
+  // Visual Evolution stage 6 (final form): twin dual chimneys (the second
+  // one added on the opposite flank) + a full molten-crack aura — the
+  // "true fire fortress" payoff.
   if (visualStage >= 6) {
     ctx.save();
-    ctx.globalAlpha = 0.5 + 0.25 * Math.sin(timeMs / 400);
+    ctx.translate(-11, 0);
+    ctx.scale(-1, 1);
+    ctx.fillStyle = "#26201c";
+    const h2 = 14 + 6 * 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 2);
+    ctx.lineTo(-1, 2 - h2 * 0.7);
+    ctx.lineTo(4, 2 - h2 * 0.7);
+    ctx.lineTo(4.5, 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = 0.3 + 0.2 * pulse;
     ctx.strokeStyle = theme.accent;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.ellipse(0, 5, 21, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 6, 22, 8, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = 1;
     ctx.restore();
   }
 }
 
+/**
+ * FROSTBORN — REBUILT (Visual Overhaul spec section 8): an ancient arcane
+ * ice tower, not an ice cube/crystal cluster. Ice is now PART of the
+ * architecture (a frozen core, a crystalline crown), never the whole
+ * structure — the body is dark, weathered, rune-carved stone, the same
+ * "built from the local ground, ancient" language the fortress and
+ * Stormcaller's pillar already use, so Frostborn reads as belonging to
+ * the same world instead of a foreign ice-block prop.
+ */
 function drawFrostborn(
   ctx: CanvasRenderingContext2D,
   theme: (typeof TOWER_THEME)["FROSTBORN"],
@@ -603,16 +792,20 @@ function drawFrostborn(
   timeMs: number,
   visualStage = 1,
 ): void {
-  ctx.fillStyle = "rgba(180,225,255,0.3)";
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 500);
+
+  // Frost creeping across the ground, always present but faint — the
+  // ground-hugging mist (stage 4+) is a stronger, wider version of this.
+  ctx.fillStyle = "rgba(180,225,255,0.22)";
   ctx.beginPath();
   ctx.ellipse(0, 8, 16, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Hexagonal ice pedestal.
-  const pedestalGradient = ctx.createLinearGradient(0, 6, 0, -6);
-  pedestalGradient.addColorStop(0, "#5a92b8");
-  pedestalGradient.addColorStop(1, "#a8dcf5");
-  ctx.fillStyle = pedestalGradient;
+  // --- Hexagonal STONE plinth (dark, weathered — not ice-colored). ---
+  const stoneGrad = ctx.createLinearGradient(0, 6, 0, -6);
+  stoneGrad.addColorStop(0, "#242e36");
+  stoneGrad.addColorStop(1, "#3a4a56");
+  ctx.fillStyle = stoneGrad;
   ctx.beginPath();
   for (let i = 0; i < 6; i++) {
     const angle = (i / 6) * Math.PI * 2 + Math.PI / 6;
@@ -623,20 +816,138 @@ function drawFrostborn(
   }
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.5)";
+  ctx.strokeStyle = "rgba(200,235,255,0.35)";
   ctx.lineWidth = 1.2;
   ctx.stroke();
+  // Frost rime along the plinth's seams.
+  ctx.strokeStyle = "rgba(210,240,255,0.4)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-10, 3);
+  ctx.lineTo(-4, 5);
+  ctx.moveTo(5, 5);
+  ctx.lineTo(11, 2);
+  ctx.stroke();
 
-  // Visual Evolution stage 2+: small crystal outcrops breaking through the
-  // pedestal's edge — real added geometry, not a bigger main spire.
+  // --- The tower proper: a tapering stone obelisk (the real architecture).
+  // Widened from the original thin needle profile, and warmed off pure
+  // blue-grey toward a slate/purple stone tone — at this render scale a
+  // blue-grey obelisk blended into the cyan ice accents and read as solid
+  // ice despite being geometrically "stone"; a hue that visibly contrasts
+  // against the crystal accents is what actually makes the architecture
+  // read as stone with ice growing on it, not the other way around. ---
+  const spireH = 20 + Math.min(visualStage, 6) * 2.6 + level * 0.4;
+  ctx.save();
+  const sway = Math.sin(timeMs / 3000) * 0.012;
+  ctx.rotate(sway);
+
+  const obeliskGrad = ctx.createLinearGradient(-9, -spireH, 9, 2);
+  obeliskGrad.addColorStop(0, "#4f4a5c");
+  obeliskGrad.addColorStop(0.6, "#2c2836");
+  obeliskGrad.addColorStop(1, "#15131c");
+  ctx.fillStyle = obeliskGrad;
+  ctx.beginPath();
+  ctx.moveTo(-9, 2);
+  ctx.lineTo(-5.5, -spireH * 0.55);
+  ctx.lineTo(-3.2, -spireH);
+  ctx.lineTo(3.2, -spireH);
+  ctx.lineTo(5.5, -spireH * 0.55);
+  ctx.lineTo(9, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#0e1418";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Carved rune band, low on the spire — always present, brighter with level.
+  const runeGlow = 0.35 + Math.min(level, 10) * 0.045 + 0.2 * pulse;
+  ctx.globalAlpha = runeGlow;
+  ctx.fillStyle = theme.accent;
+  ctx.fillRect(-5.5, -6, 11, 2.2);
+  ctx.globalAlpha = 1;
+
+  // Visual Evolution stage 3+: a second, higher rune band — the spire has
+  // grown a real second architectural tier. Dimmed alongside the icicles
+  // and core glow it sits next to (see notes above) — this band alone was
+  // fine, but the cluster of accents all sharing this stretch of the
+  // spire is what buried the stone in cyan.
+  if (visualStage >= 3) {
+    ctx.globalAlpha = 0.18 + 0.15 * Math.sin(timeMs / 500 + 1.4);
+    ctx.fillStyle = theme.accent;
+    ctx.fillRect(-4.2, -spireH * 0.55 - 2, 8.4, 1.8);
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Frozen core: a crystal orb bound in a stone collar, roughly
+  // 2/3 up the spire — the tower's focal "weapon". ---
+  const coreY = -spireH * 0.62;
+  ctx.fillStyle = "#1a2126";
+  ctx.beginPath();
+  ctx.ellipse(0, coreY, 6.2, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Same runaway-per-level bug documented on Stormcaller's orb: an
+  // unbounded `13 + level * 1.1` reaches a 46px-radius halo at level 30 —
+  // nearly the full height of the spire — which washes the dark stone
+  // architecture out in cyan and defeats the "ice is PART of the
+  // structure, not the whole structure" direction. Even the first fix
+  // (capping the radius) still measured as a broad wash once stacked with
+  // the icicles/second rune band/sparkles that also cluster around the
+  // core — this is now a small, tight accent sized to the orb itself, not
+  // something that reaches the spire's shoulders.
+  glowBlob(ctx, 0, coreY, 8 + Math.min(level, 10) * 0.25, theme.glow);
+  const coreGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
+  coreGrad.addColorStop(0, "#eafcff");
+  coreGrad.addColorStop(0.55, theme.accent);
+  coreGrad.addColorStop(1, theme.primary);
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(0, coreY, 4.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+
+  // Visual Evolution stage 2+: crystal outcrops breaking through the
+  // spire's own stone near the base — ice growing FROM the architecture.
   if (visualStage >= 2) {
-    for (const [cx, cy] of [
-      [-13, 5],
-      [13, 4],
-    ] as const) {
-      drawCrystalShard(ctx, cx, cy - 7, 2.6, theme);
+    drawCrystalShard(ctx, -6, -3, 2.4, theme);
+    drawCrystalShard(ctx, 6, -3, 2.4, theme);
+  }
+
+  // Visual Evolution stage 4+: icicles hanging off the spire's shoulder
+  // ledges — a real architectural detail, not a bigger core. Dimmed from
+  // the original 0.75 alpha: at full brightness these stacked with the
+  // core glow and second rune band (both nearby) into a single wash that
+  // buried the stone shoulders they're supposed to be hanging off of.
+  if (visualStage >= 4) {
+    for (const ix of [-3.5, 3.5]) {
+      ctx.fillStyle = "rgba(200,230,245,0.4)";
+      ctx.beginPath();
+      ctx.moveTo(ix - 0.7, -spireH * 0.55);
+      ctx.lineTo(ix + 0.7, -spireH * 0.55);
+      ctx.lineTo(ix, -spireH * 0.55 + 5);
+      ctx.closePath();
+      ctx.fill();
     }
   }
+
+  ctx.restore(); // end sway
+
+  // A small shard orbiting the core.
+  const orbitAngle = timeMs / 1400;
+  const ox = Math.cos(orbitAngle) * 11;
+  ctx.save();
+  ctx.translate(ox, coreY + Math.sin(orbitAngle) * 4);
+  ctx.rotate(orbitAngle * 2);
+  ctx.fillStyle = theme.accent;
+  ctx.beginPath();
+  ctx.moveTo(0, -3);
+  ctx.lineTo(1.6, 0);
+  ctx.lineTo(0, 3);
+  ctx.lineTo(-1.6, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 
   // Visual Evolution stage 4+: a low ground-hugging frost mist ring —
   // the structure now radiates cold beyond its own footprint.
@@ -651,31 +962,25 @@ function drawFrostborn(
     ctx.restore();
   }
 
-  glowBlob(ctx, 0, -16, 17 + level * 1.3, theme.glow);
+  // Visual Evolution stage 5+: faint aurora arcs above the tower — arcane
+  // energy the ancient structure now visibly commands.
+  if (visualStage >= 5) {
+    ctx.save();
+    ctx.globalAlpha = 0.28 + 0.18 * Math.sin(timeMs / 700);
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < 2; i++) {
+      const yOff = -spireH - 6 - i * 5;
+      ctx.beginPath();
+      ctx.moveTo(-14 + i * 3, yOff + 6);
+      ctx.quadraticCurveTo(0, yOff - 4, 14 - i * 3, yOff + 6);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 
-  // Central spire + two smaller flanking crystals, taller with level.
-  const crystalHeight = 22 + level * 2;
-  drawCrystalShard(ctx, 0, -crystalHeight, 8, theme);
-  drawCrystalShard(ctx, -9, -8 - level * 1.2, 5, theme);
-  drawCrystalShard(ctx, 9, -8 - level * 1.2, 5, theme);
-
-  // A small shard orbiting the cluster.
-  const orbitAngle = timeMs / 1400;
-  const ox = Math.cos(orbitAngle) * 13;
-  ctx.save();
-  ctx.translate(ox, -12 + Math.sin(orbitAngle) * 4);
-  ctx.rotate(orbitAngle * 2);
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.moveTo(0, -3);
-  ctx.lineTo(1.6, 0);
-  ctx.lineTo(0, 3);
-  ctx.lineTo(-1.6, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-
-  // Sparkle twinkles.
+  // Sparkle twinkles around the core.
   ctx.fillStyle = "#ffffff";
   for (let i = 0; i < 2 + Math.min(level, 3); i++) {
     const twinkle = (Math.sin(timeMs / 300 + i * 5) + 1) / 2;
@@ -683,18 +988,19 @@ function drawFrostborn(
     const angle = i * 2.1;
     ctx.globalAlpha = (twinkle - 0.7) / 0.3;
     ctx.beginPath();
-    ctx.arc(Math.cos(angle) * 11, -12 + Math.sin(angle) * 9, 1.3, 0, Math.PI * 2);
+    ctx.arc(Math.cos(angle) * 11, coreY + Math.sin(angle) * 9, 1.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 
-  // Visual Evolution stage 6 (final form): a crown of small shards atop
-  // the central spire's tip.
+  // Visual Evolution stage 6 (final form): a crystalline crown atop the
+  // spire's tip — the ancient-monument payoff at max level.
   if (visualStage >= 6) {
-    const crownY = -(22 + level * 2);
+    const crownY = -spireH;
+    drawCrystalShard(ctx, 0, crownY - 6, 3.4, theme, 8);
     for (let i = 0; i < 4; i++) {
       const angle = (i / 4) * Math.PI * 2;
-      drawCrystalShard(ctx, Math.cos(angle) * 5, crownY + Math.sin(angle) * 2.5, 2, theme);
+      drawCrystalShard(ctx, Math.cos(angle) * 5, crownY + Math.sin(angle) * 2.5, 2, theme, 5);
     }
   }
 }
@@ -705,8 +1011,20 @@ function drawCrystalShard(
   tipY: number,
   width: number,
   theme: (typeof TOWER_THEME)["FROSTBORN"],
+  /**
+   * Shard length along its own axis. Defaults to a short ground-level
+   * outcrop (spec's original use case). BUG FIX: the crown callers (stage
+   * 6) used to pass a very negative `tipY` (near the spire's tip) while
+   * this always hardcoded `baseY = 4` (ground level) — so each "small
+   * crown shard" actually stretched from the crown all the way down to
+   * the ground, and 5 of them overlapping is what painted a broad cyan
+   * band across most of the tower's height, burying the stone body under
+   * it. A shard now always spans exactly `length` from its own tip,
+   * regardless of where on the spire it sits.
+   */
+  length = 7,
 ): void {
-  const baseY = 4;
+  const baseY = tipY + length;
   const gradient = ctx.createLinearGradient(0, tipY, 0, baseY);
   gradient.addColorStop(0, theme.accent);
   gradient.addColorStop(1, theme.primary);
@@ -724,13 +1042,32 @@ function drawCrystalShard(
   ctx.stroke();
 }
 
+/**
+ * STORMCALLER — ELEVATED, NOT REPLACED (Visual Overhaul spec section 9):
+ * the pillar-and-orb identity already reads well, so the goal here is
+ * charge → discharge storytelling instead of a rebuild. Idle sparks run
+ * at every stage so the tower never looks inert; `readiness` (0..1, how
+ * close the next attack is) drives a visible CHARGE telegraph — the orb
+ * tightens and brightens as it approaches ready — and `attackFlashMs`
+ * drives a short DISCHARGE beat down through the pillar into the ground
+ * the instant it fires. Neither parameter is read by any other tower, and
+ * neither alters gameplay — both are purely cosmetic reads of state the
+ * engine already exposes (tower.cooldownRemainingMs / attack timestamp).
+ */
 function drawStormcaller(
   ctx: CanvasRenderingContext2D,
   theme: (typeof TOWER_THEME)["STORMCALLER"],
   level: number,
   timeMs: number,
   visualStage = 1,
+  readiness = 0,
+  attackFlashMs = Infinity,
 ): void {
+  const discharge = attackFlashMs < 180 ? 1 - attackFlashMs / 180 : 0;
+  // Charge telegraph: only meaningfully visible in the last stretch before
+  // ready, so it reads as "building up" rather than being on the whole time.
+  const charge = Math.max(0, (Math.max(0, Math.min(1, readiness)) - 0.6) / 0.4);
+
   // Two-tier stone plinth.
   ctx.fillStyle = "#4a3f30";
   ctx.beginPath();
@@ -741,16 +1078,49 @@ function drawStormcaller(
   ctx.ellipse(0, 3, 12, 6, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  // Discharge beat: a bright ground ring stamps outward from the plinth
+  // the instant the attack fires — the "energy just left the structure"
+  // beat, distinct from the ordinary projectile-impact VFX at the target.
+  if (discharge > 0) {
+    ctx.save();
+    ctx.globalAlpha = discharge * 0.6;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.5 + discharge * 2;
+    ctx.beginPath();
+    ctx.ellipse(0, 6, 14 + (1 - discharge) * 14, 6 + (1 - discharge) * 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Rune pillar.
   ctx.fillStyle = "#5a4a38";
   ctx.fillRect(-6, -26, 12, 30);
   ctx.fillStyle = theme.primary;
   for (let i = 0; i < 3; i++) {
     const bandPulse = 0.4 + 0.4 * Math.sin(timeMs / 500 + i * 1.4);
-    ctx.globalAlpha = bandPulse;
+    ctx.globalAlpha = discharge > 0 ? 0.9 : bandPulse;
     ctx.fillRect(-6, -22 + i * 8, 12, 2.4);
   }
   ctx.globalAlpha = 1;
+
+  // Discharge beat: a bright bolt races down the pillar's core into the
+  // ground the instant the attack fires — energy visibly leaving the
+  // structure through its own body, not just appearing at the orb.
+  if (discharge > 0) {
+    ctx.save();
+    ctx.strokeStyle = "#f4faff";
+    ctx.globalAlpha = discharge;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = "round";
+    const jitter = (n: number) => (((n * 9301 + 49297) % 233280) / 233280 - 0.5) * 5;
+    ctx.beginPath();
+    ctx.moveTo(0, -22);
+    ctx.lineTo(jitter(1), -10);
+    ctx.lineTo(jitter(2), 2);
+    ctx.lineTo(0, 8);
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // Visual Evolution stage 2+: two small carved rune stones flanking the
   // pillar's base — a real added part, not just a brighter pillar.
@@ -769,6 +1139,29 @@ function drawStormcaller(
     }
   }
 
+  // Visual Evolution stage 3+: paired lightning-rod spires jutting from the
+  // pillar's top corners — the structure now actively draws energy from
+  // above, not just channels it through the orb.
+  if (visualStage >= 3) {
+    for (const sx of [-6.5, 6.5]) {
+      ctx.save();
+      ctx.strokeStyle = "#2c2f34";
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(sx, -26);
+      ctx.lineTo(sx * 1.3, -34);
+      ctx.stroke();
+      ctx.globalAlpha = 0.5 + 0.4 * Math.sin(timeMs / 240 + sx);
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(sx * 1.3, -34, 1.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.restore();
+    }
+  }
+
   // Same runaway-per-level bug as the tower's overall scale: the orb's
   // rise and glow radius were unbounded (level * 1.4 / level * 1.3), so a
   // maxed Stormcaller's orb drifted ~74px above its plinth with a 55px
@@ -776,25 +1169,26 @@ function drawStormcaller(
   // a fixed total budget across the level range instead.
   const levelProgress = (level - 1) / (MAX_TOWER_LEVEL - 1);
   const orbY = -32 - levelProgress * 16;
-  glowBlob(ctx, 0, orbY, 16 + levelProgress * 8, theme.glow);
+  const chargeGlow = 1 + charge * 0.5 + discharge * 0.8;
+  glowBlob(ctx, 0, orbY, (16 + levelProgress * 8) * chargeGlow, theme.glow);
 
   // A rotating arcane ring around the orb (drawn as a squashed ellipse for
-  // a top-down "ring" read).
+  // a top-down "ring" read) — spins faster as the charge builds.
   ctx.save();
   ctx.translate(0, orbY);
-  ctx.rotate(timeMs / 2000);
+  ctx.rotate(timeMs / (2000 - charge * 1400));
   ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1.3;
+  ctx.lineWidth = 1.3 + charge * 1.2;
   ctx.setLineDash([3, 3]);
   ctx.beginPath();
-  ctx.ellipse(0, 0, 11, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, 11 - charge * 3, 4 - charge * 1, 0, 0, Math.PI * 2);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  ctx.fillStyle = theme.accent;
+  ctx.fillStyle = discharge > 0 ? "#f4faff" : theme.accent;
   ctx.beginPath();
-  ctx.arc(0, orbY, 6, 0, Math.PI * 2);
+  ctx.arc(0, orbY, 6 + charge * 1.5 - discharge * 1.5, 0, Math.PI * 2);
   ctx.fill();
 
   // Visual Evolution stage 4+: a second, smaller orb orbits the main one —
@@ -809,13 +1203,18 @@ function drawStormcaller(
     ctx.globalAlpha = 1;
   }
 
-  // Crackling arcs jumping between the orb and the pillar top.
-  ctx.strokeStyle = theme.primary;
-  ctx.lineWidth = 1.3;
-  const arcCount = 2 + Math.min(level, 3);
+  // Crackling arcs jumping between the orb and the pillar top — always
+  // present at idle (spec: "pequenos elementos elétricos durante idle"),
+  // denser and brighter while charging or discharging so power visibly
+  // builds and releases rather than sitting at one constant intensity.
+  const arcIntensity = 1 + charge * 0.6 + discharge * 1.2;
+  ctx.strokeStyle = discharge > 0 ? "#f4faff" : theme.primary;
+  ctx.lineWidth = 1.3 * arcIntensity;
+  ctx.globalAlpha = Math.min(1, 0.7 + charge * 0.3 + discharge * 0.3);
+  const arcCount = 2 + Math.min(level, 3) + (charge > 0.4 ? 1 : 0) + (discharge > 0 ? 2 : 0);
   for (let i = 0; i < arcCount; i++) {
     const seed = Math.floor(timeMs / 110) + i * 17;
-    const jitter = (n: number) => (((n * 9301 + 49297) % 233280) / 233280 - 0.5) * 12;
+    const jitter = (n: number) => (((n * 9301 + 49297) % 233280) / 233280 - 0.5) * 12 * arcIntensity;
     ctx.beginPath();
     ctx.moveTo(0, orbY + 5);
     const midX = jitter(seed);
@@ -823,6 +1222,40 @@ function drawStormcaller(
     ctx.lineTo(midX, midY);
     ctx.lineTo(jitter(seed + 2) * 0.6, -24);
     ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Residual sparks: a brief handful of fading motes drifting off the orb
+  // right after a discharge — the "aftermath" beat the spec asks for so
+  // an attack doesn't just cut instantly back to idle.
+  if (discharge > 0 && discharge < 0.7) {
+    const fade = discharge / 0.7;
+    ctx.save();
+    ctx.globalAlpha = fade * 0.7;
+    ctx.fillStyle = theme.accent;
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2 + timeMs / 90;
+      const r = 9 + (1 - fade) * 10;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, orbY + Math.sin(a) * r * 0.5, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // Visual Evolution stage 5+: a faint standing energy field ripples at
+  // ground level, fed continuously by the pillar — the structure now
+  // sustains ambient power between attacks, not just at the orb.
+  if (visualStage >= 5) {
+    ctx.save();
+    ctx.globalAlpha = 0.25 + 0.12 * Math.sin(timeMs / 500) + discharge * 0.3;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(0, 8, 19, 6, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    ctx.restore();
   }
 
   // Visual Evolution stage 6 (final form): a faint storm-cloud halo hangs

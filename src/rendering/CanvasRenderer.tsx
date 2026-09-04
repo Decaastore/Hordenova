@@ -22,6 +22,7 @@ import { drawBossAura, drawEliteAura, drawEnemy, drawProjectile, drawTower } fro
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
+import type { RunPhase } from "@/engine/types";
 
 const SLOT_HIT_RADIUS = 22;
 const TOWER_HIT_RADIUS = 20;
@@ -49,6 +50,8 @@ interface PrevEnemyState {
   lastHitTimestamp: number;
   /** A boss/mini-boss death gets the same premium burst treatment as the Crawler proof piece — an event, not a routine kill. */
   isBoss: boolean;
+  /** True while a FULL freeze (SlowEffect.percent === 1, see entities/Enemy.ts's Frostborn Deep Freeze) was active last frame — drives the SHATTER VFX the instant it naturally expires (spec section 11: "SHATTER quando o freeze terminar"). Purely a render-side read of gameplay state; never influences it. */
+  wasFrozen: boolean;
 }
 
 /**
@@ -88,6 +91,7 @@ export function CanvasRenderer({
     let prevTowerCooldowns = new Map<string, number>();
     const towerAttackTimestamps = new Map<string, number>();
     let prevGold: number | null = null;
+    let prevPhase: RunPhase | null = null;
     let lastFrameTimestamp: number | null = null;
 
     const resize = () => {
@@ -123,7 +127,8 @@ export function CanvasRenderer({
       latestSnapshotRef.current = snapshot;
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
-      detectVfxEvents(snapshot, hud.gold, castleHpPercent, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
+      detectVfxEvents(snapshot, hud.gold, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
+      prevPhase = hud.phase;
 
       // Attack detection: a tower's cooldown only ever counts down during
       // normal play — it can only go UP when an attack just reset it. That
@@ -151,6 +156,7 @@ export function CanvasRenderer({
               direction: e.direction,
               lastHitTimestamp: hit ? timestamp : (prior?.lastHitTimestamp ?? -Infinity),
               isBoss: e.boss !== undefined,
+              wasFrozen: e.slow?.percent === 1,
             },
           ];
         }),
@@ -271,16 +277,37 @@ export function CanvasRenderer({
   );
 }
 
-function detectVfxEvents(
+/**
+ * Camera Shake spec: shake is reserved for genuinely important moments —
+ * boss entrance, castle damage/destruction — and MUST stay at zero for
+ * every normal attack/hit/kill/build/upgrade. Every one of those routine
+ * events above only ever calls a `spawn*` VFX method, none of which touch
+ * `vfx.triggerShake`. The two calls below (boss entrance, castle impact
+ * inside the enemy-reached-base branch) are the ONLY shake triggers in
+ * the entire renderer — see rendering/vfx.ts's own triggerShake doc
+ * comment for why it can never accumulate across repeated triggers.
+ */
+const BOSS_INTRO_SHAKE_MAGNITUDE = 4.5;
+const BOSS_INTRO_SHAKE_DURATION_MS = 320;
+
+export function detectVfxEvents(
   snapshot: RenderSnapshot,
   gold: number,
   castleHpPercent: number,
+  phase: RunPhase,
+  prevPhase: RunPhase | null,
   vfx: VfxManager,
   prevEnemies: Map<string, PrevEnemyState>,
   prevTowerLevels: Map<string, number>,
   prevGold: number | null,
   gatePosition: Vector2,
 ): void {
+  // Boss entrance — the moment BOSS_INTRO begins (once, not every frame
+  // spent in it) is the one big scripted beat camera shake is meant for.
+  if (phase === "BOSS_INTRO" && prevPhase !== null && prevPhase !== "BOSS_INTRO") {
+    vfx.triggerShake(BOSS_INTRO_SHAKE_MAGNITUDE, BOSS_INTRO_SHAKE_DURATION_MS);
+  }
+
   // Enemies still alive: damage numbers when their hp dropped since last frame.
   // The Crawler proof piece additionally gets the premium white-hot impact
   // burst (spec: "impacto" + "partículas") instead of just a number popping.
@@ -292,6 +319,16 @@ function detectVfxEvents(
       if (enemy.type === "CRAWLER") {
         vfx.spawnHitImpact(enemy.position, ENEMY_THEME.CRAWLER.accent, enemy.direction);
       }
+    }
+
+    // Freeze SHATTER (spec section 11/12) — fires exactly once, the
+    // instant a full Frostborn freeze naturally expires (was frozen last
+    // frame, isn't anymore, and is still alive — a death while frozen is
+    // handled by the normal death-burst branch below, not this one). Pure
+    // render-side diffing of gameplay state (entities/Enemy.ts's
+    // time-based slow/freeze expiry, untouched here) — never influences it.
+    if (prev?.wasFrozen && enemy.slow?.percent !== 1) {
+      vfx.spawnFreezeShatter(enemy.position);
     }
   }
 

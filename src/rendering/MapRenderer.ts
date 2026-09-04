@@ -389,67 +389,48 @@ function hexToRgba(hex: string, alpha: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Organic road — the gameplay path (ENEMY_PATH, straight rectilinear
-// segments) is untouched; everything below only builds a VISUAL spline for
-// drawing. Enemy movement still uses the original waypoints via
-// getPointAtDistance, completely independent of this.
+// Organic road. `path` here is ALWAYS data/mapWhisperingWoods.ts's
+// ENEMY_PATH — the same dense, already-curved polyline entities/Enemy.ts
+// walks via getPointAtDistance. This file does NOT re-smooth it: there
+// used to be a second, private Catmull-Rom pass right here that produced
+// its own curve purely for drawing, independent of the one enemies
+// actually walked — at sharp turns the two curves diverged, so the drawn
+// road could visibly not contain the enemy's real position ("inimigos
+// saem do mapa nas curvas"). Building the road ribbon directly around the
+// SAME array both sides already share is what makes "path visual = path
+// real de movimentação" an actual invariant instead of a coincidence.
+// Everything below only adds cosmetic width-breathing/edge jitter AROUND
+// that one real centerline — see the half-width floor in
+// buildOrganicRoad, which guarantees the jitter can never shrink the road
+// thin enough for the walked centerline point to end up outside it.
 // ---------------------------------------------------------------------------
-
-function catmullRom(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: number): Vector2 {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return {
-    x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
-    y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
-  };
-}
-
-/** Smooths the straight-segment gameplay path into a curved visual-only spline. */
-function buildSmoothedPath(path: readonly Vector2[], samplesPerSegment = 14): Vector2[] {
-  if (path.length < 2) return [...path];
-  const first = path[0]!;
-  const second = path[1]!;
-  const last = path[path.length - 1]!;
-  const secondLast = path[path.length - 2]!;
-  const extended: Vector2[] = [
-    { x: first.x - (second.x - first.x), y: first.y - (second.y - first.y) },
-    ...path,
-    { x: last.x + (last.x - secondLast.x), y: last.y + (last.y - secondLast.y) },
-  ];
-
-  const result: Vector2[] = [];
-  for (let i = 1; i < extended.length - 2; i++) {
-    const p0 = extended[i - 1]!;
-    const p1 = extended[i]!;
-    const p2 = extended[i + 1]!;
-    const p3 = extended[i + 2]!;
-    for (let s = 0; s < samplesPerSegment; s++) {
-      result.push(catmullRom(p0, p1, p2, p3, s / samplesPerSegment));
-    }
-  }
-  result.push(last);
-  return result;
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-interface OrganicRoad {
-  smoothed: Vector2[];
+export interface OrganicRoad {
+  smoothed: readonly Vector2[];
   left: Vector2[];
   right: Vector2[];
 }
 
 /**
- * Builds the road's visual edges from the smoothed spline: width breathes
- * along its length and each edge is independently jittered, so the road
- * reads as a worn trail cut through terrain instead of a uniform painted
- * ribbon. `widthOffset` lets the caller nest several passes (soft dirt
- * halo, dark edge, bright fill) around the same centerline.
+ * Builds the road's visual edges directly around `path` (the real,
+ * already-curved centerline both rendering and movement share — see the
+ * file header above): width breathes along its length and each edge is
+ * independently jittered, so the road reads as a worn trail cut through
+ * terrain instead of a uniform painted ribbon. `widthOffset` lets the
+ * caller nest several passes (soft dirt halo, dark edge, bright fill)
+ * around the same centerline. `MIN_HALF_WIDTH` floors how thin any single
+ * pass can get even at the noise/jitter's most extreme combination, so
+ * the real walked centerline point is ALWAYS strictly inside every pass's
+ * polygon, corners included — not just "usually".
  */
-function buildOrganicRoad(path: readonly Vector2[], baseWidth: number, widthOffset: number, seed: number): OrganicRoad {
-  const smoothed = buildSmoothedPath(path);
+const MIN_HALF_WIDTH = 10;
+
+export function buildOrganicRoad(path: readonly Vector2[], baseWidth: number, widthOffset: number, seed: number): OrganicRoad {
+  const smoothed = path;
   const n = smoothed.length;
   const cumulative: number[] = [0];
   for (let i = 1; i < n; i++) {
@@ -470,10 +451,15 @@ function buildOrganicRoad(path: readonly Vector2[], baseWidth: number, widthOffs
     const halfWidth = (baseWidth * clamp(widthNoise, 0.72, 1.32)) / 2 + widthOffset;
     const jitterL = 3 * Math.sin(s * 0.09 + seed * 3.1);
     const jitterR = 3 * Math.sin(s * 0.11 + seed * 5.7 + 1.7);
+    // Floor each edge's distance from the real centerline independently of
+    // the jitter's sign/magnitude — this is what guarantees the walked
+    // point can never end up outside the drawn road, not just "usually".
+    const leftWidth = Math.max(halfWidth + jitterL, MIN_HALF_WIDTH);
+    const rightWidth = Math.max(halfWidth + jitterR, MIN_HALF_WIDTH);
 
     const point = smoothed[i]!;
-    left.push({ x: point.x + normal.x * (halfWidth + jitterL), y: point.y + normal.y * (halfWidth + jitterL) });
-    right.push({ x: point.x - normal.x * (halfWidth + jitterR), y: point.y - normal.y * (halfWidth + jitterR) });
+    left.push({ x: point.x + normal.x * leftWidth, y: point.y + normal.y * leftWidth });
+    right.push({ x: point.x - normal.x * rightWidth, y: point.y - normal.y * rightWidth });
   }
 
   return { smoothed, left, right };

@@ -189,6 +189,35 @@ export class VfxManager {
     });
   }
 
+  /**
+   * Freeze SHATTER (spec section 11/12): the instant a full Frostborn
+   * freeze naturally expires, the ice reads as physically breaking apart
+   * rather than just silently switching the enemy back on. A wide,
+   * fast, all-around radial burst (unlike the narrower directional bursts
+   * used for hits/kills) plus a bright core flash is what sells
+   * "crystalline structure shattering" with the same particle/burst
+   * primitives the rest of this file already uses — no new rendering
+   * primitive needed, no gameplay coupling (the caller only ever calls
+   * this after independently observing the enemy's own slow effect
+   * already ended; this method itself doesn't touch or know about it).
+   */
+  spawnFreezeShatter(position: Vector2): void {
+    const count = 10;
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: "#bdf3ff",
+      remainingMs: 380,
+      totalMs: 380,
+      hotCore: true,
+      particles: Array.from({ length: count }, (_, i) => ({
+        angle: (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.25,
+        speed: 55 + Math.random() * 30,
+        curve: (Math.random() - 0.5) * 0.6, // straighter, sharper flight than a rounded death burst — reads as rigid shards, not smoke
+      })),
+    });
+  }
+
   spawnBuildRing(position: Vector2, color: string): void {
     this.pushRing({ x: position.x, y: position.y, color, remainingMs: 380, totalMs: 380, maxRadius: 30 });
   }

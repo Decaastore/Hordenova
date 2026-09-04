@@ -94,6 +94,54 @@ export function getPointAtDistance(
   return { position: last, direction: { x: 1, y: 0 }, finished: true };
 }
 
+function catmullRomPoint(p0: Vector2, p1: Vector2, p2: Vector2, p3: Vector2, t: number): Vector2 {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return {
+    x: 0.5 * (2 * p1.x + (-p0.x + p2.x) * t + (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 + (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3),
+    y: 0.5 * (2 * p1.y + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3),
+  };
+}
+
+/**
+ * Turns a small set of sharp-corner control points into a single smooth,
+ * densely-sampled polyline via a Catmull-Rom spline — the ONE place this
+ * game turns "a route" into "a curve". Critical invariant this exists to
+ * guarantee (Path spec: "PATH VISUAL = PATH REAL DE MOVIMENTAÇÃO"): the
+ * result of this function must be used AS the actual path both rendering
+ * and enemy movement walk, never re-derived independently by each side —
+ * two separate smoothing passes over the same control points are not
+ * guaranteed to produce the same curve (different sample counts, boundary
+ * handling, or algorithm choices all drift), which is exactly what used to
+ * make the rendered road cut corners differently from where enemies
+ * actually walked. See data/mapWhisperingWoods.ts, the sole call site.
+ */
+export function buildCatmullRomSpline(controlPoints: readonly Vector2[], samplesPerSegment = 14): Vector2[] {
+  if (controlPoints.length < 2) return [...controlPoints];
+  const first = controlPoints[0]!;
+  const second = controlPoints[1]!;
+  const last = controlPoints[controlPoints.length - 1]!;
+  const secondLast = controlPoints[controlPoints.length - 2]!;
+  const extended: Vector2[] = [
+    { x: first.x - (second.x - first.x), y: first.y - (second.y - first.y) },
+    ...controlPoints,
+    { x: last.x + (last.x - secondLast.x), y: last.y + (last.y - secondLast.y) },
+  ];
+
+  const result: Vector2[] = [];
+  for (let i = 1; i < extended.length - 2; i++) {
+    const p0 = extended[i - 1]!;
+    const p1 = extended[i]!;
+    const p2 = extended[i + 1]!;
+    const p3 = extended[i + 2]!;
+    for (let s = 0; s < samplesPerSegment; s++) {
+      result.push(catmullRomPoint(p0, p1, p2, p3, s / samplesPerSegment));
+    }
+  }
+  result.push(last);
+  return result;
+}
+
 /**
  * A point offset perpendicular from a point `t` (0..1) along segment [a, b],
  * `distance` world units to one `side` (1 or -1). Used to author tower
