@@ -177,6 +177,35 @@ const HP_COMPOUND_PER_WAVE = 0.006;
 /** Small reward growth so later waves stay worth playing. */
 const GOLD_GROWTH_PER_WAVE = 0.03;
 
+/**
+ * NUMERICAL SAFETY (Master Implementation Pass spec section 47/52) — a raw
+ * `Math.pow(1 + HP_COMPOUND_PER_WAVE, waveIndex)` overflows to `Infinity`
+ * around wave ~116,000-118,000 (verified: (1.006)^117999 already exceeds
+ * Number.MAX_VALUE), which would make every enemy from that wave onward
+ * literally unkillable — a hard break, not just "very hard". Since the
+ * spec explicitly requires the game to keep functioning out to wave
+ * 3,000,000+ with no artificial MAX_PHASE, the compounding term's
+ * exponent is capped at this wave index: compounding growth STOPS
+ * accelerating beyond it, but the linear term above keeps growing forever
+ * (pure multiplication, never overflows at any wave number a real save
+ * could reach), so difficulty still climbs indefinitely — it just stops
+ * being exponential once it's already astronomically large (~1e52 at the
+ * cap, leaving ~250 orders of magnitude of headroom below Number.MAX_VALUE
+ * for the linear term and any other multiplier to stack on top of safely).
+ * Far below any wave a real player reaches (~450-460 is already the
+ * documented "wall"), so this changes nothing about actual gameplay balance
+ * — see enemyStats.test.ts for the exact-match regression proof.
+ */
+const HP_COMPOUND_WAVE_INDEX_CAP = 20_000;
+
+/** The HP multiplier for a given (0-indexed) wave — the only place `Math.pow` for HP scaling happens, so the overflow-safety cap above is applied exactly once. */
+function hpMultiplierForWaveIndex(waveIndex: number): number {
+  const linear = 1 + waveIndex * HP_GROWTH_PER_WAVE;
+  const compoundIndex = Math.min(waveIndex, HP_COMPOUND_WAVE_INDEX_CAP);
+  const compound = Math.pow(1 + HP_COMPOUND_PER_WAVE, compoundIndex);
+  return linear * compound;
+}
+
 export interface ScaledEnemyStats {
   hp: number;
   speed: number;
@@ -189,7 +218,7 @@ export interface ScaledEnemyStats {
 export function getScaledEnemyStats(type: EnemyType, waveNumber: number): ScaledEnemyStats {
   const def = ENEMY_DEFINITIONS[type];
   const waveIndex = Math.max(waveNumber - 1, 0);
-  const hpMultiplier = (1 + waveIndex * HP_GROWTH_PER_WAVE) * Math.pow(1 + HP_COMPOUND_PER_WAVE, waveIndex);
+  const hpMultiplier = hpMultiplierForWaveIndex(waveIndex);
   const goldMultiplier = 1 + waveIndex * GOLD_GROWTH_PER_WAVE;
   const hp = Math.round(def.baseHp * hpMultiplier);
   return {
