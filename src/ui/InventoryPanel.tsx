@@ -21,6 +21,10 @@ interface InventoryPanelProps {
   /** Progression 2.0 spec section 34 — manual, player-triggered Shards -> Gems conversion. */
   gemShards: number;
   onConvertGemShards: () => void;
+  /** Master Implementation Pass spec section 7-8 — Profile Prestige, the recurring cosmetic Gem sink. */
+  gems: number;
+  prestigeLevel: number;
+  onUpgradePrestige: () => void;
 }
 
 type Tab = "items" | "trade" | "stats";
@@ -48,6 +52,9 @@ export function InventoryPanel({
   onClaimOverflowItem,
   gemShards,
   onConvertGemShards,
+  gems,
+  prestigeLevel,
+  onUpgradePrestige,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
@@ -122,6 +129,9 @@ export function InventoryPanel({
               itemsOwnedTotal: inventory.length,
               itemsFoundTotal: inventory.length,
             }}
+            gems={gems}
+            prestigeLevel={prestigeLevel}
+            onUpgradePrestige={onUpgradePrestige}
           />
         )}
       </div>

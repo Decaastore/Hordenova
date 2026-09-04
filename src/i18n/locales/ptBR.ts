@@ -449,4 +449,21 @@ export const ptBR: TranslationSchema = {
     },
     fallbackNote: "Todas as Skins de Castelo já foram desbloqueadas — convertido em Gemas.",
   },
+  prestige: {
+    title: "PRESTÍGIO DE PERFIL",
+    level: "Prestígio Nív.{level}",
+    upgrade: "MELHORAR PRESTÍGIO",
+    tiers: {
+      INITIATE: "Iniciado",
+      ADEPT: "Adepto",
+      VETERAN: "Veterano",
+      CHAMPION: "Campeão",
+      PARAGON: "Paragão",
+      LUMINARY: "Luminar",
+      ASCENDANT: "Ascendente",
+      MYTHIC: "Mítico",
+      ETERNAL: "Eterno",
+      TRANSCENDENT: "Transcendente",
+    },
+  },
 };

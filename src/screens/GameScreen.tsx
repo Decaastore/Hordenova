@@ -151,6 +151,9 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
             onClaimOverflowItem={(instanceId) => engine.claimOverflowItem(instanceId)}
             gemShards={hud.gemShards}
             onConvertGemShards={() => engine.convertGemShards()}
+            gems={hud.gems}
+            prestigeLevel={engine.getPrestigeLevel()}
+            onUpgradePrestige={() => engine.upgradePrestige()}
           />
         )}
       </div>

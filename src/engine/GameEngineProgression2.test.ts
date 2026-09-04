@@ -182,4 +182,47 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getInventoryCapacity()).toBe(DEFAULT_INVENTORY_CAPACITY);
     expect(engine.getOverflowInventory()).toEqual([]);
   });
+
+  describe("Profile Prestige (Master Implementation Pass spec section 7-8)", () => {
+    it("starts at level 0 and spends Gems (never Gold) on upgrade", () => {
+      updateSave({ gems: 100, gold: 500 });
+      const engine = new GameEngine();
+      engine.startRun();
+      expect(engine.getPrestigeLevel()).toBe(0);
+
+      const goldBefore = engine.getHudSnapshot().gold;
+      expect(engine.upgradePrestige()).toBe(true);
+      expect(engine.getPrestigeLevel()).toBe(1);
+      expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
+      expect(engine.getGemBalance()).toBeLessThan(100); // Gems spent
+    });
+
+    it("fails without enough Gems, and nothing is applied on the failed attempt", () => {
+      updateSave({ gems: 0 });
+      const engine = new GameEngine();
+      engine.startRun();
+      expect(engine.upgradePrestige()).toBe(false);
+      expect(engine.getPrestigeLevel()).toBe(0);
+    });
+
+    it("is genuinely uncapped — many consecutive purchases keep succeeding given enough Gems", () => {
+      updateSave({ gems: 1_000_000 });
+      const engine = new GameEngine();
+      engine.startRun();
+      for (let i = 0; i < 50; i++) expect(engine.upgradePrestige()).toBe(true);
+      expect(engine.getPrestigeLevel()).toBe(50);
+    });
+
+    it("persists across a reload", () => {
+      updateSave({ gems: 1_000_000 });
+      const first = new GameEngine();
+      first.startRun();
+      first.upgradePrestige();
+      first.upgradePrestige();
+
+      const reloaded = new GameEngine();
+      reloaded.startRun();
+      expect(reloaded.getPrestigeLevel()).toBe(2);
+    });
+  });
 });

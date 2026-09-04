@@ -448,6 +448,23 @@ export const en = {
     },
     fallbackNote: "Every real Castle Skin is already unlocked — converted to Gems instead.",
   },
+  prestige: {
+    title: "PROFILE PRESTIGE",
+    level: "Prestige Lv.{level}",
+    upgrade: "UPGRADE PRESTIGE",
+    tiers: {
+      INITIATE: "Initiate",
+      ADEPT: "Adept",
+      VETERAN: "Veteran",
+      CHAMPION: "Champion",
+      PARAGON: "Paragon",
+      LUMINARY: "Luminary",
+      ASCENDANT: "Ascendant",
+      MYTHIC: "Mythic",
+      ETERNAL: "Eternal",
+      TRANSCENDENT: "Transcendent",
+    },
+  },
 } as const;
 
 /** Same shape as `en`, but with every leaf widened to `string` — a locale only needs to match structure, not English's exact wording. */

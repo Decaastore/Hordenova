@@ -116,9 +116,12 @@ export interface SaveData {
   castleHpBonus: number;
   /** config/castleSkins.ts CastleSkinDefinition ids this save has unlocked via the Roulette's CASTLE_SKIN outcome — permanent, non-consumable, never removed (spec section 48: "deve ser permanente... nunca desaparecer"). */
   unlockedCastleSkinIds: string[];
+
+  /** Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the recurring, uncapped, purely-cosmetic Gem sink (config/prestige.ts). Account-wide, never per-tower. 0 = never invested. */
+  prestigeLevel: number;
 }
 
-export const SAVE_DATA_VERSION = 10;
+export const SAVE_DATA_VERSION = 11;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -156,6 +159,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   seasonRewardRecords: [],
   castleHpBonus: 0,
   unlockedCastleSkinIds: [],
+  prestigeLevel: 0,
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -382,6 +386,8 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // Master Implementation (save v8 -> v9) — same pattern once more.
       castleHpBonus: typeof parsed.castleHpBonus === "number" && parsed.castleHpBonus >= 0 ? parsed.castleHpBonus : 0,
       unlockedCastleSkinIds: parseUnlockedCastleSkinIds(parsed.unlockedCastleSkinIds),
+      // Master Implementation Pass (save v10 -> v11) — same pattern once more.
+      prestigeLevel: typeof parsed.prestigeLevel === "number" && parsed.prestigeLevel >= 0 ? parsed.prestigeLevel : 0,
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

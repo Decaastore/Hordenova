@@ -21,6 +21,7 @@ import {
   type RouletteRewardType,
 } from "@/config/roulette";
 import { CASTLE_SKINS } from "@/config/castleSkins";
+import { getPrestigeUpgradeCost } from "@/config/prestige";
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
@@ -250,6 +251,9 @@ export class GameEngine {
   private unlockedCastleSkinIds: string[] = [];
   private pendingRouletteResults: RouletteResult[] = [];
 
+  /** Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the recurring, uncapped, purely-cosmetic Gem sink (config/prestige.ts). */
+  private prestigeLevel = 0;
+
   /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
   private audioEvents: GameAudioEvent[] = [];
   private waveCompleteAudioFiredForWave: number | null = null;
@@ -311,6 +315,7 @@ export class GameEngine {
     this.overflowInventory = save.overflowInventory;
     this.castleHpBonus = save.castleHpBonus;
     this.unlockedCastleSkinIds = save.unlockedCastleSkinIds;
+    this.prestigeLevel = save.prestigeLevel;
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -629,6 +634,26 @@ export class GameEngine {
     const gemsGained = shardsToConvert / rate;
     this.gemShards -= shardsToConvert;
     this.addGems(gemsGained, "gem_shard_conversion");
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE. The
+  // recurring, uncapped Gem sink: purely cosmetic (a display tier/color,
+  // see config/prestige.ts), never a combat-power lever, exactly like
+  // every other Gem spend this class exposes.
+  // -------------------------------------------------------------------
+
+  getPrestigeLevel(): number {
+    return this.prestigeLevel;
+  }
+
+  upgradePrestige(): boolean {
+    const cost = getPrestigeUpgradeCost(this.prestigeLevel);
+    if (!this.spendGems(cost, "profile_prestige")) return false;
+    this.prestigeLevel += 1;
     this.persist();
     this.notify();
     return true;
@@ -1089,6 +1114,7 @@ export class GameEngine {
         overflowInventory: this.overflowInventory,
         castleHpBonus: this.castleHpBonus,
         unlockedCastleSkinIds: this.unlockedCastleSkinIds,
+        prestigeLevel: this.prestigeLevel,
       },
       this.storageKey,
     );
