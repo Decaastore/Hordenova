@@ -9,7 +9,7 @@ import {
 } from "@/config/gameBalance";
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
-import { isBossMilestone } from "@/config/waveConfig";
+import { isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
 import {
@@ -969,7 +969,8 @@ export class GameEngine {
 
   /** Elite Wave (spec section 4/5): one stat-and-ability-boosted enemy on top of the wave's normal composition, not a wave-wide change. */
   private maybeSpawnElite(): void {
-    if (getWaveTag(this.wave.currentWave) !== "ELITE") return;
+    const isElite = getWaveTag(this.wave.currentWave) === "ELITE" || isBonusEliteWave(this.wave.currentWave);
+    if (!isElite) return;
     if (this.eliteSpawnedForWave === this.wave.currentWave) return;
     if (this.wave.phase !== "SPAWNING") return;
     this.eliteSpawnedForWave = this.wave.currentWave;

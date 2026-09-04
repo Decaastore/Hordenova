@@ -206,6 +206,40 @@ function hpMultiplierForWaveIndex(waveIndex: number): number {
   return linear * compound;
 }
 
+/**
+ * Master Implementation Pass spec section 9-10 — ENDGAME MULTI-DIMENSIONAL
+ * SCALING: "não simplesmente multiplicar HP infinitamente". HP above stays
+ * the dominant, ever-present pressure (and is what produces the documented
+ * ~450-460 wall) — these two additional dimensions only start contributing
+ * at wave 300, matching the spec's own first calibration band ("300–500")
+ * rather than the wall itself, so a build is already feeling a second and
+ * third kind of pressure by the time HP alone starts to bite, not after.
+ * Early/mid-game (< wave 300) is completely unaffected, and each dimension
+ * is explicitly capped so no enemy ever becomes literally un-fightable: a
+ * build has to adapt (more armor penetration, faster-firing towers), not
+ * get permanently locked out.
+ *
+ * Both use the same "start wave + linear-per-wave + hard cap" shape —
+ * genuinely uncapped in WAVE NUMBER (never overflows, no Math.pow anywhere
+ * here) while the actual bonus itself stays bounded forever once capped.
+ */
+const ARMOR_SCALING_START_WAVE = 300;
+const ARMOR_SCALING_PER_WAVE = 0.0006;
+/** Extra damage reduction from this dimension alone never exceeds this. */
+const ARMOR_SCALING_CAP = 0.5;
+/** Combined (base archetype resistance + this scaling) damage reduction never exceeds this — always leaves SOME damage getting through, never literal invulnerability. */
+const MAX_COMBINED_DAMAGE_REDUCTION = 0.9;
+
+const SPEED_SCALING_START_WAVE = 300;
+const SPEED_SCALING_PER_WAVE = 0.0003;
+/** Enemies never move more than this fraction faster from this dimension alone. */
+const SPEED_SCALING_CAP = 0.6;
+
+function bandScaling(waveNumber: number, startWave: number, perWave: number, cap: number): number {
+  if (waveNumber <= startWave) return 0;
+  return Math.min(cap, (waveNumber - startWave) * perWave);
+}
+
 export interface ScaledEnemyStats {
   hp: number;
   speed: number;
@@ -221,12 +255,17 @@ export function getScaledEnemyStats(type: EnemyType, waveNumber: number): Scaled
   const hpMultiplier = hpMultiplierForWaveIndex(waveIndex);
   const goldMultiplier = 1 + waveIndex * GOLD_GROWTH_PER_WAVE;
   const hp = Math.round(def.baseHp * hpMultiplier);
+
+  const extraArmor = bandScaling(waveNumber, ARMOR_SCALING_START_WAVE, ARMOR_SCALING_PER_WAVE, ARMOR_SCALING_CAP);
+  const damageReduction = Math.min(MAX_COMBINED_DAMAGE_REDUCTION, def.damageReduction + extraArmor);
+  const speedMultiplier = 1 + bandScaling(waveNumber, SPEED_SCALING_START_WAVE, SPEED_SCALING_PER_WAVE, SPEED_SCALING_CAP);
+
   return {
     hp,
-    speed: def.baseSpeed,
+    speed: def.baseSpeed * speedMultiplier,
     damageToBase: def.baseDamageToBase,
     goldReward: Math.round(def.goldReward * goldMultiplier),
-    damageReduction: def.damageReduction,
+    damageReduction,
     regenPerSecond: hp * def.regenPercentPerSecond,
   };
 }

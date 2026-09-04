@@ -51,3 +51,38 @@ describe("enemyStats — numerical safety at extreme wave numbers", () => {
     }
   });
 });
+
+describe("enemyStats — multi-dimensional endgame scaling (Master Implementation Pass spec section 9-10)", () => {
+  it("armor and speed scaling never touch waves before 300 (early/mid-game unaffected)", () => {
+    for (const wave of [1, 50, 130, 200, 300]) {
+      const stats = getScaledEnemyStats("CRAWLER", wave);
+      expect(stats.damageReduction).toBe(0); // CRAWLER's base damageReduction is 0
+      expect(stats.speed).toBe(60); // CRAWLER's base speed, untouched
+    }
+  });
+
+  it("armor and speed both climb past wave 300, and armor never removes the base archetype's own resistance identity", () => {
+    const early = getScaledEnemyStats("SHIELDBEARER", 300);
+    const late = getScaledEnemyStats("SHIELDBEARER", 2000);
+    expect(late.damageReduction).toBeGreaterThan(early.damageReduction);
+    expect(late.speed).toBeGreaterThan(early.speed);
+  });
+
+  it("combined damage reduction never exceeds the 90% cap (never literal invulnerability), even at extreme waves", () => {
+    for (const wave of [10_000, 100_000, 1_000_000, 10_000_000]) {
+      // IRONCLAD already has the highest base damageReduction (0.55) — the worst case.
+      const stats = getScaledEnemyStats("IRONCLAD", wave);
+      expect(stats.damageReduction).toBeLessThanOrEqual(0.9);
+      expect(Number.isFinite(stats.damageReduction)).toBe(true);
+    }
+  });
+
+  it("speed multiplier stays bounded (never more than +60% from this dimension) at extreme waves", () => {
+    const baseSpeed = 60; // CRAWLER
+    for (const wave of [10_000, 100_000, 1_000_000, 10_000_000]) {
+      const stats = getScaledEnemyStats("CRAWLER", wave);
+      expect(stats.speed).toBeLessThanOrEqual(baseSpeed * 1.6 + 1e-9);
+      expect(Number.isFinite(stats.speed)).toBe(true);
+    }
+  });
+});

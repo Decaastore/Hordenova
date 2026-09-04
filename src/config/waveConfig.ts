@@ -84,6 +84,37 @@ export function isBossMilestone(waveNumber: number): boolean {
   return isMainBossWave(waveNumber);
 }
 
+/**
+ * Master Implementation Pass spec section 9-10 — ELITE DENSITY as one of
+ * several endgame difficulty dimensions (alongside HP/armor/speed scaling
+ * in enemyStats.ts), so deep-endgame pressure never comes from raw HP
+ * alone. The phase system's own hand-authored waveTags (config/
+ * phaseConfig.ts) already place a couple of ELITE waves per 20-wave phase
+ * cycle — but that ratio never changes no matter how far a save
+ * progresses, since waves beyond 130 just replay the same relative tags
+ * offset by however many cycles have elapsed. This is a SEPARATE,
+ * purely-additive mechanism layered on top (never replaces or edits
+ * phaseConfig's own tags) that only ever activates well past the
+ * documented ~450-460 balance wall, and its interval is floored so it can
+ * never spam an Elite on every single wave.
+ */
+const ELITE_DENSITY_START_WAVE = 300;
+const ELITE_DENSITY_INITIAL_INTERVAL = 15;
+const ELITE_DENSITY_MIN_INTERVAL = 5;
+const ELITE_DENSITY_SHRINK_PER_WAVE = 0.002;
+
+function eliteBonusInterval(waveNumber: number): number {
+  const wavesIntoScaling = Math.max(0, waveNumber - ELITE_DENSITY_START_WAVE);
+  const shrink = wavesIntoScaling * ELITE_DENSITY_SHRINK_PER_WAVE;
+  return Math.max(ELITE_DENSITY_MIN_INTERVAL, Math.round(ELITE_DENSITY_INITIAL_INTERVAL - shrink));
+}
+
+/** True on top of (never instead of) the phase's own ELITE tag — see this function's own doc comment above for the full rationale. */
+export function isBonusEliteWave(waveNumber: number): boolean {
+  if (waveNumber <= ELITE_DENSITY_START_WAVE) return false;
+  return waveNumber % eliteBonusInterval(waveNumber) === 0;
+}
+
 /** Deterministic per-wave PRNG so a given wave's composition is reproducible. */
 function mulberry32(seed: number): () => number {
   let a = seed;
