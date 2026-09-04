@@ -362,4 +362,87 @@ export const ptBR: TranslationSchema = {
     convert: "CONVERTER",
     convertHint: "{rate} Fragmentos = 1 Gema",
   },
+  modeSelect: {
+    title: "ESCOLHA SEU CAMINHO",
+    infinite: {
+      label: "INFINITO",
+      subtitle: "PROGRESSO PERMANENTE",
+      phase: "Fase {wave}",
+      play: "JOGAR INFINITO",
+    },
+    ascension: {
+      label: "ASCENSÃO",
+      subtitle: "COMPETIÇÃO SEMANAL",
+      endsIn: "TERMINA EM {time}",
+      yourBest: "SEU MELHOR: {wave}",
+      play: "JOGAR ASCENSÃO",
+      viewCollection: "COLEÇÃO E HISTÓRICO",
+    },
+  },
+  ascension: {
+    seasonThemes: {
+      THE_HOLLOW_KING: "O Rei Oco",
+      EMBERS_OF_WAR: "Brasas da Guerra",
+      FROZEN_REIGN: "Reinado Congelado",
+      STORMFALL: "Queda da Tempestade",
+    },
+    hudBadge: {
+      endsIn: "Termina em {time}",
+    },
+    topFive: {
+      title: "TOP 5",
+      honestNote: "HORDENOVA ainda não tem um servidor ativo, então não existe um grupo real de adversários para te ranquear. Quando houver um backend, isto se tornará um Top 5 real — nada aqui é um rival inventado. Seu próprio resultado da temporada continua sendo registrado com honestidade abaixo.",
+    },
+    collection: {
+      title: "COLEÇÃO",
+      empty: "Nenhuma temporada concluída ainda — termine uma temporada para começar a ganhar recompensas permanentes.",
+      owned: "OBTIDO",
+    },
+    history: {
+      title: "HISTÓRICO",
+      empty: "Nenhuma temporada jogada ainda.",
+      didNotParticipate: "Não participou",
+      rank: "Posição #{rank}",
+    },
+    records: {
+      seasonsWon: "🏆 Temporadas Vencidas",
+      top3: "🥈 Top 3",
+      top5: "🏅 Top 5",
+    },
+    rankTitles: {
+      CHAMPION: "Campeão",
+      ELITE: "Elite",
+      VETERAN: "Veterano",
+      CONTENDER: "Concorrente",
+    },
+    cosmeticTypes: {
+      TOWER_SKIN: "Skin de Torre",
+      CASTLE_SKIN: "Skin de Castelo",
+      ATTACK_EFFECT: "Efeito de Ataque",
+      DEATH_EFFECT: "Efeito de Morte",
+      VICTORY_EFFECT: "Efeito de Vitória",
+      ENTRANCE_EFFECT: "Efeito de Entrada",
+      AURA: "Aura",
+      PROFILE_FRAME: "Moldura de Perfil",
+      PROFILE_BANNER: "Estandarte de Perfil",
+      TITLE: "Título",
+      PROFILE_EFFECT: "Efeito de Perfil",
+      TROPHY: "Troféu",
+    },
+    panel: {
+      close: "Fechar",
+    },
+  },
+  roulette: {
+    title: "ROLETA DE MARCO",
+    subtitle: "Toda chance mostrada é a chance real exata — sem piedade escondida.",
+    outcomes: {
+      CASTLE_HP_5: "+5 HP do Castelo",
+      CASTLE_HP_10: "+10 HP do Castelo",
+      CASTLE_HP_20: "+20 HP do Castelo",
+      GEM: "+1 Gema",
+      CASTLE_SKIN: "Nova Skin de Castelo!",
+    },
+    fallbackNote: "Todas as Skins de Castelo já foram desbloqueadas — convertido em Gemas.",
+  },
 };

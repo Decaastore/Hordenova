@@ -361,6 +361,89 @@ export const en = {
     convert: "CONVERT",
     convertHint: "{rate} Shards = 1 Gem",
   },
+  modeSelect: {
+    title: "CHOOSE YOUR PATH",
+    infinite: {
+      label: "INFINITE",
+      subtitle: "PERMANENT PROGRESS",
+      phase: "Phase {wave}",
+      play: "PLAY INFINITE",
+    },
+    ascension: {
+      label: "ASCENSION",
+      subtitle: "WEEKLY COMPETITION",
+      endsIn: "ENDS IN {time}",
+      yourBest: "YOUR BEST: {wave}",
+      play: "PLAY ASCENSION",
+      viewCollection: "COLLECTION & HISTORY",
+    },
+  },
+  ascension: {
+    seasonThemes: {
+      THE_HOLLOW_KING: "The Hollow King",
+      EMBERS_OF_WAR: "Embers of War",
+      FROZEN_REIGN: "Frozen Reign",
+      STORMFALL: "Stormfall",
+    },
+    hudBadge: {
+      endsIn: "Ends in {time}",
+    },
+    topFive: {
+      title: "TOP 5",
+      honestNote: "HORDENOVA has no live server yet, so there is no real opponent pool to rank you against. Once a backend exists, this becomes a real Top 5 leaderboard — nothing here is a fabricated rival. Your own season result is still recorded honestly below.",
+    },
+    collection: {
+      title: "COLLECTION",
+      empty: "No seasons completed yet — finish a season to start earning permanent rewards.",
+      owned: "OWNED",
+    },
+    history: {
+      title: "HISTORY",
+      empty: "No seasons played yet.",
+      didNotParticipate: "Did not participate",
+      rank: "Rank #{rank}",
+    },
+    records: {
+      seasonsWon: "🏆 Seasons Won",
+      top3: "🥈 Top 3",
+      top5: "🏅 Top 5",
+    },
+    rankTitles: {
+      CHAMPION: "Champion",
+      ELITE: "Elite",
+      VETERAN: "Veteran",
+      CONTENDER: "Contender",
+    },
+    cosmeticTypes: {
+      TOWER_SKIN: "Tower Skin",
+      CASTLE_SKIN: "Castle Skin",
+      ATTACK_EFFECT: "Attack Effect",
+      DEATH_EFFECT: "Death Effect",
+      VICTORY_EFFECT: "Victory Effect",
+      ENTRANCE_EFFECT: "Entrance Effect",
+      AURA: "Aura",
+      PROFILE_FRAME: "Profile Frame",
+      PROFILE_BANNER: "Profile Banner",
+      TITLE: "Title",
+      PROFILE_EFFECT: "Profile Effect",
+      TROPHY: "Trophy",
+    },
+    panel: {
+      close: "Close",
+    },
+  },
+  roulette: {
+    title: "MILESTONE ROULETTE",
+    subtitle: "Every chance shown is the exact real chance — no hidden pity.",
+    outcomes: {
+      CASTLE_HP_5: "+5 Castle HP",
+      CASTLE_HP_10: "+10 Castle HP",
+      CASTLE_HP_20: "+20 Castle HP",
+      GEM: "+1 Gem",
+      CASTLE_SKIN: "New Castle Skin!",
+    },
+    fallbackNote: "Every real Castle Skin is already unlocked — converted to Gems instead.",
+  },
 } as const;
 
 /** Same shape as `en`, but with every leaf widened to `string` — a locale only needs to match structure, not English's exact wording. */

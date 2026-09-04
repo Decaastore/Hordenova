@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
 import { MainMenu } from "./screens/MainMenu";
 import { GameScreen } from "./screens/GameScreen";
+import { ModeSelectScreen, type GameMode } from "./screens/ModeSelectScreen";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { initAudioSettingsFromSave } from "./audio/audioSettings";
 
-type View = "MENU" | "GAME";
+type View = "MENU" | "MODE_SELECT" | "GAME";
 
 export default function App() {
   const [view, setView] = useState<View>("MENU");
+  const [mode, setMode] = useState<GameMode>("INFINITE");
 
   // Restores the player's saved SFX volume/mute before any sound can play
   // — safe to do before the audio system is "unlocked" (spec section 12),
@@ -19,9 +21,17 @@ export default function App() {
   return (
     <LanguageProvider>
       {view === "GAME" ? (
-        <GameScreen onExitToMenu={() => setView("MENU")} />
+        <GameScreen mode={mode} onExitToMenu={() => setView("MODE_SELECT")} />
+      ) : view === "MODE_SELECT" ? (
+        <ModeSelectScreen
+          onSelectMode={(selected) => {
+            setMode(selected);
+            setView("GAME");
+          }}
+          onBack={() => setView("MENU")}
+        />
       ) : (
-        <MainMenu onStart={() => setView("GAME")} />
+        <MainMenu onStart={() => setView("MODE_SELECT")} />
       )}
     </LanguageProvider>
   );

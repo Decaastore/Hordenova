@@ -8,11 +8,17 @@ import { GameLoop } from "@/engine/GameLoop";
  * render cycle (GameLoop drives it via requestAnimationFrame); this hook
  * only re-renders the calling component when HUD-relevant state changes,
  * via GameEngine's cached snapshot (see GameEngine.getHudSnapshot).
+ *
+ * `storageKey` (Master Implementation spec section 2) selects which
+ * SaveData namespace this instance plays — omit for the default Infinite
+ * save, or pass SaveSystem.ASCENSION_STORAGE_KEY for Ascension. Only read
+ * on first mount, matching GameEngine's own constructor contract (a mode
+ * never changes mid-lifetime of one engine instance).
  */
-export function useGameEngine() {
+export function useGameEngine(storageKey?: string) {
   const engineRef = useRef<GameEngine>();
   if (!engineRef.current) {
-    engineRef.current = new GameEngine();
+    engineRef.current = new GameEngine(storageKey);
   }
   const engine = engineRef.current;
 

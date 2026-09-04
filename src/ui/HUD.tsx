@@ -9,11 +9,13 @@ import { BagIcon, BoltIcon, CoinIcon, GemIcon, ShieldIcon, SpeakerIcon, WaveIcon
 
 interface HUDProps {
   hud: HudSnapshot;
+  /** Master Implementation spec section 1 — "a interface deve deixar claro qual modo está sendo jogado". Always visible in the top bar, not just on a transient banner. */
+  mode: "INFINITE" | "ASCENSION";
   onSetSpeed: (speed: GameSpeed) => void;
   onOpenInventory: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
+export function HUD({ hud, mode, onSetSpeed, onOpenInventory }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -21,6 +23,9 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
   return (
     <div style={barStyle}>
       <div style={brandStyle}>HORDENOVA</div>
+      <div style={{ ...modeChipStyle, borderColor: mode === "ASCENSION" ? PALETTE.gem : PALETTE.uiAccent, color: mode === "ASCENSION" ? PALETTE.gem : PALETTE.uiAccent }}>
+        {mode === "ASCENSION" ? `🏆 ${t("modeSelect.ascension.label")}` : `♾️ ${t("modeSelect.infinite.label")}`}
+      </div>
 
       <div style={groupStyle}>
         <Stat
@@ -159,6 +164,16 @@ const brandStyle: CSSProperties = {
   letterSpacing: 3,
   color: PALETTE.uiAccentBright,
   textShadow: `0 0 12px ${PALETTE.uiAccent}88`,
+  whiteSpace: "nowrap",
+};
+
+const modeChipStyle: CSSProperties = {
+  padding: "3px 9px",
+  borderRadius: 6,
+  border: "1px solid",
+  fontWeight: 700,
+  fontSize: 10,
+  letterSpacing: 0.6,
   whiteSpace: "nowrap",
 };
 
