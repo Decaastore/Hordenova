@@ -6,6 +6,7 @@ import { getTowerVisualStage, MAX_TOWER_LEVEL } from "@/config/towerStats";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawMagicCore, rimHighlight } from "./lighting";
+import { getMovementVfxCategory } from "@/config/movementVfx";
 
 /** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
 const TOWER_MAX_GROWTH = 0.35;
@@ -1295,6 +1296,82 @@ function drawStormcaller(
  * a boss-specific scale + draws an aura ring behind it; every regular
  * enemy call site keeps the default (1) and is visually unchanged.
  */
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec sections 33-38 — per-archetype movement
+ * VFX (config/movementVfx.ts assigns the category). Called from drawEnemy
+ * in the already-translated-but-unrotated local origin (0,0) = the enemy's
+ * real world position this exact frame — everything here is derived from
+ * `enemy.distanceTraveled` (a monotonically increasing value already
+ * tracked for pathing) purely as an animation clock, so the effect can
+ * never desync from where the enemy actually is. `angle` gives "behind"
+ * (`-cos(angle), -sin(angle)`) for the trail-shaped categories. Elite/Boss
+ * instances get a modest intensity bump (spec section 37-38: "mais forte...
+ * mas sem exagero") via `intensity`, never a different category.
+ */
+function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, angle: number, timeMs: number): void {
+  const category = getMovementVfxCategory(enemy.type);
+  if (!category) return;
+
+  const intensity = enemy.boss ? 1.6 : enemy.elite ? 1.25 : 1;
+  const behindX = -Math.cos(angle);
+  const behindY = -Math.sin(angle);
+  const theme = ENEMY_THEME[enemy.type];
+
+  ctx.save();
+  if (category === "DUST") {
+    // Two small ground-impact puffs, phase-offset so they alternate like footfalls.
+    for (let i = 0; i < 2; i++) {
+      const phase = (enemy.distanceTraveled / 14 + i * 0.5) % 1;
+      const puffRadius = 3.5 * intensity * (1 - phase);
+      if (puffRadius <= 0.2) continue;
+      const dist = 8 + phase * 5;
+      ctx.globalAlpha = 0.35 * (1 - phase);
+      ctx.fillStyle = "#c9b892";
+      ctx.beginPath();
+      ctx.arc(behindX * dist, behindY * dist + 4, puffRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (category === "TRAIL") {
+    // A short fading streak directly behind the travel direction — sells "built to slip past towers".
+    const segments = 3;
+    for (let i = 0; i < segments; i++) {
+      const t = i / segments;
+      const dist = 6 + t * 10 * intensity;
+      ctx.globalAlpha = 0.3 * (1 - t);
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(behindX * dist, behindY * dist, 2.4 * (1 - t * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (category === "WISP") {
+    // Slow-rising healing motes, independent of travel direction — reads as ambient life, not exhaust.
+    for (let i = 0; i < 2; i++) {
+      const phase = ((timeMs / 900 + i * 0.5) % 1) * intensity;
+      const wx = Math.sin(timeMs / 500 + i * 3) * 6;
+      const wy = 6 - phase * 14;
+      ctx.globalAlpha = 0.5 * (1 - phase);
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(wx, wy, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } else if (category === "SHADOW") {
+    // Dark interference wisps trailing behind — unsettling, matches "the build itself is the target".
+    for (let i = 0; i < 3; i++) {
+      const phase = (enemy.distanceTraveled / 20 + i / 3) % 1;
+      const dist = 4 + phase * 10 * intensity;
+      const spread = Math.sin(timeMs / 300 + i * 2) * 3;
+      ctx.globalAlpha = 0.4 * (1 - phase);
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(behindX * dist + behindY * spread, behindY * dist - behindX * spread, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 export function drawEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: EnemyInstance,
@@ -1314,6 +1391,17 @@ export function drawEnemy(
   // with the enemy at every turn instead of staying anchored to the fixed
   // top-left light source.
   if (enemy.type === "CRAWLER") drawContactShadow(ctx, 10, 4.5, 0.32);
+
+  // AUDITORIA E CORREÇÃO GERAL spec sections 33-38 — archetype movement VFX
+  // (config/movementVfx.ts). Drawn in the same untranslated-but-unrotated
+  // local space as the contact shadow above, BEHIND the body, so it reads
+  // as trailing from underneath/behind the enemy's own travel direction
+  // rather than rotating rigidly with it. Purely procedural from
+  // `enemy.distanceTraveled` (already tracked for movement) — no new
+  // per-enemy state, no pooled particles, nothing that could leak or
+  // accumulate: it's recomputed fresh every frame straight from the
+  // enemy's REAL current position, so it can never drift out of sync with it.
+  drawMovementVfx(ctx, enemy, angle, timeMs);
 
   ctx.save();
   ctx.rotate(angle);
