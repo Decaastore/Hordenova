@@ -46,6 +46,10 @@ export function BossBanner({ hud }: BossBannerProps) {
           <div style={barTrackStyle}>
             <div style={{ ...barFillStyle, width: `${hpRatio * 100}%`, background: isEnraged ? enragedGradient : barFillStyle.background }} />
           </div>
+          {/* AUDITORIA E CORREÇÃO GERAL spec section 30 — exact current/max HP, never abbreviated ("12.450 / 25.000", not "12K"). */}
+          <div style={hpTextStyle}>
+            {Math.max(0, Math.ceil(hud.bossHp ?? 0)).toLocaleString()} / {Math.round(hud.bossMaxHp ?? 0).toLocaleString()}
+          </div>
         </>
       ) : (
         <div style={subtitleStyle}>{t("boss.getReady")}</div>
@@ -100,6 +104,14 @@ const barFillStyle: CSSProperties = {
 };
 
 const enragedGradient = "linear-gradient(90deg, #ff2e2e, #ffb347)";
+
+const hpTextStyle: CSSProperties = {
+  fontSize: 10.5,
+  fontWeight: 700,
+  letterSpacing: 0.5,
+  color: PALETTE.uiTextDim,
+  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
+};
 
 const enragedTagStyle: CSSProperties = {
   fontSize: 10,

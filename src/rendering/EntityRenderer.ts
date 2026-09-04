@@ -1365,8 +1365,34 @@ export function drawEnemy(
   }
 
   ctx.restore();
+}
 
-  if (enemy.boss) return; // boss HP is shown in a dedicated top-of-screen banner, not a floating bar.
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec sections 29-33 — HP must be visible for
+ * EVERY enemy tier, each reading as a step up in prominence: Normal
+ * (compacta, unchanged below) < Elite (mais destacada) < Mini-Boss (maior)
+ * < Boss (extremamente legível, via the dedicated BossBanner — the only
+ * tier that still returns early here). Before this fix, a mini-boss
+ * (enemy.boss set, isMainBoss false) hit the SAME early return as the main
+ * boss and rendered with NO HP indicator at all — the real gap this fixes,
+ * not just a cosmetic upgrade.
+ *
+ * Deliberately a SEPARATE call from drawEnemy (spec section 33: "não
+ * permitir que [a barra] fique escondida por particles/projectiles/damage
+ * numbers/VFX/outros inimigos") — CanvasRenderer calls this in its own pass
+ * AFTER projectiles and vfx.draw(), so a bar is never drawn underneath a
+ * transient effect that renders on top of the enemy layer.
+ */
+export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {
+  if (enemy.boss?.isMainBoss) return;
+  if (enemy.boss) {
+    drawMiniBossHpBar(ctx, enemy);
+    return;
+  }
+  if (enemy.elite) {
+    drawEliteHpBar(ctx, enemy);
+    return;
+  }
   if (enemy.type === "CRAWLER") drawHpBarPremium(ctx, enemy);
   else drawHpBar(ctx, enemy);
 }
@@ -1481,6 +1507,113 @@ function drawHpBarPremium(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): 
   ctx.lineWidth = 0.8;
   roundedRect(ctx, barX, barY, barWidth, barHeight, r);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec section 29 — "Elite: mais destacada."
+ * Same premium rounded-bar construction as drawHpBarPremium, but larger and
+ * with a gold outline matching drawEliteAura's own accent color, so an
+ * Elite reads as visually distinct at a glance, never confused with a
+ * Boss/Mini-Boss (no exact-number text — that escalation is reserved for
+ * the tiers above, per spec's own "Normal < Elite < Mini-Boss < Boss" scale).
+ */
+function drawEliteHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {
+  const radius = 13;
+  const hpRatio = Math.max(enemy.hp / enemy.maxHp, 0);
+  const barWidth = radius * 2.6;
+  const barHeight = 5.5;
+  const barX = enemy.position.x - barWidth / 2;
+  const barY = enemy.position.y - radius - 10;
+  const fillColor =
+    hpRatio > 0.6 ? STATUS_COLORS.hpHealthy : hpRatio > 0.3 ? STATUS_COLORS.hpWounded : STATUS_COLORS.hpCritical;
+  const r = barHeight / 2;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.4)";
+  roundedRect(ctx, barX + 0.6, barY + 1, barWidth, barHeight, r);
+  ctx.fill();
+
+  ctx.fillStyle = STATUS_COLORS.hpTrack;
+  roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+  ctx.fill();
+
+  if (hpRatio > 0) {
+    const fillGradient = ctx.createLinearGradient(barX, barY, barX, barY + barHeight);
+    fillGradient.addColorStop(0, fillColor);
+    fillGradient.addColorStop(1, "rgba(0,0,0,0.25)");
+    ctx.save();
+    roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+    ctx.clip();
+    ctx.fillStyle = fillGradient;
+    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = "rgba(255,214,90,0.85)"; // matches drawEliteAura's gold accent — the "this one's different" cue
+  ctx.lineWidth = 1.2;
+  roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec section 29 — "Mini-Boss: maior." Before
+ * this fix, a mini-boss hit the exact same early-return as the main boss
+ * (both have `enemy.boss` set) and rendered with NO HP indicator at all —
+ * the real gap, not just an insufficiently prominent one. This is
+ * noticeably larger than the Elite bar and adds an exact current/max HP
+ * readout (spec section 30's "quando apropriado, mostrar CURRENT HP / MAX
+ * HP") since a mini-boss's HP pool is large enough that a percentage alone
+ * under-communicates it, matching the same treatment the top-of-screen
+ * BossBanner gives the main boss.
+ */
+function drawMiniBossHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {
+  const radius = 17;
+  const hpRatio = Math.max(enemy.hp / enemy.maxHp, 0);
+  const barWidth = radius * 2.8;
+  const barHeight = 7;
+  const barX = enemy.position.x - barWidth / 2;
+  const barY = enemy.position.y - radius - 14;
+  const fillColor =
+    hpRatio > 0.6 ? STATUS_COLORS.hpHealthy : hpRatio > 0.3 ? STATUS_COLORS.hpWounded : STATUS_COLORS.hpCritical;
+  const r = barHeight / 2;
+
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.45)";
+  roundedRect(ctx, barX + 0.8, barY + 1.2, barWidth, barHeight, r);
+  ctx.fill();
+
+  ctx.fillStyle = STATUS_COLORS.hpTrack;
+  roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+  ctx.fill();
+
+  if (hpRatio > 0) {
+    const fillGradient = ctx.createLinearGradient(barX, barY, barX, barY + barHeight);
+    fillGradient.addColorStop(0, fillColor);
+    fillGradient.addColorStop(1, "rgba(0,0,0,0.25)");
+    ctx.save();
+    roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+    ctx.clip();
+    ctx.fillStyle = fillGradient;
+    ctx.fillRect(barX, barY, barWidth * hpRatio, barHeight);
+    ctx.restore();
+  }
+
+  ctx.strokeStyle = "rgba(255,120,60,0.9)"; // a distinct ember-orange border — reads as "important" without borrowing the main boss's own red
+  ctx.lineWidth = 1.4;
+  roundedRect(ctx, barX, barY, barWidth, barHeight, r);
+  ctx.stroke();
+
+  // Exact current/max HP, never abbreviated — spec section 30.
+  const hpText = `${Math.ceil(enemy.hp).toLocaleString()} / ${Math.round(enemy.maxHp).toLocaleString()}`;
+  ctx.font = "bold 9px Georgia, serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
+  ctx.fillStyle = "rgba(0,0,0,0.85)";
+  ctx.fillText(hpText, enemy.position.x + 0.5, barY - 1.5);
+  ctx.fillStyle = "#fff2df";
+  ctx.fillText(hpText, enemy.position.x, barY - 2);
   ctx.restore();
 }
 

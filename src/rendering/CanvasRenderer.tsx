@@ -18,7 +18,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawBossAura, drawEliteAura, drawEnemy, drawProjectile, drawTower } from "./EntityRenderer";
+import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawProjectile, drawTower } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
@@ -212,6 +212,12 @@ export function CanvasRenderer({
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
 
       vfx.draw(ctx);
+
+      // AUDITORIA E CORREÇÃO GERAL spec section 33 — HP bars are drawn in
+      // their OWN pass, after every projectile/particle/damage-number, so
+      // they're never momentarily hidden underneath one (see
+      // EntityRenderer.drawEnemyHpBar's own doc comment).
+      for (const enemy of snapshot.enemies) drawEnemyHpBar(ctx, enemy);
 
       drawFog(ctx, biome, timestamp);
       drawAmbientParticles(ctx, biome, timestamp);

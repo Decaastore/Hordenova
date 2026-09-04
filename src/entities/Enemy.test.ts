@@ -264,4 +264,15 @@ describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec
     applySlow(miniBoss, 1, 1000);
     expect(mainBoss.slow!.remainingMs).toBeLessThan(miniBoss.slow!.remainingMs);
   });
+
+  it("BUG 6 (AUDITORIA spec sections 39-49): the 'stuck blue enemy' report — EntityRenderer draws a light-blue ring around ANY enemy with an active `slow`/freeze effect (see EntityRenderer.ts's `if (enemy.slow)` ring), regardless of the enemy's own archetype color. A permanently-refreshed freeze (Bug 3, already fixed above) is therefore indistinguishable, visually, from 'a distinct blue-colored enemy frozen on the path forever' — this test proves the actual path/movement layer is sound: under the exact worst-case constant-refreeze pressure that used to never release, distanceTraveled still keeps climbing over a long simulated battle and the enemy genuinely reaches the end of the path in finite time, never soft-locked.", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    let reachedEnd = false;
+    for (let t = 0; t < 300_000 && !reachedEnd; t += 100) {
+      applySlow(boss, 1, 2200); // constant worst-case re-freeze pressure, every single tick
+      const result = advanceEnemy(boss, 100);
+      if (result.reachedEnd) reachedEnd = true;
+    }
+    expect(reachedEnd).toBe(true);
+  });
 });
