@@ -42,10 +42,10 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           valueColor={PALETTE.gold}
         />
         <Stat
-          icon={<GemIcon color="#c88aff" />}
+          icon={<GemIcon color={PALETTE.gem} />}
           label={t("hud.gems")}
           value={hud.gemShards > 0 ? `${hud.gems} (+${hud.gemShards})` : String(hud.gems)}
-          valueColor="#c88aff"
+          valueColor={PALETTE.gem}
         />
         <div style={{ textAlign: "center", minWidth: 100 }}>
           <div style={labelStyle}>{t("hud.state")}</div>

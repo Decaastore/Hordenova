@@ -15,16 +15,23 @@ import {
   MAX_TOWER_LEVEL,
   type TowerType,
 } from "@/config/towerStats";
-import { getSpecializationsForTower, MAX_SPECIALIZATION_LEVEL, SPECIALIZATION_UNLOCK_TOWER_LEVEL, type SpecializationId } from "@/config/specializations";
+import {
+  getSpecializationsForTower,
+  MAX_SPECIALIZATION_LEVEL,
+  SPECIALIZATION_UNLOCK_GEM_COST,
+  SPECIALIZATION_UNLOCK_TOWER_LEVEL,
+  type SpecializationId,
+} from "@/config/specializations";
 import { getSkinsForTower } from "@/config/towerSkins";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { CoinIcon } from "./icons";
+import { CoinIcon, GemIcon } from "./icons";
 
 interface TowerInfoPanelProps {
   tower: TowerInstance;
   gold: number;
+  gems: number;
   onUpgrade: () => void;
   onClose: () => void;
   onChooseSpecialization: (id: SpecializationId) => void;
@@ -44,6 +51,7 @@ type Translate = ReturnType<typeof useLanguage>["t"];
 export function TowerInfoPanel({
   tower,
   gold,
+  gems,
   onUpgrade,
   onClose,
   onChooseSpecialization,
@@ -137,6 +145,7 @@ export function TowerInfoPanel({
       <SpecializationSection
         tower={tower}
         gold={gold}
+        gems={gems}
         theme={theme}
         t={t}
         onChoose={onChooseSpecialization}
@@ -149,15 +158,19 @@ export function TowerInfoPanel({
 }
 
 /**
- * Progression 2.0 — Specialization / Upgrade Slot (spec section 5/6). A
- * second, independent gold sink from the tower's own level: once unlocked,
- * the player permanently picks ONE path (a real, mutually-exclusive
- * decision — see entities/Tower.chooseSpecialization) and can then keep
- * investing gold into it, well past MAX_TOWER_LEVEL.
+ * Progression 2.0 / Visual Overhaul spec section 21: the CHOICE of a path
+ * (this section's top half) is a one-time Gems purchase — a strategic
+ * decision the player unlocks with premium currency, never with Gold and
+ * never buying a stat directly (the path still has to be leveled up with
+ * Gold afterward, same as before). Everything past the choice — the
+ * specialization's own 1->5 levels (bottom half) — is unchanged: an
+ * independent Gold sink from the tower's own level, well past
+ * MAX_TOWER_LEVEL.
  */
 function SpecializationSection({
   tower,
   gold,
+  gems,
   theme,
   t,
   onChoose,
@@ -165,6 +178,7 @@ function SpecializationSection({
 }: {
   tower: TowerInstance;
   gold: number;
+  gems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
   onChoose: (id: SpecializationId) => void;
@@ -185,31 +199,28 @@ function SpecializationSection({
     }
 
     const options = getSpecializationsForTower(tower.type);
+    const affordable = gems >= SPECIALIZATION_UNLOCK_GEM_COST;
     return (
       <>
         <div style={dividerStyle} />
         <div style={sectionLabelStyle}>{t("towerInfo.specializationSection")}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {options.map((option) => {
-            const cost = getSpecializationUpgradeCostFor({ ...tower, specializationId: option.id, specializationLevel: 0 });
-            const affordable = cost !== null && gold >= cost;
-            return (
-              <button
-                key={option.id}
-                onClick={() => onChoose(option.id)}
-                disabled={!affordable}
-                style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
-              >
-                <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
-                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
-                  {t(`specializations.${option.id}.description`)}
-                </div>
-                <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {t("towerInfo.specializationChoose")} · <CoinIcon size={10} color={PALETTE.gold} /> {cost}
-                </div>
-              </button>
-            );
-          })}
+          {options.map((option) => (
+            <button
+              key={option.id}
+              onClick={() => onChoose(option.id)}
+              disabled={!affordable}
+              style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+            >
+              <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
+              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
+                {t(`specializations.${option.id}.description`)}
+              </div>
+              <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                {t("towerInfo.specializationChoose")} · <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_UNLOCK_GEM_COST}
+              </div>
+            </button>
+          ))}
         </div>
       </>
     );

@@ -3,14 +3,7 @@ import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
-import {
-  canChooseSpecialization,
-  canUpgradeSpecialization,
-  getSpecializationUpgradeCostFor,
-  getTowerUpgradeCost,
-  type TowerInstance,
-} from "@/entities/Tower";
-import { getSpecializationsForTower, type SpecializationId } from "@/config/specializations";
+import { canUpgradeSpecialization, getSpecializationUpgradeCostFor, getTowerUpgradeCost, type TowerInstance } from "@/entities/Tower";
 
 /**
  * Progression 2.0 spec section 3/4 — the exact problem this whole
@@ -27,9 +20,17 @@ import { getSpecializationsForTower, type SpecializationId } from "@/config/spec
 type Action =
   | { kind: "build"; cost: number; slotId: string; type: TowerType }
   | { kind: "level"; cost: number; towerId: string }
-  | { kind: "specChoose"; cost: number; towerId: string; specId: SpecializationId }
   | { kind: "specUpgrade"; cost: number; towerId: string };
 
+/**
+ * Visual Overhaul spec section 21: choosing a specialization path is now a
+ * Gems purchase, not a Gold one (see GameEngine.chooseTowerSpecialization) —
+ * this greedy bot only ever spends Gold, so it can no longer unlock a path
+ * on its own (a real Gold-only player wouldn't be able to either). It still
+ * exercises specUpgrade (still Gold, still requires a chosen path) whenever
+ * a save already ships one pre-chosen — see the "with a pre-chosen
+ * specialization" variant below.
+ */
 function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: ReadonlySet<string>, typeIndex: number): Action | null {
   const candidates: Action[] = [];
 
@@ -43,11 +44,7 @@ function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: Reado
     const levelCost = getTowerUpgradeCost(tower);
     if (levelCost !== null) candidates.push({ kind: "level", cost: levelCost, towerId: tower.id });
 
-    if (canChooseSpecialization(tower)) {
-      const specId = getSpecializationsForTower(tower.type)[0]!.id;
-      const cost = getSpecializationUpgradeCostFor({ ...tower, specializationId: specId, specializationLevel: 0 });
-      if (cost !== null) candidates.push({ kind: "specChoose", cost, towerId: tower.id, specId });
-    } else if (canUpgradeSpecialization(tower)) {
+    if (canUpgradeSpecialization(tower)) {
       const cost = getSpecializationUpgradeCostFor(tower);
       if (cost !== null) candidates.push({ kind: "specUpgrade", cost, towerId: tower.id });
     }
@@ -87,9 +84,6 @@ function runGreedyBot(simulatedMs: number): { waveReached: number; phaseId: stri
       } else if (action.kind === "level") {
         engine.selectTower(action.towerId);
         engine.upgradeSelectedTower();
-      } else if (action.kind === "specChoose") {
-        engine.selectTower(action.towerId);
-        engine.chooseTowerSpecialization(action.specId);
       } else {
         engine.selectTower(action.towerId);
         engine.upgradeSelectedTowerSpecialization();

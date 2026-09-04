@@ -100,6 +100,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           <TowerInfoPanel
             tower={selectedTower}
             gold={hud.gold}
+            gems={hud.gems}
             onUpgrade={() => engine.upgradeSelectedTower()}
             onClose={() => engine.selectTower(null)}
             onChooseSpecialization={(id) => engine.chooseTowerSpecialization(id)}

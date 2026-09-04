@@ -22,6 +22,7 @@ export const PALETTE = {
   uiText: "#fdf6e8",
   uiTextDim: "#d3b98d",
   gold: "#ffd257",
+  gem: "#c88aff",
   danger: "#e8503a",
   success: "#7fd857",
 } as const;

@@ -14,6 +14,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     updateSave({
       currentWave: 1,
       gold: 999_999,
+      gems: 999_999,
       towerLoadout: [
         {
           slotId: TOWER_SLOTS[0]!.id,
@@ -49,26 +50,59 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getHudSnapshot().gold).toBe(goldBefore);
   });
 
-  it("choosing a specialization spends gold and is reflected on the tower instance", () => {
+  it("choosing a specialization spends Gems (never Gold) and is reflected on the tower instance", () => {
     const engine = startWithOneMaxedTower();
     const goldBefore = engine.getHudSnapshot().gold;
+    const gemsBefore = engine.getHudSnapshot().gems;
 
     expect(engine.canChooseSpecializationForSelectedTower()).toBe(true);
     expect(engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(true);
 
-    expect(engine.getHudSnapshot().gold).toBeLessThan(goldBefore);
+    // Visual Overhaul spec section 21: the CHOICE is a Gems purchase — Gold
+    // must be completely untouched by it.
+    expect(engine.getHudSnapshot().gold).toBe(goldBefore);
+    expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore);
     const tower = engine.getRenderSnapshot().towers[0]!;
     expect(tower.specializationId).toBe("IRONWOOD_EXECUTIONER");
     expect(tower.specializationLevel).toBe(1);
   });
 
-  it("upgrading a chosen specialization increments its level and spends more gold each time", () => {
+  it("cannot choose a specialization without enough Gems, and nothing is applied on the failed attempt", () => {
+    updateSave({
+      currentWave: 1,
+      gold: 999_999,
+      gems: 0,
+      towerLoadout: [
+        {
+          slotId: TOWER_SLOTS[0]!.id,
+          type: "IRONWOOD",
+          level: SPECIALIZATION_UNLOCK_TOWER_LEVEL,
+          specializationId: null,
+          specializationLevel: 0,
+          equippedSkinId: null,
+        },
+      ],
+    });
+    const engine = new GameEngine();
+    engine.startRun();
+    const tower = engine.getRenderSnapshot().towers[0]!;
+    engine.selectTower(tower.id);
+
+    expect(engine.canChooseSpecializationForSelectedTower()).toBe(true);
+    expect(engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(false);
+    expect(engine.getRenderSnapshot().towers[0]!.specializationId).toBeNull();
+    expect(engine.getHudSnapshot().gems).toBe(0);
+  });
+
+  it("upgrading a chosen specialization increments its level and spends more Gold each time (Gems untouched past the initial choice)", () => {
     const engine = startWithOneMaxedTower();
     engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER");
     const goldAfterChoice = engine.getHudSnapshot().gold;
+    const gemsAfterChoice = engine.getHudSnapshot().gems;
 
     expect(engine.upgradeSelectedTowerSpecialization()).toBe(true);
     expect(engine.getHudSnapshot().gold).toBeLessThan(goldAfterChoice);
+    expect(engine.getHudSnapshot().gems).toBe(gemsAfterChoice);
     expect(engine.getRenderSnapshot().towers[0]!.specializationLevel).toBe(2);
   });
 

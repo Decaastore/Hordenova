@@ -47,6 +47,20 @@ export type SpecializationId =
 export const MAX_SPECIALIZATION_LEVEL = 5;
 export const SPECIALIZATION_UNLOCK_TOWER_LEVEL = 10;
 
+/**
+ * Visual Overhaul spec section 21/22: specialization is a strategic
+ * decision Gems can unlock, not a stat Gems can buy. The CHOICE of a path
+ * (null -> level 1) now costs this flat Gem amount instead of Gold —
+ * every LEVEL of that path after the choice (1->2, ..., 4->5) stays on
+ * Gold via getSpecializationUpgradeCost below, unchanged. A flat cost
+ * (not scaled by tower level/type) keeps this one clear "premium
+ * decision" price rather than inventing a second gold-shaped curve in
+ * Gems; tuned against the existing Gem-Shard drop rates (main boss 5,
+ * mini-boss 2, milestone wave ~1-3, 10 shards/Gem) so a single
+ * specialization unlock is a genuine mid-game goal, not an instant spend.
+ */
+export const SPECIALIZATION_UNLOCK_GEM_COST = 25;
+
 export interface SpecializationDefinition {
   id: SpecializationId;
   towerType: TowerType;

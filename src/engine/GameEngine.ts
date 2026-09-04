@@ -30,7 +30,7 @@ import {
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import type { SpecializationId } from "@/config/specializations";
+import { SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import {
   advanceEnemy,
   createEliteEnemyInstance,
@@ -429,21 +429,26 @@ export class GameEngine {
     return !!tower && canChooseSpecialization(tower);
   }
 
-  /** Costs the level-0->1 specialization price (config/specializations.getSpecializationUpgradeCost). Permanent once chosen — no re-spec in this pass, matching the spec's "escolha real". */
+  /**
+   * Visual Overhaul spec section 21: the CHOICE of a specialization path
+   * (null -> level 1) is a premium, Gems-gated strategic decision, not
+   * another gold sink — Gems can unlock a build direction, never buy
+   * damage/level/HP/victory directly, and this is the one place that
+   * unlock lives. Every level AFTER the choice (1->2, ..., 4->5, via
+   * upgradeSelectedTowerSpecialization below) still costs Gold, unchanged.
+   * Permanent once chosen — no re-spec in this pass, matching the spec's
+   * "escolha real".
+   */
   chooseTowerSpecialization(specializationId: SpecializationId): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !canChooseSpecialization(tower)) return false;
+    if (!this.canAffordGems(SPECIALIZATION_UNLOCK_GEM_COST)) return false;
 
-    const cost = getSpecializationUpgradeCostFor({ ...tower, specializationId, specializationLevel: 0 });
-    if (cost === null || this.gold < cost) return false;
-
-    this.gold -= cost;
     const applied = chooseSpecializationEntity(tower, specializationId);
-    if (!applied) {
-      this.gold += cost; // Roll back — id didn't belong to this tower type or another guard failed.
-      return false;
-    }
+    if (!applied) return false;
+
+    this.spendGems(SPECIALIZATION_UNLOCK_GEM_COST, `specialization:${specializationId}`);
     this.emitAudio({ type: "level_unlock" });
     this.persist();
     this.notify();
@@ -514,7 +519,13 @@ export class GameEngine {
     return this.gems >= amount;
   }
 
-  /** Never called by anything gameplay-affecting in this pass (spec section 35: Gems must never be pay-to-win) — reserved for future cosmetic/convenience purchases (inventory expansion, skin unlocks) that ARE allowed to cost Gems. */
+  /**
+   * The only Gems ever spend on is Specialization unlock (chooseTowerSpecialization
+   * above), Convenience, and Cosmetics — never damage/HP/level/victory/phase
+   * directly (spec section 23's forbidden list). Callers are responsible for
+   * applying whatever the purchase unlocks; this method only owns the
+   * balance mutation + ledger record.
+   */
   spendGems(amount: number, reason: string): boolean {
     if (amount <= 0 || this.gems < amount) return false;
     this.gems -= amount;
