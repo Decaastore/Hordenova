@@ -13,6 +13,7 @@ import {
   type SpecializationId,
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -22,6 +23,18 @@ export interface TowerInstance {
   level: number;
   position: Vector2;
   cooldownRemainingMs: number;
+  /**
+   * Master Implementation spec section 26-28 — Special Attack: a SECOND,
+   * fully independent cooldown timer from `cooldownRemainingMs`. The normal
+   * attack keeps firing at its attack-speed-driven cadence exactly as
+   * before; this one ticks down on a fixed per-tower-type interval (see
+   * config/towerSpecials.ts) and fires a distinct, more impactful attack
+   * when it reaches 0, without ever touching or resetting the normal
+   * cooldown. Deliberately NOT derived from attackSpeed — it's a rhythm of
+   * its own, the way a real "ultimate" reads differently from a basic
+   * attack.
+   */
+  specialCooldownRemainingMs: number;
   /** >0 while jammed by a DISABLER-archetype enemy/mini-boss — see CombatSystem.tickEnemyDisableAbilities. */
   disabledRemainingMs: number;
   /** Progression 2.0 — the player's chosen build-identity path, null until chosen. Permanent once set (see chooseSpecialization). */
@@ -65,6 +78,13 @@ export function createTowerInstance(
     level: Math.min(Math.max(initialLevel, 1), MAX_TOWER_LEVEL),
     position,
     cooldownRemainingMs: 0,
+    // A freshly-built tower must charge up before its first Special Attack
+    // — the ultimate meter starts empty, not full — both thematically (an
+    // "ultimate" firing before a single normal shot feels wrong) and
+    // mechanically (keeps the special's much bigger cooldown from ever
+    // colliding with the normal attack's own instant-ready-at-0 on the
+    // very same first tick).
+    specialCooldownRemainingMs: getTowerSpecialCooldownMs(type),
     disabledRemainingMs: 0,
     specializationId,
     specializationLevel,
@@ -89,14 +109,20 @@ export function upgradeTower(tower: TowerInstance): void {
   if (canUpgradeTower(tower)) tower.level += 1;
 }
 
-/** Mutates `tower` in place, ticking its attack cooldown (and any active jam) down. */
+/** Mutates `tower` in place, ticking its attack cooldown, special cooldown, and any active jam down. */
 export function tickTowerCooldown(tower: TowerInstance, dtMs: number): void {
   tower.cooldownRemainingMs = Math.max(0, tower.cooldownRemainingMs - dtMs);
+  tower.specialCooldownRemainingMs = Math.max(0, tower.specialCooldownRemainingMs - dtMs);
   tower.disabledRemainingMs = Math.max(0, tower.disabledRemainingMs - dtMs);
 }
 
 export function isTowerReadyToAttack(tower: TowerInstance): boolean {
   return tower.cooldownRemainingMs <= 0 && tower.disabledRemainingMs <= 0;
+}
+
+/** Special Attack readiness — completely independent of the normal-attack cooldown above; only shares the disable-jam gate (a disabled tower can't fire either attack). */
+export function isTowerReadyForSpecial(tower: TowerInstance): boolean {
+  return tower.specialCooldownRemainingMs <= 0 && tower.disabledRemainingMs <= 0;
 }
 
 /** Jams the tower for `durationMs` (a DISABLER-archetype hit) — refreshes rather than stacks. */
@@ -108,6 +134,11 @@ export function disableTower(tower: TowerInstance, durationMs: number): void {
 export function resetTowerCooldown(tower: TowerInstance): void {
   const stats = getTowerStats(tower);
   tower.cooldownRemainingMs = 1000 / stats.attackSpeed;
+}
+
+/** Resets the Special Attack cooldown to its fixed per-tower-type interval (config/towerSpecials.ts) — never derived from attackSpeed/level. */
+export function resetTowerSpecialCooldown(tower: TowerInstance): void {
+  tower.specialCooldownRemainingMs = getTowerSpecialCooldownMs(tower.type);
 }
 
 // ---------------------------------------------------------------------------

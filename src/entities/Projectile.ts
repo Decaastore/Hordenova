@@ -15,18 +15,23 @@ export interface ProjectileInstance {
   chainTargets: Vector2[];
   remainingMs: number;
   totalMs: number;
+  /** Master Implementation spec section 27 — true for a tower's fixed-interval Special Attack (see config/towerSpecials.ts), never a normal attack. Purely a rendering signal (bigger/flashier draw in EntityRenderer.drawProjectile) — carries no extra gameplay authority than a normal projectile already had. */
+  isSpecial: boolean;
 }
 
 let nextProjectileId = 1;
 
 const DEFAULT_DURATION_MS = 140;
+/** Specials get a slightly longer flight so the bigger visual actually reads before it resolves. */
+const SPECIAL_DURATION_MS = 220;
 
 export function createProjectile(
   towerType: TowerType,
   from: Vector2,
   to: Vector2,
   chainTargets: Vector2[] = [],
-  durationMs: number = DEFAULT_DURATION_MS,
+  isSpecial = false,
+  durationMs: number = isSpecial ? SPECIAL_DURATION_MS : DEFAULT_DURATION_MS,
 ): ProjectileInstance {
   return {
     id: `projectile-${nextProjectileId++}`,
@@ -36,6 +41,7 @@ export function createProjectile(
     chainTargets,
     remainingMs: durationMs,
     totalMs: durationMs,
+    isSpecial,
   };
 }
 

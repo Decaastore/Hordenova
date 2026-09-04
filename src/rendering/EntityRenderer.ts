@@ -1794,8 +1794,19 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
   ctx.globalAlpha = Math.max(1 - progress * 1.4, 0);
   ctx.fillStyle = theme.accent;
   ctx.beginPath();
-  ctx.arc(projectile.to.x, projectile.to.y, 4, 0, Math.PI * 2);
+  ctx.arc(projectile.to.x, projectile.to.y, projectile.isSpecial ? 8 : 4, 0, Math.PI * 2);
   ctx.fill();
+  // Special Attack (spec section 27): an extra ring stamp at impact so a
+  // special always reads as visibly bigger than a normal hit, even for
+  // towers whose own impact dot barely changes size.
+  if (projectile.isSpecial) {
+    ctx.globalAlpha = Math.max(1 - progress * 1.4, 0) * 0.6;
+    ctx.strokeStyle = theme.accent;
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(projectile.to.x, projectile.to.y, 14 + progress * 10, 0, Math.PI * 2);
+    ctx.stroke();
+  }
   ctx.restore();
 }
 
@@ -1806,8 +1817,12 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
  */
 function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
   const { from, to } = projectile;
+  // Special Attack (spec section 27) — "Firestorm": a visibly bigger,
+  // slower-lofted fireball with a thicker ember trail, matching the much
+  // larger burn radius it actually deals in CombatSystem's special block.
+  const scale = projectile.isSpecial ? 1.9 : 1;
   const dist = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  const arcHeight = Math.min(14, dist * 0.16);
+  const arcHeight = Math.min(14, dist * 0.16) * (projectile.isSpecial ? 1.6 : 1);
   const midX = (from.x + to.x) / 2;
   const midY = (from.y + to.y) / 2 - arcHeight;
   const currentX = quadPoint(from.x, midX, to.x, progress);
@@ -1816,14 +1831,14 @@ function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: Projecti
   // Ember trail: a handful of fading dots along the path just behind the
   // fireball's current position — reads as heat streaming off it in flight.
   ctx.save();
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= (projectile.isSpecial ? 7 : 4); i++) {
     const trailT = Math.max(0, progress - i * 0.05);
     const tx = quadPoint(from.x, midX, to.x, trailT);
     const ty = quadPoint(from.y, midY, to.y, trailT);
     ctx.globalAlpha = Math.max(0, 0.5 - i * 0.11);
     ctx.fillStyle = i % 2 === 0 ? "#ffb35a" : "#ff6a2e";
     ctx.beginPath();
-    ctx.arc(tx, ty, 2.6 - i * 0.35, 0, Math.PI * 2);
+    ctx.arc(tx, ty, (2.6 - i * 0.25) * scale, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
@@ -1831,7 +1846,7 @@ function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: Projecti
   // The fireball itself: hot white core, orange corona.
   ctx.save();
   const impactGrow = progress > 0.88 ? (progress - 0.88) / 0.12 : 0;
-  const radius = 3.6 + impactGrow * 5;
+  const radius = (3.6 + impactGrow * 5) * scale;
   const coreGrad = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, radius);
   coreGrad.addColorStop(0, "#fff4d8");
   coreGrad.addColorStop(0.4, "#ffb35a");
@@ -1851,6 +1866,31 @@ function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: Projecti
  */
 function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
   const { from, to } = projectile;
+
+  // Special Attack (spec section 27) — "Absolute Zero" freezes every enemy
+  // in range from a nova CENTERED ON THE TOWER (see CombatSystem's special
+  // block), not a bolt travelling to one target — so instead of the normal
+  // directional shard, this reads as an expanding ring of frost radiating
+  // outward from the tower itself.
+  if (projectile.isSpecial) {
+    const maxRadius = 90;
+    const radius = maxRadius * Math.min(1, progress * 1.4);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, 1 - progress) * 0.8;
+    ctx.strokeStyle = "#bdf3ff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = Math.max(0, 1 - progress) * 0.35;
+    ctx.fillStyle = "#bdf3ff";
+    ctx.beginPath();
+    ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
   const currentX = from.x + (to.x - from.x) * progress;
   const currentY = from.y + (to.y - from.y) * progress;
 
@@ -1891,8 +1931,9 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
     ctx.globalAlpha = 1 - t;
     ctx.strokeStyle = "#bdf3ff";
     ctx.lineWidth = 1.2;
-    for (let i = 0; i < 5; i++) {
-      const a = (i / 5) * Math.PI * 2;
+    const shardCount = 5;
+    for (let i = 0; i < shardCount; i++) {
+      const a = (i / shardCount) * Math.PI * 2;
       const r = 2 + t * 7;
       ctx.beginPath();
       ctx.moveTo(to.x, to.y);
@@ -1915,13 +1956,17 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
 function drawStormcallerBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
   const theme = TOWER_THEME.STORMCALLER;
   const flashFade = progress < 0.3 ? 1 : Math.max(0, 1 - (progress - 0.3) / 0.7);
+  // Special Attack (spec section 27) — "Chain Overload": a visibly thicker,
+  // brighter-glowing bolt matching the much higher per-hit damage and
+  // longer chain the CombatSystem special block actually resolves.
+  const scale = projectile.isSpecial ? 2.2 : 1;
 
   ctx.save();
-  ctx.strokeStyle = theme.primary;
-  ctx.lineWidth = 2.2 * (0.5 + flashFade * 0.5);
+  ctx.strokeStyle = projectile.isSpecial ? "#f4faff" : theme.primary;
+  ctx.lineWidth = 2.2 * (0.5 + flashFade * 0.5) * scale;
   ctx.globalAlpha = flashFade;
   ctx.shadowColor = theme.glow;
-  ctx.shadowBlur = 6;
+  ctx.shadowBlur = 6 * scale;
 
   drawJaggedBolt(ctx, projectile.from, projectile.to);
   let originForChain = projectile.to;
@@ -1939,12 +1984,13 @@ function drawStormcallerBolt(ctx: CanvasRenderingContext2D, projectile: Projecti
     ctx.globalAlpha = (1 - sparkFade) * 0.7;
     ctx.fillStyle = theme.accent;
     const points = [projectile.to, ...projectile.chainTargets];
+    const sparksPerPoint = projectile.isSpecial ? 5 : 2;
     for (const p of points) {
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < sparksPerPoint; i++) {
         const a = Math.random() * Math.PI * 2;
-        const r = Math.random() * 6;
+        const r = Math.random() * 6 * scale;
         ctx.beginPath();
-        ctx.arc(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 0.8, 0, Math.PI * 2);
+        ctx.arc(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 0.8 * scale, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -1991,6 +2037,10 @@ function drawIronwoodArrow(
   progress: number,
 ): void {
   const { from, to } = projectile;
+  // Special Attack (spec section 27) — "Piercing Shot": a visibly bigger,
+  // brighter-trailed bolt matching the guaranteed heavy hit the
+  // CombatSystem special block actually resolves.
+  const scale = projectile.isSpecial ? 2.1 : 1;
   const dist = Math.hypot(to.x - from.x, to.y - from.y) || 1;
   const arcHeight = Math.min(16, dist * 0.2);
   const midX = (from.x + to.x) / 2;
@@ -2005,9 +2055,9 @@ function drawIronwoodArrow(
   ctx.save();
   const trailGradient = ctx.createLinearGradient(from.x, from.y, currentX, currentY);
   trailGradient.addColorStop(0, "rgba(212,247,154,0)");
-  trailGradient.addColorStop(1, "rgba(212,247,154,0.6)");
+  trailGradient.addColorStop(1, projectile.isSpecial ? "rgba(255,236,180,0.85)" : "rgba(212,247,154,0.6)");
   ctx.strokeStyle = trailGradient;
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 1.4 * scale;
   ctx.beginPath();
   ctx.moveTo(from.x, from.y);
   ctx.quadraticCurveTo(midX, midY, currentX, currentY);
@@ -2017,6 +2067,7 @@ function drawIronwoodArrow(
   ctx.save();
   ctx.translate(currentX, currentY);
   ctx.rotate(angle);
+  ctx.scale(scale, scale);
   ctx.strokeStyle = "#5a3f22";
   ctx.lineWidth = 1.2;
   ctx.lineCap = "round";
@@ -2024,7 +2075,7 @@ function drawIronwoodArrow(
   ctx.moveTo(-6, 0);
   ctx.lineTo(3, 0);
   ctx.stroke();
-  ctx.fillStyle = "#e8e0c8";
+  ctx.fillStyle = projectile.isSpecial ? "#ffecb4" : "#e8e0c8";
   ctx.beginPath();
   ctx.moveTo(4.5, 0);
   ctx.lineTo(1, -1.7);

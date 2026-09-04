@@ -1,8 +1,10 @@
 import {
   disableTower,
   getTowerStats,
+  isTowerReadyForSpecial,
   isTowerReadyToAttack,
   resetTowerCooldown,
+  resetTowerSpecialCooldown,
   tickTowerCooldown,
   type TowerInstance,
 } from "@/entities/Tower";
@@ -14,9 +16,10 @@ import {
   type EnemyInstance,
 } from "@/entities/Enemy";
 import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
-import { getTowerSpecialAtLevel, type TowerType } from "@/config/towerStats";
+import { getTowerSpecialAtLevel, type TowerSpecial, type TowerType } from "@/config/towerStats";
 import { applySpecializationToSpecial } from "@/config/specializations";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
+import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -148,19 +151,42 @@ export function tickCombat(
 
   for (const tower of towers) {
     tickTowerCooldown(tower, dtMs);
-    if (!isTowerReadyToAttack(tower)) continue;
 
-    const stats = getTowerStats(tower);
-    const target = findPrimaryTarget(tower.position, stats.range, enemies);
-    if (!target) continue;
+    // Normal attack — unchanged cadence/logic. No longer `continue`s the
+    // whole tower on a miss/no-target: the Special Attack block below is a
+    // fully independent cooldown (Master Implementation spec section
+    // 26-28) and must still get its own chance to fire on the same tick
+    // even when the normal attack isn't ready or has nothing to hit.
+    if (isTowerReadyToAttack(tower)) {
+      resolveNormalAttack(tower, enemies, dealDamage, projectiles);
+    }
 
-    resetTowerCooldown(tower);
-    const special = applySpecializationToSpecial(
-      getTowerSpecialAtLevel(tower.type, tower.level),
-      tower.specializationId,
-      tower.specializationLevel,
-    );
+    if (isTowerReadyForSpecial(tower)) {
+      resolveSpecialAttack(tower, enemies, dealDamage, projectiles);
+    }
+  }
 
+  return { projectiles, damageEvents };
+}
+
+function resolveNormalAttack(
+  tower: TowerInstance,
+  enemies: readonly EnemyInstance[],
+  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number) => DamageEvent,
+  projectiles: ProjectileInstance[],
+): void {
+  const stats = getTowerStats(tower);
+  const target = findPrimaryTarget(tower.position, stats.range, enemies);
+  if (!target) return;
+
+  resetTowerCooldown(tower);
+  const special = applySpecializationToSpecial(
+    getTowerSpecialAtLevel(tower.type, tower.level),
+    tower.specializationId,
+    tower.specializationLevel,
+  );
+
+  {
     if (special.type === "IRONWOOD") {
       const bossMult = (enemy: EnemyInstance) => (enemy.boss ? special.bossDamageMultiplier : 1);
       const armorPen = special.bonusArmorPenetration ?? 0;
@@ -235,6 +261,76 @@ export function tickCombat(
       );
     }
   }
+}
 
-  return { projectiles, damageEvents };
+/**
+ * Master Implementation spec section 26-28 — Special Attack. Fully
+ * independent of `resolveNormalAttack`'s cooldown/logic above: fires on its
+ * own fixed interval (config/towerSpecials.ts), with its own per-type
+ * identity, using the SAME `dealDamage`/status-effect plumbing so it's
+ * still subject to the real damageReduction/armorPenetration math — just a
+ * much bigger, rarer hit, never a second copy of the normal attack's own
+ * per-level growth curve. Note: "special" elsewhere in this file (and in
+ * config/towerStats.ts's `TowerSpecial`) means the tower's per-level
+ * identity stats (crit chance, aoeRadius, etc.) — an unfortunate but
+ * pre-existing name collision with the player-facing "Special Attack" this
+ * function resolves; kept distinct here as `ultimate`.
+ */
+function resolveSpecialAttack(
+  tower: TowerInstance,
+  enemies: readonly EnemyInstance[],
+  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number) => DamageEvent,
+  projectiles: ProjectileInstance[],
+): void {
+  const stats = getTowerStats(tower);
+  const target = findPrimaryTarget(tower.position, stats.range, enemies);
+  if (!target) return;
+
+  resetTowerSpecialCooldown(tower);
+  const ultimate = tower.type;
+
+  if (ultimate === "IRONWOOD") {
+    dealDamage(tower, target, stats.damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
+    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+  } else if (ultimate === "INFERNO") {
+    const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level) as Extract<TowerSpecial, { type: "INFERNO" }>;
+    const radius = infernoSpecial.aoeRadius * INFERNO_SPECIAL.radiusMultiplier;
+    for (const enemy of enemies) {
+      if (isEnemyDead(enemy)) continue;
+      if (distance(target.position, enemy.position) > radius) continue;
+      dealDamage(tower, enemy, stats.damage * INFERNO_SPECIAL.damageMultiplier);
+      applyBurn(enemy, infernoSpecial.burnDamagePerSecond, infernoSpecial.burnDurationMs, infernoSpecial.burnMaxStacks);
+    }
+    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+  } else if (ultimate === "FROSTBORN") {
+    // A nova centered on the TOWER itself, not the target — every enemy in
+    // range is fully frozen, not just the primary target (spec: area
+    // control identity, distinct from Ironwood's single-target burst).
+    for (const enemy of enemies) {
+      if (isEnemyDead(enemy)) continue;
+      if (distance(tower.position, enemy.position) > stats.range) continue;
+      dealDamage(tower, enemy, stats.damage * FROSTBORN_SPECIAL.damageMultiplier);
+      applySlow(enemy, 1, FROSTBORN_SPECIAL.freezeDurationMs);
+    }
+    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+  } else if (ultimate === "STORMCALLER") {
+    const stormSpecial = getTowerSpecialAtLevel("STORMCALLER", tower.level) as Extract<TowerSpecial, { type: "STORMCALLER" }>;
+    let chainDamage = stats.damage * STORMCALLER_SPECIAL.damageMultiplier;
+    dealDamage(tower, target, chainDamage, stormSpecial.armorPenetration);
+
+    const chainImpactPoints: Vector2[] = [];
+    const alreadyHit = new Set<string>([target.id]);
+    let chainOrigin = target;
+    const totalChain = stormSpecial.chainTargets + STORMCALLER_SPECIAL.extraChainTargets;
+    for (let i = 0; i < totalChain; i++) {
+      chainDamage *= stormSpecial.chainFalloff;
+      const next = findNearestUnhit(chainOrigin.position, stats.range * 0.6, enemies, alreadyHit);
+      if (!next) break;
+      dealDamage(tower, next, chainDamage, stormSpecial.armorPenetration);
+      chainImpactPoints.push(next.position);
+      alreadyHit.add(next.id);
+      chainOrigin = next;
+    }
+    projectiles.push(createProjectile(tower.type, tower.position, target.position, chainImpactPoints, true));
+  }
 }
