@@ -105,6 +105,47 @@ describe("SaveSystem", () => {
     expect(loadSave().inventory).toEqual([validItem]);
   });
 
+  describe("Save versioning (Master Implementation Pass spec section 39)", () => {
+    it("a pre-Tower-Mastery/pre-Prestige save (v9, missing masteryLevel/prestigeLevel entirely) self-heals both new fields to their fresh-account defaults without losing any pre-existing progress", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          version: 9,
+          bestWave: 240,
+          gold: 88_000,
+          currentWave: 240,
+          towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 30, specializationId: null, specializationLevel: 0, equippedSkinId: null }],
+          gems: 42,
+        }),
+      );
+      const loaded = loadSave();
+      expect(loaded.version).toBe(11);
+      // Pre-existing progress is fully preserved.
+      expect(loaded.bestWave).toBe(240);
+      expect(loaded.gold).toBe(88_000);
+      expect(loaded.currentWave).toBe(240);
+      expect(loaded.gems).toBe(42);
+      // Brand-new fields self-heal to a fresh-account default, never throwing/dropping the save.
+      expect(loaded.prestigeLevel).toBe(0);
+      expect(loaded.towerLoadout[0]?.masteryLevel).toBe(0);
+    });
+
+    it("never regresses a save already at the current (or a future) version", () => {
+      window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify({ ...DEFAULT_SAVE_DATA, version: 999, prestigeLevel: 7 }));
+      const loaded = loadSave();
+      // loadSave always normalizes to the code's own SAVE_DATA_VERSION on write,
+      // but must never discard a higher-versioned save's actual data doing so.
+      expect(loaded.prestigeLevel).toBe(7);
+    });
+
+    it("reloading an already-migrated save (F5 twice in a row) is idempotent — no field drifts or resets on a second load", () => {
+      writeSave({ ...DEFAULT_SAVE_DATA, prestigeLevel: 3, gold: 500, towerLoadout: [{ slotId: "s1", type: "INFERNO", level: 10, specializationId: null, specializationLevel: 0, equippedSkinId: null, masteryLevel: 5 }] });
+      const first = loadSave();
+      const second = loadSave();
+      expect(second).toEqual(first);
+    });
+  });
+
   describe("Ascension storage namespace (Master Implementation spec section 2)", () => {
     it("the Ascension save is a completely separate blob from the Infinite save — writing one never touches the other", () => {
       updateSave({ gold: 999, currentWave: 50 }); // Infinite
