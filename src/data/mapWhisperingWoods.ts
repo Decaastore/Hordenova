@@ -1,5 +1,5 @@
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
-import { buildCatmullRomSpline, offsetFromSegment, type Vector2 } from "@/utils/geometry";
+import { buildCatmullRomSpline, distanceToPolyline, offsetFromSegment, type Vector2 } from "@/utils/geometry";
 
 /**
  * WHISPERING WOODS — first map.
@@ -123,6 +123,15 @@ interface SlotSeed {
 // 1.0 (max 0.68) so the LAST slot still leaves a real, visually and
 // tactically clear gap before the gate — "last line of defense before the
 // castle", never on top of it (Map spec section 14).
+// AUDITORIA E CORREÇÃO GERAL spec sections 50-52 — MIN_TOWER_SPACING
+// (see the exported constant + isTowerPositionValid below). Four pairs
+// originally converged on the same "gap between lanes" corner from
+// different segments/sides and ended up far closer together than intended
+// (slot-2/slot-7 as close as 20 units apart — visibly "grudadas"): fixed by
+// nudging only the offending seeds' `t` (position along their own lane)
+// further from the shared corner, never touching `distanceFromPath`/`side`
+// (which is what the Level-1-range and CLOSE/MEDIUM/FAR-variety tests key
+// off), so every other existing guarantee about this map stays intact.
 const SLOT_SEEDS: readonly SlotSeed[] = [
   { id: "slot-1", segmentIndex: 0, t: 0.12, distanceFromPath: 40, side: 1, distanceCategory: "CLOSE" },
   { id: "slot-2", segmentIndex: 0, t: 0.35, distanceFromPath: 75, side: 1, distanceCategory: "FAR" },
@@ -132,12 +141,22 @@ const SLOT_SEEDS: readonly SlotSeed[] = [
   // clear of the path regardless of which type occupies the slot.
   { id: "slot-3", segmentIndex: 0, t: 0.65, distanceFromPath: 65, side: -1, distanceCategory: "CLOSE" },
   { id: "slot-4", segmentIndex: 1, t: 0.5, distanceFromPath: 55, side: 1, distanceCategory: "MEDIUM" },
-  { id: "slot-5", segmentIndex: 2, t: 0.2, distanceFromPath: 80, side: 1, distanceCategory: "FAR" },
+  // t nudged from 0.2 to 0.35 — was converging on the lane-1/lane-2 corner
+  // right next to slot-4 (75.7 units apart); still the same FAR gap-between
+  // -lanes placement, just further along its own lane.
+  { id: "slot-5", segmentIndex: 2, t: 0.35, distanceFromPath: 80, side: 1, distanceCategory: "FAR" },
   { id: "slot-6", segmentIndex: 2, t: 0.5, distanceFromPath: 40, side: -1, distanceCategory: "CLOSE" },
-  { id: "slot-7", segmentIndex: 2, t: 0.8, distanceFromPath: 85, side: 1, distanceCategory: "FAR" },
+  // t nudged from 0.8 to 0.55 — was landing within 20 units of slot-2
+  // (both anchored to the same gap between lane 1 and lane 2).
+  { id: "slot-7", segmentIndex: 2, t: 0.55, distanceFromPath: 85, side: 1, distanceCategory: "FAR" },
   { id: "slot-8", segmentIndex: 3, t: 0.5, distanceFromPath: 50, side: -1, distanceCategory: "MEDIUM" },
-  { id: "slot-9", segmentIndex: 4, t: 0.12, distanceFromPath: 45, side: -1, distanceCategory: "CLOSE" },
-  { id: "slot-10", segmentIndex: 4, t: 0.32, distanceFromPath: 80, side: -1, distanceCategory: "FAR" },
+  // t nudged from 0.12 to 0.2 — was converging on the lane-2/corridor
+  // corner right next to slot-8 (68.8 units apart).
+  { id: "slot-9", segmentIndex: 4, t: 0.2, distanceFromPath: 45, side: -1, distanceCategory: "CLOSE" },
+  // t nudged from 0.32 to 0.5 — was landing within 80 units of slot-6
+  // (a different segment/side that happens to fold back nearby in world
+  // space). Still comfortably before slot-11/slot-12 further up the corridor.
+  { id: "slot-10", segmentIndex: 4, t: 0.5, distanceFromPath: 80, side: -1, distanceCategory: "FAR" },
   { id: "slot-11", segmentIndex: 4, t: 0.5, distanceFromPath: 40, side: 1, distanceCategory: "CLOSE" },
   // The LAST tower slot — pulled back from the old t=0.88 (which sat
   // ~30 world units from the castle set-piece, effectively on top of the
@@ -145,6 +164,50 @@ const SLOT_SEEDS: readonly SlotSeed[] = [
   // while still reading as the final, most-forward defensive position.
   { id: "slot-12", segmentIndex: 4, t: 0.68, distanceFromPath: 55, side: -1, distanceCategory: "MEDIUM" },
 ];
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec sections 50-52 — the structural rule
+ * itself. No two tower slots may sit closer than this together (accounts
+ * for a tower's own visual footprint — base/platform/shadow/idle VFX —
+ * being roughly 60-80 units across at the largest, per rendering/
+ * EntityRenderer.ts's tower silhouettes), and no slot may sit closer than
+ * this to the castle gate (the "last tower before the castle" clearance —
+ * spec section 53).
+ */
+export const MIN_TOWER_SPACING = 90;
+export const MIN_TOWER_TO_CASTLE_DISTANCE = 120;
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec section 52 — genuine structural
+ * validation, not just a design-time assertion: checks spacing against
+ * every OTHER already-placed tower, minimum distance to the enemy path
+ * (a slot sitting exactly on the road would look broken), the castle gate,
+ * and the map's own bounds. Returns the specific reason a position fails,
+ * or null when it's valid — usable both by this map's own test suite
+ * (validating every hand-authored TOWER_SLOTS entry satisfies its own
+ * rule) and by any future freeform/procedural placement without
+ * duplicating the rule a second time.
+ */
+export function isTowerPositionValid(
+  position: Vector2,
+  existingPositions: readonly Vector2[],
+  path: readonly Vector2[] = ENEMY_PATH,
+  castleGate: Vector2 = PATH_DEFINITION.end,
+): string | null {
+  if (position.x < 0 || position.x > WORLD_SIZE.width || position.y < 0 || position.y > WORLD_SIZE.height) {
+    return "OUT_OF_BOUNDS";
+  }
+  const distanceToGate = Math.hypot(position.x - castleGate.x, position.y - castleGate.y);
+  if (distanceToGate < MIN_TOWER_TO_CASTLE_DISTANCE) return "TOO_CLOSE_TO_CASTLE_GATE";
+  const distanceToPath = distanceToPolyline(position, path);
+  if (distanceToPath <= 15) return "ON_THE_PATH";
+  for (const other of existingPositions) {
+    if (other === position) continue;
+    const distance = Math.hypot(position.x - other.x, position.y - other.y);
+    if (distance < MIN_TOWER_SPACING) return "TOO_CLOSE_TO_ANOTHER_TOWER";
+  }
+  return null;
+}
 
 export const TOWER_SLOTS: readonly TowerSlotDefinition[] = SLOT_SEEDS.map((seed) => {
   const a = PATH_CONTROL_POINTS[seed.segmentIndex]!;
