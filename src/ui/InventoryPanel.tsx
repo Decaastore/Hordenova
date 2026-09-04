@@ -9,6 +9,7 @@ import { RarityBadge } from "./RarityBadge";
 import { ItemDetailsModal } from "./ItemDetailsModal";
 import { TradeScreen } from "./TradeScreen";
 import { EconomyStatsPanel } from "./EconomyStatsPanel";
+import { GameEngine } from "@/engine/GameEngine";
 
 interface InventoryPanelProps {
   inventory: readonly ItemInstance[];
@@ -88,12 +89,41 @@ export function InventoryPanel({
           <>
             <div style={capacityRowStyle}>
               <span>{t("inventory.capacity", { used: inventory.length, capacity: inventoryCapacity })}</span>
-              {gemShards > 0 && (
-                <button onClick={onConvertGemShards} style={convertButtonStyle}>
-                  {t("gems.convert")} ({gemShards})
-                </button>
-              )}
             </div>
+
+            {gemShards > 0 && (
+              // AUDITORIA E CORREÇÃO GERAL spec section 18 — exact raw
+              // values (never a "1.2K"-style abbreviation), and section 15's
+              // "a mesma função/regra deve ser usada por UI/clique/validação"
+              // — GameEngine.canConvertGemShards is the ONE eligibility rule
+              // both this button's disabled state and convertGemShards()
+              // itself check, so they can never disagree.
+              <div style={convertBoxStyle}>
+                <div style={convertRowStyle}>
+                  <span>{t("gems.shardsAvailable")}</span>
+                  <span>{gemShards}</span>
+                </div>
+                <div style={convertRowStyle}>
+                  <span>{t("gems.cost")}</span>
+                  <span>{GameEngine.GEM_SHARD_TO_GEM_RATE}</span>
+                </div>
+                <div style={convertRowStyle}>
+                  <span>{t("gems.receive")}</span>
+                  <span>1</span>
+                </div>
+                <button
+                  onClick={onConvertGemShards}
+                  disabled={!GameEngine.canConvertGemShards(gemShards)}
+                  style={{
+                    ...convertButtonStyle,
+                    opacity: GameEngine.canConvertGemShards(gemShards) ? 1 : 0.45,
+                    cursor: GameEngine.canConvertGemShards(gemShards) ? "pointer" : "not-allowed",
+                  }}
+                >
+                  {t("gems.convert")}
+                </button>
+              </div>
+            )}
 
             {inventory.length === 0 ? (
               <div style={emptyStyle}>{t("inventory.empty")}</div>
@@ -291,7 +321,25 @@ const capacityRowStyle: CSSProperties = {
   marginBottom: 10,
 };
 
+const convertBoxStyle: CSSProperties = {
+  border: `1px solid #c88aff55`,
+  borderRadius: 8,
+  padding: "8px 10px",
+  marginBottom: 10,
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+};
+
+const convertRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+};
+
 const convertButtonStyle: CSSProperties = {
+  marginTop: 4,
   padding: "5px 10px",
   borderRadius: 6,
   border: `1px solid #c88aff`,
@@ -299,7 +347,7 @@ const convertButtonStyle: CSSProperties = {
   color: "#e8d4ff",
   fontWeight: 700,
   fontSize: 10.5,
-  cursor: "pointer",
+  width: "100%",
 };
 
 const overflowTitleStyle: CSSProperties = {

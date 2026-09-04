@@ -122,6 +122,16 @@ export interface HudSnapshot {
   pendingItemReward: { instanceId: string; itemDefinitionId: string } | null;
   /** The most recent still-unacknowledged Roulette spin, or null — see GameEngine.acknowledgeRouletteResult. Master Implementation spec section 46-48. */
   pendingRouletteResult: RouletteResult | null;
+  /**
+   * AUDITORIA E CORREÇÃO GERAL spec sections 1-3, 9, 11-13 — the oldest wave
+   * milestone whose Roulette has NOT been spun yet, or null. Its reward is
+   * NOT granted and its result is NOT known until the player explicitly
+   * calls GameEngine.spinPendingRoulette() — crossing the milestone only
+   * ever gets it into this queue, never resolves it. A UI must show a
+   * "Roulette available" prompt whenever this is non-null, and keep showing
+   * it (even across F5) until the player actually spins.
+   */
+  pendingRouletteSpinWave: number | null;
 }
 
 /**
@@ -173,7 +183,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.pendingDiscoveryType === b.pendingDiscoveryType &&
     a.pendingItemReward?.instanceId === b.pendingItemReward?.instanceId &&
     a.pendingRouletteResult?.wave === b.pendingRouletteResult?.wave &&
-    a.pendingRouletteResult?.rewardType === b.pendingRouletteResult?.rewardType
+    a.pendingRouletteResult?.rewardType === b.pendingRouletteResult?.rewardType &&
+    a.pendingRouletteSpinWave === b.pendingRouletteSpinWave
   );
 }
 
@@ -244,15 +255,26 @@ export class GameEngine {
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
 
-  // Master Implementation spec sections 46-48 — the every-10-wave Roulette.
+  // Master Implementation spec sections 46-48, and AUDITORIA E CORREÇÃO
+  // GERAL spec sections 1-13 — the every-10-wave Roulette.
   // `castleHpBonus`/`unlockedCastleSkinIds` are the persistent halves (see
   // SaveSystem.ts); `pendingRouletteResults` is a purely in-memory display
   // queue exactly like `pendingItemRewards` above — the reward itself is
   // already granted and persisted by the time an entry lands here, so
   // losing this queue to a reload loses only the banner, never the reward.
+  //
+  // `pendingRouletteSpinWaves` is the opposite: a PERSISTED queue of wave
+  // milestones whose Roulette has NOT been spun/granted yet. Crossing a
+  // milestone (in advanceBestWave, or a batch of them inside an Offline
+  // Defense return) only ever pushes here — nothing is rolled or granted
+  // until spinPendingRoulette() is explicitly called (the player's own
+  // ROLETAR click). This MUST be persisted (unlike pendingRouletteResults)
+  // because losing it to a reload would mean losing a reward the player
+  // never got the chance to claim, not just losing a toast.
   private castleHpBonus = 0;
   private unlockedCastleSkinIds: string[] = [];
   private pendingRouletteResults: RouletteResult[] = [];
+  private pendingRouletteSpinWaves: number[] = [];
 
   /** Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the recurring, uncapped, purely-cosmetic Gem sink (config/prestige.ts). */
   private prestigeLevel = 0;
@@ -319,6 +341,7 @@ export class GameEngine {
     this.castleHpBonus = save.castleHpBonus;
     this.unlockedCastleSkinIds = save.unlockedCastleSkinIds;
     this.prestigeLevel = save.prestigeLevel;
+    this.pendingRouletteSpinWaves = [...save.pendingRouletteSpinWaves];
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -333,9 +356,19 @@ export class GameEngine {
         capacityMs,
       });
       if (result.phasesCleared > 0) {
+        // AUDITORIA E CORREÇÃO GERAL spec section 12 — Offline Defense can
+        // jump `currentWave`/`bestWave` across several ROULETTE_MILESTONE_
+        // INTERVAL boundaries in one shot (this never happens in live play,
+        // where advanceBestWave is called once per single wave crossed).
+        // Every milestone crossed while offline is queued as pending here —
+        // NEVER auto-resolved — exactly like a milestone crossed live.
+        const oldBestWave = this.bestWave;
         this.wave.currentWave = result.endingWave;
         this.gold += result.resourcesEarned;
         this.bestWave = Math.max(this.bestWave, result.endingWave);
+        for (let w = oldBestWave + 1; w <= this.bestWave; w++) {
+          if (w % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(w);
+        }
         this.offlineSummary = result;
         this.phase = "OFFLINE_RETURN";
         this.persist();
@@ -635,9 +668,25 @@ export class GameEngine {
   /** Gem Shards -> Gems conversion (spec section 34: "se a conversão não fizer sentido, deixe a arquitetura preparada sem inventar uma economia arbitrária"). A conservative fixed rate, player-triggered — never automatic. */
   static readonly GEM_SHARD_TO_GEM_RATE = 10;
 
+  /**
+   * AUDITORIA E CORREÇÃO GERAL spec section 15 — "a mesma função/regra deve
+   * ser usada por: UI, clique, validação. Não criar regras diferentes." This
+   * static, pure, side-effect-free predicate is the ONE place that decides
+   * eligibility — both convertGemShards() below and the InventoryPanel UI's
+   * button-disabled state call this exact function, so they can never drift
+   * apart (which was the real root cause of the reported bug: the UI used
+   * to show the convert button for ANY gemShards > 0 with no disabled state
+   * at all, so a balance below GEM_SHARD_TO_GEM_RATE looked clickable but
+   * silently did nothing when clicked — indistinguishable from "the button
+   * doesn't work" even when the underlying engine logic was already correct).
+   */
+  static canConvertGemShards(gemShards: number): boolean {
+    return gemShards >= GameEngine.GEM_SHARD_TO_GEM_RATE;
+  }
+
   convertGemShards(): boolean {
+    if (!GameEngine.canConvertGemShards(this.gemShards)) return false;
     const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
-    if (this.gemShards < rate) return false;
     const shardsToConvert = Math.floor(this.gemShards / rate) * rate;
     const gemsGained = shardsToConvert / rate;
     this.gemShards -= shardsToConvert;
@@ -874,9 +923,18 @@ export class GameEngine {
         // tracked enemy is gone, permanently soft-locking the run. No
         // reward (it wasn't killed), but Active Idle must never stall —
         // the base already paid for it in HP, so progression continues.
+        // AUDITORIA E CORREÇÃO GERAL spec sections 1, 11 — advanceBestWave
+        // MUST be called for the boss wave itself (this.wave.currentWave,
+        // BEFORE activateNextWave bumps it) or a milestone landing exactly
+        // on a boss wave (e.g. wave 30) is silently skipped entirely: the
+        // very next advanceBestWave call would already be for wave 31,
+        // which is never a multiple of ROULETTE_MILESTONE_INTERVAL. This
+        // bug pre-dates the pending-Roulette rework but was invisible
+        // before it — a skipped auto-grant just silently gave nothing;
+        // now it would have silently skipped queuing a pending spin.
         this.activeBossId = null;
-        activateNextWave(this.wave);
         this.advanceBestWave(this.wave.currentWave);
+        activateNextWave(this.wave);
         this.phase = "RUNNING";
         this.persist();
       }
@@ -888,6 +946,14 @@ export class GameEngine {
           this.waveCompleteAudioFiredForWave = this.wave.currentWave;
           this.emitAudio({ type: "wave_complete" });
         }
+        // AUDITORIA E CORREÇÃO GERAL spec section 10/13 — advanceBestWave
+        // can now enqueue a pending Roulette spin (pendingRouletteSpinWaves)
+        // purely in memory; without persisting here, a reload landing
+        // between this wave transition and the next boss/victory tick would
+        // silently lose that pending milestone. The sibling BOSS_BATTLE
+        // branches above already persist on every wave-advancing event —
+        // this keeps the same guarantee for a plain (non-boss) wave clear.
+        this.persist();
       }
     }
 
@@ -899,7 +965,19 @@ export class GameEngine {
     this.notify();
   }
 
-  /** Raises bestWave and, the first time THIS wave number is ever crossed, grants its milestone bonus (config/phaseConfig.ts) — spec section 12 — and, every ROULETTE_MILESTONE_INTERVAL waves, spins the Roulette (spec section 46). */
+  /**
+   * Raises bestWave and, the first time THIS wave number is ever crossed,
+   * grants its milestone bonus (config/phaseConfig.ts) — spec section 12.
+   *
+   * AUDITORIA E CORREÇÃO GERAL spec sections 1-3 — every
+   * ROULETTE_MILESTONE_INTERVAL waves, this ONLY enqueues the milestone as
+   * pending (`pendingRouletteSpinWaves`). It must NEVER roll or grant a
+   * reward itself — that was the exact bug this pass fixes: Castle HP (and
+   * every other Roulette reward) used to be rolled and applied the instant
+   * a milestone wave was reached, with the UI only showing a toast
+   * afterward. Now nothing is rolled/granted until the player explicitly
+   * calls spinPendingRoulette() (their own ROLETAR click).
+   */
   private advanceBestWave(wave: number): void {
     if (wave <= this.bestWave) return;
     const bonus = getMilestoneBonus(wave);
@@ -911,18 +989,28 @@ export class GameEngine {
       this.addGemShards(Math.max(1, Math.round(bonus / 150)), `milestone_wave_${wave}`);
     }
     this.bestWave = wave;
-    if (wave % ROULETTE_MILESTONE_INTERVAL === 0) this.triggerRouletteSpin(wave);
+    if (wave % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(wave);
   }
 
   /**
-   * Spec sections 46-48: every 10th wave, a real weighted roll
-   * (config/roulette.ts) is resolved and its reward granted immediately —
-   * before any UI ever renders a "spin". Persisted synchronously in the same
-   * call (like grantBossDrop's item drop above) so the reward can never be
-   * lost to a reload landing between the roll and the tick's own conditional
-   * persist().
+   * AUDITORIA E CORREÇÃO GERAL spec sections 2-3, 6, 9, 11, 13 — the ONLY
+   * way any Roulette reward is ever rolled or granted: an explicit player
+   * action (the ROLETAR click). Resolves the OLDEST pending milestone
+   * (FIFO — spec section 11: "Roulette 20 → jogador roleta → resultado,
+   * Roulette 30 → jogador roleta → resultado", never both at once). Returns
+   * false (a no-op) if nothing is pending, so a UI can safely call this
+   * without checking first.
+   *
+   * The result is determined HERE, synchronously, the instant this is
+   * called (spec section 6: "o resultado deve ser determinado de maneira
+   * segura" at click time) — any spin/reveal animation a UI wants to show
+   * is purely a cosmetic delay on ALREADY-decided state, never something
+   * that can alter the outcome.
    */
-  private triggerRouletteSpin(wave: number): void {
+  spinPendingRoulette(): boolean {
+    const wave = this.pendingRouletteSpinWaves.shift();
+    if (wave === undefined) return false;
+
     const rewardType = rollRoulette();
     const castleHpGranted = castleHpForReward(rewardType);
     let gemsGranted = 0;
@@ -935,10 +1023,10 @@ export class GameEngine {
     } else if (rewardType === "GEM") {
       gemsGranted = ROULETTE_GEM_REWARD_AMOUNT;
       this.addGems(gemsGranted, `roulette_wave_${wave}`);
-    } else {
-      // CASTLE_SKIN — grant the first real skin this save doesn't already
-      // own; if every real Castle Skin is already unlocked, the 1%-rarity
-      // roll falls back to Gems rather than doing nothing (spec section 48).
+    } else if (rewardType === "CASTLE_SKIN") {
+      // Grant the first real skin this save doesn't already own; if every
+      // real Castle Skin is already unlocked, the 1%-rarity roll falls back
+      // to Gems rather than doing nothing (spec section 48).
       const unowned = CASTLE_SKINS.find((s) => !this.unlockedCastleSkinIds.includes(s.id));
       if (unowned) {
         castleSkinId = unowned.id;
@@ -948,9 +1036,14 @@ export class GameEngine {
         this.addGems(gemsGranted, `roulette_wave_${wave}_skin_fallback`);
       }
     }
+    // else rewardType === "NOTHING" — grant absolutely nothing (spec section
+    // 4-5: a real, honest chance of walking away empty-handed). Every
+    // reward variable above already defaults to its "nothing granted" value.
 
     this.pendingRouletteResults.push({ wave, rewardType, castleHpGranted, gemsGranted, castleSkinId });
     this.persist();
+    this.notify();
+    return true;
   }
 
   /** Dismisses the currently-shown Roulette result banner (see HudSnapshot.pendingRouletteResult) so the next one, if any, can show. */
@@ -1136,6 +1229,7 @@ export class GameEngine {
         castleHpBonus: this.castleHpBonus,
         unlockedCastleSkinIds: this.unlockedCastleSkinIds,
         prestigeLevel: this.prestigeLevel,
+        pendingRouletteSpinWaves: this.pendingRouletteSpinWaves,
       },
       this.storageKey,
     );
@@ -1173,6 +1267,7 @@ export class GameEngine {
         ? { instanceId: this.pendingItemRewards[0].instanceId, itemDefinitionId: this.pendingItemRewards[0].itemDefinitionId }
         : null,
       pendingRouletteResult: this.pendingRouletteResults[0] ?? null,
+      pendingRouletteSpinWave: this.pendingRouletteSpinWaves[0] ?? null,
     };
 
     const prev = this.cachedHud;

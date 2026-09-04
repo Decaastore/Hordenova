@@ -366,6 +366,9 @@ export const en = {
   gems: {
     convert: "CONVERT",
     convertHint: "{rate} Shards = 1 Gem",
+    shardsAvailable: "Shards Available",
+    cost: "Cost",
+    receive: "Receive",
   },
   modeSelect: {
     title: "CHOOSE YOUR PATH",
@@ -447,8 +450,14 @@ export const en = {
       CASTLE_HP_20: "+20 Castle HP",
       GEM: "+1 Gem",
       CASTLE_SKIN: "New Castle Skin!",
+      NOTHING: "No Reward",
     },
     fallbackNote: "Every real Castle Skin is already unlocked — converted to Gems instead.",
+    pendingTitle: "ROULETTE AVAILABLE",
+    pendingSubtitle: "Wave {wave} milestone reached",
+    oddsTitle: "Possible outcomes",
+    spinButton: "ROLL",
+    spinning: "Rolling…",
   },
   prestige: {
     title: "PROFILE PRESTIGE",

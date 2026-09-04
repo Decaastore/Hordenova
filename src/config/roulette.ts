@@ -1,20 +1,27 @@
 /**
- * Master Implementation spec sections 46-48 — the every-10-wave milestone
- * Roulette. Mirrors config/dropTables.ts's proven pattern exactly (same
- * "SE O JOGO MOSTRA UMA CHANCE, ESSA CHANCE É REAL" contract spec section
- * 47 restates: "não pode haver: resultado pré-determinado escondido, sistema
- * de pity oculto, animação manipulada, sensação de quase-vitória falsa"):
- * `weightPercent` on each entry IS the weight `rollRoulette` uses, there is
- * no hidden multiplier or per-player modifier anywhere in this file, and a
- * UI's "spin" animation is free to take however long it wants to feel good
- * — but the result it lands on must always be the one `rollRoulette` really
- * produced, never a value chosen to manufacture a near-miss.
+ * Master Implementation spec sections 46-48, and the AUDITORIA E CORREÇÃO
+ * GERAL pass's own sections 4-5 — the every-10-wave milestone Roulette.
+ * Mirrors config/dropTables.ts's proven pattern exactly (same "SE O JOGO
+ * MOSTRA UMA CHANCE, ESSA CHANCE É REAL" contract): `weightPercent` on each
+ * entry IS the weight `rollRoulette` uses, there is no hidden multiplier or
+ * per-player modifier anywhere in this file, and a UI's "spin" animation is
+ * free to take however long it wants to feel good — but the result it lands
+ * on must always be the one `rollRoulette` really produced, never a value
+ * chosen to manufacture a near-miss.
+ *
+ * NOTHING outcome (AUDITORIA spec section 4-5): a real, honest chance of
+ * walking away with no reward at all — the table was RECALIBRATED (not just
+ * appended-to) so the five original outcomes plus NOTHING still sum to
+ * exactly 100%. Rank order is preserved (CASTLE_HP_5 stays the dominant
+ * outcome, CASTLE_SKIN stays the rarest at 1%); NOTHING is set to 15%,
+ * meaningful but never crushing, with the other five scaled down from
+ * their original 55/25/10/9/1 to make room for it.
  *
  * Test values only (spec section 47: "não finais, sujeitos a ajuste após
  * simulação") — tune here, nowhere else.
  */
 
-export type RouletteRewardType = "CASTLE_HP_5" | "CASTLE_HP_10" | "CASTLE_HP_20" | "GEM" | "CASTLE_SKIN";
+export type RouletteRewardType = "CASTLE_HP_5" | "CASTLE_HP_10" | "CASTLE_HP_20" | "GEM" | "CASTLE_SKIN" | "NOTHING";
 
 /** Spec section 46: "a cada 10 níveis" — reuses the codebase's existing "wave" vocabulary (config/phaseConfig.ts's PHASE_MILESTONE_BONUSES is keyed the same way) since HORDENOVA has no separate "nível" concept from "wave". */
 export const ROULETTE_MILESTONE_INTERVAL = 10;
@@ -26,14 +33,15 @@ export interface RouletteEntry {
 }
 
 export const ROULETTE_ENTRIES: readonly RouletteEntry[] = [
-  { type: "CASTLE_HP_5", weightPercent: 55 },
-  { type: "CASTLE_HP_10", weightPercent: 25 },
-  { type: "CASTLE_HP_20", weightPercent: 10 },
-  { type: "GEM", weightPercent: 9 },
+  { type: "CASTLE_HP_5", weightPercent: 45 },
+  { type: "CASTLE_HP_10", weightPercent: 22 },
+  { type: "CASTLE_HP_20", weightPercent: 9 },
+  { type: "GEM", weightPercent: 8 },
   { type: "CASTLE_SKIN", weightPercent: 1 },
+  { type: "NOTHING", weightPercent: 15 },
 ];
 
-/** How much permanent max Castle HP each HP-flavored reward grants — 0 for the non-HP outcomes. */
+/** How much permanent max Castle HP each HP-flavored reward grants — 0 for every non-HP outcome (GEM/CASTLE_SKIN/NOTHING alike). */
 export function castleHpForReward(type: RouletteRewardType): number {
   if (type === "CASTLE_HP_5") return 5;
   if (type === "CASTLE_HP_10") return 10;

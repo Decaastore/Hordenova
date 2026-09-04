@@ -367,6 +367,9 @@ export const ptBR: TranslationSchema = {
   gems: {
     convert: "CONVERTER",
     convertHint: "{rate} Fragmentos = 1 Gema",
+    shardsAvailable: "Fragmentos Disponíveis",
+    cost: "Custo",
+    receive: "Recebe",
   },
   modeSelect: {
     title: "ESCOLHA SEU CAMINHO",
@@ -448,8 +451,14 @@ export const ptBR: TranslationSchema = {
       CASTLE_HP_20: "+20 HP do Castelo",
       GEM: "+1 Gema",
       CASTLE_SKIN: "Nova Skin de Castelo!",
+      NOTHING: "Sem Recompensa",
     },
     fallbackNote: "Todas as Skins de Castelo já foram desbloqueadas — convertido em Gemas.",
+    pendingTitle: "ROLETA DISPONÍVEL",
+    pendingSubtitle: "Marco da wave {wave} alcançado",
+    oddsTitle: "Resultados possíveis",
+    spinButton: "ROLETAR",
+    spinning: "Girando…",
   },
   prestige: {
     title: "PRESTÍGIO DE PERFIL",

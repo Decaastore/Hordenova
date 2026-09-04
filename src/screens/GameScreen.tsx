@@ -14,6 +14,7 @@ import { EnemyDiscoveryBanner } from "@/ui/EnemyDiscoveryBanner";
 import { ItemRewardBanner } from "@/ui/ItemRewardBanner";
 import { InventoryPanel } from "@/ui/InventoryPanel";
 import { RouletteBanner } from "@/ui/RouletteBanner";
+import { RoulettePendingPrompt } from "@/ui/RoulettePendingPrompt";
 import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
 import type { TowerType } from "@/config/towerStats";
 import { ASCENSION_STORAGE_KEY } from "@/engine/SaveSystem";
@@ -111,6 +112,10 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
         )}
         {hud.pendingRouletteResult && (
           <RouletteBanner result={hud.pendingRouletteResult} onAcknowledge={() => engine.acknowledgeRouletteResult()} />
+        )}
+        {/* AUDITORIA E CORREÇÃO GERAL spec sections 2-3, 11 — shown whenever a milestone is unlocked but not yet spun (persists across F5). Hidden while a just-resolved result is still being revealed, so the two never overlap in the same bottom-center slot; a second pending wave (e.g. Offline Defense crossing both 20 and 30) shows here again the instant the current reveal is acknowledged. */}
+        {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && (
+          <RoulettePendingPrompt wave={hud.pendingRouletteSpinWave} onSpin={() => engine.spinPendingRoulette()} />
         )}
 
         {selectedTower && (

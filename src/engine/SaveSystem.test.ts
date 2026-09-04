@@ -119,7 +119,7 @@ describe("SaveSystem", () => {
         }),
       );
       const loaded = loadSave();
-      expect(loaded.version).toBe(11);
+      expect(loaded.version).toBe(12);
       // Pre-existing progress is fully preserved.
       expect(loaded.bestWave).toBe(240);
       expect(loaded.gold).toBe(88_000);

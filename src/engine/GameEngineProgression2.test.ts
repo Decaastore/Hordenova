@@ -176,6 +176,64 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine2.getGemShardBalance()).toBe(3); // the remainder stays as shards, not discarded
   });
 
+  describe("Gem Conversion button eligibility (AUDITORIA E CORREÇÃO GERAL spec section 14-15)", () => {
+    // GameEngine.canConvertGemShards is the SAME rule InventoryPanel's
+    // button-disabled state uses (spec section 15: "a mesma função/regra
+    // deve ser usada por UI, clique, validação") — testing the static
+    // predicate here covers the UI's own logic by construction, since it's
+    // not duplicated anywhere else.
+    const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
+
+    it("0 shards -> DISABLED", () => {
+      expect(GameEngine.canConvertGemShards(0)).toBe(false);
+    });
+
+    it("below the rate -> DISABLED", () => {
+      expect(GameEngine.canConvertGemShards(rate - 1)).toBe(false);
+    });
+
+    it("exactly at the rate -> ENABLED", () => {
+      expect(GameEngine.canConvertGemShards(rate)).toBe(true);
+    });
+
+    it("above the rate -> ENABLED", () => {
+      expect(GameEngine.canConvertGemShards(rate + 5)).toBe(true);
+    });
+
+    it("convertGemShards() itself agrees with canConvertGemShards() at every boundary — they can never disagree since one calls the other", () => {
+      for (const shards of [0, rate - 1, rate, rate + 1, rate * 3 + 7]) {
+        updateSave({ gemShards: shards, gems: 0 });
+        const engine = new GameEngine();
+        engine.startRun();
+        expect(engine.convertGemShards()).toBe(GameEngine.canConvertGemShards(shards));
+      }
+    });
+
+    it("a double click (two synchronous calls) never double-converts — the second call only sees whatever shards are left", () => {
+      updateSave({ gemShards: rate + 3, gems: 0 });
+      const engine = new GameEngine();
+      engine.startRun();
+      expect(engine.convertGemShards()).toBe(true); // converts `rate` shards -> 1 Gem, 3 left over
+      expect(engine.getGemBalance()).toBe(1);
+      expect(engine.convertGemShards()).toBe(false); // 3 remaining shards < rate, correctly refused
+      expect(engine.getGemBalance()).toBe(1); // unchanged — no double-grant
+    });
+
+    it("F5 after converting: the new Gems/remaining Shards balance persists exactly, never re-converts on reload", () => {
+      updateSave({ gemShards: rate * 2, gems: 0 });
+      const first = new GameEngine();
+      first.startRun();
+      first.convertGemShards();
+      expect(first.getGemBalance()).toBe(2);
+      expect(first.getGemShardBalance()).toBe(0);
+
+      const reloaded = new GameEngine();
+      reloaded.startRun();
+      expect(reloaded.getGemBalance()).toBe(2);
+      expect(reloaded.getGemShardBalance()).toBe(0);
+    });
+  });
+
   it("inventory capacity defaults to DEFAULT_INVENTORY_CAPACITY and overflow starts empty", () => {
     const engine = new GameEngine();
     engine.startRun();

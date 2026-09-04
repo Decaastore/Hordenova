@@ -1,6 +1,7 @@
 import { ENEMY_DEFINITIONS, getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
+import { CC_DR_DECAY_MS, CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "@/config/ccResistance";
 
 export interface SlowEffect {
   percent: number; // 0..1
@@ -77,6 +78,15 @@ export interface EnemyInstance {
   disablerState?: DisablerState;
   /** Elite modifier applied at spawn — see BossManager-style creation in GameEngine.maybeSpawnElite. Purely a marker for rendering/rewards; its stat bumps are already baked into hp/damageToBase/goldReward. */
   elite?: boolean;
+  /**
+   * AUDITORIA E CORREÇÃO GERAL spec sections 24-25 — CC diminishing-returns
+   * bookkeeping (see config/ccResistance.ts). 0 for every NORMAL-tier enemy
+   * for its entire life (never incremented — normal enemies always take
+   * full CC, unaffected by any of this). `ccResistanceDecayRemainingMs`
+   * only ticks down while `ccResistanceStacks > 0`; see advanceEnemy.
+   */
+  ccResistanceStacks: number;
+  ccResistanceDecayRemainingMs: number;
 }
 
 let nextEnemyId = 1;
@@ -101,6 +111,8 @@ export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyI
     slow: null,
     burn: null,
     disablerState: def.disablerIntervalMs !== undefined ? { nextTriggerAtMs: 0 } : undefined,
+    ccResistanceStacks: 0,
+    ccResistanceDecayRemainingMs: 0,
   };
 }
 
@@ -138,6 +150,19 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
     // duration — see applySlow's guard below — leave the enemy stuck
     // "frozen" forever, since NaN can never satisfy a <= comparison).
     if (!(enemy.slow.remainingMs > 0)) enemy.slow = null;
+  }
+
+  // AUDITORIA E CORREÇÃO GERAL spec section 25 — CC resistance decays back
+  // toward baseline after a stretch without a NEW stack-increasing hit
+  // (applySlow stops refreshing this once already at CC_DR_MAX_STACKS, so
+  // sustained fire against an already-immune target can't hold the decay
+  // clock open forever — recovery is guaranteed even under constant fire).
+  if (enemy.ccResistanceStacks > 0) {
+    enemy.ccResistanceDecayRemainingMs -= dtMs;
+    if (!(enemy.ccResistanceDecayRemainingMs > 0)) {
+      enemy.ccResistanceStacks -= 1;
+      enemy.ccResistanceDecayRemainingMs = CC_DR_DECAY_MS;
+    }
   }
 
   const distanceDelta = getEffectiveSpeed(enemy) * dtSeconds;
@@ -196,8 +221,23 @@ export function applySlow(enemy: EnemyInstance, percent: number, durationMs: num
   if (!Number.isFinite(durationMs) || durationMs <= 0) return;
   const clampedPercent = Math.min(Math.max(percent, 0), 1);
 
+  // AUDITORIA E CORREÇÃO GERAL spec sections 24-25 — tiered CC resistance +
+  // diminishing returns (config/ccResistance.ts). NORMAL-tier enemies are
+  // completely unaffected (multiplier always 1, never accumulates a stack)
+  // — this is what guarantees a Boss/Mini-Boss/Elite can never be kept
+  // permanently frozen no matter how often a same-or-stronger reapplication
+  // would otherwise refresh the timer to full: eventually the stack caps
+  // and the effective duration is forced to 0 (a genuine, temporary immunity).
+  const tier = getCcResistanceTier(enemy.boss !== undefined, enemy.boss?.isMainBoss === true, enemy.elite === true);
+  const effectiveDurationMs = durationMs * getCcDurationMultiplier(tier, enemy.ccResistanceStacks);
+  if (tier !== "NORMAL" && enemy.ccResistanceStacks < CC_DR_MAX_STACKS) {
+    enemy.ccResistanceStacks += 1;
+    enemy.ccResistanceDecayRemainingMs = CC_DR_DECAY_MS;
+  }
+  if (!(effectiveDurationMs > 0)) return; // fully resisted this application — a real, temporary immunity window, not a bug.
+
   if (!enemy.slow || clampedPercent >= enemy.slow.percent) {
-    enemy.slow = { percent: clampedPercent, remainingMs: durationMs };
+    enemy.slow = { percent: clampedPercent, remainingMs: effectiveDurationMs };
   }
   // else: strictly weaker than the active effect — no-op, see doc comment above.
 }

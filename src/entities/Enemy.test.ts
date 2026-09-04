@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { advanceEnemy, applySlow, createEnemyInstance, getEffectiveSpeed, isEnemyDead } from "./Enemy";
+import { advanceEnemy, applySlow, createEnemyInstance, createEliteEnemyInstance, getEffectiveSpeed, isEnemyDead } from "./Enemy";
+import { createBossInstance } from "@/engine/BossManager";
+import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
+import { CC_DR_DECAY_MS } from "@/config/ccResistance";
 
 /**
  * Frostborn Freeze bug fix — see entities/Enemy.ts's applySlow doc
@@ -158,5 +161,107 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
     // it must fully clear within, at most, the largest duration used above.
     advanceEnemy(enemy, 1500);
     expect(enemy.slow).toBeNull();
+  });
+});
+
+/**
+ * AUDITORIA E CORREÇÃO GERAL spec sections 23-28 — the REAL, still-live
+ * cause of "a boss gets permanently stuck": a Frostborn tower landing a
+ * SAME-OR-STRONGER freeze (a fresh 100% freeze on an already-100%-frozen
+ * target) legitimately renews the timer to full (see the "same-or-stronger
+ * reapplication... correctly renews" test above — that's intended, NOT a
+ * bug). Against a normal enemy this is harmless because the enemy is a
+ * one-off individual; against a BOSS being repeatedly hit while stuck at 0
+ * speed in range, a high enough freeze chance means this can refresh
+ * indefinitely in practice. These tests prove the fix: CC resistance +
+ * diminishing returns (config/ccResistance.ts) guarantee a Boss/Mini-Boss/
+ * Elite ALWAYS resumes moving, no matter how many same-or-stronger freezes
+ * land back-to-back — while a plain (NORMAL-tier) enemy is completely
+ * unaffected, preserving every test above unchanged.
+ */
+describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec sections 23-28)", () => {
+  const ELITE_MODIFIER = { hpMultiplier: 1.5, speedMultiplier: 1, damageMultiplier: 1.5, rewardMultiplier: 2, regenPercentPerSecond: 0 };
+
+  it("THE BUG, reproduced and fixed: a Boss hit with a constant 100% freeze chance every 100ms is NEVER stuck forever — it eventually resumes moving", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    expect(boss.boss?.isMainBoss).toBe(true);
+
+    // Simulate a Frostborn tower landing a full (percent=1) freeze on this
+    // exact same boss every 100ms, forever — the worst realistic case (a
+    // 100% freeze chance, an attack interval far shorter than the freeze
+    // duration itself) that would have produced a truly permanent freeze
+    // under the pre-fix logic (every hit is same-or-stronger, so it always
+    // legitimately renews... unless resistance eventually refuses it).
+    let everMovedAgain = false;
+    for (let t = 0; t < 20_000; t += 100) {
+      applySlow(boss, 1, 2200); // Frostborn's real freezeDurationMs
+      advanceEnemy(boss, 100);
+      if (getEffectiveSpeed(boss) > 0) {
+        everMovedAgain = true;
+        break;
+      }
+    }
+    expect(everMovedAgain).toBe(true);
+  });
+
+  it("a NORMAL-tier enemy (no boss/elite tag) is completely unaffected by CC resistance — every existing freeze test above stays valid", () => {
+    const enemy = createEnemyInstance("CRAWLER", 1);
+    applySlow(enemy, 1, 1000);
+    expect(enemy.slow!.remainingMs).toBe(1000); // full duration, no reduction
+    expect(enemy.ccResistanceStacks).toBe(0); // never tracked for NORMAL tier
+  });
+
+  it("an ELITE enemy's first freeze is already reduced by its tier's baseline resistance", () => {
+    const elite = createEliteEnemyInstance("CRAWLER", 1, ELITE_MODIFIER);
+    applySlow(elite, 1, 1000);
+    expect(elite.slow!.remainingMs).toBeLessThan(1000);
+    expect(elite.slow!.remainingMs).toBeGreaterThan(0);
+  });
+
+  it("repeated freezes on the same Boss apply strictly shrinking durations, then stop extending the timer at all once fully resisted", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    // Freshly-APPLIED duration (read immediately, before any tick) at each
+    // successive hit — must strictly shrink as the stack climbs.
+    const appliedDurations: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      applySlow(boss, 1, 2000);
+      appliedDurations.push(boss.slow!.remainingMs);
+    }
+    for (let i = 1; i < appliedDurations.length; i++) {
+      expect(appliedDurations[i]).toBeLessThan(appliedDurations[i - 1]!);
+    }
+    expect(boss.ccResistanceStacks).toBe(3); // capped
+
+    // Once fully resisted, a further "freeze" attempt must be a genuine
+    // no-op — it neither extends nor otherwise touches the already-ticking
+    // timer; the boss's remaining freeze just keeps counting down exactly
+    // as if the attempt never happened (the real fix: no infinite refresh).
+    const remainingBeforeResistedHit = boss.slow!.remainingMs;
+    applySlow(boss, 1, 2000); // fully resisted (stack already at cap)
+    expect(boss.slow!.remainingMs).toBe(remainingBeforeResistedHit); // untouched
+    advanceEnemy(boss, remainingBeforeResistedHit);
+    expect(boss.slow).toBeNull(); // and it still expires on schedule
+  });
+
+  it("resistance decays back to baseline after CC_DR_DECAY_MS without any further hit", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    applySlow(boss, 1, 100); // first hit — reaches stack 1
+    applySlow(boss, 1, 100); // second hit — reaches stack 2
+    expect(boss.ccResistanceStacks).toBe(2);
+
+    advanceEnemy(boss, CC_DR_DECAY_MS + 10);
+    expect(boss.ccResistanceStacks).toBe(1); // decayed by exactly one stack
+
+    advanceEnemy(boss, CC_DR_DECAY_MS + 10);
+    expect(boss.ccResistanceStacks).toBe(0); // fully recovered
+  });
+
+  it("a Mini-Boss has non-zero but less severe resistance than a Main Boss (a real hierarchy)", () => {
+    const mainBoss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    const miniBoss = createBossInstance(MINI_BOSSES["ashfen-warlord"]!, 10, 0);
+
+    applySlow(mainBoss, 1, 1000);
+    applySlow(miniBoss, 1, 1000);
+    expect(mainBoss.slow!.remainingMs).toBeLessThan(miniBoss.slow!.remainingMs);
   });
 });

@@ -48,6 +48,8 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
     direction: start.direction,
     slow: null,
     burn: null,
+    ccResistanceStacks: 0,
+    ccResistanceDecayRemainingMs: 0,
     boss: {
       bossId: def.id,
       nameKey: def.i18nKey,

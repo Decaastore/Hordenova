@@ -119,9 +119,21 @@ export interface SaveData {
 
   /** Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the recurring, uncapped, purely-cosmetic Gem sink (config/prestige.ts). Account-wide, never per-tower. 0 = never invested. */
   prestigeLevel: number;
+
+  /**
+   * AUDITORIA E CORREÇÃO GERAL spec sections 1-3, 9-13 — wave milestones
+   * (config/roulette.ts's ROULETTE_MILESTONE_INTERVAL) whose Roulette has
+   * been unlocked but NOT yet spun by the player. MUST be persisted (unlike
+   * the purely-transient post-spin result banner) — losing this to a
+   * reload would mean losing a reward the player never got the chance to
+   * claim, not just losing a toast. Never auto-resolved by anything that
+   * reads this array; only GameEngine.spinPendingRoulette() ever removes an
+   * entry, and only in response to a real player click.
+   */
+  pendingRouletteSpinWaves: number[];
 }
 
-export const SAVE_DATA_VERSION = 11;
+export const SAVE_DATA_VERSION = 12;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -160,6 +172,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   castleHpBonus: 0,
   unlockedCastleSkinIds: [],
   prestigeLevel: 0,
+  pendingRouletteSpinWaves: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -264,6 +277,7 @@ function emptySaveData(): SaveData {
     ownedCosmetics: [],
     seasonRewardRecords: [],
     unlockedCastleSkinIds: [],
+    pendingRouletteSpinWaves: [],
   };
 }
 
@@ -313,6 +327,12 @@ function parseSeasonRewardRecords(raw: unknown): SeasonRewardRecord[] {
 function parseUnlockedCastleSkinIds(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((entry): entry is string => typeof entry === "string");
+}
+
+/** Self-healing parse for `pendingRouletteSpinWaves` — drops anything that isn't a positive integer wave number instead of trusting a corrupted/tampered save. */
+function parseWaveNumberArray(raw: unknown): number[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0);
 }
 
 /** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
@@ -388,6 +408,11 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       unlockedCastleSkinIds: parseUnlockedCastleSkinIds(parsed.unlockedCastleSkinIds),
       // Master Implementation Pass (save v10 -> v11) — same pattern once more.
       prestigeLevel: typeof parsed.prestigeLevel === "number" && parsed.prestigeLevel >= 0 ? parsed.prestigeLevel : 0,
+      // AUDITORIA E CORREÇÃO GERAL (save v11 -> v12) — a pre-existing save
+      // never had pending Roulette spins tracked at all (every Roulette
+      // used to auto-resolve instantly), so an empty queue is the only
+      // correct default; nothing was ever "missed" for it to represent.
+      pendingRouletteSpinWaves: parseWaveNumberArray(parsed.pendingRouletteSpinWaves),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;
