@@ -135,7 +135,6 @@ export function CanvasRenderer({
       // jump is the one reliable "this tower just fired" signal available
       // from the engine's own data, no extra event plumbing needed.
       for (const tower of snapshot.towers) {
-        if (tower.type !== "IRONWOOD") continue;
         const prevCooldown = prevTowerCooldowns.get(tower.id);
         if (prevCooldown !== undefined && tower.cooldownRemainingMs > prevCooldown + 50) {
           towerAttackTimestamps.set(tower.id, timestamp);
@@ -192,8 +191,7 @@ export function CanvasRenderer({
       });
 
       for (const tower of snapshot.towers) {
-        const attackFlashMs =
-          tower.type === "IRONWOOD" ? timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity) : Infinity;
+        const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
         drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs);
         if (tower.id === snapshot.selectedTowerId) {
           drawRangeCircle(ctx, tower.position, getTowerStats(tower).range);

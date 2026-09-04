@@ -55,10 +55,10 @@ export function drawTower(
       drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage);
       break;
     case "INFERNO":
-      drawInferno(ctx, theme, stats.level, timeMs, visualStage);
+      drawInferno(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs);
       break;
     case "FROSTBORN":
-      drawFrostborn(ctx, theme, stats.level, timeMs, visualStage);
+      drawFrostborn(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs);
       break;
     case "STORMCALLER":
       drawStormcaller(ctx, theme, stats.level, timeMs, visualStage, readiness, attackFlashMs);
@@ -522,8 +522,11 @@ function drawInferno(
   level: number,
   timeMs: number,
   visualStage = 1,
+  /** ms since this tower's last attack — drives a brief launch flare at the furnace mouth (spec section 11's CHARGE/LAUNCH beat). */
+  attackFlashMs = Infinity,
 ): void {
   const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
+  const launchFlare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
   const bodyScale = 1 + Math.min(visualStage - 1, 5) * 0.045; // structural growth on top of the tower's own scale — the forge itself gets more massive, not just brighter
 
   drawContactShadow(ctx, 20, 9, 0.42);
@@ -636,8 +639,11 @@ function drawInferno(
   }
 
   // --- Furnace mouth: the "weapon" — an arched, metal-framed opening
-  // with the incandescent core inside it. ---
-  glowBlob(ctx, 0, -6, 15 + level * 1.1, theme.glow);
+  // with the incandescent core inside it. A LAUNCH beat (spec section 11)
+  // briefly flares the mouth brighter/wider the instant the tower fires,
+  // so the fireball reads as something that left the furnace, not just
+  // appeared at the target.
+  glowBlob(ctx, 0, -6, (15 + level * 1.1) * (1 + launchFlare * 0.4), theme.glow);
   ctx.fillStyle = "#1a1310";
   ctx.beginPath();
   ctx.moveTo(-7.5, 1);
@@ -646,12 +652,12 @@ function drawInferno(
   ctx.closePath();
   ctx.fill();
   const mouthGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 8);
-  mouthGrad.addColorStop(0, `rgba(255,240,190,${0.85 + 0.15 * pulse})`);
+  mouthGrad.addColorStop(0, `rgba(255,240,190,${0.85 + 0.15 * pulse + launchFlare * 0.15})`);
   mouthGrad.addColorStop(0.55, theme.primary);
   mouthGrad.addColorStop(1, theme.secondary);
   ctx.fillStyle = mouthGrad;
   ctx.beginPath();
-  ctx.ellipse(0, -4, 5.6, 7.2, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, -4, 5.6 + launchFlare * 1.8, 7.2 + launchFlare * 1.8, 0, 0, Math.PI * 2);
   ctx.fill();
   // Muzzle ring — a distinct metal collar around the opening (stage 3+, "arma mais sofisticada").
   if (visualStage >= 3) {
@@ -791,8 +797,11 @@ function drawFrostborn(
   level: number,
   timeMs: number,
   visualStage = 1,
+  /** ms since this tower's last attack — drives a brief brighter core pulse at launch (spec section 11's CHARGE/LAUNCH beat). */
+  attackFlashMs = Infinity,
 ): void {
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 500);
+  const launchFlare = attackFlashMs < 200 ? 1 - attackFlashMs / 200 : 0;
 
   // Frost creeping across the ground, always present but faint — the
   // ground-hugging mist (stage 4+) is a stronger, wider version of this.
@@ -894,14 +903,17 @@ function drawFrostborn(
   // the icicles/second rune band/sparkles that also cluster around the
   // core — this is now a small, tight accent sized to the orb itself, not
   // something that reaches the spire's shoulders.
-  glowBlob(ctx, 0, coreY, 8 + Math.min(level, 10) * 0.25, theme.glow);
+  // launchFlare: the instant this tower fires, the core briefly tightens
+  // and flares brighter — the "arcane energy" beat before a bolt leaves
+  // the crystal (spec section 11's CHARGE/LAUNCH for Frostborn).
+  glowBlob(ctx, 0, coreY, (8 + Math.min(level, 10) * 0.25) * (1 + launchFlare * 0.35), theme.glow);
   const coreGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
   coreGrad.addColorStop(0, "#eafcff");
   coreGrad.addColorStop(0.55, theme.accent);
   coreGrad.addColorStop(1, theme.primary);
   ctx.fillStyle = coreGrad;
   ctx.beginPath();
-  ctx.arc(0, coreY, 4.4, 0, Math.PI * 2);
+  ctx.arc(0, coreY, 4.4 + launchFlare * 1, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "rgba(255,255,255,0.6)";
   ctx.lineWidth = 0.9;
@@ -1752,29 +1764,30 @@ function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_TH
 // Projectiles / attack effects.
 // ---------------------------------------------------------------------------
 
+/**
+ * Attack VFX (spec section 11): each tower's projectile now has its own
+ * signature TRAVEL + IMPACT read instead of sharing one generic fading
+ * line — Ironwood already had this (a lofted arrow); Inferno, Frostborn
+ * and Stormcaller get their own here. None of this reads or affects
+ * damage/stats — ProjectileInstance is purely cosmetic (see Projectile.ts).
+ */
 export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance): void {
   const progress = 1 - projectile.remainingMs / projectile.totalMs;
   const theme = TOWER_THEME[projectile.towerType];
 
-  if (projectile.towerType === "IRONWOOD") {
-    drawIronwoodArrow(ctx, projectile, progress);
-  } else {
-    ctx.save();
-    ctx.strokeStyle = theme.primary;
-    ctx.lineWidth = 2.2;
-    ctx.globalAlpha = 1 - progress * 0.35;
-    ctx.shadowColor = theme.glow;
-    ctx.shadowBlur = 6;
-
-    drawImpactLine(ctx, projectile.from, projectile.to);
-
-    let originForChain = projectile.to;
-    for (const target of projectile.chainTargets) {
-      drawImpactLine(ctx, originForChain, target);
-      originForChain = target;
-    }
-
-    ctx.restore();
+  switch (projectile.towerType) {
+    case "IRONWOOD":
+      drawIronwoodArrow(ctx, projectile, progress);
+      break;
+    case "INFERNO":
+      drawInfernoFireball(ctx, projectile, progress);
+      break;
+    case "FROSTBORN":
+      drawFrostbornBolt(ctx, projectile, progress);
+      break;
+    case "STORMCALLER":
+      drawStormcallerBolt(ctx, projectile, progress);
+      break;
   }
 
   ctx.save();
@@ -1786,16 +1799,181 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
   ctx.restore();
 }
 
-function drawImpactLine(
+/**
+ * INFERNO — a lofted, glowing fireball (heat-charge → launch → travel →
+ * impact) with a fading ember trail behind it, and a bright flash-burst
+ * right at impact instead of just a dot.
+ */
+function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
+  const { from, to } = projectile;
+  const dist = Math.hypot(to.x - from.x, to.y - from.y) || 1;
+  const arcHeight = Math.min(14, dist * 0.16);
+  const midX = (from.x + to.x) / 2;
+  const midY = (from.y + to.y) / 2 - arcHeight;
+  const currentX = quadPoint(from.x, midX, to.x, progress);
+  const currentY = quadPoint(from.y, midY, to.y, progress);
+
+  // Ember trail: a handful of fading dots along the path just behind the
+  // fireball's current position — reads as heat streaming off it in flight.
+  ctx.save();
+  for (let i = 1; i <= 4; i++) {
+    const trailT = Math.max(0, progress - i * 0.05);
+    const tx = quadPoint(from.x, midX, to.x, trailT);
+    const ty = quadPoint(from.y, midY, to.y, trailT);
+    ctx.globalAlpha = Math.max(0, 0.5 - i * 0.11);
+    ctx.fillStyle = i % 2 === 0 ? "#ffb35a" : "#ff6a2e";
+    ctx.beginPath();
+    ctx.arc(tx, ty, 2.6 - i * 0.35, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // The fireball itself: hot white core, orange corona.
+  ctx.save();
+  const impactGrow = progress > 0.88 ? (progress - 0.88) / 0.12 : 0;
+  const radius = 3.6 + impactGrow * 5;
+  const coreGrad = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, radius);
+  coreGrad.addColorStop(0, "#fff4d8");
+  coreGrad.addColorStop(0.4, "#ffb35a");
+  coreGrad.addColorStop(1, "rgba(255,106,46,0)");
+  ctx.fillStyle = coreGrad;
+  ctx.globalAlpha = 1 - impactGrow * 0.5;
+  ctx.beginPath();
+  ctx.arc(currentX, currentY, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * FROSTBORN — an arcane ice bolt that travels in a near-straight line
+ * (no lofted arc — a precise beam of cold, not a lobbed projectile),
+ * leaving a crystalline trail and crystallizing sharply on impact.
+ */
+function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
+  const { from, to } = projectile;
+  const currentX = from.x + (to.x - from.x) * progress;
+  const currentY = from.y + (to.y - from.y) * progress;
+
+  // Freezing trail: a thin, fading crystalline line behind the bolt.
+  ctx.save();
+  ctx.strokeStyle = "rgba(190,240,255,0.55)";
+  ctx.lineWidth = 1.6;
+  ctx.globalAlpha = 1 - progress * 0.3;
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(currentX, currentY);
+  ctx.stroke();
+  ctx.restore();
+
+  // The bolt itself: a small elongated shard oriented along its travel direction.
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  ctx.save();
+  ctx.translate(currentX, currentY);
+  ctx.rotate(angle);
+  const shardGrad = ctx.createLinearGradient(-5, 0, 3, 0);
+  shardGrad.addColorStop(0, "rgba(220,249,255,0)");
+  shardGrad.addColorStop(1, "#eafcff");
+  ctx.fillStyle = shardGrad;
+  ctx.beginPath();
+  ctx.moveTo(3.5, 0);
+  ctx.lineTo(-4, -1.6);
+  ctx.lineTo(-5, 0);
+  ctx.lineTo(-4, 1.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+
+  // Impact: sharp crystallization burst — small shards radiating from the
+  // hit point in the last stretch of the projectile's life.
+  if (progress > 0.85) {
+    const t = (progress - 0.85) / 0.15;
+    ctx.save();
+    ctx.globalAlpha = 1 - t;
+    ctx.strokeStyle = "#bdf3ff";
+    ctx.lineWidth = 1.2;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      const r = 2 + t * 7;
+      ctx.beginPath();
+      ctx.moveTo(to.x, to.y);
+      ctx.lineTo(to.x + Math.cos(a) * r, to.y + Math.sin(a) * r);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/**
+ * STORMCALLER — an instant jagged lightning bolt (electricity doesn't
+ * meaningfully "travel" at readable game speed, so this collapses the
+ * TRAVEL phase per spec section 11's "where it makes sense") with a
+ * flicker driven by real randomness each frame (authentic crackle, not a
+ * bug — a static bolt shape would read as a laser, not lightning), plus
+ * a fading residual-spark aftermath along its path after the initial
+ * flash instead of an instant cut to nothing.
+ */
+function drawStormcallerBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
+  const theme = TOWER_THEME.STORMCALLER;
+  const flashFade = progress < 0.3 ? 1 : Math.max(0, 1 - (progress - 0.3) / 0.7);
+
+  ctx.save();
+  ctx.strokeStyle = theme.primary;
+  ctx.lineWidth = 2.2 * (0.5 + flashFade * 0.5);
+  ctx.globalAlpha = flashFade;
+  ctx.shadowColor = theme.glow;
+  ctx.shadowBlur = 6;
+
+  drawJaggedBolt(ctx, projectile.from, projectile.to);
+  let originForChain = projectile.to;
+  for (const target of projectile.chainTargets) {
+    drawJaggedBolt(ctx, originForChain, target);
+    originForChain = target;
+  }
+  ctx.restore();
+
+  // Residual sparks: small crackling motes lingering near the impact
+  // points after the main flash fades — the "aftermath" beat.
+  if (progress > 0.25) {
+    const sparkFade = Math.min(1, (progress - 0.25) / 0.6);
+    ctx.save();
+    ctx.globalAlpha = (1 - sparkFade) * 0.7;
+    ctx.fillStyle = theme.accent;
+    const points = [projectile.to, ...projectile.chainTargets];
+    for (const p of points) {
+      for (let i = 0; i < 2; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.random() * 6;
+        ctx.beginPath();
+        ctx.arc(p.x + Math.cos(a) * r, p.y + Math.sin(a) * r, 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    ctx.restore();
+  }
+}
+
+function drawJaggedBolt(
   ctx: CanvasRenderingContext2D,
   from: { x: number; y: number },
   to: { x: number; y: number },
 ): void {
+  const segments = 5;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const nx = -dy;
+  const ny = dx;
+  const len = Math.hypot(nx, ny) || 1;
   ctx.beginPath();
   ctx.moveTo(from.x, from.y);
+  for (let i = 1; i < segments; i++) {
+    const t = i / segments;
+    const jitter = (Math.random() - 0.5) * 6;
+    ctx.lineTo(from.x + dx * t + (nx / len) * jitter, from.y + dy * t + (ny / len) * jitter);
+  }
   ctx.lineTo(to.x, to.y);
   ctx.stroke();
 }
+
 
 function quadPoint(p0: number, p1: number, p2: number, t: number): number {
   return (1 - t) * (1 - t) * p0 + 2 * (1 - t) * t * p1 + t * t * p2;
