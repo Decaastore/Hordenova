@@ -29,6 +29,7 @@ export type SfxId =
   | "boss_death"
   | "boss_enrage"
   | "castle_damage"
+  | "tower_siege_hit"
   | "wave_start"
   | "wave_complete"
   | "defeat"
@@ -90,6 +91,8 @@ export const SFX_ASSETS: Record<SfxId, SfxAssetConfig> = {
   boss_enrage: asset("boss_enrage", { priority: "HIGH", cooldownMs: 0, maxSimultaneous: 1, baseVolume: 1, pitchVariance: 0 }),
 
   castle_damage: asset("castle_damage", { priority: "HIGH", cooldownMs: 400, maxSimultaneous: 1, baseVolume: 0.95 }),
+  // Master Implementation Pass spec section 13 — Boss Siege Attack (a boss hitting a tower, distinct from castle_damage's "enemy reached the base").
+  tower_siege_hit: asset("tower_siege_hit", { priority: "HIGH", cooldownMs: 400, maxSimultaneous: 1, baseVolume: 0.9 }),
 
   wave_start: asset("wave_start", { priority: "MEDIUM", cooldownMs: 500, maxSimultaneous: 1, pitchVariance: 0 }),
   wave_complete: asset("wave_complete", { priority: "MEDIUM", cooldownMs: 500, maxSimultaneous: 1, pitchVariance: 0 }),

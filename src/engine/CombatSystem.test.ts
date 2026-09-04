@@ -148,6 +148,9 @@ describe("CombatSystem", () => {
         shieldUntilMs: null,
         nextAbilityAtMs: 0,
         enraged: false,
+        nextSiegeAtMs: null,
+        siegeTelegraphRemainingMs: 0,
+        siegeTargetTowerId: null,
       };
 
       tickCombat([tower], [bossTarget], 50);
@@ -180,6 +183,9 @@ describe("CombatSystem", () => {
         shieldUntilMs: null,
         nextAbilityAtMs: 0,
         enraged: false,
+        nextSiegeAtMs: null,
+        siegeTelegraphRemainingMs: 0,
+        siegeTargetTowerId: null,
       };
 
       tickCombat([tower], [bossTarget], 50);

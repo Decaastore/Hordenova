@@ -64,6 +64,8 @@ export const en = {
     damage: "Damage",
     attackSpeed: "Attack Speed",
     range: "Range",
+    hp: "Tower HP",
+    shield: "Shield",
     special: "Specialization",
     maxLevel: "MAX LEVEL",
     upgrade: "UPGRADE",

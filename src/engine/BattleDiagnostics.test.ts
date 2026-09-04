@@ -40,6 +40,9 @@ describe("BattleDiagnostics", () => {
       shieldUntilMs: null,
       nextAbilityAtMs: 0,
       enraged: false,
+        nextSiegeAtMs: null,
+        siegeTelegraphRemainingMs: 0,
+        siegeTargetTowerId: null,
     };
     recordBossSnapshot(stats, boss);
 

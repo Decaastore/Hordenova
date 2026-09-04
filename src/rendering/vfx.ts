@@ -147,6 +147,29 @@ export class VfxManager {
     this.triggerShake(1.5 + severity * 1.3, 140 + severity * 40);
   }
 
+  /**
+   * Boss Siege Attack impact (Master Implementation Pass spec section
+   * 13/15): a boss hitting a tower is exactly the "major ability" camera
+   * shake is meant for — short, controlled, non-accumulating, same as
+   * every other shake trigger in this file.
+   */
+  spawnTowerSiegeImpact(position: Vector2): void {
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: "#ff6a3a",
+      remainingMs: 320,
+      totalMs: 320,
+      hotCore: true,
+      particles: Array.from({ length: 9 }, (_, i) => ({
+        angle: (i / 9) * Math.PI * 2 + (Math.random() - 0.5) * 0.3,
+        speed: 30 + Math.random() * 20,
+        curve: (Math.random() - 0.5) * 1.2,
+      })),
+    });
+    this.triggerShake(3, 180);
+  }
+
   /** Bounded, additive camera shake — a new trigger while one is active just refreshes toward the stronger of the two rather than stacking indefinitely. */
   triggerShake(magnitude: number, durationMs: number): void {
     if (magnitude < this.shakeMagnitude && this.shakeRemainingMs > 0) return;

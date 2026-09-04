@@ -88,6 +88,7 @@ export function CanvasRenderer({
     const vfx = new VfxManager();
     let prevEnemies = new Map<string, PrevEnemyState>();
     let prevTowerLevels = new Map<string, number>();
+    let prevTowerHp = new Map<string, number>();
     let prevTowerCooldowns = new Map<string, number>();
     const towerAttackTimestamps = new Map<string, number>();
     let prevGold: number | null = null;
@@ -127,7 +128,7 @@ export function CanvasRenderer({
       latestSnapshotRef.current = snapshot;
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
-      detectVfxEvents(snapshot, hud.gold, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevGold, gateHomePosition);
+      detectVfxEvents(snapshot, hud.gold, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevTowerHp, prevGold, gateHomePosition);
       prevPhase = hud.phase;
 
       // Attack detection: a tower's cooldown only ever counts down during
@@ -161,6 +162,7 @@ export function CanvasRenderer({
         }),
       );
       prevTowerLevels = new Map(snapshot.towers.map((t) => [t.id, t.level]));
+      prevTowerHp = new Map(snapshot.towers.map((t) => [t.id, t.hp]));
       prevGold = hud.gold;
       vfx.update(frameDt);
 
@@ -277,13 +279,14 @@ export function CanvasRenderer({
 
 /**
  * Camera Shake spec: shake is reserved for genuinely important moments —
- * boss entrance, castle damage/destruction — and MUST stay at zero for
- * every normal attack/hit/kill/build/upgrade. Every one of those routine
- * events above only ever calls a `spawn*` VFX method, none of which touch
- * `vfx.triggerShake`. The two calls below (boss entrance, castle impact
- * inside the enemy-reached-base branch) are the ONLY shake triggers in
- * the entire renderer — see rendering/vfx.ts's own triggerShake doc
- * comment for why it can never accumulate across repeated triggers.
+ * boss entrance, castle damage/destruction, tower siege impact — and MUST
+ * stay at zero for every normal attack/hit/kill/build/upgrade. Every one of
+ * those routine events above only ever calls a `spawn*` VFX method, none of
+ * which touch `vfx.triggerShake`. The three calls below (boss entrance,
+ * castle impact inside the enemy-reached-base branch, tower siege impact)
+ * are the ONLY shake triggers in the entire renderer — see rendering/vfx.ts's
+ * own triggerShake doc comment for why it can never accumulate across
+ * repeated triggers.
  */
 const BOSS_INTRO_SHAKE_MAGNITUDE = 4.5;
 const BOSS_INTRO_SHAKE_DURATION_MS = 320;
@@ -297,6 +300,7 @@ export function detectVfxEvents(
   vfx: VfxManager,
   prevEnemies: Map<string, PrevEnemyState>,
   prevTowerLevels: Map<string, number>,
+  prevTowerHp: Map<string, number>,
   prevGold: number | null,
   gatePosition: Vector2,
 ): void {
@@ -359,6 +363,15 @@ export function detectVfxEvents(
       vfx.spawnBuildRing(tower.position, TOWER_THEME[tower.type].accent);
     } else if (tower.level > prevLevel) {
       vfx.spawnUpgradeBurst(tower.position, TOWER_THEME[tower.type].accent);
+    }
+
+    // Boss Siege Attack impact (spec section 13/15) — a tower's HP only
+    // ever drops via applySiegeDamage (GameEngine.ts), so this is a
+    // reliable "a siege hit just landed on THIS tower" signal, pure
+    // render-side diffing exactly like the castle-impact branch above.
+    const prevHp = prevTowerHp.get(tower.id);
+    if (prevHp !== undefined && tower.hp < prevHp) {
+      vfx.spawnTowerSiegeImpact(tower.position);
     }
   }
 

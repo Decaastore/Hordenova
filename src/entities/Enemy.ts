@@ -35,6 +35,21 @@ export interface BossState {
   nextAbilityAtMs: number;
   /** Set once the boss crosses its enrage HP threshold — see BossManager.tickBossAbilities. */
   enraged: boolean;
+
+  // -------------------------------------------------------------------
+  // Master Implementation Pass spec section 13 — Boss Siege Attack. A
+  // separate cadence from `nextAbilityAtMs`/`ability` above (SUMMON/
+  // SHIELD/DISABLE/etc never compete with this for the same cooldown).
+  // Only main bosses have this (nextSiegeAtMs is null for a mini-boss) —
+  // see config/bossSiege.ts's own doc comment for why the scope stops
+  // there for this first pass.
+  // -------------------------------------------------------------------
+  /** World-clock timestamp the next siege attack may begin telegraphing, or null if this boss never sieges. */
+  nextSiegeAtMs: number | null;
+  /** > 0 while a siege hit is telegraphed and about to land — see BossManager.tickBossSiege. */
+  siegeTelegraphRemainingMs: number;
+  /** The tower a telegraphed siege will hit, or null when no siege is telegraphing right now. */
+  siegeTargetTowerId: string | null;
 }
 
 /** DISABLER-archetype enemies (regular or mini-boss) periodically jam the nearest tower — see CombatSystem.tickEnemyDisableAbilities. */

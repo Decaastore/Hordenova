@@ -6,6 +6,7 @@ import {
   resetTowerCooldown,
   resetTowerSpecialCooldown,
   tickTowerCooldown,
+  tickTowerSurvivalRegen,
   type TowerInstance,
 } from "@/entities/Tower";
 import {
@@ -151,6 +152,7 @@ export function tickCombat(
 
   for (const tower of towers) {
     tickTowerCooldown(tower, dtMs);
+    tickTowerSurvivalRegen(tower, dtMs);
 
     // Normal attack — unchanged cadence/logic. No longer `continue`s the
     // whole tower on a miss/no-target: the Special Attack block below is a

@@ -10,6 +10,7 @@ import {
   getTowerUpgradeCost,
 } from "@/entities/Tower";
 import { getMasteryBonusMultipliers } from "@/config/towerMastery";
+import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
   getTowerLevelStats,
@@ -66,6 +67,7 @@ export function TowerInfoPanel({
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
   const stats = getTowerStats(tower);
+  const survival = getTowerSurvivalDefinition(tower.type);
   const upgradeCost = getTowerUpgradeCost(tower);
   const canAfford = upgradeCost !== null && gold >= upgradeCost;
   const nextLevel = upgradeCost !== null ? tower.level + 1 : null;
@@ -94,6 +96,8 @@ export function TowerInfoPanel({
       <Row label={t("towerInfo.damage")} value={stats.damage.toFixed(1)} />
       <Row label={t("towerInfo.attackSpeed")} value={`${stats.attackSpeed.toFixed(2)}/s`} />
       <Row label={t("towerInfo.range")} value={stats.range.toFixed(0)} />
+      <Row label={t("towerInfo.hp")} value={`${Math.ceil(tower.hp)} / ${tower.maxHp}`} />
+      {survival.maxShield > 0 && <Row label={t("towerInfo.shield")} value={`${Math.ceil(tower.shieldHp)} / ${survival.maxShield}`} />}
 
       <div style={{ ...sectionLabelStyle, marginTop: 4 }}>{t("towerInfo.special")}</div>
       {renderSpecialLines(tower.type, tower.level, t).map((line) => (

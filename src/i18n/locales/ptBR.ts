@@ -65,6 +65,8 @@ export const ptBR: TranslationSchema = {
     damage: "Dano",
     attackSpeed: "Velocidade de Ataque",
     range: "Alcance",
+    hp: "HP da Torre",
+    shield: "Escudo",
     special: "Especialização",
     maxLevel: "NÍVEL MÁXIMO",
     upgrade: "MELHORAR",

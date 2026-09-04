@@ -15,6 +15,7 @@ import {
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
 import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "@/config/towerMastery";
+import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -46,6 +47,20 @@ export interface TowerInstance {
   equippedSkinId: string | null;
   /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. 0 = never invested. See config/towerMastery.ts for the bonus/cost formulas. */
   masteryLevel: number;
+
+  // -------------------------------------------------------------------
+  // Master Implementation Pass spec section 12-13 — TOWER SURVIVAL /
+  // BOSS SIEGE ATTACK. Deliberately TRANSIENT (not part of
+  // TowerLoadoutEntry / SaveData): a tower's current battle HP resets to
+  // full on every retryPhase(), exactly like Castle HP already does (see
+  // GameEngine.resetAttemptState) — never a lingering, unrecoverable
+  // "damaged" state carried into a fresh attempt. Level/Mastery/
+  // Specialization stay the only permanent parts of a tower.
+  // -------------------------------------------------------------------
+  hp: number;
+  maxHp: number;
+  /** 0 for a tower type with no shield identity (see config/towerSurvival.ts) — always <= its type's maxShield. */
+  shieldHp: number;
 }
 
 /**
@@ -96,7 +111,66 @@ export function createTowerInstance(
     specializationLevel,
     equippedSkinId,
     masteryLevel,
+    ...survivalStatsForFreshTower(type),
   };
+}
+
+function survivalStatsForFreshTower(type: TowerType): Pick<TowerInstance, "hp" | "maxHp" | "shieldHp"> {
+  const def = getTowerSurvivalDefinition(type);
+  return { hp: def.maxHp, maxHp: def.maxHp, shieldHp: def.maxShield };
+}
+
+/** Restores a tower's battle HP/shield to full — called once per tower at the start of every attempt (see GameEngine.resetAttemptState), the same "fresh attempt" treatment Castle HP already gets. */
+export function resetTowerSurvival(tower: TowerInstance): void {
+  const fresh = survivalStatsForFreshTower(tower.type);
+  tower.hp = fresh.hp;
+  tower.maxHp = fresh.maxHp;
+  tower.shieldHp = fresh.shieldHp;
+}
+
+/** Flat HP/shield regeneration per second (Recovery — spec section 12), ticked every combat frame alongside tickTowerCooldown. */
+export function tickTowerSurvivalRegen(tower: TowerInstance, dtMs: number): void {
+  const def = getTowerSurvivalDefinition(tower.type);
+  const dtSeconds = dtMs / 1000;
+  if (def.maxShield > 0 && tower.shieldHp < def.maxShield) {
+    tower.shieldHp = Math.min(def.maxShield, tower.shieldHp + def.shieldRegenPerSecond * dtSeconds);
+  }
+  if (tower.hp < tower.maxHp) {
+    tower.hp = Math.min(tower.maxHp, tower.hp + def.hpRegenPerSecond * dtSeconds);
+  }
+}
+
+export interface SiegeDamageResult {
+  /** Actual amount subtracted from HP (after shield absorption and armor reduction) — 0 if the shield fully absorbed the hit. */
+  damageToHp: number;
+  /** True the instant this hit brought the tower's HP to exactly 0 (was above 0 before). */
+  towerJustDisabled: boolean;
+}
+
+/**
+ * Resolves one Boss Siege Attack hit against `tower` — shield absorbs
+ * first, armor reduces what's left, remainder comes off HP. Reaching 0 HP
+ * disables the tower (reuses the exact same disabledRemainingMs mechanic a
+ * DISABLER enemy already uses) for `disableDurationMs` rather than
+ * destroying it — a tower is never permanently lost to this.
+ */
+export function applySiegeDamage(tower: TowerInstance, rawDamage: number, disableDurationMs: number): SiegeDamageResult {
+  const def = getTowerSurvivalDefinition(tower.type);
+  let remaining = rawDamage;
+
+  if (tower.shieldHp > 0) {
+    const absorbed = Math.min(tower.shieldHp, remaining);
+    tower.shieldHp -= absorbed;
+    remaining -= absorbed;
+  }
+
+  const afterArmor = remaining * (1 - def.armor);
+  const wasAboveZero = tower.hp > 0;
+  tower.hp = Math.max(0, tower.hp - afterArmor);
+  const towerJustDisabled = wasAboveZero && tower.hp === 0;
+  if (towerJustDisabled) disableTower(tower, disableDurationMs);
+
+  return { damageToHp: afterArmor, towerJustDisabled };
 }
 
 /**

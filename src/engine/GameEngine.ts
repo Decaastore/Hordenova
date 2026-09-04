@@ -40,6 +40,8 @@ import {
   equipSkin as equipSkinEntity,
   getMasteryUpgradeCostFor,
   upgradeMastery as upgradeMasteryEntity,
+  applySiegeDamage,
+  resetTowerSurvival,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
@@ -62,7 +64,8 @@ import {
   tickWaveManager,
   type WaveManagerState,
 } from "./WaveManager";
-import { createBossInstance, tickBossAbilities } from "./BossManager";
+import { createBossInstance, tickBossAbilities, tickBossSiege } from "./BossManager";
+import { SIEGE_DISABLE_ON_DEPLETION_MS } from "@/config/bossSiege";
 import {
   createBattleStats,
   finalizeBattleStats,
@@ -389,6 +392,11 @@ export class GameEngine {
     this.simClockMs = 0;
     this.waveCompleteAudioFiredForWave = null;
     this.enrageAudioFired = new Set();
+    // Master Implementation Pass spec section 12-13 — Tower Survival HP/
+    // Shield are transient battle state, restored to full on every fresh
+    // attempt exactly like Castle HP (baseHp) above — never a lingering
+    // "damaged from last attempt" state carried into a retry.
+    for (const tower of this.towers) resetTowerSurvival(tower);
   }
 
   /** Starts Wave 1 (fresh save) or resumes/retries the current wave — intercepting into BOSS_INTRO if that wave is a main-boss milestone. */
@@ -769,6 +777,18 @@ export class GameEngine {
       if (enemy.boss?.enraged && !this.enrageAudioFired.has(enemy.id)) {
         this.enrageAudioFired.add(enemy.id);
         this.emitAudio({ type: "boss_enrage" });
+      }
+      // Master Implementation Pass spec section 13 — Boss Siege Attack.
+      // Fully independent of tickBossAbilities' own cadence above.
+      if (enemy.boss) {
+        const siegeHit = tickBossSiege(enemy, nowMs, scaledDt, this.towers);
+        if (siegeHit) {
+          const target = this.towers.find((t) => t.id === siegeHit.targetTowerId);
+          if (target) {
+            applySiegeDamage(target, siegeHit.rawDamage, SIEGE_DISABLE_ON_DEPLETION_MS);
+            this.emitAudio({ type: "tower_siege_hit" });
+          }
+        }
       }
     }
     this.enemies.push(...bossSummons);

@@ -71,6 +71,9 @@ export function playGameAudioEvent(event: GameAudioEvent): void {
     case "castle_damage":
       audioManager.play("castle_damage");
       return;
+    case "tower_siege_hit":
+      audioManager.play("tower_siege_hit");
+      return;
     case "wave_start":
       audioManager.play("wave_start");
       return;

@@ -12,13 +12,13 @@ function emptySnapshot(phase: RunPhase = "RUNNING"): RenderSnapshot {
 describe("CanvasRenderer.detectVfxEvents — camera shake gating (integration)", () => {
   it("a quiet tick with no state changes triggers no shake at all", () => {
     const vfx = new VfxManager();
-    detectVfxEvents(emptySnapshot(), 100, 1, "RUNNING", "RUNNING", vfx, new Map(), new Map(), 100, { x: 0, y: 0 });
+    detectVfxEvents(emptySnapshot(), 100, 1, "RUNNING", "RUNNING", vfx, new Map(), new Map(), new Map(), 100, { x: 0, y: 0 });
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
   });
 
   it("transitioning INTO BOSS_INTRO triggers shake exactly once (on the transition, not every frame spent in it)", () => {
     const vfx = new VfxManager();
-    detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", "RUNNING", vfx, new Map(), new Map(), 100, { x: 0, y: 0 });
+    detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", "RUNNING", vfx, new Map(), new Map(), new Map(), 100, { x: 0, y: 0 });
     const firedMagnitude = (vfx as unknown as { shakeMagnitude: number }).shakeMagnitude;
     expect(firedMagnitude).toBeGreaterThan(0);
 
@@ -28,14 +28,14 @@ describe("CanvasRenderer.detectVfxEvents — camera shake gating (integration)",
     vfx.update(10_000);
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
     for (let i = 0; i < 5; i++) {
-      detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", "BOSS_INTRO", vfx, new Map(), new Map(), 100, { x: 0, y: 0 });
+      detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", "BOSS_INTRO", vfx, new Map(), new Map(), new Map(), 100, { x: 0, y: 0 });
     }
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
   });
 
   it("the very first frame ever drawn (prevPhase null) never fires the boss-entrance shake, even if it happens to start in BOSS_INTRO", () => {
     const vfx = new VfxManager();
-    detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", null, vfx, new Map(), new Map(), 100, { x: 0, y: 0 });
+    detectVfxEvents(emptySnapshot("BOSS_INTRO"), 100, 1, "BOSS_INTRO", null, vfx, new Map(), new Map(), new Map(), 100, { x: 0, y: 0 });
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
   });
 
@@ -47,7 +47,7 @@ describe("CanvasRenderer.detectVfxEvents — camera shake gating (integration)",
       ["BOSS_BATTLE", "VICTORY"],
     ];
     for (const [prev, next] of transitions) {
-      detectVfxEvents(emptySnapshot(next), 100, 1, next, prev, vfx, new Map(), new Map(), 100, { x: 0, y: 0 });
+      detectVfxEvents(emptySnapshot(next), 100, 1, next, prev, vfx, new Map(), new Map(), new Map(), 100, { x: 0, y: 0 });
     }
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
   });
@@ -77,6 +77,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
       vfx,
       prevEnemies,
       new Map(),
+      new Map(),
       100,
       { x: 0, y: 0 },
     );
@@ -104,6 +105,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
       vfx,
       prevEnemies,
       new Map(),
+      new Map(),
       100,
       { x: 0, y: 0 },
     );
@@ -130,6 +132,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
       vfx,
       prevEnemies,
       new Map(),
+      new Map(),
       100,
       { x: 0, y: 0 },
     );
@@ -155,6 +158,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
       "RUNNING",
       vfx,
       prevEnemies,
+      new Map(),
       new Map(),
       100,
       { x: 0, y: 0 },
@@ -184,6 +188,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
       "RUNNING",
       vfx,
       prevEnemies,
+      new Map(),
       new Map(),
       100,
       { x: 0, y: 0 },
