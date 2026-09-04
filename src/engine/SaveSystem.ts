@@ -7,7 +7,24 @@ import { DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 import type { ItemInstance } from "@/entities/Item";
 import type { LocalFirstDiscoveries } from "./WorldFirst";
+import type { AscensionHistoryEntry } from "@/config/ascension";
 import { generateId } from "@/utils/id";
+import { seasonClock } from "./SeasonClock";
+
+/**
+ * Master Implementation spec section 2/36 — the ASCENSION season's own
+ * playthrough state (its temporary wave/gold/towerLoadout) is stored as a
+ * COMPLETELY SEPARATE SaveData blob, under this key, rather than a new
+ * field bag bolted onto the Infinite save above — that's what makes "dois
+ * modos completamente separados" true architecturally, not just by
+ * convention: GameEngine doesn't need a single line of mode-branching
+ * logic, it just gets pointed at a different storageKey (see
+ * GameEngine.ts's constructor and engine/AscensionManager.ts, which owns
+ * resetting this namespace at each season boundary). Anything that must
+ * survive that reset (history, trophies, rank counters, owned cosmetic
+ * rewards) lives on the PERMANENT (Infinite) SaveData below instead.
+ */
+export const ASCENSION_STORAGE_KEY = "hordenova.ascension.save.v1";
 
 /**
  * Isolated persistence layer. Nothing outside this file touches
@@ -65,9 +82,28 @@ export interface SaveData {
   inventoryCapacity: number;
   /** Progression 2.0 spec section 39 — items that arrived while the inventory was full. Never deleted; the player reclaims them by freeing a slot. */
   overflowInventory: ItemInstance[];
+
+  // -----------------------------------------------------------------------
+  // Master Implementation spec sections 1-24 — ASCENSION. Every field below
+  // is PERMANENT (survives every season reset) even though it's all
+  // derived from playing the temporary Ascension namespace (see
+  // ASCENSION_STORAGE_KEY above and engine/AscensionManager.ts). None of
+  // these ever grant gameplay power — history/counters are read-only
+  // records, and gems/ownedCosmetics follow the exact same "never buys
+  // stats" rule as the rest of the Gem economy.
+  // -----------------------------------------------------------------------
+  /** The last season number this save has fully processed (finalized + reset the Ascension namespace for). Defaults to the CURRENT season on a fresh/legacy save — never retroactively "owes" finalization for seasons that existed before this save ever touched Ascension. */
+  ascensionLastSyncedSeason: number;
+  /** One entry per season this save has ever finalized — permanent, append-only, never trimmed. The authoritative idempotency guard for season-reward granting (see AscensionManager.finalizeSeason). */
+  ascensionHistory: AscensionHistoryEntry[];
+  ascensionSeasonsWon: number;
+  ascensionTop3: number;
+  ascensionTop5: number;
+  /** CosmeticRewardDefinition ids this save has ever been granted, from any season — permanent, never removed. */
+  ownedCosmetics: string[];
 }
 
-export const SAVE_DATA_VERSION = 6;
+export const SAVE_DATA_VERSION = 7;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -96,6 +132,12 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   gemShards: 0,
   inventoryCapacity: DEFAULT_INVENTORY_CAPACITY,
   overflowInventory: [],
+  ascensionLastSyncedSeason: seasonClock.getCurrentSeasonWindow().seasonNumber,
+  ascensionHistory: [],
+  ascensionSeasonsWon: 0,
+  ascensionTop3: 0,
+  ascensionTop5: 0,
+  ownedCosmetics: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -195,17 +237,42 @@ function emptySaveData(): SaveData {
     discoveredEnemyTypes: [],
     localFirstDiscoveries: {},
     overflowInventory: [],
+    ascensionHistory: [],
+    ownedCosmetics: [],
   };
 }
 
-export function loadSave(): SaveData {
+function isValidAscensionHistoryEntry(raw: unknown): raw is AscensionHistoryEntry {
+  if (!raw || typeof raw !== "object") return false;
+  const e = raw as Partial<AscensionHistoryEntry>;
+  return (
+    typeof e.seasonNumber === "number" &&
+    typeof e.bestWave === "number" &&
+    (e.rank === null || (typeof e.rank === "number" && e.rank >= 1 && e.rank <= 5)) &&
+    typeof e.achievedAtMs === "number" &&
+    typeof e.seasonThemeNameKey === "string"
+  );
+}
+
+function parseAscensionHistory(raw: unknown): AscensionHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isValidAscensionHistoryEntry);
+}
+
+function parseOwnedCosmetics(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is string => typeof entry === "string");
+}
+
+/** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
+export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
   if (!isStorageAvailable()) return { ...emptySaveData(), playerId: generateId("player") };
 
   try {
-    const raw = window.localStorage.getItem(SAVE_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) {
       const fresh = { ...emptySaveData(), playerId: generateId("player") };
-      writeSave(fresh);
+      writeSave(fresh, storageKey);
       return fresh;
     }
 
@@ -246,32 +313,47 @@ export function loadSave(): SaveData {
           ? parsed.inventoryCapacity
           : DEFAULT_INVENTORY_CAPACITY,
       overflowInventory: parseInventory(parsed.overflowInventory),
+      // Master Implementation (save v6 -> v7) — same "brand new field, so a
+      // pre-existing save just gets the sensible fresh-account default"
+      // pattern as the v5->v6 Gem Economy fields above. ascensionLastSyncedSeason
+      // defaults to the CURRENT season (not 0/1) specifically so a save
+      // that's never touched Ascension doesn't retroactively "owe"
+      // finalizing every season since SEASON_EPOCH_MS the instant it does.
+      ascensionLastSyncedSeason:
+        typeof parsed.ascensionLastSyncedSeason === "number" && parsed.ascensionLastSyncedSeason > 0
+          ? parsed.ascensionLastSyncedSeason
+          : seasonClock.getCurrentSeasonWindow().seasonNumber,
+      ascensionHistory: parseAscensionHistory(parsed.ascensionHistory),
+      ascensionSeasonsWon: typeof parsed.ascensionSeasonsWon === "number" && parsed.ascensionSeasonsWon >= 0 ? parsed.ascensionSeasonsWon : 0,
+      ascensionTop3: typeof parsed.ascensionTop3 === "number" && parsed.ascensionTop3 >= 0 ? parsed.ascensionTop3 : 0,
+      ascensionTop5: typeof parsed.ascensionTop5 === "number" && parsed.ascensionTop5 >= 0 ? parsed.ascensionTop5 : 0,
+      ownedCosmetics: parseOwnedCosmetics(parsed.ownedCosmetics),
     };
-    if (result.playerId !== parsed.playerId) writeSave(result);
+    if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;
   } catch {
     return { ...emptySaveData(), playerId: generateId("player") };
   }
 }
 
-export function writeSave(data: SaveData): void {
+export function writeSave(data: SaveData, storageKey: string = SAVE_STORAGE_KEY): void {
   if (!isStorageAvailable()) return;
   try {
-    window.localStorage.setItem(SAVE_STORAGE_KEY, JSON.stringify(data));
+    window.localStorage.setItem(storageKey, JSON.stringify(data));
   } catch {
     // Storage unavailable/full — progress simply won't persist this session.
   }
 }
 
-/** Loads, applies `updates`, writes back, and returns the merged result. */
-export function updateSave(updates: Partial<SaveData>): SaveData {
-  const current = loadSave();
+/** Loads, applies `updates`, writes back, and returns the merged result. Pass ASCENSION_STORAGE_KEY as `storageKey` to update the separate Ascension namespace instead of the Infinite save. */
+export function updateSave(updates: Partial<SaveData>, storageKey: string = SAVE_STORAGE_KEY): SaveData {
+  const current = loadSave(storageKey);
   const next: SaveData = { ...current, ...updates, lastPlayedAt: Date.now() };
-  writeSave(next);
+  writeSave(next, storageKey);
   return next;
 }
 
-export function recordRunResult(waveReached: number): SaveData {
-  const current = loadSave();
-  return updateSave({ bestWave: Math.max(current.bestWave, waveReached) });
+export function recordRunResult(waveReached: number, storageKey: string = SAVE_STORAGE_KEY): SaveData {
+  const current = loadSave(storageKey);
+  return updateSave({ bestWave: Math.max(current.bestWave, waveReached) }, storageKey);
 }

@@ -4,6 +4,7 @@ import {
   GAME_SPEEDS,
   OFFLINE_RETURN_MIN_ELAPSED_MS,
   RUN_START,
+  SAVE_STORAGE_KEY,
   type GameSpeed,
 } from "@/config/gameBalance";
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
@@ -216,6 +217,17 @@ export class GameEngine {
 
   private readonly listeners = new Set<() => void>();
 
+  /**
+   * Master Implementation spec section 2 — the ONLY thing that
+   * distinguishes an Ascension GameEngine from an Infinite one: which
+   * SaveData namespace it loads from / persists to (see SaveSystem.ts's
+   * ASCENSION_STORAGE_KEY). Every other line of this class — combat,
+   * waves, bosses, freeze, VFX, Active Idle — is completely unaware a
+   * second mode even exists, which is exactly what "dois modos
+   * completamente separados" requires without duplicating this file.
+   */
+  constructor(private readonly storageKey: string = SAVE_STORAGE_KEY) {}
+
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
@@ -239,7 +251,7 @@ export class GameEngine {
     // RETURN summary before the player ever saw it.
     if (this.phase !== "PRE_RUN") return;
 
-    const save = loadSave();
+    const save = loadSave(this.storageKey);
     this.bestWave = save.bestWave;
     this.gold = save.gold;
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
@@ -900,7 +912,7 @@ export class GameEngine {
     this.phase = "PROGRESSION_STOPPED";
     const finalized = finalizeBattleStats(this.battleStats, this.wave.currentWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
-    this.bestWave = recordRunResult(this.wave.currentWave).bestWave;
+    this.bestWave = recordRunResult(this.wave.currentWave, this.storageKey).bestWave;
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();
@@ -929,29 +941,32 @@ export class GameEngine {
   }
 
   private persist(): void {
-    updateSave({
-      bestWave: this.bestWave,
-      gold: this.gold,
-      currentWave: this.wave.currentWave,
-      towerLoadout: this.towers.map((t) => ({
-        slotId: t.slotId,
-        type: t.type,
-        level: t.level,
-        specializationId: t.specializationId,
-        specializationLevel: t.specializationLevel,
-        equippedSkinId: t.equippedSkinId,
-      })),
-      discoveredEnemyTypes: [...this.discoveredEnemyTypes],
-      inventory: this.inventory,
-      playerId: this.playerId,
-      bossesDefeatedTotal: this.bossesDefeatedTotal,
-      miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,
-      localFirstDiscoveries: this.localFirstDiscoveries,
-      gems: this.gems,
-      gemShards: this.gemShards,
-      inventoryCapacity: this.inventoryCapacity,
-      overflowInventory: this.overflowInventory,
-    });
+    updateSave(
+      {
+        bestWave: this.bestWave,
+        gold: this.gold,
+        currentWave: this.wave.currentWave,
+        towerLoadout: this.towers.map((t) => ({
+          slotId: t.slotId,
+          type: t.type,
+          level: t.level,
+          specializationId: t.specializationId,
+          specializationLevel: t.specializationLevel,
+          equippedSkinId: t.equippedSkinId,
+        })),
+        discoveredEnemyTypes: [...this.discoveredEnemyTypes],
+        inventory: this.inventory,
+        playerId: this.playerId,
+        bossesDefeatedTotal: this.bossesDefeatedTotal,
+        miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,
+        localFirstDiscoveries: this.localFirstDiscoveries,
+        gems: this.gems,
+        gemShards: this.gemShards,
+        inventoryCapacity: this.inventoryCapacity,
+        overflowInventory: this.overflowInventory,
+      },
+      this.storageKey,
+    );
   }
 
   private cachedHud: HudSnapshot | null = null;

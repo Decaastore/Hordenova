@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_SAVE_DATA, loadSave, recordRunResult, writeSave } from "./SaveSystem";
+import { ASCENSION_STORAGE_KEY, DEFAULT_SAVE_DATA, loadSave, recordRunResult, updateSave, writeSave } from "./SaveSystem";
 import { SAVE_STORAGE_KEY } from "@/config/gameBalance";
 
 describe("SaveSystem", () => {
@@ -102,5 +102,44 @@ describe("SaveSystem", () => {
       JSON.stringify({ ...DEFAULT_SAVE_DATA, inventory: [validItem, "garbage", { instanceId: "missing-fields" }] }),
     );
     expect(loadSave().inventory).toEqual([validItem]);
+  });
+
+  describe("Ascension storage namespace (Master Implementation spec section 2)", () => {
+    it("the Ascension save is a completely separate blob from the Infinite save — writing one never touches the other", () => {
+      updateSave({ gold: 999, currentWave: 50 }); // Infinite
+      updateSave({ gold: 5, currentWave: 3 }, ASCENSION_STORAGE_KEY); // Ascension
+
+      expect(loadSave().gold).toBe(999);
+      expect(loadSave().currentWave).toBe(50);
+      expect(loadSave(ASCENSION_STORAGE_KEY).gold).toBe(5);
+      expect(loadSave(ASCENSION_STORAGE_KEY).currentWave).toBe(3);
+    });
+
+    it("recordRunResult against the Ascension key only raises the Ascension save's bestWave, leaving Infinite's untouched", () => {
+      writeSave({ ...DEFAULT_SAVE_DATA, bestWave: 100 }); // Infinite's own personal best
+      writeSave({ ...DEFAULT_SAVE_DATA, bestWave: 0 }, ASCENSION_STORAGE_KEY);
+
+      recordRunResult(7, ASCENSION_STORAGE_KEY);
+
+      expect(loadSave(ASCENSION_STORAGE_KEY).bestWave).toBe(7);
+      expect(loadSave().bestWave).toBe(100);
+    });
+
+    it("a fresh Ascension save (nothing written yet) still returns valid default data, independent of whatever the Infinite save holds", () => {
+      updateSave({ gold: 12345, bestWave: 999 }); // Infinite has real progress
+      const ascension = loadSave(ASCENSION_STORAGE_KEY); // Ascension never touched
+      expect(ascension.gold).toBe(DEFAULT_SAVE_DATA.gold);
+      expect(ascension.bestWave).toBe(0);
+    });
+
+    it("permanent Ascension fields (history/trophies/counters) live on the Infinite save, not the Ascension namespace", () => {
+      const entry = { seasonNumber: 3, bestWave: 88, rank: 1 as const, achievedAtMs: 5000, seasonThemeNameKey: "EMBERS_OF_WAR" };
+      updateSave({ ascensionHistory: [entry], ascensionSeasonsWon: 1 });
+
+      expect(loadSave().ascensionHistory).toEqual([entry]);
+      expect(loadSave().ascensionSeasonsWon).toBe(1);
+      // The Ascension namespace itself never carries this — it's not what it's for.
+      expect(loadSave(ASCENSION_STORAGE_KEY).ascensionHistory).toEqual([]);
+    });
   });
 });
