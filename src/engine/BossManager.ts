@@ -2,7 +2,7 @@ import type { BossDefinition } from "@/config/bossConfig";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 import { getPointAtDistance, distance } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
-import { createEnemyInstance, type EnemyInstance } from "@/entities/Enemy";
+import { createEnemyInstance, REGEN_SUPPRESSION_MS, type EnemyInstance } from "@/entities/Enemy";
 import { tryDisableNearestTower } from "./CombatSystem";
 import type { TowerInstance } from "@/entities/Tower";
 import {
@@ -50,6 +50,7 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
     burn: null,
     ccResistanceStacks: 0,
     ccResistanceDecayRemainingMs: 0,
+    msSinceLastDamage: REGEN_SUPPRESSION_MS,
     boss: {
       bossId: def.id,
       nameKey: def.i18nKey,

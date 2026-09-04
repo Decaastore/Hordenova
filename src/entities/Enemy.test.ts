@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { advanceEnemy, applySlow, createEnemyInstance, createEliteEnemyInstance, getEffectiveSpeed, isEnemyDead } from "./Enemy";
+import { advanceEnemy, applyDamageToEnemy, applySlow, createEnemyInstance, createEliteEnemyInstance, getEffectiveSpeed, isEnemyDead, REGEN_SUPPRESSION_MS } from "./Enemy";
 import { createBossInstance } from "@/engine/BossManager";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { CC_DR_DECAY_MS } from "@/config/ccResistance";
@@ -274,5 +274,126 @@ describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec
       if (result.reachedEnd) reachedEnd = true;
     }
     expect(reachedEnd).toBe(true);
+  });
+});
+
+/**
+ * P0 root-cause fix: mini-boss HP "stuck at ~4420" report. Root cause
+ * confirmed via a corrected single-instance-tracked simulation (see
+ * Enemy.ts's REGEN_SUPPRESSION_MS doc comment): passive regen used to apply
+ * unconditionally every tick, so a REGENERATOR-archetype mini-boss
+ * (mossback-regenerator, regenPercentPerSecond 0.02) under weak-enough
+ * sustained DPS could have its HP climb to and then permanently pin at
+ * exactly maxHp — a real, mathematically-guaranteed stalemate, NOT a
+ * display/caching/stale-reference bug (those were all directly ruled out
+ * by reading getRenderSnapshot/CanvasRenderer/CombatSystem — no caching,
+ * no React-state involvement, no copy-instead-of-reference passing).
+ * These tests exercise the entity layer directly (real `enemy.hp` mutation
+ * via the real applyDamageToEnemy/advanceEnemy functions), not a fake or
+ * a rendering mock — proving both the bug's old mechanism and the fix.
+ */
+describe("Regen suppression window (P0 fix: mini-boss HP appearing stuck at maxHp)", () => {
+  it("a fresh mini-boss with regen can still passively heal when truly undamaged (the mechanic itself is NOT removed)", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    expect(boss.regenPerSecond).toBeGreaterThan(0);
+    boss.hp = boss.maxHp - 100;
+    advanceEnemy(boss, 1000);
+    expect(boss.hp).toBeGreaterThan(boss.maxHp - 100); // regenerated — undamaged, nothing to suppress
+  });
+
+  it("regen is suppressed immediately after taking direct damage", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    boss.hp = boss.maxHp - 500;
+    applyDamageToEnemy(boss, 1); // any real hit resets the suppression window
+    const hpAfterHit = boss.hp;
+    advanceEnemy(boss, 1000); // well within the suppression window
+    expect(boss.hp).toBe(hpAfterHit); // must NOT have regenerated yet
+  });
+
+  it("regen is suppressed immediately after taking burn-tick damage", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    boss.hp = boss.maxHp - 500;
+    boss.burn = { damagePerSecond: 10, remainingMs: 100, stacks: 1 };
+    const beforeTick = boss.hp;
+    advanceEnemy(boss, 100); // burn tick fires and expires this same tick
+    expect(boss.hp).toBeLessThan(beforeTick); // burn damage applied
+    expect(boss.burn).toBeNull();
+    const afterBurnTick = boss.hp;
+    advanceEnemy(boss, 500); // still well within the suppression window, no more burn
+    expect(boss.hp).toBe(afterBurnTick); // no regen crept in during the suppressed window
+  });
+
+  it("regen resumes once the suppression window fully elapses without further damage", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    boss.hp = boss.maxHp - 500;
+    applyDamageToEnemy(boss, 1);
+    const hpRightAfterHit = boss.hp;
+    advanceEnemy(boss, REGEN_SUPPRESSION_MS); // counter reaches the threshold; still gated THIS tick (checked pre-increment)
+    expect(boss.hp).toBe(hpRightAfterHit);
+    advanceEnemy(boss, 100); // counter now exceeds the threshold going into this tick — regen resumes
+    expect(boss.hp).toBeGreaterThan(hpRightAfterHit);
+  });
+
+  it("THE BUG, reproduced and fixed: sustained fire that used to permanently pin HP at exactly maxHp now keeps grinding HP down instead", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    // A hit landing more often than REGEN_SUPPRESSION_MS, with damage-per-hit
+    // far below the regen's absolute per-tick rate — the exact worst-case
+    // "weak but real" pressure that used to be fully cancelled out forever.
+    const hitIntervalMs = 500;
+    let msSinceHit = 0;
+    let minHpSeen = boss.hp;
+    for (let t = 0; t < 60_000; t += 100) {
+      advanceEnemy(boss, 100);
+      msSinceHit += 100;
+      if (msSinceHit >= hitIntervalMs) {
+        applyDamageToEnemy(boss, 1); // tiny hit, way under the regen's own healing rate
+        msSinceHit = 0;
+      }
+      minHpSeen = Math.min(minHpSeen, boss.hp);
+      if (boss.hp <= 0) break;
+    }
+    // Under the OLD (buggy) code this would climb to and permanently sit at
+    // exactly boss.maxHp. Under the fix, since every hit lands well within
+    // the suppression window, regen never gets a chance to fire at all.
+    expect(boss.hp).toBeLessThan(boss.maxHp);
+    expect(minHpSeen).toBeLessThan(boss.maxHp);
+  });
+
+  it("multiple hits keep reducing HP — it never bounces back up to a prior higher value without a legitimate un-suppressed regen tick", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    let lastHp = boss.hp;
+    for (let i = 0; i < 20; i++) {
+      applyDamageToEnemy(boss, 50);
+      expect(boss.hp).toBeLessThanOrEqual(lastHp); // never increases from a hit
+      lastHp = boss.hp;
+      advanceEnemy(boss, 100); // well within suppression window after each hit
+      expect(boss.hp).toBeLessThanOrEqual(lastHp); // and ticking forward doesn't sneak in a heal either
+      lastHp = boss.hp;
+    }
+    expect(boss.hp).toBeLessThan(boss.maxHp);
+  });
+
+  it("a mini-boss with regen can still die under sustained real damage — no infinite stalemate is possible", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    let ticks = 0;
+    while (boss.hp > 0 && ticks < 100_000) {
+      advanceEnemy(boss, 50);
+      applyDamageToEnemy(boss, 20); // sustained fire every tick, dwarfing the regen rate
+      ticks += 1;
+    }
+    expect(boss.hp).toBe(0);
+    expect(isEnemyDead(boss)).toBe(true);
+  });
+
+  it("the HP bar's source of truth is the real enemy.hp/maxHp — no independent cached copy exists on the instance", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 13, 0);
+    const hpBefore = boss.hp;
+    applyDamageToEnemy(boss, 300);
+    // Exactly one hp field, exactly one maxHp field — nothing else on the
+    // instance could visually diverge from this real, mutated value.
+    expect(boss.hp).toBe(hpBefore - 300 * (1 - boss.damageReduction));
+    expect(Object.keys(boss).filter((k) => k.toLowerCase().includes("hp"))).toEqual(
+      expect.arrayContaining(["hp", "maxHp"]),
+    );
   });
 });

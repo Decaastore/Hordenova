@@ -3,6 +3,25 @@ import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
 import { CC_DR_DECAY_MS, CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "@/config/ccResistance";
 
+/**
+ * P0 root-cause fix (mini-boss HP appearing "stuck"): passive regen
+ * (regenPerSecond, below) used to apply unconditionally every tick with no
+ * link to recent damage. For the REGENERATOR archetype (e.g.
+ * mossback-regenerator, regenPercentPerSecond 0.02) this made a LITERAL,
+ * permanent 100%-damage-cancellation stalemate mathematically possible
+ * whenever a build's sustained DPS-in-range was at or below the regen's
+ * absolute rate — HP climbs to and then pins forever at exactly maxHp
+ * (reproduced directly: locked at exactly 2115 for dozens of consecutive
+ * ticks against mossback-regenerator under a deliberately weak build).
+ * Suppressing regen for a short window after ANY damage (direct hit or
+ * burn tick) makes that outcome impossible under real, sustained
+ * multi-hit-per-second tower fire while leaving the archetype's intended
+ * "needs real pressure, punishes disengagement" identity fully intact for
+ * genuinely weak/interrupted fire — mirrors the CC diminishing-returns
+ * decay-window pattern (CC_DR_DECAY_MS) above.
+ */
+export const REGEN_SUPPRESSION_MS = 1800;
+
 export interface SlowEffect {
   percent: number; // 0..1
   remainingMs: number;
@@ -87,6 +106,15 @@ export interface EnemyInstance {
    */
   ccResistanceStacks: number;
   ccResistanceDecayRemainingMs: number;
+  /**
+   * Milliseconds elapsed since this enemy last took damage (direct hit or
+   * burn tick) — resets to 0 on any actual damage, counts up otherwise.
+   * Passive regen only applies once this reaches REGEN_SUPPRESSION_MS; see
+   * the doc comment on that constant above for why this field exists.
+   * Starts at REGEN_SUPPRESSION_MS so a freshly-spawned, undamaged enemy can
+   * regen immediately (there is nothing to suppress yet).
+   */
+  msSinceLastDamage: number;
 }
 
 let nextEnemyId = 1;
@@ -113,6 +141,7 @@ export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyI
     disablerState: def.disablerIntervalMs !== undefined ? { nextTriggerAtMs: 0 } : undefined,
     ccResistanceStacks: 0,
     ccResistanceDecayRemainingMs: 0,
+    msSinceLastDamage: REGEN_SUPPRESSION_MS,
   };
 }
 
@@ -137,11 +166,16 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
     burnDamageDealt = tickDamage;
     enemy.burn.remainingMs -= dtMs;
     if (enemy.burn.remainingMs <= 0) enemy.burn = null;
+    if (tickDamage > 0) enemy.msSinceLastDamage = 0;
   }
 
-  if (enemy.regenPerSecond > 0 && enemy.hp > 0) {
+  // See REGEN_SUPPRESSION_MS's doc comment: regen is gated behind a
+  // no-recent-damage window so sustained fire can never be fully cancelled
+  // out by passive healing, no matter how weak the fire is per-hit.
+  if (enemy.regenPerSecond > 0 && enemy.hp > 0 && enemy.msSinceLastDamage >= REGEN_SUPPRESSION_MS) {
     enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.regenPerSecond * dtSeconds);
   }
+  enemy.msSinceLastDamage += dtMs;
 
   if (enemy.slow) {
     enemy.slow.remainingMs -= dtMs;
@@ -186,6 +220,7 @@ export function applyDamageToEnemy(enemy: EnemyInstance, rawDamage: number, armo
   const effectiveReduction = enemy.damageReduction * (1 - armorPenetration);
   const actualDamage = rawDamage * (1 - effectiveReduction);
   enemy.hp = Math.max(0, enemy.hp - actualDamage);
+  if (actualDamage > 0) enemy.msSinceLastDamage = 0;
   return actualDamage;
 }
 
