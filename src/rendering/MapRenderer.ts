@@ -2,6 +2,7 @@ import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { getCastleHpTier } from "@/config/castleConfig";
+import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
 import type { BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration } from "./mapDecorations";
@@ -740,8 +741,10 @@ export function drawFortress(
   windIntensity = 0,
   /** 0..1 — baseHp/maxBaseHp. Drives the Castle Visual State damage overlay (config/castleConfig.ts). Defaults to 1 (pristine) so every existing caller (the menu's cinematic fortress) is visually unchanged. */
   hpPercent = 1,
+  /** Castle Skin architecture (spec section 20, config/castleSkins.ts) — overrides only the fortress's own stonework colors (rock/rockDark), never any other biome-driven element (terrain, decorations, path stay biome-accurate). Defaults to null so every existing caller is pixel-identical to before. */
+  skin: CastleSkinDefinition | null = null,
 ): FortressAnchors {
-  const p = biome.palette;
+  const p = { ...biome.palette, ...skin?.paletteOverride };
   ctx.save();
   ctx.translate(position.x, position.y);
   ctx.scale(scale, scale);
