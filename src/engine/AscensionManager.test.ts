@@ -119,6 +119,32 @@ describe("AscensionManager — season lifecycle (Master Implementation spec sect
     expect(getAscensionStatus()).toEqual(status);
   });
 
+  it("finalizing a placed season records a full SeasonRewardRecord (spec section 24: SeasonId/PlayerId/RewardId/RewardType/Rank/GrantedAt) per reward, Gems included, and never duplicates them on re-sync", () => {
+    mockSeasonNumber(2);
+    updateSave({ ascensionLastSyncedSeason: 1, gems: 0, seasonRewardRecords: [] });
+    updateSave({ currentWave: 40 }, ASCENSION_STORAGE_KEY);
+
+    syncSeasonIfNeeded();
+
+    const main = loadSave();
+    const expectedBundle = getSeasonRewardBundle(1, 1);
+    // One record per cosmetic, plus one for the Gems grant.
+    expect(main.seasonRewardRecords).toHaveLength(expectedBundle.cosmetics.length + 1);
+
+    const gemsRecord = main.seasonRewardRecords.find((r) => r.rewardType === "GEMS");
+    expect(gemsRecord).toMatchObject({ seasonId: "season-1", seasonNumber: 1, playerId: main.playerId, rank: 1 });
+    expect(typeof gemsRecord!.grantedAt).toBe("number");
+
+    for (const cosmetic of expectedBundle.cosmetics) {
+      const record = main.seasonRewardRecords.find((r) => r.rewardId === cosmetic.id);
+      expect(record).toMatchObject({ seasonNumber: 1, playerId: main.playerId, rewardType: cosmetic.type, rank: 1 });
+    }
+
+    // Re-syncing (already caught up) must never add duplicate records.
+    syncSeasonIfNeeded();
+    expect(loadSave().seasonRewardRecords).toHaveLength(expectedBundle.cosmetics.length + 1);
+  });
+
   it("getAscensionSave never conflates with the Infinite save", () => {
     updateSave({ gold: 777 }); // Infinite
     updateSave({ gold: 3 }, ASCENSION_STORAGE_KEY);

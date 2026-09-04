@@ -7,7 +7,7 @@ import { DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 import type { ItemInstance } from "@/entities/Item";
 import type { LocalFirstDiscoveries } from "./WorldFirst";
-import type { AscensionHistoryEntry } from "@/config/ascension";
+import type { AscensionHistoryEntry, SeasonRewardRecord } from "@/config/ascension";
 import { generateId } from "@/utils/id";
 import { seasonClock } from "./SeasonClock";
 
@@ -101,9 +101,11 @@ export interface SaveData {
   ascensionTop5: number;
   /** CosmeticRewardDefinition ids this save has ever been granted, from any season — permanent, never removed. */
   ownedCosmetics: string[];
+  /** Full provenance record (spec section 24: SeasonId/PlayerId/RewardId/RewardType/Rank/GrantedAt) for every individual reward ever granted, Gems included — permanent, append-only, never trimmed. See config/ascension.ts's SeasonRewardRecord doc comment for why this exists alongside (not instead of) ownedCosmetics. */
+  seasonRewardRecords: SeasonRewardRecord[];
 }
 
-export const SAVE_DATA_VERSION = 7;
+export const SAVE_DATA_VERSION = 8;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -138,6 +140,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ascensionTop3: 0,
   ascensionTop5: 0,
   ownedCosmetics: [],
+  seasonRewardRecords: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -239,6 +242,7 @@ function emptySaveData(): SaveData {
     overflowInventory: [],
     ascensionHistory: [],
     ownedCosmetics: [],
+    seasonRewardRecords: [],
   };
 }
 
@@ -262,6 +266,27 @@ function parseAscensionHistory(raw: unknown): AscensionHistoryEntry[] {
 function parseOwnedCosmetics(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((entry): entry is string => typeof entry === "string");
+}
+
+function isValidSeasonRewardRecord(raw: unknown): raw is SeasonRewardRecord {
+  if (!raw || typeof raw !== "object") return false;
+  const r = raw as Partial<SeasonRewardRecord>;
+  return (
+    typeof r.seasonId === "string" &&
+    typeof r.seasonNumber === "number" &&
+    typeof r.playerId === "string" &&
+    typeof r.rewardId === "string" &&
+    typeof r.rewardType === "string" &&
+    typeof r.rank === "number" &&
+    r.rank >= 1 &&
+    r.rank <= 5 &&
+    typeof r.grantedAt === "number"
+  );
+}
+
+function parseSeasonRewardRecords(raw: unknown): SeasonRewardRecord[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isValidSeasonRewardRecord);
 }
 
 /** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
@@ -328,6 +353,10 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       ascensionTop3: typeof parsed.ascensionTop3 === "number" && parsed.ascensionTop3 >= 0 ? parsed.ascensionTop3 : 0,
       ascensionTop5: typeof parsed.ascensionTop5 === "number" && parsed.ascensionTop5 >= 0 ? parsed.ascensionTop5 : 0,
       ownedCosmetics: parseOwnedCosmetics(parsed.ownedCosmetics),
+      // Master Implementation (save v7 -> v8) — same "brand new field,
+      // sensible empty default for a pre-existing save" pattern as
+      // ascensionLastSyncedSeason above.
+      seasonRewardRecords: parseSeasonRewardRecords(parsed.seasonRewardRecords),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

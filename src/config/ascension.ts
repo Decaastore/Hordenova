@@ -107,6 +107,108 @@ function rewardId(seasonNumber: number, rank: AscensionRank, type: CosmeticType)
 }
 
 /**
+ * Master Implementation spec section 24 — "Toda recompensa permanente
+ * precisa de: SeasonId, PlayerId, RewardId, RewardType, Rank, GrantedAt".
+ * `ownedCosmetics` (a plain id list) is what gameplay checks against for
+ * "does this save have cosmetic X"; this is the fuller provenance record
+ * alongside it — one entry per individual reward ever granted (Gems
+ * included, via the synthetic "GEMS" type), so a future Collection/History
+ * UI can show exactly which season+rank earned which reward and when,
+ * without re-deriving it from ascensionHistory + getSeasonRewardBundle.
+ * See engine/AscensionManager.grantSeasonRewards for how these get built —
+ * always alongside, never instead of, the existing ownedCosmetics/gems
+ * updates and EconomyLedger entry.
+ */
+export type RewardRecordType = CosmeticType | "GEMS";
+
+export interface SeasonRewardRecord {
+  /** Human-readable season identity, not just the raw number — matches spec's "SeasonId" field name while staying joinable with AscensionHistoryEntry.seasonNumber. */
+  seasonId: string;
+  seasonNumber: number;
+  playerId: string;
+  rewardId: string;
+  rewardType: RewardRecordType;
+  rank: AscensionRank;
+  grantedAt: number;
+}
+
+export function seasonId(seasonNumber: number): string {
+  return `season-${seasonNumber}`;
+}
+
+// ---------------------------------------------------------------------------
+// Master Implementation spec section 55 — "Prepare estas interfaces (mesmo
+// sem backend ainda)". These describe the shape a future server-authoritative
+// Ascension backend would own; nothing in this client currently constructs
+// them from a live server, but every field is deliberately named to match
+// what the client-local equivalents above already track, so wiring a real
+// backend later is a data-source swap, not a redesign. Kept here (not used
+// internally) purely as the documented contract the spec asks for.
+// ---------------------------------------------------------------------------
+
+/** Server-owned config for one season — the authoritative version of getSeasonTheme()'s output. */
+export interface SeasonDefinition {
+  seasonNumber: number;
+  startsAtMs: number;
+  endsAtMs: number;
+  theme: SeasonTheme;
+  rewardBundlesByRank: Record<AscensionRank, SeasonRewardBundle>;
+}
+
+/** Server-owned live state of the CURRENT season — the authoritative version of AscensionManager.getAscensionStatus(). */
+export interface SeasonState {
+  seasonNumber: number;
+  isActive: boolean;
+  timeRemainingMs: number;
+}
+
+/** One player's entry on the server-authoritative leaderboard — the wave-only ranking basis spec section 6 requires ("EXCLUSIVAMENTE a maior wave"). */
+export interface SeasonEntry {
+  playerId: string;
+  bestWave: number;
+  /** Tie-break — spec section 6: "quem alcançou primeiro" — first timestamp at which bestWave was reached, never overwritten by a later tie at the same wave. */
+  reachedAtMs: number;
+}
+
+/** The full ranked board for one season, server-computed — the authoritative replacement for this client's honest single-entrant "rank 1" fallback (see AscensionManager's own doc comment on why it can't do this locally). */
+export interface SeasonLeaderboard {
+  seasonNumber: number;
+  entries: SeasonEntry[]; // pre-sorted by (bestWave desc, reachedAtMs asc)
+}
+
+/** The outcome for ONE player once a season is frozen and ranked — the server-authoritative version of finalizeSeason()'s locally-derived AscensionHistoryEntry. */
+export interface SeasonResult {
+  seasonNumber: number;
+  playerId: string;
+  bestWave: number;
+  rank: AscensionRank | null;
+}
+
+/** A single delivered reward — the server-authoritative version of SeasonRewardRecord above (same field set, same names). */
+export type SeasonReward = SeasonRewardRecord;
+
+/** What a rank is entitled to before it's granted — the server-authoritative version of getSeasonRewardBundle()'s output, addressable by id rather than only derivable by calling the function. */
+export interface SeasonRewardDefinition {
+  seasonNumber: number;
+  rank: AscensionRank;
+  bundle: SeasonRewardBundle;
+}
+
+/** Per-player lifetime Ascension stats — the authoritative version of the ascensionSeasonsWon/ascensionTop3/ascensionTop5 counters on SaveData. */
+export interface PlayerSeasonStats {
+  playerId: string;
+  seasonsWon: number;
+  top3Finishes: number;
+  top5Finishes: number;
+}
+
+/** A player's full season-by-season record — the authoritative version of SaveData.ascensionHistory. */
+export interface AscensionHistory {
+  playerId: string;
+  entries: AscensionHistoryEntry[];
+}
+
+/**
  * The full reward bundle for finishing a season at `rank`. Purely a
  * function of (seasonNumber, rank) — same inputs always produce the exact
  * same bundle (including cosmetic ids), which is what lets granting be

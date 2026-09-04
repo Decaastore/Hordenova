@@ -1,6 +1,13 @@
 import { ASCENSION_STORAGE_KEY, loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { seasonClock } from "./SeasonClock";
-import { getSeasonRewardBundle, getSeasonTheme, type AscensionHistoryEntry, type AscensionRank } from "@/config/ascension";
+import {
+  getSeasonRewardBundle,
+  getSeasonTheme,
+  seasonId,
+  type AscensionHistoryEntry,
+  type AscensionRank,
+  type SeasonRewardRecord,
+} from "@/config/ascension";
 import { appendLedgerEvent } from "./EconomyLedger";
 
 /**
@@ -78,12 +85,47 @@ function resetAscensionNamespace(): void {
 function grantSeasonRewards(seasonNumber: number, rank: AscensionRank): void {
   const bundle = getSeasonRewardBundle(seasonNumber, rank);
   const main = loadSave();
+  const grantedAt = Date.now();
 
   const newCosmeticIds = bundle.cosmetics.map((c) => c.id).filter((id) => !main.ownedCosmetics.includes(id));
+
+  // Full provenance record (spec section 24) for every individual reward —
+  // Gems included — alongside the plain-id ownedCosmetics list. Guarded the
+  // same way as ownedCosmetics itself: only ids this save doesn't already
+  // hold a record for get appended, so a defensive re-grant (should the
+  // ascensionHistory guard in finalizeSeason ever be bypassed) still can't
+  // duplicate a record.
+  const existingRewardIds = new Set(main.seasonRewardRecords.map((r) => r.rewardId));
+  const newRecords: SeasonRewardRecord[] = [];
+  const gemsRewardId = `season-${seasonNumber}-rank-${rank}-gems`;
+  if (bundle.gems > 0 && !existingRewardIds.has(gemsRewardId)) {
+    newRecords.push({
+      seasonId: seasonId(seasonNumber),
+      seasonNumber,
+      playerId: main.playerId,
+      rewardId: gemsRewardId,
+      rewardType: "GEMS",
+      rank,
+      grantedAt,
+    });
+  }
+  for (const cosmetic of bundle.cosmetics) {
+    if (existingRewardIds.has(cosmetic.id)) continue;
+    newRecords.push({
+      seasonId: seasonId(seasonNumber),
+      seasonNumber,
+      playerId: main.playerId,
+      rewardId: cosmetic.id,
+      rewardType: cosmetic.type,
+      rank,
+      grantedAt,
+    });
+  }
 
   updateSave({
     gems: main.gems + bundle.gems,
     ownedCosmetics: [...main.ownedCosmetics, ...newCosmeticIds],
+    seasonRewardRecords: [...main.seasonRewardRecords, ...newRecords],
     ascensionSeasonsWon: main.ascensionSeasonsWon + (rank === 1 ? 1 : 0),
     ascensionTop3: main.ascensionTop3 + (rank <= 3 ? 1 : 0),
     ascensionTop5: main.ascensionTop5 + 1, // any recorded placement (rank is always 1-5 here) counts as a top-5 finish
