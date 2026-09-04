@@ -55,7 +55,7 @@ function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: Reado
   return candidates[0]!;
 }
 
-function runGreedyBot(simulatedMs: number): { waveReached: number; phaseId: string; gold: number } {
+function runGreedyBot(simulatedMs: number): { waveReached: number; phaseId: string; gold: number; avgTowerLevel: number } {
   window.localStorage.clear();
   updateSave({ currentWave: 1, gold: 100, towerLoadout: [] });
   const engine = new GameEngine();
@@ -96,7 +96,9 @@ function runGreedyBot(simulatedMs: number): { waveReached: number; phaseId: stri
   }
 
   const hud = engine.getHudSnapshot();
-  return { waveReached: hud.wave, phaseId: hud.phaseId, gold: hud.gold };
+  const towers = engine.getRenderSnapshot().towers;
+  const avgTowerLevel = towers.length ? towers.reduce((sum, t) => sum + t.level, 0) / towers.length : 0;
+  return { waveReached: hud.wave, phaseId: hud.phaseId, gold: hud.gold, avgTowerLevel };
 }
 
 describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
@@ -112,4 +114,19 @@ describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
     // target) but a failure here means the fix regressed.
     expect(result.waveReached).toBeLessThan(46);
   });
+
+  it("ECONOMY AUDIT (Master Implementation spec section 42/43): a greedy always-spend bot has NOT maxed all 12 tower slots after 6 simulated hours", () => {
+    // Empirical audit (not tuned to pass, tuned to the actual reported
+    // symptom): with the ORIGINAL flat `targetLevel * 0.75` upgrade-cost
+    // formula, this same bot fully maxed all 12 slots to level 30 in
+    // ~5-6 simulated hours, after which gold had zero remaining sink for
+    // 40+ more hours while the HP-scaling wall didn't bite until
+    // ~wave 330-390 — the reported "gold feels too fast" symptom. The
+    // getUpgradeCost lateGameFactor fix (config/towerStats.ts) stretches
+    // full-mastery out to ~27-30 simulated hours, overlapping with when
+    // the wall actually starts to matter instead of preceding it by days.
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+    const result = runGreedyBot(SIX_HOURS_MS);
+    expect(result.avgTowerLevel).toBeLessThan(25);
+  }, 30_000);
 });

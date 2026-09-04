@@ -307,12 +307,33 @@ export function getMilestoneUnlockForLevel(type: TowerType, level: number): Towe
   return MILESTONE_UNLOCKS[type].find((unlock) => unlock.level === level) ?? null;
 }
 
-/** Gold cost to go from `currentLevel` to `currentLevel + 1`. Returns null at max level. */
+/**
+ * Gold cost to go from `currentLevel` to `currentLevel + 1`. Returns null at
+ * max level.
+ *
+ * ECONOMY AUDIT (Master Implementation spec section 42/43): the flat linear
+ * `targetLevel * 0.75` term let a greedy always-spend player fully max ALL
+ * 12 tower slots (level 30) in ~5 SIMULATED hours of Active Idle play,
+ * after which gold had no sink left at all — the enemy HP wall doesn't
+ * bite until ~wave 330-390, so the player was left with 40+ hours of gold
+ * piling up uselessly (empirically over 1.7M gold sitting idle by the
+ * 48-hour mark) before the wall gave them anything to do again. That is
+ * the actual reported symptom ("wave 160 by day 2, gold feels too fast"),
+ * not the wave count itself — the wave-vs-time curve near the wall is
+ * within the documented ~450-460 design target.
+ *
+ * Fix: a convex `lateGameFactor` that stays ~1x for early levels (so a
+ * fresh build still feels responsive) and grows the cost of LATE levels
+ * (20-30) steeply, stretching the spending phase to better overlap with
+ * when the HP wall actually starts to matter, without touching the HP/gold
+ * scaling formulas in enemyStats.ts or inventing a second currency.
+ */
 export function getUpgradeCost(type: TowerType, currentLevel: number): number | null {
   if (currentLevel >= MAX_TOWER_LEVEL) return null;
   const def = TOWER_DEFINITIONS[type];
   const targetLevel = currentLevel + 1;
-  return Math.round(def.upgradeCostBase * targetLevel * 0.75);
+  const lateGameFactor = 1 + currentLevel * 0.35;
+  return Math.round(def.upgradeCostBase * targetLevel * 0.75 * lateGameFactor);
 }
 
 function round2(value: number): number {
