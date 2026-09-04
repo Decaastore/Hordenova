@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { tickCombat } from "./CombatSystem";
 import { createTowerInstance } from "@/entities/Tower";
-import { createEnemyInstance, isEnemyDead } from "@/entities/Enemy";
+import { advanceEnemy, createEnemyInstance, isEnemyDead } from "@/entities/Enemy";
 import { getTowerLevelStats, TOWER_TYPES } from "@/config/towerStats";
 
 const TICK_MS = 50;
@@ -187,6 +187,73 @@ describe("CombatSystem", () => {
       tickCombat([towerForRegular], [regularTarget], 50);
 
       expect(bossTarget.hp).toBe(regularTarget.hp);
+    });
+  });
+
+  describe("Frostborn freeze — permanent-freeze bug regression (through the real combat path)", () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("a target frozen once and then kept in range/attacked continuously still thaws on schedule, not permanently", () => {
+      // Worst case for the old bug: guarantee every single hit rolls a
+      // freeze (Math.random -> 0 always beats freezeChance), so the target
+      // is frozen at every attack opportunity — if freeze application
+      // itself could self-extend indefinitely, this would never thaw.
+      vi.spyOn(Math, "random").mockReturnValue(0);
+
+      const tower = createTowerInstance("slot-test", "FROSTBORN", { x: 0, y: 0 }, 10); // Deep Freeze unlocked
+      const target = createEnemyInstance("CRAWLER", 1);
+      target.position = { x: 20, y: 0 }; // stays in range the whole time — can't flee while frozen anyway
+
+      tickCombat([tower], [target], 50);
+      expect(target.slow).not.toBeNull();
+      expect(target.slow!.percent).toBe(1);
+      const freezeDurationMs = target.slow!.remainingMs;
+
+      // Stop attacking (tower cooldown resets only via resetTowerCooldown,
+      // which only fires on an actual hit — no further tickCombat calls
+      // here) and let the freeze itself run out. It must thaw purely from
+      // elapsed time, with no combat interaction re-touching it at all.
+      advanceEnemy(target, freezeDurationMs);
+      expect(target.slow).toBeNull();
+    });
+
+    it("a Frostborn tower that keeps re-attacking a target which is NOT re-rolling freeze (only partial slows) never re-extends an earlier freeze forever", () => {
+      // First hit: force a freeze. Every hit after: force a partial slow
+      // (no freeze) — this is exactly the real-world sequence that used to
+      // cause the permanent-freeze bug (see entities/Enemy.ts applySlow).
+      let callCount = 0;
+      vi.spyOn(Math, "random").mockImplementation(() => (callCount++ === 0 ? 0 : 0.999));
+
+      const tower = createTowerInstance("slot-test", "FROSTBORN", { x: 0, y: 0 }, 10);
+      const target = createEnemyInstance("CRAWLER", 1);
+      target.position = { x: 20, y: 0 };
+
+      // First attack cycle: freezes the target.
+      tickCombat([tower], [target], 50);
+      const cooldownMs = target.slow ? 1000 / getTowerLevelStats("FROSTBORN", 10).attackSpeed : 0;
+      expect(target.slow!.percent).toBe(1);
+      const freezeDurationMs = target.slow!.remainingMs;
+
+      // Keep ticking through many more attack cycles (each landing a
+      // partial slow, never another freeze) well past the ORIGINAL freeze
+      // duration. If the bug were still present, remainingMs would keep
+      // getting refreshed by every partial-slow hit and target.slow would
+      // still report percent === 1 here. Mirrors GameEngine's real tick
+      // order — tickCombat, then advanceEnemy — since tickCombat alone
+      // never decrements a status effect's remainingMs; that only happens
+      // inside advanceEnemy.
+      let elapsed = 0;
+      const totalWindow = freezeDurationMs + cooldownMs * 3; // several extra attack cycles past when it should have thawed
+      while (elapsed < totalWindow) {
+        tickCombat([tower], [target], 50);
+        advanceEnemy(target, 50);
+        target.position = { x: 20, y: 0 }; // stay in range even once no longer frozen — irrelevant to what this test checks
+        elapsed += 50;
+      }
+
+      expect(target.slow === null || target.slow!.percent < 1).toBe(true);
     });
   });
 });

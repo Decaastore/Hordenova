@@ -118,7 +118,11 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
 
   if (enemy.slow) {
     enemy.slow.remainingMs -= dtMs;
-    if (enemy.slow.remainingMs <= 0) enemy.slow = null;
+    // `!(remainingMs > 0)` rather than `remainingMs <= 0`: also catches
+    // NaN (NaN <= 0 is false, which would otherwise let a corrupted
+    // duration — see applySlow's guard below — leave the enemy stuck
+    // "frozen" forever, since NaN can never satisfy a <= comparison).
+    if (!(enemy.slow.remainingMs > 0)) enemy.slow = null;
   }
 
   const distanceDelta = getEffectiveSpeed(enemy) * dtSeconds;
@@ -149,12 +153,38 @@ export function isEnemyDead(enemy: EnemyInstance): boolean {
   return enemy.hp <= 0;
 }
 
+/**
+ * Applies a slow (percent 0..1; 1 = a full freeze — Frostborn's Deep Freeze
+ * reuses this exact plumbing, see CombatSystem.ts). Percent-or-stronger
+ * reapplications refresh/replace the effect outright — that's the intended
+ * "renew on a fresh hit" behavior.
+ *
+ * BUGFIX (permanent-freeze): a WEAKER reapplication landing on an already
+ * more-slowed/frozen target must be a complete no-op — it must NOT touch
+ * `remainingMs` at all. The previous code took `Math.max(remainingMs,
+ * durationMs)` here, which extended the STRONGER effect's timer using the
+ * WEAKER hit's own (unrelated) duration. Because a frozen enemy has 0
+ * effective speed, it can never leave tower range to break the cycle: every
+ * later hit — freeze-roll or not — kept re-extending the freeze before it
+ * could expire, so a target that got frozen once next to an active tower
+ * stayed frozen indefinitely. Ignoring weaker reapplications outright
+ * removes that self-sustaining refresh loop while leaving every
+ * same-or-stronger case (the normal, intended path) unchanged.
+ *
+ * Also guards against an invalid `durationMs` (undefined/NaN/Infinity/<=0)
+ * ever being able to create an effect at all, and clamps `percent` to
+ * 0..1 — neither should be reachable from real callers today, but a
+ * corrupted value here is exactly the kind of thing that must never
+ * produce a permanent status effect.
+ */
 export function applySlow(enemy: EnemyInstance, percent: number, durationMs: number): void {
-  if (!enemy.slow || percent >= enemy.slow.percent) {
-    enemy.slow = { percent, remainingMs: durationMs };
-  } else {
-    enemy.slow.remainingMs = Math.max(enemy.slow.remainingMs, durationMs);
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+  const clampedPercent = Math.min(Math.max(percent, 0), 1);
+
+  if (!enemy.slow || clampedPercent >= enemy.slow.percent) {
+    enemy.slow = { percent: clampedPercent, remainingMs: durationMs };
   }
+  // else: strictly weaker than the active effect — no-op, see doc comment above.
 }
 
 /**
