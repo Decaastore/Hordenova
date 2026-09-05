@@ -16,6 +16,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     maxBaseHp: 100,
     speed: 1,
     bestWave: 14,
+    seasonBestWave: 14,
     enemiesDefeated: 0,
     selectedTowerId: null,
     bossNameKey: null,
@@ -34,7 +35,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
 function renderHud(hud: HudSnapshot): string {
   return renderToStaticMarkup(
     <LanguageProvider>
-      <HUD hud={hud} mode="INFINITE" onSetSpeed={() => {}} onOpenInventory={() => {}} />
+      <HUD hud={hud} onSetSpeed={() => {}} onOpenInventory={() => {}} />
     </LanguageProvider>,
   );
 }

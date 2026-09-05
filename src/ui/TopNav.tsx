@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 
-export type NavView = "HOME" | "WIKI" | "NOVIDADES";
+export type NavView = "HOME" | "SEASON" | "WIKI" | "NOVIDADES";
 
 interface TopNavProps {
   active: NavView;
@@ -11,17 +11,16 @@ interface TopNavProps {
 }
 
 /**
- * Persistent top navigation shown on the Home/Wiki/Novidades screens (see
- * App.tsx) — the game had zero shared chrome outside active gameplay
+ * Persistent top navigation shown on the Home/Season/Wiki/Novidades screens
+ * (see App.tsx) — the game had zero shared chrome outside active gameplay
  * before this (each screen built its own full-bleed layout from scratch,
  * per the Home/Wiki/Novidades architecture audit). Deliberately NOT shown
- * during MODE_SELECT/GAME: those already own their own back-arrow / HUD
- * chrome, and this session's spec explicitly asks to preserve everything
- * already working there untouched.
+ * during GAME, which keeps its own HUD chrome untouched.
  *
- * "Jogar" always jumps straight to Mode Select ("CHOOSE YOUR PATH") — the
- * real entry point into a run — never re-triggering Home's own portal
- * transition a second time.
+ * "Jogar" always jumps straight into the game (there is a single permanent
+ * save now — PRÓXIMA GRANDE FASE spec's "DECISÃO DEFINITIVA SOBRE
+ * PROGRESSÃO" retired the old Infinite/Ascension mode-select step) — never
+ * re-triggering Home's own portal transition a second time.
  */
 export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   const { t } = useLanguage();
@@ -35,6 +34,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
         <button style={playLinkStyle} onClick={onPlay}>
           {t("nav.play")}
         </button>
+        <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
         <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
         <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
       </div>

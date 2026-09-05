@@ -19,6 +19,7 @@ export const en = {
   nav: {
     home: "Home",
     play: "Play",
+    season: "Season",
     wiki: "Wiki",
     novidades: "News",
   },
@@ -382,22 +383,12 @@ export const en = {
     cost: "Cost",
     receive: "Receive",
   },
-  modeSelect: {
-    title: "CHOOSE YOUR PATH",
-    infinite: {
-      label: "INFINITE",
-      subtitle: "PERMANENT PROGRESS",
-      phase: "Phase {wave}",
-      play: "PLAY INFINITE",
-    },
-    ascension: {
-      label: "ASCENSION",
-      subtitle: "WEEKLY COMPETITION",
-      endsIn: "ENDS IN {time}",
-      yourBest: "YOUR BEST: {wave}",
-      play: "PLAY ASCENSION",
-      viewCollection: "COLLECTION & HISTORY",
-    },
+  season: {
+    title: "SEASON {number}",
+    endsIn: "Ends in {time}",
+    yourBest: "Your Season Best",
+    notYetParticipating: "Play a wave this Season to enter the ranking.",
+    viewCollection: "COLLECTION & HISTORY",
   },
   ascension: {
     seasonThemes: {
@@ -555,7 +546,7 @@ export const en = {
     tradable: "Tradable",
     notTradable: "Soulbound",
     masteryTitle: "Tower Mastery",
-    masteryHint: "Uncapped Gold sink past Level 30 — a small, uniform bonus per level.",
+    masteryHint: "Uncapped Gems sink past Level 30 — a small, uniform bonus per level. Permanent across Seasons.",
     goldSinksTitle: "Gold Sinks",
     gemSinksTitle: "Gem Sinks",
     uncapped: "Uncapped",

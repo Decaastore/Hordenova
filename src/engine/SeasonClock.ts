@@ -13,7 +13,14 @@
  * implement the exact same interface without any caller changing.
  */
 
-export const SEASON_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * HORDENOVA — PRÓXIMA GRANDE FASE spec section 3: Season is now the ONE
+ * competitive window (30 days), not a 7-day side ladder next to a separate
+ * "Infinite" mode. It measures the player's permanent, never-reset save
+ * (see SaveData.seasonBestWave) rather than resetting anything — see
+ * AscensionManager.ts's updated doc comment for the full lifecycle.
+ */
+export const SEASON_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
  * Reference point for season numbering — season 1 starts here, season 2

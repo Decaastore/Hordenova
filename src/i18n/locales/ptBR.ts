@@ -20,6 +20,7 @@ export const ptBR: TranslationSchema = {
   nav: {
     home: "Início",
     play: "Jogar",
+    season: "Season",
     wiki: "Wiki",
     novidades: "Novidades",
   },
@@ -383,22 +384,12 @@ export const ptBR: TranslationSchema = {
     cost: "Custo",
     receive: "Recebe",
   },
-  modeSelect: {
-    title: "ESCOLHA SEU CAMINHO",
-    infinite: {
-      label: "INFINITO",
-      subtitle: "PROGRESSO PERMANENTE",
-      phase: "Fase {wave}",
-      play: "JOGAR INFINITO",
-    },
-    ascension: {
-      label: "ASCENSÃO",
-      subtitle: "COMPETIÇÃO SEMANAL",
-      endsIn: "TERMINA EM {time}",
-      yourBest: "SEU MELHOR: {wave}",
-      play: "JOGAR ASCENSÃO",
-      viewCollection: "COLEÇÃO E HISTÓRICO",
-    },
+  season: {
+    title: "SEASON {number}",
+    endsIn: "Termina em {time}",
+    yourBest: "Seu Melhor da Season",
+    notYetParticipating: "Jogue uma onda nesta Season para entrar no ranking.",
+    viewCollection: "COLEÇÃO E HISTÓRICO",
   },
   ascension: {
     seasonThemes: {
@@ -556,7 +547,7 @@ export const ptBR: TranslationSchema = {
     tradable: "Negociável",
     notTradable: "Vinculado à Alma",
     masteryTitle: "Maestria da Torre",
-    masteryHint: "Sink de Ouro sem limite após o Nível 30 — um pequeno bônus uniforme por nível.",
+    masteryHint: "Sink de Gemas sem limite após o Nível 30 — um pequeno bônus uniforme por nível. Permanente entre Seasons.",
     goldSinksTitle: "Sinks de Ouro",
     gemSinksTitle: "Sinks de Gemas",
     uncapped: "Sem Limite",

@@ -38,6 +38,7 @@ import {
   getSpecializationUpgradeCostFor,
   upgradeSpecialization as upgradeSpecializationEntity,
   equipSkin as equipSkinEntity,
+  canPurchaseSkin as canPurchaseSkinEntity,
   getMasteryUpgradeCostFor,
   upgradeMastery as upgradeMasteryEntity,
   applySiegeDamage,
@@ -45,6 +46,7 @@ import {
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
+import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import {
   advanceEnemy,
@@ -107,6 +109,8 @@ export interface HudSnapshot {
   maxBaseHp: number;
   speed: GameSpeed;
   bestWave: number;
+  /** This Season's own high-water mark — see SaveData.seasonBestWave's doc comment. */
+  seasonBestWave: number;
   enemiesDefeated: number;
   selectedTowerId: string | null;
   /** i18n key (bosses.<bossNameKey>.name) — NOT a display string. */
@@ -173,6 +177,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.maxBaseHp === b.maxBaseHp &&
     a.speed === b.speed &&
     a.bestWave === b.bestWave &&
+    a.seasonBestWave === b.seasonBestWave &&
     a.enemiesDefeated === b.enemiesDefeated &&
     a.selectedTowerId === b.selectedTowerId &&
     a.bossNameKey === b.bossNameKey &&
@@ -220,6 +225,8 @@ export class GameEngine {
   private enemiesDefeated = 0;
   private selectedTowerId: string | null = null;
   private bestWave = 0;
+  /** This Season's own high-water mark — separate from `bestWave` (the account's all-time record), reset to 0 only at a Season boundary. See SaveData.seasonBestWave's doc comment. */
+  private seasonBestWave = 0;
 
   private bossIntroRemainingMs = 0;
   private bossIntroNameKey: string | null = null;
@@ -254,6 +261,17 @@ export class GameEngine {
   private gemShards = 0;
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
+
+  // CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — Tower Mastery and Tower
+  // Skin ownership are PERMANENT, account-wide, keyed by TOWER TYPE (every
+  // placed tower of a type shares its type's Mastery level and equipped
+  // skin) — unlike `towers[].level`/`specializationLevel`, which live in the
+  // Season-scoped towerLoadout and reset to 0 at every Season boundary (see
+  // AscensionManager.syncSeasonIfNeeded). See SaveData's doc comment for the
+  // full PERMANENT vs SEASONAL split this mirrors.
+  private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
+  private ownedTowerSkinIds = new Set<string>();
+  private equippedTowerSkinByType: Partial<Record<TowerType, string>> = {};
 
   // Master Implementation spec sections 46-48, and AUDITORIA E CORREÇÃO
   // GERAL spec sections 1-13 — the every-10-wave Roulette.
@@ -291,13 +309,18 @@ export class GameEngine {
   private readonly listeners = new Set<() => void>();
 
   /**
-   * Master Implementation spec section 2 — the ONLY thing that
-   * distinguishes an Ascension GameEngine from an Infinite one: which
-   * SaveData namespace it loads from / persists to (see SaveSystem.ts's
-   * ASCENSION_STORAGE_KEY). Every other line of this class — combat,
-   * waves, bosses, freeze, VFX, Active Idle — is completely unaware a
-   * second mode even exists, which is exactly what "dois modos
-   * completamente separados" requires without duplicating this file.
+   * PRÓXIMA GRANDE FASE spec — "DECISÃO DEFINITIVA SOBRE PROGRESSÃO": there
+   * is now exactly one permanent, never-reset save (SAVE_STORAGE_KEY); the
+   * separate Ascension/Infinite dual-mode split (a second GameEngine
+   * pointed at ASCENSION_STORAGE_KEY, with its own temporary
+   * wave/gold/towers reset every season) no longer exists in the real app
+   * flow. `storageKey` stays overridable — GameEngineDualMode.test.ts still
+   * exercises this constructor's namespace-isolation guarantee directly,
+   * a real and still-useful property of the engine — but nothing under
+   * src/screens/ constructs a second instance anymore. Season-scoped
+   * competitive state (`seasonBestWave`) lives as an ordinary field on THIS
+   * SAME permanent save (see SaveData.seasonBestWave), not a second
+   * namespace.
    */
   constructor(private readonly storageKey: string = SAVE_STORAGE_KEY) {}
 
@@ -326,7 +349,15 @@ export class GameEngine {
 
     const save = loadSave(this.storageKey);
     this.bestWave = save.bestWave;
+    this.seasonBestWave = save.seasonBestWave;
     this.gold = save.gold;
+    // Permanent Mastery/Skin state must be loaded BEFORE instantiating towers
+    // from the (Season-scoped) loadout below — instantiateTowerFromLoadout
+    // reads these maps to give each tower its permanent-by-type Mastery
+    // level and equipped skin.
+    this.towerMasteryLevels = { ...save.towerMasteryLevels };
+    this.ownedTowerSkinIds = new Set(save.ownedTowerSkinIds);
+    this.equippedTowerSkinByType = { ...save.equippedTowerSkinByType };
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.playerId = save.playerId;
@@ -470,6 +501,14 @@ export class GameEngine {
     return this.phase === "RUNNING" || this.phase === "WAVE_TRANSITION" || this.phase === "PROGRESSION_STOPPED";
   }
 
+  /**
+   * Mastery level and equipped skin are sourced from the PERMANENT,
+   * per-type maps (this.towerMasteryLevels/this.equippedTowerSkinByType),
+   * never from the loadout entry itself — the entry's own equivalent
+   * fields are legacy/unused now that both became account-wide-by-type
+   * state instead of per-slot state (see SEASON-RESET-CORRECTION doc
+   * comment on those fields above).
+   */
   private instantiateTowerFromLoadout(entry: TowerLoadoutEntry): TowerInstance {
     const slot = TOWER_SLOTS.find((s) => s.id === entry.slotId);
     return createTowerInstance(
@@ -479,8 +518,8 @@ export class GameEngine {
       entry.level,
       entry.specializationId,
       entry.specializationLevel,
-      entry.equippedSkinId,
-      entry.masteryLevel,
+      this.equippedTowerSkinByType[entry.type] ?? null,
+      this.towerMasteryLevels[entry.type] ?? 0,
     );
   }
 
@@ -495,7 +534,18 @@ export class GameEngine {
     if (this.gold < cost) return false;
 
     this.gold -= cost;
-    this.towers.push(createTowerInstance(slotId, type, slot.position));
+    this.towers.push(
+      createTowerInstance(
+        slotId,
+        type,
+        slot.position,
+        1,
+        null,
+        0,
+        this.equippedTowerSkinByType[type] ?? null,
+        this.towerMasteryLevels[type] ?? 0,
+      ),
+    );
     this.persist();
     this.notify();
     return true;
@@ -524,12 +574,19 @@ export class GameEngine {
   }
 
   /**
-   * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the gold
-   * sink past MAX_TOWER_LEVEL. Deliberately available at ANY tower level
-   * (not gated behind level 30) — a player free to invest gold into
-   * Mastery earlier if they'd rather spread spending out, exactly like
-   * Specialization already works once its own level gate is passed. Same
-   * "caller owns gold deduction" shape as upgradeSelectedTower above.
+   * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the
+   * uncapped sink past MAX_TOWER_LEVEL. Deliberately available at ANY tower
+   * level (not gated behind level 30) — a player free to invest earlier if
+   * they'd rather spread spending out, exactly like Specialization already
+   * works once its own level gate is passed.
+   *
+   * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): Mastery is now PERMANENT
+   * and funded by GEMS, never Gold — see gemSinks.ts's doc comment for why
+   * this is a deliberate, explicit exception to the game's own "Gems never
+   * buy combat power" contract. The level lives in `this.towerMasteryLevels`
+   * (keyed by TYPE, not by tower instance), applied to every placed tower of
+   * that type immediately so two Ironwood towers never silently disagree on
+   * their own Mastery level.
    */
   upgradeSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
@@ -537,10 +594,13 @@ export class GameEngine {
     if (!tower) return false;
 
     const cost = getMasteryUpgradeCostFor(tower);
-    if (this.gold < cost) return false;
+    if (!this.spendGems(cost, `tower_mastery:${tower.type}`)) return false;
 
-    this.gold -= cost;
     upgradeMasteryEntity(tower);
+    this.towerMasteryLevels[tower.type] = tower.masteryLevel;
+    for (const other of this.towers) {
+      if (other.type === tower.type && other.id !== tower.id) other.masteryLevel = tower.masteryLevel;
+    }
     this.emitAudio({ type: "tower_upgrade" });
     this.persist();
     this.notify();
@@ -604,14 +664,56 @@ export class GameEngine {
   // -------------------------------------------------------------------
   // Progression 2.0 — Tower Skins (spec section 10/11). Purely cosmetic:
   // never touches gold, level, specialization, or combat.
+  //
+  // CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): a skin must be PURCHASED
+  // with Gems (purchaseTowerSkin below) before it can ever be equipped —
+  // reaching its unlockLevel only makes it purchasable, it no longer grants
+  // it for free. Ownership (this.ownedTowerSkinIds) and the equipped choice
+  // (this.equippedTowerSkinByType, keyed by TYPE) are both PERMANENT and
+  // survive every Season boundary untouched, unlike tower level itself.
   // -------------------------------------------------------------------
+
+  /** Gems cost to buy `skinId`, or null if the id isn't a real skin — read by UI before calling purchaseTowerSkin. */
+  getTowerSkinGemCost(skinId: string): number | null {
+    return getTowerSkinDefinition(skinId)?.gemCost ?? null;
+  }
+
+  isTowerSkinOwned(skinId: string): boolean {
+    return this.ownedTowerSkinIds.has(skinId);
+  }
+
+  canPurchaseSkinForSelectedTower(skinId: string): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    return !!tower && canPurchaseSkinEntity(tower, skinId, this.ownedTowerSkinIds);
+  }
+
+  /** Debits Gems atomically (spendGems already guards insufficient balance) and grants PERMANENT ownership — never revoked by a future Season's tower-level reset. */
+  purchaseTowerSkin(skinId: string): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canPurchaseSkinEntity(tower, skinId, this.ownedTowerSkinIds)) return false;
+
+    const def = getTowerSkinDefinition(skinId);
+    if (!def) return false;
+    if (!this.spendGems(def.gemCost, `tower_skin:${skinId}`)) return false;
+
+    this.ownedTowerSkinIds.add(skinId);
+    this.persist();
+    this.notify();
+    return true;
+  }
 
   equipSkinOnSelectedTower(skinId: string | null): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower) return false;
-    const applied = equipSkinEntity(tower, skinId);
+    const applied = equipSkinEntity(tower, skinId, this.ownedTowerSkinIds);
     if (applied) {
+      if (skinId === null) delete this.equippedTowerSkinByType[tower.type];
+      else this.equippedTowerSkinByType[tower.type] = skinId;
+      for (const other of this.towers) {
+        if (other.type === tower.type && other.id !== tower.id) other.equippedSkinId = skinId;
+      }
       this.persist();
       this.notify();
     }
@@ -979,6 +1081,16 @@ export class GameEngine {
    * calls spinPendingRoulette() (their own ROLETAR click).
    */
   private advanceBestWave(wave: number): void {
+    // Season high-water mark (PRÓXIMA GRANDE FASE spec — "Season possui seu
+    // próprio seasonBestWave") tracked completely independently of the
+    // account's all-time bestWave below: it can be lower than bestWave at
+    // any moment (right after a Season boundary resets it to 0, a returning
+    // veteran player's very next wave crossed is already a new SEASON best
+    // long before it's anywhere near a new ACCOUNT best) — gating this on
+    // `wave <= this.bestWave` would silently stop updating it the moment an
+    // account's lifetime record pulls ahead, which is exactly wrong.
+    if (wave > this.seasonBestWave) this.seasonBestWave = wave;
+
     if (wave <= this.bestWave) return;
     const bonus = getMilestoneBonus(wave);
     if (bonus > 0) {
@@ -1230,6 +1342,10 @@ export class GameEngine {
         unlockedCastleSkinIds: this.unlockedCastleSkinIds,
         prestigeLevel: this.prestigeLevel,
         pendingRouletteSpinWaves: this.pendingRouletteSpinWaves,
+        seasonBestWave: this.seasonBestWave,
+        towerMasteryLevels: this.towerMasteryLevels,
+        ownedTowerSkinIds: [...this.ownedTowerSkinIds],
+        equippedTowerSkinByType: this.equippedTowerSkinByType,
       },
       this.storageKey,
     );
@@ -1255,6 +1371,7 @@ export class GameEngine {
       maxBaseHp: this.maxBaseHp,
       speed: this.speed,
       bestWave: this.bestWave,
+      seasonBestWave: this.seasonBestWave,
       enemiesDefeated: this.enemiesDefeated,
       selectedTowerId: this.selectedTowerId,
       bossNameKey: boss?.boss?.nameKey ?? this.bossIntroNameKey,

@@ -131,9 +131,45 @@ export interface SaveData {
    * entry, and only in response to a real player click.
    */
   pendingRouletteSpinWaves: number[];
+
+  /**
+   * HORDENOVA — PRÓXIMA GRANDE FASE spec, "DECISÃO DEFINITIVA SOBRE
+   * PROGRESSÃO": the account's single permanent save NEVER resets for a
+   * Season boundary — towers/gold/gems/Tower Mastery/Prestige/items/
+   * collection/skins/unlocks all keep going forever, exactly like
+   * `bestWave` above always has. Season is purely a competitive window
+   * layered on top: `seasonBestWave` is a SEPARATE high-water mark of the
+   * SAME `currentWave` progress, tracked identically to `bestWave` (see
+   * GameEngine.advanceBestWave/recordRunResult, which update both), except
+   * it resets to 0 only when a season boundary is crossed (see
+   * AscensionManager.syncSeasonIfNeeded) — never on a retry, never for any
+   * other reason. `bestWave` (the account's all-time record) and
+   * `seasonBestWave` (this season's record) can and will diverge the
+   * moment a season rolls over, by design.
+   */
+  seasonBestWave: number;
+
+  // -----------------------------------------------------------------------
+  // HORDENOVA — PRÓXIMA GRANDE FASE spec, "CORREÇÃO DE REQUISITOS": a
+  // player's build (tower LEVEL, specialization progress, Gold) is
+  // SEASONAL — it resets to a fresh start at every Season boundary (see
+  // AscensionManager.syncSeasonIfNeeded), exactly like `towerLoadout`/
+  // `gold`/`currentWave` above. Tower Mastery and Tower Skin OWNERSHIP are
+  // the opposite: permanent, account-wide, and untouched by that reset —
+  // moved out of TowerLoadoutEntry (which IS wiped each season) into their
+  // own top-level fields here. Mastery is funded by GEMS, never Gold (a
+  // deliberate, explicit exception to the Gem economy's usual
+  // never-buys-power rule — see config/gemSinks.ts's doc comment for why).
+  // -----------------------------------------------------------------------
+  /** Permanent per-tower-TYPE Mastery level (0 = never invested) — survives every Season reset. Applied to a freshly-placed tower of that type via GameEngine.instantiateTowerFromLoadout/placeTower. */
+  towerMasteryLevels: Partial<Record<TowerType, number>>;
+  /** Permanent record of every Tower Skin id this account has ever unlocked (by reaching its unlockLevel on some tower, in any Season) — mirrors unlockedCastleSkinIds. Never removed once granted, regardless of the tower's current (seasonal) level. */
+  ownedTowerSkinIds: string[];
+  /** Permanent per-tower-TYPE equipped-skin preference, auto-reapplied whenever a tower of that type is placed in a future Season — so an owned skin doesn't visually vanish just because the season reset the tower itself. Absent/undefined = default look. */
+  equippedTowerSkinByType: Partial<Record<TowerType, string>>;
 }
 
-export const SAVE_DATA_VERSION = 12;
+export const SAVE_DATA_VERSION = 14;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -173,6 +209,10 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   unlockedCastleSkinIds: [],
   prestigeLevel: 0,
   pendingRouletteSpinWaves: [],
+  seasonBestWave: 0,
+  towerMasteryLevels: {},
+  ownedTowerSkinIds: [],
+  equippedTowerSkinByType: {},
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -329,10 +369,42 @@ function parseUnlockedCastleSkinIds(raw: unknown): string[] {
   return raw.filter((entry): entry is string => typeof entry === "string");
 }
 
+/** Self-healing parse for `ownedTowerSkinIds` — same shape as parseUnlockedCastleSkinIds (an id list), kept as its own named function since it's a conceptually distinct permanent field. */
+function parseOwnedTowerSkinIds(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((entry): entry is string => typeof entry === "string");
+}
+
 /** Self-healing parse for `pendingRouletteSpinWaves` — drops anything that isn't a positive integer wave number instead of trusting a corrupted/tampered save. */
 function parseWaveNumberArray(raw: unknown): number[] {
   if (!Array.isArray(raw)) return [];
   return raw.filter((entry): entry is number => typeof entry === "number" && Number.isInteger(entry) && entry > 0);
+}
+
+const VALID_TOWER_TYPES = new Set<TowerType>(TOWER_TYPES);
+
+/** Self-healing parse for `towerMasteryLevels` — drops any key that isn't a real TowerType or any value that isn't a non-negative integer. */
+function parseTowerMasteryLevels(raw: unknown): Partial<Record<TowerType, number>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Partial<Record<TowerType, number>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (VALID_TOWER_TYPES.has(key as TowerType) && typeof value === "number" && value >= 0) {
+      result[key as TowerType] = value;
+    }
+  }
+  return result;
+}
+
+/** Self-healing parse for `equippedTowerSkinByType` — drops any key that isn't a real TowerType, or a skin id that doesn't actually belong to that tower type. */
+function parseEquippedTowerSkinByType(raw: unknown): Partial<Record<TowerType, string>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Partial<Record<TowerType, string>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!VALID_TOWER_TYPES.has(key as TowerType) || typeof value !== "string") continue;
+    const skin = getTowerSkinDefinition(value);
+    if (skin && skin.towerType === key) result[key as TowerType] = value;
+  }
+  return result;
 }
 
 /** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
@@ -413,6 +485,19 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // used to auto-resolve instantly), so an empty queue is the only
       // correct default; nothing was ever "missed" for it to represent.
       pendingRouletteSpinWaves: parseWaveNumberArray(parsed.pendingRouletteSpinWaves),
+      // PRÓXIMA GRANDE FASE (save v12 -> v13) — a pre-existing save never
+      // tracked a season-scoped high-water mark separately from its
+      // all-time bestWave; 0 is the only correct default (nothing was
+      // "achieved this season" before this field existed to record it).
+      seasonBestWave: typeof parsed.seasonBestWave === "number" && parsed.seasonBestWave >= 0 ? parsed.seasonBestWave : 0,
+      // CORREÇÃO DE REQUISITOS — Tower Mastery, owned skins, and equipped
+      // skins are permanent account-wide state (unlike tower level/loadout,
+      // which are Season-scoped and live only in towerLoadout). A
+      // pre-existing save never tracked these separately, so empty is the
+      // only correct default.
+      towerMasteryLevels: parseTowerMasteryLevels(parsed.towerMasteryLevels),
+      ownedTowerSkinIds: parseOwnedTowerSkinIds(parsed.ownedTowerSkinIds),
+      equippedTowerSkinByType: parseEquippedTowerSkinByType(parsed.equippedTowerSkinByType),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;
@@ -440,5 +525,11 @@ export function updateSave(updates: Partial<SaveData>, storageKey: string = SAVE
 
 export function recordRunResult(waveReached: number, storageKey: string = SAVE_STORAGE_KEY): SaveData {
   const current = loadSave(storageKey);
-  return updateSave({ bestWave: Math.max(current.bestWave, waveReached) }, storageKey);
+  return updateSave(
+    {
+      bestWave: Math.max(current.bestWave, waveReached),
+      seasonBestWave: Math.max(current.seasonBestWave, waveReached),
+    },
+    storageKey,
+  );
 }

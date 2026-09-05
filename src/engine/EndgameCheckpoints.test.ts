@@ -54,29 +54,30 @@ describe("Economy simulation checkpoints (Master Implementation Pass spec sectio
     }
   });
 
-  it("Gold always has an available, finite sink at every checkpoint — Tower Mastery is uncapped and never overflows (Gold Economy Invariant, spec section 45)", () => {
-    expect(hasUncappedGoldSink()).toBe(true);
+  it("Gold has a finite, real sink below the level cap at every checkpoint (CORREÇÃO DE REQUISITOS: Tower Mastery moved to Gems, so Gold's own uncapped-sink invariant is honestly false now — see goldSinks.ts's doc comment)", () => {
+    expect(hasUncappedGoldSink()).toBe(false);
     for (const type of TOWER_TYPES) {
-      // A tower not yet at max level: the level-up sink is finite.
       const levelCost = getUpgradeCost(type, Math.floor(MAX_TOWER_LEVEL / 2));
       expect(levelCost).not.toBeNull();
       expect(Number.isFinite(levelCost)).toBe(true);
-      // A maxed tower: Mastery is ALWAYS available, at any mastery depth a
-      // save could plausibly have accumulated by a given checkpoint.
-      for (const masteryLevel of [0, 10, 100, 1000]) {
-        const masteryCost = getMasteryUpgradeCost(type, masteryLevel);
-        expect(Number.isFinite(masteryCost)).toBe(true);
-        expect(masteryCost).toBeGreaterThan(0);
-      }
     }
   });
 
-  it("Gems always have an available, finite sink at every checkpoint — Profile Prestige is uncapped and never overflows (Gem Economy Invariant, spec section 46)", () => {
+  it("Gems always have an available, finite sink at every checkpoint — Profile Prestige AND (CORREÇÃO DE REQUISITOS) Tower Mastery are both uncapped and never overflow (Gem Economy Invariant, spec section 46)", () => {
     expect(hasUncappedGemSink()).toBe(true);
     for (const prestigeLevel of [0, 10, 100, 1000]) {
       const cost = getPrestigeUpgradeCost(prestigeLevel);
       expect(Number.isFinite(cost)).toBe(true);
       expect(cost).toBeGreaterThan(0);
+    }
+    for (const type of TOWER_TYPES) {
+      // Mastery is ALWAYS available in Gems, at any mastery depth a save
+      // could plausibly have accumulated by a given checkpoint.
+      for (const masteryLevel of [0, 10, 100, 1000]) {
+        const masteryCost = getMasteryUpgradeCost(type, masteryLevel);
+        expect(Number.isFinite(masteryCost)).toBe(true);
+        expect(masteryCost).toBeGreaterThan(0);
+      }
     }
   });
 

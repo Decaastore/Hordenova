@@ -298,18 +298,39 @@ export function upgradeSpecialization(tower: TowerInstance): void {
 // Progression 2.0 — Skins (cosmetic only, never read by combat code).
 // ---------------------------------------------------------------------------
 
-export function canEquipSkin(tower: TowerInstance, skinId: string): boolean {
+/**
+ * SEASON-RESET-CORRECTION — skin ownership, not live tower level, is the
+ * gate. Tower level is Season-scoped (resets to 0 every Season), but a skin
+ * bought/unlocked with real Gems must stay equippable forever afterward
+ * (spec example: "Skin Astral" unlocked at Lv15 in Season 1 stays equippable
+ * in Season 2 even though the tower is back at level 0). `ownedSkinIds` is
+ * the permanent SaveData.ownedTowerSkinIds set — see GameEngine for how a
+ * skin actually enters it (getNewlyUnlockedSkinIds below).
+ */
+export function canEquipSkin(tower: TowerInstance, skinId: string, ownedSkinIds: ReadonlySet<string>): boolean {
   const def = getTowerSkinDefinition(skinId);
-  return !!def && def.towerType === tower.type && tower.level >= def.unlockLevel;
+  return !!def && def.towerType === tower.type && ownedSkinIds.has(skinId);
 }
 
 /** Mutates `tower` in place. `skinId` of null clears back to the default look. Purely cosmetic — never touches level/specialization/stats. */
-export function equipSkin(tower: TowerInstance, skinId: string | null): boolean {
+export function equipSkin(tower: TowerInstance, skinId: string | null, ownedSkinIds: ReadonlySet<string>): boolean {
   if (skinId === null) {
     tower.equippedSkinId = null;
     return true;
   }
-  if (!canEquipSkin(tower, skinId)) return false;
+  if (!canEquipSkin(tower, skinId, ownedSkinIds)) return false;
   tower.equippedSkinId = skinId;
   return true;
+}
+
+/**
+ * Whether `skinId` is currently purchasable for `tower` — reached the
+ * required level (this Season or a prior one; level itself doesn't persist,
+ * but the fact that a tower of this type has been leveled enough IS
+ * re-earnable every Season) and not already owned. Caller (GameEngine)
+ * still owns checking/deducting Gems — see towerSkins.ts's gemCost.
+ */
+export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinIds: ReadonlySet<string>): boolean {
+  const def = getTowerSkinDefinition(skinId);
+  return !!def && def.towerType === tower.type && tower.level >= def.unlockLevel && !ownedSkinIds.has(skinId);
 }

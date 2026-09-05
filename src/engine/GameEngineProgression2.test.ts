@@ -106,11 +106,27 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getRenderSnapshot().towers[0]!.specializationLevel).toBe(2);
   });
 
-  it("equipping a skin never changes gold and is purely cosmetic on the tower instance", () => {
-    // Bump level past the skin's unlockLevel (15) directly via a re-seeded
-    // save rather than many real upgrades — this test is about the skin
-    // wiring, not level progression.
+  it("CORREÇÃO DE REQUISITOS: a skin cannot be equipped until purchased with Gems, even at/above its unlockLevel", () => {
     updateSave({
+      gems: 999_999,
+      towerLoadout: [
+        { slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 20, specializationId: null, specializationLevel: 0, equippedSkinId: null },
+      ],
+    });
+    const engine2 = new GameEngine();
+    engine2.startRun();
+    const tower = engine2.getRenderSnapshot().towers[0]!;
+    engine2.selectTower(tower.id);
+
+    expect(engine2.isTowerSkinOwned("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(false);
+    expect(engine2.equipSkinOnSelectedTower("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(false);
+    expect(engine2.getRenderSnapshot().towers[0]!.equippedSkinId).toBeNull();
+  });
+
+  it("CORREÇÃO DE REQUISITOS: purchasing a skin costs Gems (never Gold), grants PERMANENT ownership, and only then can it be equipped/cleared with no further currency touched", () => {
+    updateSave({
+      gold: 999_999,
+      gems: 999_999,
       towerLoadout: [
         { slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 20, specializationId: null, specializationLevel: 0, equippedSkinId: null },
       ],
@@ -121,12 +137,76 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     engine2.selectTower(tower.id);
 
     const goldBefore = engine2.getHudSnapshot().gold;
+    const gemsBefore = engine2.getHudSnapshot().gems;
+    const gemCost = engine2.getTowerSkinGemCost("IRONWOOD_WARDEN_OF_THE_ABYSS");
+    expect(gemCost).toBeGreaterThan(0);
+
+    expect(engine2.purchaseTowerSkin("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(true);
+    expect(engine2.getHudSnapshot().gold).toBe(goldBefore); // Gold never touched
+    expect(engine2.getHudSnapshot().gems).toBe(gemsBefore - gemCost!);
+    expect(engine2.isTowerSkinOwned("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(true);
+
+    const goldAfterPurchase = engine2.getHudSnapshot().gold;
     expect(engine2.equipSkinOnSelectedTower("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(true);
-    expect(engine2.getHudSnapshot().gold).toBe(goldBefore);
+    expect(engine2.getHudSnapshot().gold).toBe(goldAfterPurchase);
     expect(engine2.getRenderSnapshot().towers[0]!.equippedSkinId).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
 
     expect(engine2.equipSkinOnSelectedTower(null)).toBe(true);
     expect(engine2.getRenderSnapshot().towers[0]!.equippedSkinId).toBeNull();
+
+    // Cannot purchase a second time once already owned.
+    expect(engine2.purchaseTowerSkin("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(false);
+  });
+
+  it("CORREÇÃO DE REQUISITOS: a purchased skin survives a reload — ownership is permanent, not tied to the current tower level", () => {
+    updateSave({
+      gems: 999_999,
+      towerLoadout: [{ slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 20 }],
+    });
+    const first = new GameEngine();
+    first.startRun();
+    first.selectTower(first.getRenderSnapshot().towers[0]!.id);
+    expect(first.purchaseTowerSkin("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(true);
+    first.equipSkinOnSelectedTower("IRONWOOD_WARDEN_OF_THE_ABYSS");
+
+    // Simulate a Season reset dropping the tower back to level 1 — ownership
+    // and the equipped choice must both survive it (see AscensionManager.test.ts).
+    updateSave({ towerLoadout: [{ slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 1 }] });
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+    expect(reloaded.isTowerSkinOwned("IRONWOOD_WARDEN_OF_THE_ABYSS")).toBe(true);
+    expect(reloaded.getRenderSnapshot().towers[0]!.equippedSkinId).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
+  });
+
+  describe("Tower Mastery funded by Gems (CORREÇÃO DE REQUISITOS — was Gold before)", () => {
+    it("upgrading Mastery spends Gems, never Gold, and persists permanently across a reload", () => {
+      const engine = startWithOneMaxedTower();
+      const goldBefore = engine.getHudSnapshot().gold;
+      const gemsBefore = engine.getHudSnapshot().gems;
+
+      expect(engine.upgradeSelectedTowerMastery()).toBe(true);
+      expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
+      expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore); // Gems spent
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
+
+      const reloaded = new GameEngine();
+      reloaded.startRun();
+      expect(reloaded.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
+    });
+
+    it("fails without enough Gems even when Gold is abundant", () => {
+      updateSave({
+        gold: 999_999,
+        gems: 0,
+        towerLoadout: [{ slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 1 }],
+      });
+      const engine = new GameEngine();
+      engine.startRun();
+      engine.selectTower(engine.getRenderSnapshot().towers[0]!.id);
+      expect(engine.upgradeSelectedTowerMastery()).toBe(false);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
+    });
   });
 
   it("gem balance starts at 0 and is exposed on the HUD snapshot", () => {

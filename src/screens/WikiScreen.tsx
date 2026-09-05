@@ -2,7 +2,7 @@ import { useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { TopNav } from "@/ui/TopNav";
+import { TopNav, type NavView } from "@/ui/TopNav";
 import { TOWER_DEFINITIONS, TOWER_TYPES, TOWER_SPECIALS, getTowerLevelStats, MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/config/specializations";
 import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "@/config/towerMastery";
@@ -22,7 +22,7 @@ type Category = "TOWERS" | "BESTIARY" | "CASTLE" | "ITEMS" | "PROGRESSION" | "EC
 const CATEGORIES: readonly Category[] = ["TOWERS", "BESTIARY", "CASTLE", "ITEMS", "PROGRESSION", "ECONOMY", "ASCENSION", "PROJECTIONS"];
 
 interface WikiScreenProps {
-  onNavigate: (view: "HOME" | "WIKI" | "NOVIDADES") => void;
+  onNavigate: (view: NavView) => void;
   onPlay: () => void;
 }
 
@@ -276,7 +276,7 @@ function ProgressionSection() {
               <StatRow label={t("wiki.damage")} value={`+${((bonus.damage - 1) * 100).toFixed(1)}%`} />
               <StatRow label={t("wiki.attackSpeed")} value={`+${((bonus.attackSpeed - 1) * 100).toFixed(1)}%`} />
               <StatRow label={t("wiki.range")} value={`+${((bonus.range - 1) * 100).toFixed(1)}%`} />
-              <StatRow label={t("wiki.upgradeCostBase")} value={getMasteryUpgradeCost("IRONWOOD", level)} />
+              <StatRow label={`${t("wiki.upgradeCostBase")} (${t("hud.gems")})`} value={getMasteryUpgradeCost("IRONWOOD", level)} />
             </Card>
           );
         })}

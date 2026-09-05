@@ -1,20 +1,26 @@
 import { describe, expect, it } from "vitest";
 import { getSkinsForTower, getTowerSkinDefinition, TOWER_SKINS } from "./towerSkins";
 import { TOWER_TYPES, getTowerLevelStats, getTowerSpecialAtLevel } from "./towerStats";
-import { canEquipSkin, createTowerInstance, equipSkin, getTowerStats } from "@/entities/Tower";
+import { canEquipSkin, canPurchaseSkin, createTowerInstance, equipSkin, getTowerStats } from "@/entities/Tower";
 
-describe("Tower Skin architecture (Progression 2.0 spec section 10/11)", () => {
+const OWNED = (ids: string[]) => new Set(ids);
+
+describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃO DE REQUISITOS Gems-only)", () => {
   it("every tower type has at least one skin", () => {
     for (const type of TOWER_TYPES) expect(getSkinsForTower(type).length).toBeGreaterThan(0);
   });
 
-  it("equipping a skin never changes damage/attackSpeed/range/special behavior", () => {
+  it("every skin has a positive Gems cost — never free, never Gold", () => {
+    for (const skin of TOWER_SKINS) expect(skin.gemCost).toBeGreaterThan(0);
+  });
+
+  it("equipping an owned skin never changes damage/attackSpeed/range/special behavior", () => {
     const skin = getSkinsForTower("IRONWOOD")[0]!;
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, skin.unlockLevel);
     const statsBefore = getTowerStats(tower);
     const specialBefore = getTowerSpecialAtLevel(tower.type, tower.level);
 
-    const applied = equipSkin(tower, skin.id);
+    const applied = equipSkin(tower, skin.id, OWNED([skin.id]));
     expect(applied).toBe(true);
     expect(tower.equippedSkinId).toBe(skin.id);
 
@@ -30,27 +36,47 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11)", () => {
     expect(specialAfter).toEqual(specialBefore);
   });
 
-  it("a skin cannot be equipped below its unlockLevel", () => {
+  it("a skin cannot be equipped if not owned, even at/above its unlockLevel", () => {
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 30);
+    const skin = getSkinsForTower("IRONWOOD")[0]!;
+    expect(canEquipSkin(tower, skin.id, OWNED([]))).toBe(false);
+    expect(equipSkin(tower, skin.id, OWNED([]))).toBe(false);
+    expect(tower.equippedSkinId).toBeNull();
+  });
+
+  it("a skin cannot be purchased below its unlockLevel", () => {
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 1);
     const skin = getSkinsForTower("IRONWOOD")[0]!;
     expect(skin.unlockLevel).toBeGreaterThan(1);
-    expect(canEquipSkin(tower, skin.id)).toBe(false);
-    expect(equipSkin(tower, skin.id)).toBe(false);
-    expect(tower.equippedSkinId).toBeNull();
+    expect(canPurchaseSkin(tower, skin.id, OWNED([]))).toBe(false);
   });
 
-  it("a skin cannot be equipped on the WRONG tower type", () => {
+  it("a skin cannot be purchased twice (already owned)", () => {
+    const skin = getSkinsForTower("IRONWOOD")[0]!;
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, skin.unlockLevel);
+    expect(canPurchaseSkin(tower, skin.id, OWNED([skin.id]))).toBe(false);
+  });
+
+  it("a skin cannot be equipped on the WRONG tower type even if owned", () => {
     const ironwoodTower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 30);
     const infernoSkin = getSkinsForTower("INFERNO")[0]!;
-    expect(equipSkin(ironwoodTower, infernoSkin.id)).toBe(false);
+    expect(equipSkin(ironwoodTower, infernoSkin.id, OWNED([infernoSkin.id]))).toBe(false);
   });
 
   it("passing null clears back to the default look, always succeeding", () => {
+    const skin = getSkinsForTower("IRONWOOD")[0]!;
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 30);
-    equipSkin(tower, getSkinsForTower("IRONWOOD")[0]!.id);
+    equipSkin(tower, skin.id, OWNED([skin.id]));
     expect(tower.equippedSkinId).not.toBeNull();
-    expect(equipSkin(tower, null)).toBe(true);
+    expect(equipSkin(tower, null, OWNED([skin.id]))).toBe(true);
     expect(tower.equippedSkinId).toBeNull();
+  });
+
+  it("an owned skin stays equippable even after the tower's level resets to 0 (Season reset)", () => {
+    const skin = getSkinsForTower("IRONWOOD")[0]!;
+    const resetTower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 1);
+    expect(canEquipSkin(resetTower, skin.id, OWNED([skin.id]))).toBe(true);
+    expect(equipSkin(resetTower, skin.id, OWNED([skin.id]))).toBe(true);
   });
 
   it("getTowerSkinDefinition returns null for an unknown id, never throws", () => {

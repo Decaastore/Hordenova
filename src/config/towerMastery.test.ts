@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "./towerMastery";
 import { TOWER_TYPES } from "./towerStats";
+import { SPECIALIZATION_UNLOCK_GEM_COST } from "./specializations";
 
-describe("towerMastery (Master Implementation Pass spec sections 3-6)", () => {
+describe("towerMastery (Master Implementation Pass spec sections 3-6, CORREÇÃO DE REQUISITOS — Gems-funded)", () => {
   it("costs strictly increase with mastery level (convex curve — never a bargain to keep buying)", () => {
     for (const type of TOWER_TYPES) {
       let previous = 0;
@@ -14,12 +15,17 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6)", () => {
     }
   });
 
-  it("level 1 mastery is accessible — comparable in scale to a tower's own final (29->30) level-up cost, not an instant trivial spend nor a wall", () => {
-    // IRONWOOD's 29->30 upgrade costs upgradeCostBase(40) * 30 * 0.75 * (1+29*0.35) ≈ 10,038.
-    const finalLevelUpCost = Math.round(40 * 30 * 0.75 * (1 + 29 * 0.35));
-    const masteryLevel1Cost = getMasteryUpgradeCost("IRONWOOD", 0);
-    expect(masteryLevel1Cost).toBeGreaterThan(finalLevelUpCost * 0.3);
-    expect(masteryLevel1Cost).toBeLessThan(finalLevelUpCost * 3);
+  it("level 1 mastery is accessible — comparable in scale to a Specialization unlock (both premium Gems purchases), not an instant trivial spend nor a wall", () => {
+    // CORREÇÃO DE REQUISITOS: Mastery moved from Gold to Gems, so its own
+    // scale must be compared against another Gems price, not a Gold one —
+    // engine/ProgressionSimulation.test.ts's real 48h bot run is what
+    // actually proved this magnitude reachable (a naive Gold->Gems currency
+    // swap without rescaling made even level 1 cost ~10,000 Gems).
+    for (const type of TOWER_TYPES) {
+      const masteryLevel1Cost = getMasteryUpgradeCost(type, 0);
+      expect(masteryLevel1Cost).toBeGreaterThan(SPECIALIZATION_UNLOCK_GEM_COST * 0.3);
+      expect(masteryLevel1Cost).toBeLessThan(SPECIALIZATION_UNLOCK_GEM_COST * 5);
+    }
   });
 
   it("never returns Infinity/NaN, even at mastery levels far beyond anything reachable in real play (spec section 47 numerical safety)", () => {
@@ -32,17 +38,17 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6)", () => {
     }
   });
 
-  it("a large gold stockpile cannot buy thousands of levels in one sitting (spec section 5)", () => {
-    // A genuinely enormous stockpile (1 quadrillion gold — many, many
-    // orders of magnitude past anything a real save would ever hold) buying
+  it("a large Gems stockpile cannot buy thousands of levels in one sitting (spec section 5)", () => {
+    // A genuinely enormous stockpile (1 quadrillion Gems — many, many orders
+    // of magnitude past anything a real save would ever hold) buying
     // greedily, one level at a time, from a completely fresh mastery track
     // must still run out well short of "thousands" of levels — proof the
     // convex curve, not the player's patience, is what limits this.
     const hugeStockpile = 1e15;
-    let gold = hugeStockpile;
+    let gems = hugeStockpile;
     let level = 0;
-    while (gold >= getMasteryUpgradeCost("IRONWOOD", level)) {
-      gold -= getMasteryUpgradeCost("IRONWOOD", level);
+    while (gems >= getMasteryUpgradeCost("IRONWOOD", level)) {
+      gems -= getMasteryUpgradeCost("IRONWOOD", level);
       level++;
     }
     expect(level).toBeLessThan(1000);

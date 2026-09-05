@@ -17,17 +17,14 @@ import { RouletteBanner } from "@/ui/RouletteBanner";
 import { RoulettePendingPrompt } from "@/ui/RoulettePendingPrompt";
 import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
 import type { TowerType } from "@/config/towerStats";
-import { ASCENSION_STORAGE_KEY } from "@/engine/SaveSystem";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
-import type { GameMode } from "./ModeSelectScreen";
 
 interface GameScreenProps {
-  mode: GameMode;
   onExitToMenu: () => void;
 }
 
-export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
-  const { engine, hud } = useGameEngine(mode === "ASCENSION" ? ASCENSION_STORAGE_KEY : undefined);
+export function GameScreen({ onExitToMenu }: GameScreenProps) {
+  const { engine, hud } = useGameEngine();
   useGameAudio(engine);
   const [pendingTowerType, setPendingTowerType] = useState<TowerType | null>(null);
   // The diagnostic report can be dismissed to let the player upgrade towers
@@ -38,15 +35,13 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
 
   useEffect(() => {
-    // Master Implementation spec section 9 — every entry point into
-    // Ascension must catch the account up on any season boundary that
-    // passed since it was last opened BEFORE reading/starting that
-    // namespace, so a stale leftover wave/gold from a season that already
-    // ended is never what the player sees. A no-op for Infinite mode and
-    // for an Ascension session already caught up.
-    if (mode === "ASCENSION") syncSeasonIfNeeded();
+    // Master Implementation spec section 9 — every entry point into the
+    // game must catch the account up on any Season boundary that passed
+    // since it was last opened, before anything Season-related renders.
+    // A no-op once already caught up for the current Season.
+    syncSeasonIfNeeded();
     engine.startRun();
-  }, [engine, mode]);
+  }, [engine]);
 
   useEffect(() => {
     if (hud.phase === "PROGRESSION_STOPPED") setReportDismissed(false);
@@ -86,7 +81,7 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} mode={mode} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} />
 
       <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
         <CanvasRenderer
@@ -97,7 +92,7 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
           onBackgroundClick={handleBackgroundClick}
         />
 
-        {mode === "ASCENSION" && <AscensionHudBadge />}
+        <AscensionHudBadge />
         <BossBanner hud={hud} />
         <PhaseBanner phaseId={hud.phaseId} />
         {hud.pendingDiscoveryType && (
@@ -128,6 +123,8 @@ export function GameScreen({ mode, onExitToMenu }: GameScreenProps) {
             onChooseSpecialization={(id) => engine.chooseTowerSpecialization(id)}
             onUpgradeSpecialization={() => engine.upgradeSelectedTowerSpecialization()}
             onEquipSkin={(skinId) => engine.equipSkinOnSelectedTower(skinId)}
+            onPurchaseSkin={(skinId) => engine.purchaseTowerSkin(skinId)}
+            isSkinOwned={(skinId) => engine.isTowerSkinOwned(skinId)}
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
           />
         )}

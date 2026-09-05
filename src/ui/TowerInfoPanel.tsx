@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import {
   canChooseSpecialization,
-  canEquipSkin,
   canUpgradeSpecialization,
   getMasteryUpgradeCostFor,
   getSpecializationUpgradeCostFor,
@@ -40,7 +39,11 @@ interface TowerInfoPanelProps {
   onChooseSpecialization: (id: SpecializationId) => void;
   onUpgradeSpecialization: () => void;
   onEquipSkin: (skinId: string | null) => void;
-  /** Master Implementation Pass spec sections 3-6 — Tower Mastery, the uncapped gold sink past MAX_TOWER_LEVEL. */
+  /** CORREÇÃO DE REQUISITOS — Gems-only permanent purchase, separate from equip. */
+  onPurchaseSkin: (skinId: string) => void;
+  /** Whether `skinId` is already permanently owned — reused so this component never needs its own copy of the ownership set. */
+  isSkinOwned: (skinId: string) => boolean;
+  /** Master Implementation Pass spec sections 3-6 — Tower Mastery, now a PERMANENT, Gems-funded uncapped sink past MAX_TOWER_LEVEL (CORREÇÃO DE REQUISITOS). */
   onUpgradeMastery: () => void;
 }
 
@@ -62,6 +65,8 @@ export function TowerInfoPanel({
   onChooseSpecialization,
   onUpgradeSpecialization,
   onEquipSkin,
+  onPurchaseSkin,
+  isSkinOwned,
   onUpgradeMastery,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
@@ -151,7 +156,7 @@ export function TowerInfoPanel({
         </button>
       )}
 
-      <MasterySection tower={tower} gold={gold} theme={theme} t={t} onUpgrade={onUpgradeMastery} />
+      <MasterySection tower={tower} gems={gems} theme={theme} t={t} onUpgrade={onUpgradeMastery} />
 
       <SpecializationSection
         tower={tower}
@@ -163,33 +168,45 @@ export function TowerInfoPanel({
         onUpgrade={onUpgradeSpecialization}
       />
 
-      <SkinSection tower={tower} theme={theme} t={t} onEquip={onEquipSkin} />
+      <SkinSection
+        tower={tower}
+        gems={gems}
+        theme={theme}
+        t={t}
+        onEquip={onEquipSkin}
+        onPurchase={onPurchaseSkin}
+        isSkinOwned={isSkinOwned}
+      />
     </div>
   );
 }
 
 /**
- * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the gold
- * sink past MAX_TOWER_LEVEL. Always shown (not gated behind level 30) —
- * a player is free to start investing early if they'd rather spread
+ * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the
+ * uncapped sink past MAX_TOWER_LEVEL. Always shown (not gated behind level
+ * 30) — a player is free to start investing early if they'd rather spread
  * spending out, exactly like Specialization already allows once its own
  * level gate passes.
+ *
+ * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): permanent, account-wide
+ * progression funded by GEMS, never Gold — see gemSinks.ts's doc comment
+ * for the explicit, deliberate exception this represents.
  */
 function MasterySection({
   tower,
-  gold,
+  gems,
   theme,
   t,
   onUpgrade,
 }: {
   tower: TowerInstance;
-  gold: number;
+  gems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
   onUpgrade: () => void;
 }) {
   const cost = getMasteryUpgradeCostFor(tower);
-  const affordable = gold >= cost;
+  const affordable = gems >= cost;
   const bonus = getMasteryBonusMultipliers(tower.masteryLevel);
 
   return (
@@ -210,7 +227,7 @@ function MasterySection({
         <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
           {t("towerInfo.masteryUpgrade")}
           <span style={{ opacity: 0.6 }}>·</span>
-          {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
+          {t("towerInfo.cost")} <GemIcon size={11} color={PALETTE.gem} /> {cost}
         </span>
       </button>
     </>
@@ -322,17 +339,32 @@ function SpecializationSection({
   );
 }
 
-/** Progression 2.0 — Tower Skins (spec section 10/11). Cosmetic only: equipping/clearing never appears in this component's gold math. */
+/**
+ * Progression 2.0 — Tower Skins (spec section 10/11). Cosmetic only:
+ * equipping/clearing never appears in this component's gold math.
+ *
+ * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): a skin now has 3 distinct
+ * states instead of 2 — LOCKED (tower hasn't reached unlockLevel this
+ * Season yet), PURCHASABLE (level reached, not yet bought — costs Gems),
+ * and OWNED (bought once, permanent forever after, equippable any Season
+ * regardless of the tower's current level).
+ */
 function SkinSection({
   tower,
+  gems,
   theme,
   t,
   onEquip,
+  onPurchase,
+  isSkinOwned,
 }: {
   tower: TowerInstance;
+  gems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
   onEquip: (skinId: string | null) => void;
+  onPurchase: (skinId: string) => void;
+  isSkinOwned: (skinId: string) => boolean;
 }) {
   const skins = getSkinsForTower(tower.type);
   if (skins.length === 0) return null;
@@ -353,22 +385,50 @@ function SkinSection({
           {t("towerInfo.skinDefault")}
         </button>
         {skins.map((skin) => {
-          const unlocked = canEquipSkin(tower, skin.id) || tower.equippedSkinId === skin.id;
+          const owned = isSkinOwned(skin.id);
           const equipped = tower.equippedSkinId === skin.id;
+          const reachedLevel = tower.level >= skin.unlockLevel;
+          const affordable = gems >= skin.gemCost;
+
+          if (owned) {
+            return (
+              <button
+                key={skin.id}
+                onClick={() => onEquip(skin.id)}
+                title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
+                style={{ ...skinChipStyle, borderColor: equipped ? theme.accent : PALETTE.uiPanelBorder, opacity: 1 }}
+              >
+                {t(`towerSkins.${skin.id}.name` as TranslationKey)}
+              </button>
+            );
+          }
+
+          if (reachedLevel) {
+            return (
+              <button
+                key={skin.id}
+                onClick={() => affordable && onPurchase(skin.id)}
+                disabled={!affordable}
+                title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
+                style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: affordable ? 1 : 0.55 }}
+              >
+                {t(`towerSkins.${skin.id}.name` as TranslationKey)}
+                <span style={{ marginLeft: 4, display: "inline-flex", alignItems: "center", gap: 2 }}>
+                  <GemIcon size={9} color={PALETTE.gem} /> {skin.gemCost}
+                </span>
+              </button>
+            );
+          }
+
           return (
             <button
               key={skin.id}
-              onClick={() => unlocked && onEquip(skin.id)}
-              disabled={!unlocked}
+              disabled
               title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
-              style={{
-                ...skinChipStyle,
-                borderColor: equipped ? theme.accent : PALETTE.uiPanelBorder,
-                opacity: unlocked ? 1 : 0.45,
-              }}
+              style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: 0.45 }}
             >
               {t(`towerSkins.${skin.id}.name` as TranslationKey)}
-              {!unlocked && <span style={{ marginLeft: 4, opacity: 0.7 }}>({t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })})</span>}
+              <span style={{ marginLeft: 4, opacity: 0.7 }}>({t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })})</span>
             </button>
           );
         })}

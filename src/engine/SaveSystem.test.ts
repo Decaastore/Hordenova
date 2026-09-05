@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ASCENSION_STORAGE_KEY, DEFAULT_SAVE_DATA, loadSave, recordRunResult, updateSave, writeSave } from "./SaveSystem";
+import { ASCENSION_STORAGE_KEY, DEFAULT_SAVE_DATA, SAVE_DATA_VERSION, loadSave, recordRunResult, updateSave, writeSave } from "./SaveSystem";
 import { SAVE_STORAGE_KEY } from "@/config/gameBalance";
 
 describe("SaveSystem", () => {
@@ -119,7 +119,7 @@ describe("SaveSystem", () => {
         }),
       );
       const loaded = loadSave();
-      expect(loaded.version).toBe(12);
+      expect(loaded.version).toBe(SAVE_DATA_VERSION);
       // Pre-existing progress is fully preserved.
       expect(loaded.bestWave).toBe(240);
       expect(loaded.gold).toBe(88_000);
@@ -143,6 +143,47 @@ describe("SaveSystem", () => {
       const first = loadSave();
       const second = loadSave();
       expect(second).toEqual(first);
+    });
+
+    it("CORREÇÃO DE REQUISITOS: a pre-Season-Mastery save (missing towerMasteryLevels/ownedTowerSkinIds/equippedTowerSkinByType entirely) self-heals all three to empty defaults", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({ version: 13, bestWave: 10, seasonBestWave: 10 }),
+      );
+      const loaded = loadSave();
+      expect(loaded.towerMasteryLevels).toEqual({});
+      expect(loaded.ownedTowerSkinIds).toEqual([]);
+      expect(loaded.equippedTowerSkinByType).toEqual({});
+    });
+
+    it("towerMasteryLevels/ownedTowerSkinIds/equippedTowerSkinByType round-trip through save/load exactly, and a tampered/malformed value self-heals instead of throwing", () => {
+      writeSave({
+        ...DEFAULT_SAVE_DATA,
+        towerMasteryLevels: { IRONWOOD: 3, INFERNO: 1 },
+        ownedTowerSkinIds: ["IRONWOOD_WARDEN_OF_THE_ABYSS"],
+        equippedTowerSkinByType: { IRONWOOD: "IRONWOOD_WARDEN_OF_THE_ABYSS" },
+      });
+      const loaded = loadSave();
+      expect(loaded.towerMasteryLevels).toEqual({ IRONWOOD: 3, INFERNO: 1 });
+      expect(loaded.ownedTowerSkinIds).toEqual(["IRONWOOD_WARDEN_OF_THE_ABYSS"]);
+      expect(loaded.equippedTowerSkinByType).toEqual({ IRONWOOD: "IRONWOOD_WARDEN_OF_THE_ABYSS" });
+
+      // Tampered save: an invalid tower type key, a negative mastery level,
+      // and a skin id that doesn't belong to the tower type it's keyed
+      // under — every one of these must be dropped, never trusted as-is.
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SAVE_DATA,
+          towerMasteryLevels: { IRONWOOD: -5, NOT_A_TOWER: 9 },
+          ownedTowerSkinIds: ["real-string", 42, null],
+          equippedTowerSkinByType: { IRONWOOD: "INFERNO_ASHEN_TYRANT", NOT_A_TOWER: "x" },
+        }),
+      );
+      const tamperedLoad = loadSave();
+      expect(tamperedLoad.towerMasteryLevels).toEqual({});
+      expect(tamperedLoad.ownedTowerSkinIds).toEqual(["real-string"]);
+      expect(tamperedLoad.equippedTowerSkinByType).toEqual({});
     });
   });
 

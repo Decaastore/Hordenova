@@ -1,8 +1,8 @@
 import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
 
 /**
- * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the gold
- * sink that exists past MAX_TOWER_LEVEL (30). Level 30 stays the last
+ * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the sink
+ * that exists past MAX_TOWER_LEVEL (30). Level 30 stays the last
  * VISUAL evolution and the last step of the existing level-driven special
  * unlocks (multiShot/giantSlayer/wildfire/deepFreeze/arcaneSurge/etc, all
  * in towerStats.ts, all untouched) — Mastery is a SEPARATE, uncapped track
@@ -34,6 +34,22 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  * Infinity/NaN, at any mastery level a save could ever reach. Calibrated
  * via engine/ProgressionSimulation.test.ts's real-engine bot simulation,
  * not guessed (spec section 5's own instruction).
+ *
+ * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — CURRENCY CHANGED, CURVE
+ * RE-CALIBRATED: Mastery moved from Gold to Gems (see gemSinks.ts), and
+ * MASTERY_BASE_COST_MULTIPLIER was rescaled down from its old Gold-shaped
+ * value (240) to a Gems-appropriate one — Gems and Gold are wildly
+ * different orders of magnitude in this economy (a Specialization unlock
+ * is a flat 25 Gems; Profile Prestige starts at 3 Gems), and Gem Shards
+ * only trickle in from boss/mini-boss kills (5/2 shards, 10 shards = 1 Gem
+ * — see GameEngine's addGemShards call sites). Reusing the old Gold-scaled
+ * multiplier verbatim (as a naive "just swap the currency" change would)
+ * made even Mastery's FIRST level cost ~10,000 Gems — realistically
+ * unreachable, which engine/ProgressionSimulation.test.ts's real 48-simulated-
+ * hour bot run caught directly (avgMasteryLevel stayed exactly 0). This
+ * value was re-tuned against that same test until Mastery became a
+ * genuinely reachable-but-meaningful Gems sink again — first level costs
+ * on the order of a Specialization unlock, growing from there.
  */
 
 /** Bonus multiplier growth per mastery level — small and linear, so DPS growth stays "controlado" and its real pacing comes from the cost curve below, not a bonus-side diminishing-returns curve. */
@@ -56,7 +72,7 @@ export function getMasteryBonusMultipliers(masteryLevel: number): MasteryBonusMu
   };
 }
 
-const MASTERY_BASE_COST_MULTIPLIER = 240;
+const MASTERY_BASE_COST_MULTIPLIER = 0.5;
 const MASTERY_COST_GROWTH_FACTOR = 1.05;
 /** Numerical safety (same technique as enemyStats.ts HP\_COMPOUND_WAVE_INDEX_CAP): compounding growth stops accelerating beyond this mastery level, but cost keeps climbing forever via the linear tail below — never Infinity/NaN at any mastery level, "SEM CAP REAL" on progression while staying finite. */
 const MASTERY_COST_COMPOUND_LEVEL_CAP = 2000;
@@ -64,7 +80,7 @@ const MASTERY_COST_COMPOUND_LEVEL_CAP = 2000;
 const MASTERY_COST_LINEAR_TAIL_GROWTH = 0.5;
 
 /**
- * Gold cost to go from `currentMasteryLevel` to `currentMasteryLevel + 1`.
+ * Gems cost to go from `currentMasteryLevel` to `currentMasteryLevel + 1`.
  * No max level — always returns a real (finite) number. `currentMasteryLevel`
  * is expected to be >= 0.
  */

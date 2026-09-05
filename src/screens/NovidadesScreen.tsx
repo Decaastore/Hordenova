@@ -2,11 +2,11 @@ import type { CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { TopNav } from "@/ui/TopNav";
+import { TopNav, type NavView } from "@/ui/TopNav";
 import { PATCH_NOTES, type PatchNoteType } from "@/config/patchNotes";
 
 interface NovidadesScreenProps {
-  onNavigate: (view: "HOME" | "WIKI" | "NOVIDADES") => void;
+  onNavigate: (view: NavView) => void;
   onPlay: () => void;
 }
 

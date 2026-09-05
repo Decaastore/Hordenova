@@ -31,8 +31,16 @@ export interface TowerSkinDefinition {
   paletteOverride: TowerSkinPaletteOverride;
   /** Extra dark-fantasy ornament flag read by EntityRenderer's stage-gated draw code (e.g. a void-energy ring instead of the default rune glow). Cosmetic only. */
   ornament: "abyss" | "ancient" | "void" | "none";
-  /** Minimum tower level required before this skin can be equipped — purely cosmetic gating, never a stat requirement. */
+  /** Minimum tower level the tower must reach (in any Season) before this skin becomes PURCHASABLE — purely a cosmetic-eligibility gate, never a stat requirement. Reaching this level does not itself grant the skin; see `gemCost`. */
   unlockLevel: number;
+  /**
+   * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — a skin must be ACQUIRED
+   * with Gems, never handed out for free on reaching `unlockLevel`, and
+   * never buyable with Gold. Paid once, owned permanently thereafter (see
+   * SaveData.ownedTowerSkinIds) — a tower's level resetting at a new Season
+   * never revokes an already-purchased skin. See GameEngine.purchaseTowerSkin.
+   */
+  gemCost: number;
 }
 
 export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
@@ -43,6 +51,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     paletteOverride: { primary: "#241f22", secondary: "#0a0809", accent: "#8a3fff", glow: "rgba(138,63,255,0.55)" },
     ornament: "abyss",
     unlockLevel: 15,
+    gemCost: 800,
   },
   {
     id: "INFERNO_ASHEN_TYRANT",
@@ -51,6 +60,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     paletteOverride: { primary: "#3a1a1a", secondary: "#150808", accent: "#ff2e2e", glow: "rgba(255,46,46,0.6)" },
     ornament: "abyss",
     unlockLevel: 15,
+    gemCost: 800,
   },
   {
     id: "FROSTBORN_ANCIENT_GUARDIAN",
@@ -59,6 +69,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     paletteOverride: { primary: "#7a8a6a", secondary: "#33402c", accent: "#d8e8b8", glow: "rgba(180,220,140,0.55)" },
     ornament: "ancient",
     unlockLevel: 15,
+    gemCost: 800,
   },
   {
     id: "STORMCALLER_VOID",
@@ -67,6 +78,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     paletteOverride: { primary: "#1a1622", secondary: "#08060c", accent: "#5a1fff", glow: "rgba(90,31,255,0.6)" },
     ornament: "void",
     unlockLevel: 15,
+    gemCost: 800,
   },
 ];
 
