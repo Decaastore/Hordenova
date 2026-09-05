@@ -94,6 +94,7 @@ export const ptBR: TranslationSchema = {
         critChance: "Chance de Crítico",
         critMultiplier: "Dano Crítico",
         bossDamageMultiplier: "Dano em Chefes",
+        bossDamageNote: "A força característica do Ironwood — algumas dessas torres tornam as lutas contra Chefes e Mini-Chefes visivelmente mais curtas.",
         locked: "Desbloqueia no Nív.{level}",
       },
       INFERNO: {
@@ -178,6 +179,7 @@ export const ptBR: TranslationSchema = {
   boss: {
     introLine: "{name} se aproxima",
     getReady: "Prepare suas defesas",
+    compositionHint: "Torres Ironwood causam dano extra a Chefes e Mini-Chefes.",
     defeatedLine: "{name} derrotado",
     rewardLine: "+{amount} Ouro",
     enraged: "ENFURECIDO",

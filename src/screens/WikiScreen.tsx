@@ -3,7 +3,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
-import { TOWER_DEFINITIONS, TOWER_TYPES, TOWER_SPECIALS, getTowerLevelStats, MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
+import { TOWER_DEFINITIONS, TOWER_TYPES, TOWER_SPECIALS, getTowerLevelStats, getTowerSpecialAtLevel, MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/config/specializations";
 import { getMasteryCosmeticTier, getMasteryRespecTokensEarned, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS, ENEMY_TYPES } from "@/config/enemyStats";
@@ -115,7 +115,7 @@ function TowersSection() {
             <StatRow label={t("wiki.attackSpeed")} value={def.baseAttackSpeed} />
             <StatRow label={t("wiki.range")} value={def.baseRange} />
             <StatRow label={t("wiki.upgradeCostBase")} value={def.upgradeCostBase} />
-            {renderSpecialBaseline(type, special as unknown as Record<string, number>)}
+            {renderSpecialBaseline(type, special as unknown as Record<string, number>, t)}
             {paths.length > 0 && (
               <>
                 <div style={sectionLabelStyle}>
@@ -136,15 +136,37 @@ function TowersSection() {
   );
 }
 
-function renderSpecialBaseline(type: TowerType, special: Record<string, number>) {
-  const entries = Object.entries(special);
-  if (entries.length === 0) return null;
+type Translate = ReturnType<typeof useLanguage>["t"];
+
+function renderSpecialBaseline(type: TowerType, special: Record<string, number>, t: Translate) {
+  // IRONWOOD's bossDamageMultiplier is 1 (a no-op) at the level-1 baseline
+  // shown here — showing that raw number would incorrectly read as "no
+  // Boss bonus exists." Its real payoff (Giant Slayer, see towerStats.ts's
+  // getTowerSpecialAtLevel) only unlocks at level 15, so it gets its own
+  // milestone block below instead of the flat baseline table.
+  const entries = Object.entries(special).filter(([key]) => !(type === "IRONWOOD" && key === "bossDamageMultiplier"));
+  const specialAt15 = type === "IRONWOOD" ? getTowerSpecialAtLevel("IRONWOOD", 15) : null;
+  const specialAt25 = type === "IRONWOOD" ? getTowerSpecialAtLevel("IRONWOOD", 25) : null;
+  const giantSlayerAt15 = specialAt15?.type === "IRONWOOD" ? specialAt15.bossDamageMultiplier : null;
+  const giantSlayerAt25 = specialAt25?.type === "IRONWOOD" ? specialAt25.bossDamageMultiplier : null;
   return (
     <>
-      <div style={sectionLabelStyle}>{type === "IRONWOOD" ? "Crit / Boss Damage" : type === "INFERNO" ? "AoE / Burn" : type === "FROSTBORN" ? "Slow / Freeze" : "Chain / Armor Penetration"}</div>
-      {entries.map(([key, value]) => (
-        <StatRow key={key} label={key} value={value} />
-      ))}
+      {entries.length > 0 && (
+        <>
+          <div style={sectionLabelStyle}>{type === "IRONWOOD" ? "Crit" : type === "INFERNO" ? "AoE / Burn" : type === "FROSTBORN" ? "Slow / Freeze" : "Chain / Armor Penetration"}</div>
+          {entries.map(([key, value]) => (
+            <StatRow key={key} label={key} value={value} />
+          ))}
+        </>
+      )}
+      {giantSlayerAt15 !== null && giantSlayerAt25 !== null && (
+        <>
+          <div style={sectionLabelStyle}>{t("towerInfo.unlocks.giantSlayer.name" as TranslationKey)}</div>
+          <StatRow label={t("towerInfo.unlockBanner", { level: 15 })} value={`+${Math.round((giantSlayerAt15 - 1) * 100)}%`} />
+          <StatRow label={t("towerInfo.unlockBanner", { level: 25 })} value={`+${Math.round((giantSlayerAt25 - 1) * 100)}%`} />
+          <p style={descStyle}>{t("towerInfo.specialLines.IRONWOOD.bossDamageNote")}</p>
+        </>
+      )}
     </>
   );
 }

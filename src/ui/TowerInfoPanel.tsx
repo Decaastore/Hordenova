@@ -114,7 +114,10 @@ export function TowerInfoPanel({
 
       <div style={{ ...sectionLabelStyle, marginTop: 4 }}>{t("towerInfo.special")}</div>
       {renderSpecialLines(tower.type, tower.level, t).map((line) => (
-        <Row key={line.label} label={line.label} value={line.value} dim={line.locked} />
+        <div key={line.label}>
+          <Row label={line.label} value={line.value} dim={line.locked} />
+          {line.note && <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>{line.note}</div>}
+        </div>
       ))}
 
       {nextStats && upgradeCost !== null ? (
@@ -488,6 +491,8 @@ interface SpecialLine {
   label: string;
   value: string;
   locked?: boolean;
+  /** Optional short, non-prescriptive context line shown under this stat (e.g. why Boss Damage matters) — never a "you must build N of these" instruction. */
+  note?: string;
 }
 
 /** Per-type dynamic specialization readout — real current values, not just the static role blurb. */
@@ -503,8 +508,14 @@ function renderSpecialLines(type: TowerType, level: number, t: Translate): Speci
           ? {
               label: t("towerInfo.specialLines.IRONWOOD.bossDamageMultiplier"),
               value: `+${Math.round((special.bossDamageMultiplier - 1) * 100)}%`,
+              note: t("towerInfo.specialLines.IRONWOOD.bossDamageNote"),
             }
-          : { label: t("towerInfo.specialLines.IRONWOOD.bossDamageMultiplier"), value: t("towerInfo.specialLines.IRONWOOD.locked", { level: 15 }), locked: true },
+          : {
+              label: t("towerInfo.specialLines.IRONWOOD.bossDamageMultiplier"),
+              value: t("towerInfo.specialLines.IRONWOOD.locked", { level: 15 }),
+              locked: true,
+              note: t("towerInfo.specialLines.IRONWOOD.bossDamageNote"),
+            },
       ];
     case "INFERNO":
       return [

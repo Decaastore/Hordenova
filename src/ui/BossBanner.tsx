@@ -52,7 +52,10 @@ export function BossBanner({ hud }: BossBannerProps) {
           </div>
         </>
       ) : (
-        <div style={subtitleStyle}>{t("boss.getReady")}</div>
+        <>
+          <div style={subtitleStyle}>{t("boss.getReady")}</div>
+          <div style={hintStyle}>{t("boss.compositionHint")}</div>
+        </>
       )}
     </div>
   );
@@ -85,6 +88,15 @@ const subtitleStyle: CSSProperties = {
   letterSpacing: 1,
   color: PALETTE.uiTextDim,
   textTransform: "uppercase",
+};
+
+/** A quiet, generic flavor line — never reads the player's actual composition or names a required build, just informs. */
+const hintStyle: CSSProperties = {
+  fontSize: 10,
+  letterSpacing: 0.3,
+  color: PALETTE.uiTextDim,
+  fontStyle: "italic",
+  opacity: 0.85,
 };
 
 const barTrackStyle: CSSProperties = {

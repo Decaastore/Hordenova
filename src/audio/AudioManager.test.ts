@@ -132,8 +132,8 @@ describe("AudioManager", () => {
 });
 
 /**
- * Home screen ambient music (see AudioManager.ts's buildAmbientPadGraph doc
- * comment). jsdom (this repo's test environment) has no Web Audio API at
+ * Home screen adventure theme (see AudioManager.ts's buildAdventureThemeGraph
+ * doc comment). jsdom (this repo's test environment) has no Web Audio API at
  * all — `window.AudioContext` is undefined — so every method here must
  * degrade to a safe, observable no-op rather than throwing. That's exactly
  * the same real-world case as a browser blocking/lacking Web Audio, so
@@ -191,8 +191,9 @@ describe("AudioManager — ambient music (Home screen)", () => {
 });
 
 /**
- * A minimal fake `AudioContext` implementing only the node methods
- * buildAmbientPadGraph actually calls, so the synthesis path itself
+ * A minimal fake `AudioContext` implementing only the node methods the
+ * procedural adventure-theme graph (buildAdventureThemeGraph and its
+ * per-voice schedule* helpers) actually calls, so the synthesis path itself
  * (oscillators/filters/noise buffer all created and started, gain reacting
  * to volume/mute, teardown on stop) is exercised even though jsdom has no
  * real Web Audio API to test against.
@@ -232,6 +233,7 @@ class FakeOscillatorNode extends FakeAudioNode {
 class FakeBiquadFilterNode extends FakeAudioNode {
   type = "lowpass";
   frequency = new FakeAudioParam();
+  Q = new FakeAudioParam();
 }
 class FakeAudioBuffer {
   private readonly data: Float32Array;
@@ -323,5 +325,42 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
     // Muting after the graph exists must still zero its live gain value.
     manager.setMusicMuted(false);
     expect(manager.isMusicMuted()).toBe(false);
+  });
+
+  it("falls back to the procedural adventure theme once the real-track grace window expires, and that theme is a real composition — many distinct pitches scheduled across the pass, not one held drone tone", () => {
+    vi.useFakeTimers();
+    try {
+      const oscillators: FakeOscillatorNode[] = [];
+      class TrackingAudioContext extends FakeAudioContext {
+        createOscillator(): FakeOscillatorNode {
+          const osc = super.createOscillator();
+          oscillators.push(osc);
+          return osc;
+        }
+      }
+      (window as unknown as { AudioContext: unknown }).AudioContext = TrackingAudioContext;
+
+      const manager = new AudioManager();
+      manager.playAmbientMusic();
+      expect(manager.isMusicPlaying()).toBe(true);
+      expect(oscillators.length).toBe(0); // nothing scheduled yet — still waiting on the real-track attempt
+
+      // No real asset file exists at HOME_THEME_ASSET_URL, so this grace
+      // window always expires and the procedural composition takes over.
+      vi.advanceTimersByTime(800);
+
+      // A drone is 1-4 oscillators holding fixed pitches forever. A real
+      // melody+bass+pluck composition schedules dozens of individual notes
+      // per loop pass, at many distinct frequencies.
+      expect(oscillators.length).toBeGreaterThan(20);
+      const distinctFrequencies = new Set(oscillators.map((o) => o.frequency.value));
+      expect(distinctFrequencies.size).toBeGreaterThan(10);
+      expect(oscillators.every((o) => o.started)).toBe(true);
+
+      manager.stopMusic();
+      vi.advanceTimersByTime(1000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

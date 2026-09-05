@@ -93,6 +93,7 @@ export const en = {
         critChance: "Crit Chance",
         critMultiplier: "Crit Damage",
         bossDamageMultiplier: "Boss Damage",
+        bossDamageNote: "Ironwood's signature strength — a few of these make Boss and Mini-Boss fights noticeably shorter.",
         locked: "Unlocks at Lv.{level}",
       },
       INFERNO: {
@@ -177,6 +178,7 @@ export const en = {
   boss: {
     introLine: "{name} approaches",
     getReady: "Prepare your defenses",
+    compositionHint: "Ironwood towers deal extra damage to Bosses and Mini-Bosses.",
     defeatedLine: "{name} defeated",
     rewardLine: "+{amount} Gold",
     enraged: "ENRAGED",

@@ -32,197 +32,341 @@ interface MusicGraph {
 }
 
 /**
- * PRODUÇÃO VISUAL spec section 11 — the original 4-sine-oscillator drone
- * read as a flat, static "test tone" rather than dark-fantasy/epic music,
- * and `stopMusic()`'s hard `osc.stop()` (no fade) produced an audible
- * click/pop on every screen transition — exactly the "efeito que pareça
- * erro de sistema" the direction explicitly forbids. This rebuild keeps
- * the same "no recording, no melody, no loop-point" honesty (still wholly
- * synthesized live, never resembling any existing game's soundtrack) but
- * fixes both root causes:
+ * PRODUÇÃO — RODADA 2, item 1-5 (P0, non-negotiable): the previous ambient
+ * pad — even after adding harmonics/breathing/a bell — was still, in the
+ * end, a held drone: no melody, no rhythm, nothing that resembles a game
+ * theme. That was correctly rejected as "zumbido", regardless of whether it
+ * technically produced a measurable signal. This is a from-scratch
+ * replacement: a real short COMPOSITION (melody, bass, rhythm, harmonic
+ * movement, structure, a natural loop point), not a sustained tone bank.
  *
- * 1. Richer harmonic content instead of pure sines — each pad voice sums a
- *    fundamental sine with a quiet detuned sub-octave and a very quiet 2nd
- *    harmonic (triangle), which is what separates an organ-like "pad" from
- *    a lab test tone.
- * 2. A slow (40-70s) volume "breathing" swell per voice so the texture
- *    feels alive rather than a held, static drone that can start to grate.
- * 3. A single very quiet high tension tone (a tritone above the root) far
- *    below the main chord in level — the classic "unease" interval in
- *    dark/horror scoring, kept subtle enough to read as atmosphere, not
- *    dissonant noise.
- * 4. A sparse, randomly-timed distant "bell" (a short sine with a slow
- *    exponential decay) every 18-32s — enough incidental movement to avoid
- *    "loop irritante" without ever becoming a melody or rhythm.
- * 5. `stop()` no longer clicks — see stopMusic() below, which now fades
- *    `masterGain` to 0 before tearing down the graph.
+ * HONESTY NOTE: there is no music-generation tool available to this agent,
+ * and a filesystem search of this repo turned up zero existing music
+ * assets and zero audio libraries (Tone.js, Howler, ...) already
+ * installed — see `HOME_THEME_ASSET_URL` below for the real-file path this
+ * infrastructure is ready to prefer the moment a licensed track is added;
+ * until then, this procedural piece is the best-effort placeholder. It is
+ * still synthesized in-code (oscillators + envelopes), NOT a
+ * recorded/produced audio file — that distinction is disclosed rather than
+ * hidden. What changed from the rejected drone: this has a real, singable
+ * melodic phrase, a real bass line following real chord changes, a soft
+ * rhythmic pulse, and a ~59s structure (intro -> theme -> development ->
+ * return) that loops back to its own starting point instead of holding one
+ * unchanging texture indefinitely.
  */
-function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGraph {
-  const masterGain = ctx.createGain();
-  masterGain.gain.value = initialGain;
-  masterGain.connect(ctx.destination);
 
-  const voiceFreqs = [73.42, 110.0, 146.83, 174.61]; // D2, A2, D3, F3 — a D-minor-ish drone
-  const stopFns: Array<() => void> = [];
-  const cleanupFns: Array<() => void> = [];
+/** Where a real, licensed music file would go — dropping a file at this path in `public/` makes `playAmbientMusic()` use it automatically instead of the procedural composition below (see `tryPlayRealTrackFile`). No such file exists in this project today; this constant does not claim otherwise. */
+const HOME_THEME_ASSET_URL = "/audio/music/home-theme.ogg";
 
-  for (const freq of voiceFreqs) {
-    const voiceGain = ctx.createGain();
-    voiceGain.gain.value = 0;
-    voiceGain.gain.linearRampToValueAtTime(1 / voiceFreqs.length, ctx.currentTime + 5); // slow 5s fade-in, no jarring onset
+/** Standard equal-tempered pitches (A4=440Hz) used by the composition below. */
+const NOTE: Record<string, number> = {
+  D2: 73.42, F2: 87.31, G2: 98.0, A2: 110.0, Bb2: 116.54, C3: 130.81,
+  D3: 146.83, E3: 164.81, F3: 174.61, G3: 196.0, A3: 220.0, Bb3: 233.08,
+  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0,
+  Bb4: 466.16, C5: 523.25, D5: 587.33,
+};
 
-    const filter = ctx.createBiquadFilter();
-    filter.type = "lowpass";
-    filter.frequency.value = 900;
-    filter.connect(voiceGain);
-    voiceGain.connect(masterGain);
+const THEME_BPM = 82;
+const BEAT_SEC = 60 / THEME_BPM;
+/** 20 bars of 4/4 — intro (4) + theme (8) + development (4) + return (4). */
+const LOOP_BEATS = 80;
+const LOOP_SEC = LOOP_BEATS * BEAT_SEC;
 
-    // Slow volume "breathing" — a gentle sine LFO on this voice's own gain
-    // stage (multiplicative, via a second gain node) keeps the pad from
-    // reading as a held, static drone.
-    const breathGain = ctx.createGain();
-    breathGain.gain.value = 1;
-    const breathLfo = ctx.createOscillator();
-    breathLfo.type = "sine";
-    breathLfo.frequency.value = 1 / (40 + Math.random() * 30); // one cycle every 40-70s
-    const breathDepth = ctx.createGain();
-    breathDepth.gain.value = 0.18; // modulates +/-18% around unity — audible movement, never a full swell to silence
-    breathLfo.connect(breathDepth);
-    breathDepth.connect(breathGain.gain);
-    breathGain.connect(filter);
-    breathLfo.start();
-    stopFns.push(() => breathLfo.stop());
+interface NoteEvent {
+  /** Offset from the loop's start, in beats. */
+  beat: number;
+  freq: number;
+  /** Length, in beats. */
+  beats: number;
+}
 
-    // Fundamental sine.
-    const fundamental = ctx.createOscillator();
-    fundamental.type = "sine";
-    fundamental.frequency.value = freq;
-    fundamental.connect(breathGain);
+/**
+ * The lead melody — a real, contoured phrase in D Dorian (the "heroic
+ * fantasy" mode: a minor scale with a raised 6th, common in adventure/Celtic
+ * game scoring), rising to a peak over the borrowed VI chord (bar 5, Bb)
+ * before resolving back down to the tonic — real tension and release, the
+ * thing a drone by definition cannot have.
+ */
+const LEAD_MELODY: NoteEvent[] = [
+  // Bars 5-8 (Theme A begins at beat 16 = bar 5): D-F-G / A-G-F / E-D / D-rest
+  { beat: 16, freq: NOTE.D4!, beats: 2 },
+  { beat: 18, freq: NOTE.F4!, beats: 1 },
+  { beat: 19, freq: NOTE.G4!, beats: 1 },
+  { beat: 20, freq: NOTE.A4!, beats: 2 },
+  { beat: 22, freq: NOTE.G4!, beats: 1 },
+  { beat: 23, freq: NOTE.F4!, beats: 1 },
+  { beat: 24, freq: NOTE.E4!, beats: 2 },
+  { beat: 26, freq: NOTE.D4!, beats: 2 },
+  { beat: 28, freq: NOTE.D4!, beats: 2 },
+  // Bars 9-12: the peak — C5-Bb4-A4 / G4-A4-Bb4 / A4-G4 / F4-D4 (cadence)
+  { beat: 32, freq: NOTE.C5!, beats: 2 },
+  { beat: 34, freq: NOTE.Bb4!, beats: 1 },
+  { beat: 35, freq: NOTE.A4!, beats: 1 },
+  { beat: 36, freq: NOTE.G4!, beats: 2 },
+  { beat: 38, freq: NOTE.A4!, beats: 1 },
+  { beat: 39, freq: NOTE.Bb4!, beats: 1 },
+  { beat: 40, freq: NOTE.A4!, beats: 2 },
+  { beat: 42, freq: NOTE.G4!, beats: 2 },
+  { beat: 44, freq: NOTE.F4!, beats: 2 },
+  { beat: 46, freq: NOTE.D4!, beats: 2 },
+  // Bars 13-16 (development, up an octave — more energy/urgency)
+  { beat: 48, freq: NOTE.D5!, beats: 2 },
+  { beat: 50, freq: NOTE.C5!, beats: 1 },
+  { beat: 51, freq: NOTE.Bb4!, beats: 1 },
+  { beat: 52, freq: NOTE.A4!, beats: 2 },
+  { beat: 54, freq: NOTE.C5!, beats: 2 },
+  { beat: 56, freq: NOTE.D5!, beats: 2 },
+  { beat: 58, freq: NOTE.A4!, beats: 1 },
+  { beat: 59, freq: NOTE.F4!, beats: 1 },
+  { beat: 60, freq: NOTE.G4!, beats: 2 },
+  { beat: 62, freq: NOTE.A4!, beats: 2 },
+  // Bars 17-18 (return — winding back down toward the loop point)
+  { beat: 64, freq: NOTE.A3!, beats: 2 },
+  { beat: 66, freq: NOTE.F3!, beats: 1 },
+  { beat: 67, freq: NOTE.D3!, beats: 1 },
+  { beat: 68, freq: NOTE.D3!, beats: 4 },
+  // Bars 19-20 are deliberately silent on lead — breathing room before the
+  // loop restarts, so the seam reads as a musical phrase-end, not a splice.
+];
 
-    // A quiet sub-octave sine underneath — adds weight/"ameaçador" body
-    // without thickening the harmonic content into mud.
-    const subGain = ctx.createGain();
-    subGain.gain.value = 0.35;
-    const sub = ctx.createOscillator();
-    sub.type = "sine";
-    sub.frequency.value = freq / 2;
-    sub.connect(subGain);
-    subGain.connect(breathGain);
+/** A plucked-string arpeggio (harp/lute character via a fast-closing filter, see PLUCK envelope below) outlining each bar's chord — the intro's "world opening up" figure, continuing quietly under the theme. */
+const PLUCK_NOTES: NoteEvent[] = [
+  // Intro (bars 1-4): rising Dm arpeggio, once per bar.
+  { beat: 0, freq: NOTE.D3!, beats: 1 }, { beat: 1, freq: NOTE.F3!, beats: 1 }, { beat: 2, freq: NOTE.A3!, beats: 1 }, { beat: 3, freq: NOTE.D4!, beats: 1 },
+  { beat: 4, freq: NOTE.D3!, beats: 1 }, { beat: 5, freq: NOTE.F3!, beats: 1 }, { beat: 6, freq: NOTE.A3!, beats: 1 }, { beat: 7, freq: NOTE.D4!, beats: 1 },
+  { beat: 8, freq: NOTE.Bb2!, beats: 1 }, { beat: 9, freq: NOTE.D3!, beats: 1 }, { beat: 10, freq: NOTE.F3!, beats: 1 }, { beat: 11, freq: NOTE.Bb3!, beats: 1 },
+  { beat: 12, freq: NOTE.C3!, beats: 1 }, { beat: 13, freq: NOTE.E3!, beats: 1 }, { beat: 14, freq: NOTE.G3!, beats: 1 }, { beat: 15, freq: NOTE.C4!, beats: 1 },
+  // Under Theme A (bars 5-12), a lighter one-pluck-per-beat-pair pulse outlining the same chords (Dm Dm C Dm | Bb Bb C Dm).
+  { beat: 16, freq: NOTE.D3!, beats: 2 }, { beat: 18, freq: NOTE.D3!, beats: 2 }, { beat: 20, freq: NOTE.C3!, beats: 2 }, { beat: 22, freq: NOTE.D3!, beats: 2 },
+  { beat: 24, freq: NOTE.Bb2!, beats: 2 }, { beat: 26, freq: NOTE.Bb2!, beats: 2 }, { beat: 28, freq: NOTE.C3!, beats: 2 }, { beat: 30, freq: NOTE.D3!, beats: 2 },
+  { beat: 32, freq: NOTE.D3!, beats: 2 }, { beat: 34, freq: NOTE.D3!, beats: 2 }, { beat: 36, freq: NOTE.C3!, beats: 2 }, { beat: 38, freq: NOTE.D3!, beats: 2 },
+  { beat: 40, freq: NOTE.Bb2!, beats: 2 }, { beat: 42, freq: NOTE.Bb2!, beats: 2 }, { beat: 44, freq: NOTE.C3!, beats: 2 }, { beat: 46, freq: NOTE.D3!, beats: 2 },
+  // Return (bars 17-20): mirrors the intro's rising arpeggio, descending this time, closing the loop.
+  { beat: 68, freq: NOTE.D4!, beats: 1 }, { beat: 69, freq: NOTE.A3!, beats: 1 }, { beat: 70, freq: NOTE.F3!, beats: 1 }, { beat: 71, freq: NOTE.D3!, beats: 1 },
+  { beat: 72, freq: NOTE.C4!, beats: 1 }, { beat: 73, freq: NOTE.A3!, beats: 1 }, { beat: 74, freq: NOTE.F3!, beats: 1 }, { beat: 75, freq: NOTE.D3!, beats: 1 },
+];
 
-    // A very quiet triangle at the 2nd harmonic — this is what gives the
-    // tone an organ/choir-like character instead of a pure lab sine.
-    const harmonicGain = ctx.createGain();
-    harmonicGain.gain.value = 0.12;
-    const harmonic = ctx.createOscillator();
-    harmonic.type = "triangle";
-    harmonic.frequency.value = freq * 2;
-    harmonic.connect(harmonicGain);
-    harmonicGain.connect(breathGain);
+/** Bass follows the same chord progression as the pluck (root notes, one per bar, sustained) — this is what makes the harmony changes actually audible instead of implied. */
+const BASS_NOTES: NoteEvent[] = [
+  { beat: 0, freq: NOTE.D2!, beats: 4 }, { beat: 4, freq: NOTE.D2!, beats: 4 }, { beat: 8, freq: NOTE.Bb2!, beats: 4 }, { beat: 12, freq: NOTE.G2!, beats: 4 },
+  { beat: 16, freq: NOTE.D2!, beats: 4 }, { beat: 20, freq: NOTE.D2!, beats: 4 }, { beat: 24, freq: NOTE.Bb2!, beats: 4 }, { beat: 28, freq: NOTE.D2!, beats: 4 },
+  { beat: 32, freq: NOTE.D2!, beats: 4 }, { beat: 36, freq: NOTE.D2!, beats: 4 }, { beat: 40, freq: NOTE.Bb2!, beats: 4 }, { beat: 44, freq: NOTE.D2!, beats: 4 },
+  { beat: 48, freq: NOTE.Bb2!, beats: 2 }, { beat: 50, freq: NOTE.A2!, beats: 2 }, { beat: 52, freq: NOTE.D2!, beats: 2 }, { beat: 54, freq: NOTE.Bb2!, beats: 2 },
+  { beat: 56, freq: NOTE.D2!, beats: 2 }, { beat: 58, freq: NOTE.G2!, beats: 2 }, { beat: 60, freq: NOTE.A2!, beats: 2 }, { beat: 62, freq: NOTE.D2!, beats: 2 },
+  { beat: 64, freq: NOTE.D2!, beats: 4 }, { beat: 68, freq: NOTE.D2!, beats: 4 }, { beat: 72, freq: NOTE.D2!, beats: 4 }, { beat: 76, freq: NOTE.D2!, beats: 4 },
+];
 
-    // A slow LFO on detune (a few cents, well under a semitone) gives the
-    // pad gentle, organic movement instead of a static, robotic drone.
-    const lfo = ctx.createOscillator();
-    lfo.type = "sine";
-    lfo.frequency.value = 0.05 + Math.random() * 0.05;
-    const lfoGain = ctx.createGain();
-    lfoGain.gain.value = 4;
-    lfo.connect(lfoGain);
-    lfoGain.connect(fundamental.detune);
-    lfoGain.connect(sub.detune);
-    lfoGain.connect(harmonic.detune);
+/** A soft "heartbeat" pulse on beats 1 and 3 of every bar — quiet, filtered noise, never a harsh drum hit — the rhythmic anchor a drone has none of. */
+const PERCUSSION_BEATS: number[] = Array.from({ length: LOOP_BEATS / 2 }, (_, i) => i * 2);
 
-    fundamental.start();
-    sub.start();
-    harmonic.start();
-    lfo.start();
-    stopFns.push(() => {
-      fundamental.stop();
-      sub.stop();
-      harmonic.stop();
-      lfo.stop();
-    });
-  }
+/** Soft flute/whistle lead — triangle wave, gentle vibrato, real attack/decay/release so notes breathe instead of holding forever. */
+function scheduleLeadNote(ctx: AudioContext, destination: AudioNode, startTime: number, freq: number, durationSec: number): void {
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
 
-  // A single, very quiet tritone tension tone above the root (D2 * sqrt(2)
-  // ~= Ab2/G#2) — the classic dark/horror-scoring "unease" interval, kept
-  // far enough below the main chord's level to read as atmosphere rather
-  // than a wrong note.
-  const tensionGain = ctx.createGain();
-  tensionGain.gain.value = 0;
-  tensionGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 8);
-  const tensionFilter = ctx.createBiquadFilter();
-  tensionFilter.type = "lowpass";
-  tensionFilter.frequency.value = 700;
-  const tension = ctx.createOscillator();
-  tension.type = "sine";
-  tension.frequency.value = 73.42 * Math.SQRT2;
-  tension.connect(tensionFilter);
-  tensionFilter.connect(tensionGain);
-  tensionGain.connect(masterGain);
-  tension.start();
-  stopFns.push(() => tension.stop());
+  const vibrato = ctx.createOscillator();
+  vibrato.type = "sine";
+  vibrato.frequency.value = 5.2;
+  const vibratoDepth = ctx.createGain();
+  vibratoDepth.gain.value = 3; // cents-scale via detune, subtle
+  vibrato.connect(vibratoDepth);
+  vibratoDepth.connect(osc.detune);
 
-  // Soft filtered white noise — a distant "wind/fog" texture under the pad.
-  const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
-  const data = noiseBuffer.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuffer;
-  noise.loop = true;
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = "lowpass";
-  noiseFilter.frequency.value = 400;
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.value = 0.03;
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(masterGain);
-  noise.start();
-  stopFns.push(() => noise.stop());
+  const gain = ctx.createGain();
+  const attack = Math.min(0.08, durationSec * 0.25);
+  const release = Math.min(0.25, durationSec * 0.35);
+  const sustainLevel = 0.5;
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(sustainLevel, startTime + attack);
+  gain.gain.setValueAtTime(sustainLevel, Math.max(startTime + attack, startTime + durationSec - release));
+  gain.gain.linearRampToValueAtTime(0, startTime + durationSec);
 
-  // A sparse, randomly-timed distant bell — a short sine burst with a slow
-  // exponential decay, spaced 18-32s apart. Deliberately irregular timing
-  // (re-rolled after every hit) so it never reads as a loop or a rhythm.
-  let bellTimer: ReturnType<typeof setTimeout> | null = null;
-  const scheduleBell = () => {
-    const delayMs = (18 + Math.random() * 14) * 1000;
-    bellTimer = setTimeout(() => {
-      const bellFreq = [220, 293.66, 349.23][Math.floor(Math.random() * 3)]!; // A3, D4, F4 — stays inside the same D-minor color
-      const bellOsc = ctx.createOscillator();
-      bellOsc.type = "sine";
-      bellOsc.frequency.value = bellFreq;
-      const bellGain = ctx.createGain();
-      const now = ctx.currentTime;
-      bellGain.gain.setValueAtTime(0, now);
-      bellGain.gain.linearRampToValueAtTime(0.06, now + 0.3); // soft mallet attack, never a sharp transient
-      bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 6); // long, slow decay — "distant" rather than "alert"
-      bellOsc.connect(bellGain);
-      bellGain.connect(masterGain);
-      bellOsc.start(now);
-      bellOsc.stop(now + 6.2);
-      scheduleBell();
-    }, delayMs);
-  };
-  scheduleBell();
-  cleanupFns.push(() => {
-    if (bellTimer) clearTimeout(bellTimer);
-  });
+  osc.connect(gain);
+  gain.connect(destination);
+  osc.start(startTime);
+  vibrato.start(startTime);
+  osc.stop(startTime + durationSec + 0.05);
+  vibrato.stop(startTime + durationSec + 0.05);
+}
+
+/** Plucked harp/lute character: a sawtooth through a lowpass filter whose cutoff snaps closed right after the attack — the classic synthesized-pluck technique — with a fast-decay volume envelope so it never sustains like a held tone. */
+function schedulePluckNote(ctx: AudioContext, destination: AudioNode, startTime: number, freq: number, durationSec: number): void {
+  const osc = ctx.createOscillator();
+  osc.type = "sawtooth";
+  osc.frequency.value = freq;
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.Q.value = 0.7;
+  filter.frequency.setValueAtTime(3200, startTime);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(300, freq * 2), startTime + 0.35);
+
+  const gain = ctx.createGain();
+  const decay = Math.min(durationSec, 0.9);
+  gain.gain.setValueAtTime(0.3, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + decay);
+
+  osc.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  osc.start(startTime);
+  osc.stop(startTime + decay + 0.05);
+}
+
+/** Soft bass — triangle, slower attack, sustained through the bar. */
+function scheduleBassNote(ctx: AudioContext, destination: AudioNode, startTime: number, freq: number, durationSec: number): void {
+  const osc = ctx.createOscillator();
+  osc.type = "triangle";
+  osc.frequency.value = freq;
+
+  const gain = ctx.createGain();
+  const attack = 0.12;
+  const release = Math.min(0.4, durationSec * 0.3);
+  gain.gain.setValueAtTime(0, startTime);
+  gain.gain.linearRampToValueAtTime(0.4, startTime + attack);
+  gain.gain.setValueAtTime(0.4, Math.max(startTime + attack, startTime + durationSec - release));
+  gain.gain.linearRampToValueAtTime(0, startTime + durationSec);
+
+  osc.connect(gain);
+  gain.connect(destination);
+  osc.start(startTime);
+  osc.stop(startTime + durationSec + 0.05);
+}
+
+/** A single soft filtered-noise "heartbeat" — the rhythmic pulse, never a harsh percussive transient. */
+function schedulePercussionHit(ctx: AudioContext, destination: AudioNode, startTime: number): void {
+  const durationSec = 0.18;
+  const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * durationSec), ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / data.length);
+
+  const source = ctx.createBufferSource();
+  source.buffer = buffer;
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.value = 500;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.12, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + durationSec);
+
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(destination);
+  source.start(startTime);
+}
+
+/** Schedules one full pass of the composition starting at absolute AudioContext time `startTime`. */
+function scheduleLoopPass(ctx: AudioContext, destination: AudioNode, startTime: number): void {
+  for (const note of LEAD_MELODY) scheduleLeadNote(ctx, destination, startTime + note.beat * BEAT_SEC, note.freq, note.beats * BEAT_SEC * 0.92);
+  for (const note of PLUCK_NOTES) schedulePluckNote(ctx, destination, startTime + note.beat * BEAT_SEC, note.freq, note.beats * BEAT_SEC);
+  for (const note of BASS_NOTES) scheduleBassNote(ctx, destination, startTime + note.beat * BEAT_SEC, note.freq, note.beats * BEAT_SEC * 0.96);
+  for (const beat of PERCUSSION_BEATS) schedulePercussionHit(ctx, destination, startTime + beat * BEAT_SEC);
+}
+
+/**
+ * Builds the real composition described above, connected into a
+ * caller-owned `destination` gain node (so `playAmbientMusic` can share the
+ * exact same masterGain — and therefore the exact same volume/mute control
+ * — regardless of whether a real track file or this fallback ends up
+ * playing; see `playAmbientMusic` below). Uses Web Audio's own look-ahead
+ * scheduling pattern (schedule a couple of loop passes ahead of time
+ * against `ctx.currentTime`, never `setTimeout`-timed note-by-note) — the
+ * standard technique for drift-free, click-free musical timing. Returns
+ * only a `stop` cleanup — the caller owns the destination gain's lifecycle.
+ */
+function buildAdventureThemeGraph(ctx: AudioContext, destination: AudioNode): { stop: () => void } {
+  // A quiet atmospheric bed underneath the composition — background texture
+  // only, never the main event (the core fix vs. the rejected drone: this
+  // piece HAS a foreground melody, this pad is just air behind it).
+  const atmosphereGain = ctx.createGain();
+  atmosphereGain.gain.value = 0.05;
+  atmosphereGain.connect(destination);
+  const atmosphereOsc = ctx.createOscillator();
+  atmosphereOsc.type = "sine";
+  atmosphereOsc.frequency.value = NOTE.D3!;
+  const atmosphereFilter = ctx.createBiquadFilter();
+  atmosphereFilter.type = "lowpass";
+  atmosphereFilter.frequency.value = 500;
+  atmosphereOsc.connect(atmosphereFilter);
+  atmosphereFilter.connect(atmosphereGain);
+  atmosphereOsc.start();
+
+  let nextPassAt = ctx.currentTime + 0.15;
+  scheduleLoopPass(ctx, destination, nextPassAt);
+  nextPassAt += LOOP_SEC;
+  scheduleLoopPass(ctx, destination, nextPassAt);
+  nextPassAt += LOOP_SEC;
+
+  // Look-ahead scheduler: keeps ~1.5 loops queued at all times so a slow
+  // JS event-loop tick can never create a gap/click at the loop seam.
+  const schedulerInterval = setInterval(() => {
+    while (nextPassAt < ctx.currentTime + LOOP_SEC * 1.5) {
+      scheduleLoopPass(ctx, destination, nextPassAt);
+      nextPassAt += LOOP_SEC;
+    }
+  }, Math.max(1000, LOOP_SEC * 250));
 
   return {
-    ctx,
-    masterGain,
     stop: () => {
-      for (const cleanup of cleanupFns) cleanup();
-      for (const stop of stopFns) {
-        try {
-          stop();
-        } catch {
-          // Already stopped — never throw during teardown.
-        }
+      clearInterval(schedulerInterval);
+      try {
+        atmosphereOsc.stop();
+      } catch {
+        // Already stopped — never throw during teardown.
       }
+      // Individually-scheduled notes each carry their own `stop()` time
+      // already in the future; letting the AudioContext close (see
+      // stopMusic below) silences them immediately regardless.
     },
   };
 }
+
+/**
+ * Attempts to play a real, licensed music file at `url` through the given
+ * master gain (so volume/mute controls apply identically to a real asset
+ * or the procedural fallback). Calls `onFailure` — synchronously-ish, via
+ * a short grace window — if the file doesn't exist or can't play, so the
+ * caller can fall back without ever running two audio sources at once.
+ * Never throws.
+ */
+function tryPlayRealTrackFile(ctx: AudioContext, url: string, masterGain: GainNode, onFailure: () => void): HTMLAudioElement | null {
+  let settled = false;
+  const fail = () => {
+    if (settled) return;
+    settled = true;
+    onFailure();
+  };
+  try {
+    const audio = new Audio(url);
+    audio.loop = true;
+    audio.addEventListener("error", fail, { once: true });
+    audio.addEventListener(
+      "canplaythrough",
+      () => {
+        if (settled) return;
+        settled = true;
+        try {
+          const source = ctx.createMediaElementSource(audio);
+          source.connect(masterGain);
+          audio.play().catch(fail);
+        } catch {
+          fail();
+        }
+      },
+      { once: true },
+    );
+    // No real asset exists in this project today (see HOME_THEME_ASSET_URL's
+    // doc comment) — this grace window is what lets the procedural
+    // composition take over promptly rather than waiting indefinitely.
+    setTimeout(fail, 800);
+    return audio;
+  } catch {
+    fail();
+    return null;
+  }
+}
+
 
 /** How long stopMusic()'s fade-out takes before the graph is actually torn down — long enough that the gain ramp reaches silence smoothly, short enough that navigating away from Home doesn't leave an audible tail. */
 const MUSIC_STOP_FADE_MS = 350;
@@ -289,9 +433,10 @@ export class AudioManager {
   }
 
   /**
-   * Starts the Home screen's ambient pad (see buildAmbientPadGraph above).
-   * Idempotent — calling this while already playing is a no-op rather than
-   * layering a second graph. Like `unlock()`, this must be called from a
+   * Starts the Home screen's adventure theme (see buildAdventureThemeGraph
+   * and tryPlayRealTrackFile above). Idempotent — calling this while
+   * already playing is a no-op rather than layering a second graph.
+   * Like `unlock()`, this must be called from a
    * real user-gesture handler (a click, a keydown) — browsers block
    * `AudioContext` creation/resume otherwise. Never throws: an unsupported
    * environment (no Web Audio API, e.g. this repo's vitest/jsdom tests) or
@@ -304,7 +449,42 @@ export class AudioManager {
 
     try {
       const ctx = new Ctor();
-      this.musicGraph = buildAmbientPadGraph(ctx, this.effectiveMusicGain());
+      const masterGain = ctx.createGain();
+      masterGain.gain.value = 0;
+      masterGain.gain.linearRampToValueAtTime(this.effectiveMusicGain(), ctx.currentTime + 1.2);
+      masterGain.connect(ctx.destination);
+
+      let proceduralStop: (() => void) | null = null;
+      let realAudioEl: HTMLAudioElement | null = null;
+      let stopped = false;
+
+      // Prefer a real, licensed track the moment one exists at
+      // HOME_THEME_ASSET_URL (see its doc comment) — falls back to the
+      // procedural composition the instant that file fails to load
+      // (today, always: no such file exists in this project). Guarded by
+      // `stopped` so a slow/late fallback callback can never start a
+      // graph after stopMusic() has already torn this one down.
+      realAudioEl = tryPlayRealTrackFile(ctx, HOME_THEME_ASSET_URL, masterGain, () => {
+        if (stopped || proceduralStop) return;
+        proceduralStop = buildAdventureThemeGraph(ctx, masterGain).stop;
+      });
+
+      this.musicGraph = {
+        ctx,
+        masterGain,
+        stop: () => {
+          stopped = true;
+          if (realAudioEl) {
+            try {
+              realAudioEl.pause();
+            } catch {
+              // Already stopped — never throw during teardown.
+            }
+          }
+          if (proceduralStop) proceduralStop();
+        },
+      };
+
       if (ctx.state === "suspended") {
         ctx.resume().catch(() => {
           // Still blocked — stays silent until the next user gesture calls this again.
