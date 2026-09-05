@@ -67,18 +67,6 @@ export class VfxManager {
     });
   }
 
-  spawnGoldPopup(position: Vector2, amount: number): void {
-    if (amount <= 0) return;
-    this.pushFloatingText({
-      x: position.x,
-      y: position.y - 20,
-      text: `+${amount}g`,
-      color: "#e8c15a",
-      remainingMs: 800,
-      totalMs: 800,
-    });
-  }
-
   /**
    * `travelDirection`, when given (premium-tier deaths — Etapa 4), biases
    * the burst into a cone flying backward off the enemy's own heading with

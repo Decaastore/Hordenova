@@ -41,11 +41,14 @@ import {
   canPurchaseSkin as canPurchaseSkinEntity,
   getMasteryUpgradeCostFor,
   upgradeMastery as upgradeMasteryEntity,
+  canRespecSpecialization,
+  respecSpecialization as respecSpecializationEntity,
   applySiegeDamage,
   resetTowerSurvival,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
+import { getAvailableRespecTokens } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import {
@@ -95,6 +98,9 @@ const ELITE_MODIFIER: EliteModifier = {
 };
 /** Elites are always built on the Brute silhouette — a consistent "this one's different" read across every phase without needing a bespoke archetype per elite. */
 const ELITE_BASE_TYPE: EnemyType = "BRUTE";
+
+/** CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — this many consecutive boss escapes with zero kills in between is treated as a genuine wall, not bad luck (see EndgameWallReport's own doc comment). */
+const ENDGAME_WALL_ESCAPE_THRESHOLD = 3;
 
 export interface HudSnapshot {
   phase: RunPhase;
@@ -154,6 +160,29 @@ export interface RouletteResult {
   gemsGranted: number;
   /** Set only when a real, previously-unowned Castle Skin was granted. */
   castleSkinId: string | null;
+}
+
+/**
+ * CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — surfaced once
+ * `ENDGAME_WALL_ESCAPE_THRESHOLD` boss fights in a row all end in an
+ * ESCAPE (boss reaches the base) rather than a KILL. Distinguishes a
+ * genuine "this build cannot beat any boss it's currently facing" state
+ * from an ordinary, occasional escape — never freezes the game (the run
+ * keeps ticking underneath exactly as before), this is purely an
+ * informational banner the UI can show and dismiss (acknowledgeEndgameWallReport)
+ * without blocking anything, the same "pending banner" shape as
+ * pendingItemReward/pendingRouletteResult above.
+ */
+export interface EndgameWallReport {
+  bossId: string;
+  bossNameKey: string;
+  wave: number;
+  bestWave: number;
+  /** Best fraction (0..1) of the boss's HP actually brought down across the whole streak, not just the last attempt. */
+  bestDamageFraction: number;
+  consecutiveEscapes: number;
+  /** Reuses the exact same rule-based diagnosis PROGRESSION_STOPPED shows — real recorded battle data, never randomized. */
+  diagnosis: FailureReport;
 }
 
 export interface RenderSnapshot {
@@ -239,6 +268,23 @@ export class GameEngine {
   /** Gold the main boss dropped, kept around through the VICTORY beat so the banner can show it after the boss enemy itself is gone. */
   private lastBossReward: number | null = null;
 
+  /**
+   * CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B — explicit Progression
+   * Wall). The boss-escape branch below (`boss === null`) intentionally
+   * keeps the run going instead of ever freezing (see its own doc comment)
+   * — but a KILL and an ESCAPE are very different outcomes for the player
+   * to understand, and a long unbroken streak of escapes is a genuinely
+   * different situation from one unlucky fight. This counts consecutive
+   * escapes with ZERO kill in between; any real kill resets it to 0 (proof
+   * the current build/boss matchup isn't actually a wall). Purely in-memory
+   * — like `pendingRouletteResults` above, nothing here is a reward that
+   * could be "lost" on reload, only a diagnostic banner.
+   */
+  private consecutiveBossEscapesWithoutKill = 0;
+  /** Best fraction of THIS streak's boss HP actually brought down (0..1) — reset alongside the streak counter above. */
+  private bestBossDamageFractionInStreak = 0;
+  private endgameWallReport: EndgameWallReport | null = null;
+
   private discoveredEnemyTypes = new Set<EnemyType>();
   private pendingDiscoveries: EnemyType[] = [];
 
@@ -272,6 +318,18 @@ export class GameEngine {
   private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
   private ownedTowerSkinIds = new Set<string>();
   private equippedTowerSkinByType: Partial<Record<TowerType, string>> = {};
+
+  /**
+   * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
+   * Tokens spent so far, PER TOWER TYPE — the exact same permanent,
+   * account-wide-by-type persistence shape as towerMasteryLevels above
+   * (spec's own suggestion: "mesma filosofia de persistência já usada para
+   * Mastery"). How many tokens are AVAILABLE is never stored directly —
+   * it's always recomputed as getAvailableRespecTokens(masteryLevel,
+   * spent), so a reload/restart can never re-grant a token that was
+   * already spent (idempotent by construction, not by a guard flag).
+   */
+  private towerRespecTokensSpent: Partial<Record<TowerType, number>> = {};
 
   // Master Implementation spec sections 46-48, and AUDITORIA E CORREÇÃO
   // GERAL spec sections 1-13 — the every-10-wave Roulette.
@@ -358,6 +416,7 @@ export class GameEngine {
     this.towerMasteryLevels = { ...save.towerMasteryLevels };
     this.ownedTowerSkinIds = new Set(save.ownedTowerSkinIds);
     this.equippedTowerSkinByType = { ...save.equippedTowerSkinByType };
+    this.towerRespecTokensSpent = { ...save.towerRespecTokensSpent };
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.playerId = save.playerId;
@@ -580,13 +639,15 @@ export class GameEngine {
    * they'd rather spread spending out, exactly like Specialization already
    * works once its own level gate is passed.
    *
-   * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): Mastery is now PERMANENT
-   * and funded by GEMS, never Gold — see gemSinks.ts's doc comment for why
-   * this is a deliberate, explicit exception to the game's own "Gems never
-   * buy combat power" contract. The level lives in `this.towerMasteryLevels`
-   * (keyed by TYPE, not by tower instance), applied to every placed tower of
-   * that type immediately so two Ironwood towers never silently disagree on
-   * their own Mastery level.
+   * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE / SEASON COMPETITIVA):
+   * Mastery is PERMANENT and funded by GEMS, never Gold — but grants ZERO
+   * combat power (see config/towerMastery.ts's doc comment for what it
+   * grants instead: Specialization Respec Tokens + cosmetic-only visual
+   * tiers). This is therefore an ordinary Gems purchase, not an exception
+   * to the "Gems never buy combat power" contract. The level lives in
+   * `this.towerMasteryLevels` (keyed by TYPE, not by tower instance),
+   * applied to every placed tower of that type immediately so two Ironwood
+   * towers never silently disagree on their own Mastery level.
    */
   upgradeSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
@@ -601,6 +662,43 @@ export class GameEngine {
     for (const other of this.towers) {
       if (other.type === tower.type && other.id !== tower.id) other.masteryLevel = tower.masteryLevel;
     }
+    this.emitAudio({ type: "tower_upgrade" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** How many Specialization Respec Tokens the selected tower's TYPE currently has available (earned by masteryLevel, minus spent) — 0 if nothing selected. */
+  getAvailableRespecTokensForSelectedTower(): number {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return 0;
+    return getAvailableRespecTokens(tower.masteryLevel, this.towerRespecTokensSpent[tower.type] ?? 0);
+  }
+
+  canRespecSelectedTowerSpecialization(): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    return canRespecSpecialization(tower, this.towerRespecTokensSpent[tower.type] ?? 0);
+  }
+
+  /**
+   * Spends 1 Specialization Respec Token to reset the SELECTED tower's
+   * specialization path back to unchosen (specializationId -> null,
+   * specializationLevel -> 0) — everything else (level, masteryLevel,
+   * unlock status, HP, equipped skin) is untouched. The token pool itself
+   * is per TYPE (mirrors towerMasteryLevels), so spending here reduces
+   * what every tower of this type has available, exactly like Mastery
+   * itself is shared account-wide-by-type.
+   */
+  respecSelectedTowerSpecialization(): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    const spent = this.towerRespecTokensSpent[tower.type] ?? 0;
+    if (!canRespecSpecialization(tower, spent)) return false;
+
+    respecSpecializationEntity(tower);
+    this.towerRespecTokensSpent[tower.type] = spent + 1;
     this.emitAudio({ type: "tower_upgrade" });
     this.persist();
     this.notify();
@@ -1016,6 +1114,11 @@ export class GameEngine {
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
         this.emitAudio({ type: "victory" });
         this.advanceBestWave(this.wave.currentWave);
+        // CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — a real kill is
+        // proof this exact build/boss matchup is NOT a wall, whatever the
+        // streak was before it.
+        this.consecutiveBossEscapesWithoutKill = 0;
+        this.bestBossDamageFractionInStreak = 0;
         this.persist();
       } else if (boss === null) {
         // The boss reached the base and was removed via the normal leak
@@ -1034,6 +1137,29 @@ export class GameEngine {
         // bug pre-dates the pending-Roulette rework but was invisible
         // before it — a skipped auto-grant just silently gave nothing;
         // now it would have silently skipped queuing a pending spin.
+        //
+        // CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — this escape
+        // valve itself is UNCHANGED (still never freezes the run), but a
+        // long unbroken streak of escapes with no kill in between is now
+        // surfaced explicitly instead of silently looking identical to one
+        // unlucky fight — see EndgameWallReport's own doc comment.
+        const escapedBossWave = this.wave.currentWave;
+        const escapedBoss = getMainBossForWave(escapedBossWave);
+        const damageFraction = 1 - (this.battleStats.bossHpPercentRemaining ?? 1);
+        this.bestBossDamageFractionInStreak = Math.max(this.bestBossDamageFractionInStreak, damageFraction);
+        this.consecutiveBossEscapesWithoutKill += 1;
+        if (this.consecutiveBossEscapesWithoutKill >= ENDGAME_WALL_ESCAPE_THRESHOLD) {
+          this.endgameWallReport = {
+            bossId: escapedBoss.id,
+            bossNameKey: escapedBoss.i18nKey,
+            wave: escapedBossWave,
+            bestWave: this.bestWave,
+            bestDamageFraction: this.bestBossDamageFractionInStreak,
+            consecutiveEscapes: this.consecutiveBossEscapesWithoutKill,
+            diagnosis: generateFailureReport(finalizeBattleStats(this.battleStats, escapedBossWave), this.towers),
+          };
+        }
+
         this.activeBossId = null;
         this.advanceBestWave(this.wave.currentWave);
         activateNextWave(this.wave);
@@ -1313,6 +1439,17 @@ export class GameEngine {
     return this.lastFailureReport;
   }
 
+  /** CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — non-null once ENDGAME_WALL_ESCAPE_THRESHOLD consecutive boss escapes (zero kills) have happened. The run keeps ticking regardless — this is purely informational. */
+  getEndgameWallReport(): EndgameWallReport | null {
+    return this.endgameWallReport;
+  }
+
+  /** Dismisses the current wall banner — a fresh one can reappear later if the streak (reset only by a real kill) reaches the threshold again. */
+  acknowledgeEndgameWallReport(): void {
+    this.endgameWallReport = null;
+    this.notify();
+  }
+
   private persist(): void {
     updateSave(
       {
@@ -1346,6 +1483,7 @@ export class GameEngine {
         towerMasteryLevels: this.towerMasteryLevels,
         ownedTowerSkinIds: [...this.ownedTowerSkinIds],
         equippedTowerSkinByType: this.equippedTowerSkinByType,
+        towerRespecTokensSpent: this.towerRespecTokensSpent,
       },
       this.storageKey,
     );

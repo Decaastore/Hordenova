@@ -16,20 +16,17 @@
  * reserved, honestly marked `implemented: false` below, not silently
  * pretended into existence.
  *
- * ONE DELIBERATE, EXPLICIT EXCEPTION — CORREÇÃO DE REQUISITOS (PRÓXIMA
- * GRANDE FASE): the player explicitly instructed that Tower Mastery (a real
- * damage/attack-speed/range multiplier — see config/towerMastery.ts) must
- * become a PERMANENT, Gems-funded track once tower level itself became
- * Season-scoped (see SaveSystem.ts's SaveData doc comment). This is a
- * genuine, acknowledged deviation from the NEVER-P2W CONTRACT above, kept
- * to exactly this one sink (category COMBAT_POWER_MASTERY_EXCEPTION, never
- * reused for anything else) rather than silently widening the contract or
- * silently refusing the explicit instruction. `tower_mastery` moved here
- * from goldSinks.ts — see that file's own note on the resulting Gold-sink
- * consequence.
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the deliberate exception
+ * this file used to document here (`COMBAT_POWER_MASTERY_EXCEPTION`: Tower
+ * Mastery as a real damage/attack-speed/range multiplier funded by Gems)
+ * has been REMOVED. Mastery no longer grants any combat stat at all — see
+ * config/towerMastery.ts's doc comment for what it grants instead
+ * (Specialization Respec Tokens + cosmetic-only visual tiers). `tower_mastery`
+ * is therefore a completely ordinary COSMETIC_PRESTIGE sink now, and the
+ * NEVER-P2W CONTRACT above has no exceptions left.
  */
 
-export type GemSinkCategory = "CONVENIENCE" | "COSMETIC_PRESTIGE" | "COMBAT_POWER_MASTERY_EXCEPTION";
+export type GemSinkCategory = "CONVENIENCE" | "COSMETIC_PRESTIGE";
 
 export interface GemSinkDefinition {
   id: string;
@@ -47,7 +44,7 @@ export const GEM_SINKS: readonly GemSinkDefinition[] = [
   { id: "inventory_expansion", category: "CONVENIENCE", i18nKey: "INVENTORY_EXPANSION", uncapped: false, implemented: false },
   { id: "profile_prestige", category: "COSMETIC_PRESTIGE", i18nKey: "PROFILE_PRESTIGE", uncapped: true, implemented: true },
   { id: "tower_skin", category: "COSMETIC_PRESTIGE", i18nKey: "TOWER_SKIN", uncapped: false, implemented: true },
-  { id: "tower_mastery", category: "COMBAT_POWER_MASTERY_EXCEPTION", i18nKey: "TOWER_MASTERY", uncapped: true, implemented: true },
+  { id: "tower_mastery", category: "COSMETIC_PRESTIGE", i18nKey: "TOWER_MASTERY", uncapped: true, implemented: true },
 ];
 
 /** Spec section 46's Gem Economy Invariant, made checkable: true as long as at least one UNCAPPED, IMPLEMENTED sink exists. */

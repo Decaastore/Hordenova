@@ -121,30 +121,100 @@ export const PHASES: readonly PhaseDefinition[] = [
 ];
 
 /**
- * Beyond wave 130 there's no more hand-authored content — the Abyss just
- * keeps repeating its own 20-wave cycle (new instance of the same boss,
- * same rhythm) indefinitely, all the way out to the balance wall
- * (~wave 450-460). This is a deliberate scope cut, not an oversight: it
- * keeps `getPhaseForWave` total (never crashes/falls through) without
- * requiring dozens of hand-authored phases for a first content slice.
+ * CORREÇÃO DE REQUISITOS (BOSS STALL FIX) — beyond wave 130 there's no more
+ * hand-authored content, but the game no longer just tiles the LAST phase
+ * (Abyss) forever. That old behavior meant every endgame boss fight was
+ * against `abyssal-maw` — the single HARDEST main boss (highest
+ * hpMultiplierVsBrute AND a resistance flavor on top) — while tower power
+ * has a hard structural ceiling (MAX_TOWER_LEVEL=30 + the Specialization
+ * effect cap). Real engine simulation confirmed this creates a genuine
+ * permanent wall around wave ~270-300: once a build's DPS falls behind
+ * Abyssal Maw's ever-compounding HP, it NEVER faces an easier boss again to
+ * make any further progress against, and Gem Shard income (boss/mini-boss
+ * kills only) permanently flatlines with it — see
+ * engine/ProgressionSimulation.test.ts's "HONEST FINDING" test for a real,
+ * reproduced 48h data point.
+ *
+ * THE FIX — ENDGAME BOSS ROTATION: post-130, the game cycles through EVERY
+ * main boss (in the same order as their original phases — weakest to
+ * strongest), one uniform ENDGAME_CYCLE_LENGTH-wave block each, forever. A
+ * build stuck on Abyssal Maw still gets 5 OTHER, easier bosses every lap —
+ * each one still killable, still paying out Gem Shards/Gold/bestWave
+ * progress — instead of an unbroken wall of the single hardest fight. The
+ * uniform block reuses the EXACT same mini-boss-at-+7/+14 and
+ * SWARM-at-+11/ELITE-at+17 rhythm every hand-authored 20-wave phase already
+ * ships (Volcanic Wastes through Abyss) — not a new pattern invented for
+ * this fix.
+ *
+ * ESCALATION IS PRESERVED (spec: "não apenas Boss1->Boss2->...->loop sem
+ * progressão"): getEndgameBossHpMultiplierBonus below still makes every
+ * FULL 6-boss lap measurably harder than the last, via the same
+ * compound-cap-plus-linear-tail overflow-safety pattern already used by
+ * enemyStats.ts/towerMastery.ts/specializations.ts/prestige.ts — genuinely
+ * uncapped, never Infinity/NaN, but growing slowly enough (+8%/lap) that it
+ * can never again concentrate into the single-fight wall this fix exists to
+ * remove. `getPhaseForWave` itself stays total (never crashes/falls
+ * through) exactly as before.
  */
+const ENDGAME_CYCLE_LENGTH = 20;
+/** Same relative rhythm every hand-authored 20-wave phase (Volcanic Wastes through Abyss) already uses — not a new pattern. */
+const ENDGAME_MINI_BOSS_OFFSETS: readonly number[] = [7, 14];
+const ENDGAME_WAVE_TAG_OFFSETS: Readonly<Record<number, WaveTag>> = { 11: "SWARM", 17: "ELITE" };
+
 export function getPhaseForWave(waveNumber: number): PhaseDefinition {
   for (const phase of PHASES) {
     if (waveNumber <= phase.endWave) return phase;
   }
 
   const last = PHASES[PHASES.length - 1]!;
-  const cycleLength = last.endWave - last.startWave + 1;
-  const cyclesElapsed = Math.floor((waveNumber - last.startWave) / cycleLength);
-  const offset = cyclesElapsed * cycleLength;
+  const endgameStart = last.endWave + 1;
+  const wavesIntoEndgame = waveNumber - endgameStart;
+  const blockIndex = Math.floor(wavesIntoEndgame / ENDGAME_CYCLE_LENGTH);
+  const rotation = PHASES[blockIndex % PHASES.length]!;
+  const blockStart = endgameStart + blockIndex * ENDGAME_CYCLE_LENGTH;
 
   return {
-    ...last,
-    startWave: last.startWave + offset,
-    endWave: last.endWave + offset,
-    miniBossWaves: last.miniBossWaves.map((w) => w + offset),
-    waveTags: Object.fromEntries(Object.entries(last.waveTags).map(([w, tag]) => [Number(w) + offset, tag])),
+    id: `${rotation.id}_ENDGAME_LAP${Math.floor(blockIndex / PHASES.length)}`,
+    i18nKey: rotation.i18nKey,
+    biomeId: rotation.biomeId,
+    startWave: blockStart,
+    endWave: blockStart + ENDGAME_CYCLE_LENGTH - 1,
+    mainBossId: rotation.mainBossId,
+    miniBossWaves: ENDGAME_MINI_BOSS_OFFSETS.map((offset) => blockStart + offset),
+    waveTags: Object.fromEntries(Object.entries(ENDGAME_WAVE_TAG_OFFSETS).map(([offset, tag]) => [blockStart + Number(offset), tag])),
+    enemyPool: FULL_POOL,
   };
+}
+
+/** How many FULL 6-boss rotations have completed at `waveNumber` — 0 before the endgame even starts. Used only to scale HP (see getEndgameBossHpMultiplierBonus); never changes WHICH boss appears (that's `rotation` above). */
+export function getEndgameCycleLapCount(waveNumber: number): number {
+  const last = PHASES[PHASES.length - 1]!;
+  if (waveNumber <= last.endWave) return 0;
+  const blockIndex = Math.floor((waveNumber - (last.endWave + 1)) / ENDGAME_CYCLE_LENGTH);
+  return Math.floor(blockIndex / PHASES.length);
+}
+
+const ENDGAME_HP_GROWTH_PER_LAP = 0.08;
+/** Numerical safety (same technique as enemyStats.ts/towerMastery.ts): compounding stops accelerating beyond this many laps, but keeps climbing forever via the linear tail below — never Infinity/NaN at any lap count a save could ever reach. */
+const ENDGAME_HP_LAP_COMPOUND_CAP = 500;
+const ENDGAME_HP_LAP_LINEAR_TAIL_GROWTH = 0.05;
+
+/**
+ * Multiplier (>= 1) applied on top of a boss's normal `hpMultiplierVsBrute`
+ * once the endgame rotation is underway — 1 (no change) for every
+ * hand-authored phase and the entire first lap of the rotation. This is
+ * what keeps the endgame "measurably harder over time" per spec, without
+ * ever re-concentrating into a single always-hardest fight (see this file's
+ * top doc comment).
+ */
+export function getEndgameBossHpMultiplierBonus(waveNumber: number): number {
+  const laps = getEndgameCycleLapCount(waveNumber);
+  if (laps <= 0) return 1;
+  const cappedLaps = Math.min(laps, ENDGAME_HP_LAP_COMPOUND_CAP);
+  const compound = Math.pow(1 + ENDGAME_HP_GROWTH_PER_LAP, cappedLaps);
+  const tailLaps = Math.max(0, laps - ENDGAME_HP_LAP_COMPOUND_CAP);
+  const linearTail = 1 + tailLaps * ENDGAME_HP_LAP_LINEAR_TAIL_GROWTH;
+  return compound * linearTail;
 }
 
 export function isMainBossWave(waveNumber: number): boolean {

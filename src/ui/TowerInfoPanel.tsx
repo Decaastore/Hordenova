@@ -8,7 +8,7 @@ import {
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
-import { getMasteryBonusMultipliers } from "@/config/towerMastery";
+import { getMasteryCosmeticTier, getNextMasteryCosmeticTier, MASTERY_RESPEC_TOKEN_INTERVAL } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
@@ -19,7 +19,7 @@ import {
 } from "@/config/towerStats";
 import {
   getSpecializationsForTower,
-  MAX_SPECIALIZATION_LEVEL,
+  SPECIALIZATION_EFFECT_LEVEL_CAP,
   SPECIALIZATION_UNLOCK_GEM_COST,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
@@ -45,6 +45,11 @@ interface TowerInfoPanelProps {
   isSkinOwned: (skinId: string) => boolean;
   /** Master Implementation Pass spec sections 3-6 — Tower Mastery, now a PERMANENT, Gems-funded uncapped sink past MAX_TOWER_LEVEL (CORREÇÃO DE REQUISITOS). */
   onUpgradeMastery: () => void;
+  /** CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — how many Specialization Respec Tokens this tower's type currently has available (earned by masteryLevel, minus spent). */
+  respecTokensAvailable: number;
+  /** Whether the currently-chosen specialization path can be respec'd right now (a path is chosen AND a token is available). */
+  canRespecSpecialization: boolean;
+  onRespecSpecialization: () => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -68,6 +73,9 @@ export function TowerInfoPanel({
   onPurchaseSkin,
   isSkinOwned,
   onUpgradeMastery,
+  respecTokensAvailable,
+  canRespecSpecialization,
+  onRespecSpecialization,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -166,6 +174,9 @@ export function TowerInfoPanel({
         t={t}
         onChoose={onChooseSpecialization}
         onUpgrade={onUpgradeSpecialization}
+        respecTokensAvailable={respecTokensAvailable}
+        canRespec={canRespecSpecialization}
+        onRespec={onRespecSpecialization}
       />
 
       <SkinSection
@@ -188,9 +199,14 @@ export function TowerInfoPanel({
  * spending out, exactly like Specialization already allows once its own
  * level gate passes.
  *
- * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): permanent, account-wide
- * progression funded by GEMS, never Gold — see gemSinks.ts's doc comment
- * for the explicit, deliberate exception this represents.
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery no longer buys ANY
+ * combat stat. It represents permanent prestige/experience instead: every
+ * MASTERY_RESPEC_TOKEN_INTERVAL levels grants a Specialization Respec Token
+ * (shown here as "progress to next token"), and reaching a cosmetic tier
+ * unlocks a purely visual ring/aura/rune effect around the tower (see
+ * config/towerMastery.ts — MASTERY_COSMETIC_TIERS is calculated directly
+ * from masteryLevel and is never read by CombatSystem). No "+X% Damage" /
+ * "+X% Attack Speed" / "+X% Range" text belongs here anymore.
  */
 function MasterySection({
   tower,
@@ -207,16 +223,30 @@ function MasterySection({
 }) {
   const cost = getMasteryUpgradeCostFor(tower);
   const affordable = gems >= cost;
-  const bonus = getMasteryBonusMultipliers(tower.masteryLevel);
+  const currentTier = getMasteryCosmeticTier(tower.masteryLevel);
+  const nextTier = getNextMasteryCosmeticTier(tower.masteryLevel);
+  const levelsToNextToken = MASTERY_RESPEC_TOKEN_INTERVAL - (tower.masteryLevel % MASTERY_RESPEC_TOKEN_INTERVAL);
 
   return (
     <>
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{t("towerInfo.masteryLevel", { level: tower.masteryLevel })}</div>
-      {tower.masteryLevel > 0 && (
+      <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>{t("towerInfo.masteryPrestigeNote")}</div>
+      <div style={{ fontSize: 10, color: theme.accent, marginTop: 2 }}>
+        {t("towerInfo.masteryNextToken", { levels: levelsToNextToken })}
+      </div>
+      {currentTier && (
         <div style={{ fontSize: 10, color: theme.accent, marginTop: 1 }}>
-          {t("towerInfo.masteryBonus", { damage: Math.round((bonus.damage - 1) * 100) })}
+          {t("towerInfo.masteryCosmeticActive", { name: t(`towerInfo.masteryCosmetic.${currentTier.nameKey}` as TranslationKey) })}
+        </div>
+      )}
+      {nextTier && (
+        <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1 }}>
+          {t("towerInfo.masteryCosmeticNext", {
+            name: t(`towerInfo.masteryCosmetic.${nextTier.nameKey}` as TranslationKey),
+            level: nextTier.level,
+          })}
         </div>
       )}
       <button
@@ -252,6 +282,9 @@ function SpecializationSection({
   t,
   onChoose,
   onUpgrade,
+  respecTokensAvailable,
+  canRespec,
+  onRespec,
 }: {
   tower: TowerInstance;
   gold: number;
@@ -260,6 +293,9 @@ function SpecializationSection({
   t: Translate;
   onChoose: (id: SpecializationId) => void;
   onUpgrade: () => void;
+  respecTokensAvailable: number;
+  canRespec: boolean;
+  onRespec: () => void;
 }) {
   if (!tower.specializationId) {
     if (!canChooseSpecialization(tower)) {
@@ -316,9 +352,14 @@ function SpecializationSection({
         {t(`specializations.${tower.specializationId}.description`)}
       </div>
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 2 }}>
-        {t("towerInfo.specializationLevel", { level: tower.specializationLevel, max: MAX_SPECIALIZATION_LEVEL })}
+        {t("towerInfo.specializationLevel", { level: tower.specializationLevel })}
       </div>
-      {canUpgrade ? (
+      {tower.specializationLevel >= SPECIALIZATION_EFFECT_LEVEL_CAP && (
+        <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>
+          {t("towerInfo.specializationEffectCapped", { level: SPECIALIZATION_EFFECT_LEVEL_CAP })}
+        </div>
+      )}
+      {canUpgrade && (
         <button
           onClick={onUpgrade}
           disabled={!specAffordable}
@@ -330,9 +371,15 @@ function SpecializationSection({
             {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {specCost}
           </span>
         </button>
-      ) : (
-        <button disabled style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: 0.5 }}>
-          {t("towerInfo.specializationMax")}
+      )}
+
+      {respecTokensAvailable > 0 && (
+        <button
+          onClick={onRespec}
+          disabled={!canRespec}
+          style={{ ...respecButtonStyle, borderColor: theme.accent, opacity: canRespec ? 1 : 0.5 }}
+        >
+          {t("towerInfo.specializationRespec", { tokens: respecTokensAvailable })}
         </button>
       )}
     </>
@@ -564,6 +611,18 @@ const upgradeButtonStyle: CSSProperties = {
   fontWeight: 700,
   fontSize: 12,
   letterSpacing: 0.5,
+};
+
+const respecButtonStyle: CSSProperties = {
+  marginTop: 6,
+  padding: "7px 10px",
+  borderRadius: 7,
+  border: "1px dashed",
+  background: "rgba(255,255,255,0.02)",
+  color: PALETTE.uiText,
+  fontWeight: 600,
+  fontSize: 10.5,
+  letterSpacing: 0.4,
 };
 
 const unlockBannerStyle: CSSProperties = {

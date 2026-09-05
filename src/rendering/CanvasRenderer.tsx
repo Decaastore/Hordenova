@@ -91,7 +91,6 @@ export function CanvasRenderer({
     let prevTowerHp = new Map<string, number>();
     let prevTowerCooldowns = new Map<string, number>();
     const towerAttackTimestamps = new Map<string, number>();
-    let prevGold: number | null = null;
     let prevPhase: RunPhase | null = null;
     let lastFrameTimestamp: number | null = null;
 
@@ -128,7 +127,15 @@ export function CanvasRenderer({
       latestSnapshotRef.current = snapshot;
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
-      detectVfxEvents(snapshot, hud.gold, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevTowerHp, prevGold, gateHomePosition);
+      // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA — Gold feedback fix): Gold
+      // gain no longer spawns a world-space canvas popup here — it read as
+      // "behind/near the castle" because its spawn position was always a
+      // kill location or the castle gate, never a fixed, legible spot. The
+      // feedback moved entirely to a HUD-anchored React indicator (see
+      // ui/HUD.tsx's GoldGainIndicator) that diffs hud.gold itself — no
+      // canvas involvement, no camera shake, same aggregated "+N" text,
+      // zero change to the actual Gold value/economy.
+      detectVfxEvents(snapshot, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevTowerHp, gateHomePosition);
       prevPhase = hud.phase;
 
       // Attack detection: a tower's cooldown only ever counts down during
@@ -163,7 +170,6 @@ export function CanvasRenderer({
       );
       prevTowerLevels = new Map(snapshot.towers.map((t) => [t.id, t.level]));
       prevTowerHp = new Map(snapshot.towers.map((t) => [t.id, t.hp]));
-      prevGold = hud.gold;
       vfx.update(frameDt);
 
       const biome = getBiome(snapshot.biomeId);
@@ -299,7 +305,6 @@ const BOSS_INTRO_SHAKE_DURATION_MS = 320;
 
 export function detectVfxEvents(
   snapshot: RenderSnapshot,
-  gold: number,
   castleHpPercent: number,
   phase: RunPhase,
   prevPhase: RunPhase | null,
@@ -307,7 +312,6 @@ export function detectVfxEvents(
   prevEnemies: Map<string, PrevEnemyState>,
   prevTowerLevels: Map<string, number>,
   prevTowerHp: Map<string, number>,
-  prevGold: number | null,
   gatePosition: Vector2,
 ): void {
   // Boss entrance — the moment BOSS_INTRO begins (once, not every frame
@@ -344,13 +348,11 @@ export function detectVfxEvents(
   // removes on hp<=0 OR on reaching the base) — reaching the base normally
   // leaves an enemy with most of its hp intact, so this split is reliable.
   const currentIds = new Set(snapshot.enemies.map((e) => e.id));
-  const killPositionsThisFrame: Vector2[] = [];
   for (const [id, prev] of prevEnemies) {
     if (currentIds.has(id)) continue;
     if (prev.hp <= 0.01) {
       const premium = prev.type === "CRAWLER" || prev.isBoss;
       vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
-      killPositionsThisFrame.push(prev.position);
     } else {
       // Castle Damage Event VFX (spec section 12/13) — the same "reached
       // the base" instant GameEngine already flags for audio, escalated by
@@ -379,10 +381,5 @@ export function detectVfxEvents(
     if (prevHp !== undefined && tower.hp < prevHp) {
       vfx.spawnTowerSiegeImpact(tower.position);
     }
-  }
-
-  if (prevGold !== null && gold > prevGold) {
-    const goldOrigin = killPositionsThisFrame[0] ?? gatePosition;
-    vfx.spawnGoldPopup(goldOrigin, gold - prevGold);
   }
 }

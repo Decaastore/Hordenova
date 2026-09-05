@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "./towerMastery";
+import {
+  getAvailableRespecTokens,
+  getMasteryCosmeticTier,
+  getMasteryRespecTokensEarned,
+  getMasteryUpgradeCost,
+  getNextMasteryCosmeticTier,
+  MASTERY_COSMETIC_TIERS,
+  MASTERY_RESPEC_TOKEN_INTERVAL,
+} from "./towerMastery";
 import { TOWER_TYPES } from "./towerStats";
 import { SPECIALIZATION_UNLOCK_GEM_COST } from "./specializations";
 
@@ -55,18 +63,48 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, CORREÇÃO
     expect(level).toBeGreaterThan(0); // and it's not "practically impossible" either
   });
 
-  it("bonus multipliers are 1.0 (no change) at mastery level 0, and grow linearly and small per level", () => {
-    expect(getMasteryBonusMultipliers(0)).toEqual({ damage: 1, attackSpeed: 1, range: 1 });
-    const at100 = getMasteryBonusMultipliers(100);
-    expect(at100.damage).toBeCloseTo(1.4, 5); // +0.4%/level * 100
-    expect(at100.attackSpeed).toBeCloseTo(1.2, 5);
-    expect(at100.range).toBeCloseTo(1.1, 5);
+  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery no longer grants
+  // any damage/attackSpeed/range multiplier at all (see entities/Tower.ts's
+  // own permanent regression test for the getTowerStats side of this
+  // guarantee). What it grants instead — Respec Tokens and cosmetic
+  // tiers — is exercised below.
+
+  it("Respec Tokens: 0 below the first interval, then exactly 1 every MASTERY_RESPEC_TOKEN_INTERVAL levels", () => {
+    expect(getMasteryRespecTokensEarned(0)).toBe(0);
+    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL - 1)).toBe(0);
+    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL)).toBe(1);
+    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL * 2)).toBe(2);
+    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL * 3)).toBe(3);
   });
 
-  it("bonus multipliers never overflow at extreme mastery levels", () => {
-    const at1M = getMasteryBonusMultipliers(1_000_000);
-    expect(Number.isFinite(at1M.damage)).toBe(true);
-    expect(Number.isFinite(at1M.attackSpeed)).toBe(true);
-    expect(Number.isFinite(at1M.range)).toBe(true);
+  it("Respec Tokens: is a PURE function of masteryLevel — calling it repeatedly (simulating a reload/restart) never changes the result, so it can never double-grant", () => {
+    const level = MASTERY_RESPEC_TOKEN_INTERVAL * 4;
+    const first = getMasteryRespecTokensEarned(level);
+    const second = getMasteryRespecTokensEarned(level);
+    const third = getMasteryRespecTokensEarned(level);
+    expect(first).toBe(second);
+    expect(second).toBe(third);
+  });
+
+  it("getAvailableRespecTokens subtracts what's already been spent, and never goes negative", () => {
+    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 0)).toBe(3);
+    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 2)).toBe(1);
+    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 3)).toBe(0);
+    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 999)).toBe(0);
+  });
+
+  it("cosmetic tiers unlock in order as masteryLevel rises, and are never affected by combat state (pure function of level)", () => {
+    expect(getMasteryCosmeticTier(0)).toBeNull();
+    for (const tier of MASTERY_COSMETIC_TIERS) {
+      expect(getMasteryCosmeticTier(tier.level)?.id).toBe(tier.id);
+    }
+    const highestTier = MASTERY_COSMETIC_TIERS[MASTERY_COSMETIC_TIERS.length - 1]!;
+    expect(getMasteryCosmeticTier(highestTier.level + 10_000)?.id).toBe(highestTier.id);
+  });
+
+  it("getNextMasteryCosmeticTier points at the next unearned tier, and null once every tier is unlocked", () => {
+    expect(getNextMasteryCosmeticTier(0)?.id).toBe(MASTERY_COSMETIC_TIERS[0]!.id);
+    const highestTier = MASTERY_COSMETIC_TIERS[MASTERY_COSMETIC_TIERS.length - 1]!;
+    expect(getNextMasteryCosmeticTier(highestTier.level)).toBeNull();
   });
 });

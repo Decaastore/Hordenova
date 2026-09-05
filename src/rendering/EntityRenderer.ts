@@ -1418,21 +1418,21 @@ export function drawEnemy(
     case "SHIELDBEARER":
       drawShieldbearer(ctx, theme);
       break;
-    // Four Content Progression archetypes reuse the closest existing
-    // silhouette — their own theme color (see theme.ts) plus the
-    // type-based scale CanvasRenderer applies is what differentiates them
-    // for now, ahead of any bespoke art.
+    // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
+    // Progression archetype now has its own bespoke silhouette (see their
+    // draw* functions' own doc comments) instead of reusing one of the
+    // original 4 shapes with just a different theme color/scale.
     case "SWARMLING":
-      drawCrawler(ctx, theme, timeMs, hitFlashMs);
+      drawSwarmling(ctx, theme, timeMs);
       break;
     case "REGENERATOR":
-      drawBrute(ctx, theme);
+      drawRegenerator(ctx, theme, timeMs);
       break;
     case "IRONCLAD":
-      drawShieldbearer(ctx, theme);
+      drawIronclad(ctx, theme);
       break;
     case "DISABLER":
-      drawRunner(ctx, theme, timeMs);
+      drawDisabler(ctx, theme, timeMs);
       break;
   }
   ctx.restore();
@@ -1979,6 +1979,257 @@ function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_TH
   ctx.beginPath();
   ctx.arc(-4, -1.2, 1.1, 0, Math.PI * 2);
   ctx.fill();
+}
+
+/**
+ * CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — SWARMLING,
+ * REGENERATOR, IRONCLAD and DISABLER used to literally reuse drawCrawler/
+ * drawBrute/drawShieldbearer/drawRunner verbatim (only their own theme
+ * color and a scale multiplier told them apart — see drawEnemy's dispatch
+ * switch below), which is exactly the "still looks like a recolored shape"
+ * complaint. Each gets its own bespoke silhouette here, at the same
+ * detail tier as drawCrawler (jointed limbs / distinct silhouette / an
+ * identity-specific detail), so all 8 archetypes read as genuinely
+ * different creatures, not palette swaps of 4 base shapes.
+ */
+
+/** Small, many-legged swarm creature — reads as a pack hunter, not a shrunken Crawler: rounder/lumpier body, more (thinner, faster) legs, a tight eye cluster instead of Crawler's mandibles. */
+function drawSwarmling(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["SWARMLING"], timeMs: number): void {
+  const jitter = Math.sin(timeMs / 70) * 0.5;
+  const legPhase = Math.sin(timeMs / 60);
+
+  // Six thin, fast-twitching legs — noticeably more and faster than Crawler's, the "swarm" read.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 1;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1]) {
+    for (let i = -1; i <= 1; i++) {
+      const baseX = i * 2.2;
+      const footX = baseX + legPhase * side * 1.4;
+      const footY = side * (6.5 + Math.abs(legPhase) * 1.6);
+      ctx.beginPath();
+      ctx.moveTo(baseX, side * 2.5);
+      ctx.lineTo(baseX + legPhase * side * 0.5, side * 4.5);
+      ctx.lineTo(footX, footY);
+      ctx.stroke();
+    }
+  }
+
+  // Lumpy, irregular body — an uneven blob rather than Crawler's sharp angular carapace.
+  ctx.fillStyle = theme.body;
+  ctx.beginPath();
+  ctx.moveTo(5.5 + jitter, 0);
+  ctx.bezierCurveTo(5, -4.5, 1.5, -6, -1.5, -5);
+  ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
+  ctx.bezierCurveTo(-6, 3, -3.5, 5, 0, 5);
+  ctx.bezierCurveTo(3, 4.8, 5.5, 2.5, 5.5 + jitter, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // A tight cluster of small glowing eyes — the "many of me" identity cue.
+  const flicker = 0.6 + 0.4 * Math.sin(timeMs / 180);
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = flicker;
+  for (const [ex, ey, er] of [
+    [2.5, -1.4, 0.75],
+    [3.2, 0, 0.85],
+    [2.5, 1.4, 0.75],
+    [0.5, -2.3, 0.5],
+    [0.5, 2.3, 0.5],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(ex, ey, er, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Organic, moss/root-covered creature that visibly heals — an asymmetric fleshy body with growth tendrils and a pulsing healing core, never a symmetric ellipse. */
+function drawRegenerator(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["REGENERATOR"], timeMs: number): void {
+  const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
+  const swaySway = Math.sin(timeMs / 400) * 2;
+
+  // Root/vine tendrils trailing from the body, each tipped with a small leaf.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 1.1;
+  ctx.lineCap = "round";
+  for (const [ox, oy, len, dir] of [
+    [-6, -4, 7, -1],
+    [-7, 2, 6, 0.3],
+    [-4, 6, 5.5, 1],
+  ] as const) {
+    const tipX = ox - len + swaySway * dir * 0.3;
+    const tipY = oy + dir * 3;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.quadraticCurveTo(ox - len * 0.5, oy + dir * 1.5, tipX, tipY);
+    ctx.stroke();
+    ctx.fillStyle = theme.accent;
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.ellipse(tipX, tipY, 1.6, 0.9, dir * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // Asymmetric fleshy body — deliberately lopsided, like a growth/mound rather than a creature with clean bilateral symmetry.
+  ctx.fillStyle = theme.body;
+  ctx.beginPath();
+  ctx.moveTo(7, -1);
+  ctx.bezierCurveTo(6.5, -6, 1, -8, -3, -6);
+  ctx.bezierCurveTo(-7.5, -4, -8, 1, -6, 4.5);
+  ctx.bezierCurveTo(-4, 8, 2, 8.5, 5.5, 5.5);
+  ctx.bezierCurveTo(8, 3, 7.5, 1.5, 7, -1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 0.9;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Moss tufts on the back.
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = 0.6;
+  for (const [mx, my, r] of [
+    [-2, -6, 1.6],
+    [1.5, -6.5, 1.2],
+    [-4.5, -3.5, 1.1],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(mx, my, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // Pulsing healing core — the "visibly regenerating" identity cue, brighter/dimmer over time.
+  drawMagicCore(ctx, 0, 0, 3.5 * pulse, theme.accent);
+}
+
+/** Full-body heavy plate armor — thicker and more encasing than Shieldbearer's single hand-shield, a slower hunched posture reading as "walking fortress" rather than a soldier with a shield item. */
+function drawIronclad(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["IRONCLAD"]): void {
+  // Broader, lower-slung body than Shieldbearer — the weight/bulk read.
+  ctx.fillStyle = theme.body;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Full-body plating: front chest plate, shoulder plates, AND a rear back
+  // plate — armor wraps the whole creature, not a shield it happens to carry.
+  const plateGradient = ctx.createLinearGradient(-8, -8, 8, 8);
+  plateGradient.addColorStop(0, "#9a9aa2");
+  plateGradient.addColorStop(0.5, theme.body);
+  plateGradient.addColorStop(1, theme.dark);
+  ctx.fillStyle = plateGradient;
+  ctx.beginPath();
+  ctx.moveTo(-9, -6);
+  ctx.lineTo(-2, -8.5);
+  ctx.lineTo(8, -5);
+  ctx.lineTo(9, 0);
+  ctx.lineTo(8, 5);
+  ctx.lineTo(-2, 8.5);
+  ctx.lineTo(-9, 6);
+  ctx.lineTo(-10.5, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "#000000";
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(-2, -8.5);
+      ctx.lineTo(8, -5);
+    },
+    "#d8d8de",
+    1,
+    0.5,
+  );
+
+  // Rivets across every plate seam — the material read, not just a flat gray fill.
+  ctx.fillStyle = theme.dark;
+  for (const [px, py] of [
+    [-5, -5],
+    [2, -6],
+    [6, -2],
+    [6, 2],
+    [2, 6],
+    [-5, 5],
+    [-8, 0],
+  ] as const) {
+    ctx.beginPath();
+    ctx.arc(px, py, 0.85, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // A narrow visor slit — the only "face" a fully-encased creature needs.
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.ellipse(6.5, 0, 1.3, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+/** Spectral, levitating disruptor — no legs (a tapering shadow base instead), drifting tentacle appendages, and a pulsing violet aura in place of Runner's simple speed-lined diamond. */
+function drawDisabler(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["DISABLER"], timeMs: number): void {
+  const drift = Math.sin(timeMs / 500) * 1.2;
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 240);
+
+  // Pulsing interference aura — the "disrupts nearby towers" identity cue.
+  ctx.save();
+  ctx.globalAlpha = 0.22 + 0.18 * pulse;
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.arc(0, drift * 0.3, 10 + pulse * 1.5, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Drifting tentacle-like appendages trailing behind — no legs, it floats.
+  ctx.strokeStyle = theme.dark;
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = 1;
+  ctx.lineCap = "round";
+  for (const [oy, len, phase] of [
+    [-4, 8, 0],
+    [0, 9, 1.4],
+    [4, 7.5, 2.6],
+  ] as const) {
+    const wobble = Math.sin(timeMs / 260 + phase) * 2.2;
+    ctx.beginPath();
+    ctx.moveTo(-2, oy);
+    ctx.quadraticCurveTo(-2 - len * 0.5, oy + wobble, -2 - len, oy + wobble * 1.6);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // Semi-transparent spectral body — a tapering hood shape, not a solid diamond, with no ground contact (it levitates).
+  ctx.globalAlpha = 0.72;
+  const bodyGradient = ctx.createLinearGradient(-8, 0, 6, 0);
+  bodyGradient.addColorStop(0, "rgba(0,0,0,0)");
+  bodyGradient.addColorStop(0.35, theme.dark);
+  bodyGradient.addColorStop(1, theme.body);
+  ctx.fillStyle = bodyGradient;
+  ctx.beginPath();
+  ctx.moveTo(7, drift * 0.3);
+  ctx.quadraticCurveTo(2, -6.5, -6, -3.5 + drift * 0.4);
+  ctx.quadraticCurveTo(-9, 0, -6, 3.5 + drift * 0.4);
+  ctx.quadraticCurveTo(2, 6.5, 7, drift * 0.3);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // Single glowing violet eye — the one solid, focal point on an otherwise translucent creature.
+  drawMagicCore(ctx, 4.5, drift * 0.3, 2.2 + pulse * 0.4, theme.accent);
 }
 
 // ---------------------------------------------------------------------------

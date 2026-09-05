@@ -25,12 +25,6 @@ describe("VfxManager — camera shake gating", () => {
     expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
   });
 
-  it("spawnGoldPopup never triggers shake", () => {
-    const vfx = new VfxManager();
-    vfx.spawnGoldPopup({ x: 0, y: 0 }, 50);
-    expect(vfx.getShakeOffset()).toEqual({ x: 0, y: 0 });
-  });
-
   it("spawnDeathBurst (a normal kill, even a premium one) never triggers shake", () => {
     const vfx = new VfxManager();
     vfx.spawnDeathBurst({ x: 0, y: 0 }, "#fff", { x: 1, y: 0 }, true);

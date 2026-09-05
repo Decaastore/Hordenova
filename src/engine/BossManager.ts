@@ -1,5 +1,6 @@
 import type { BossDefinition } from "@/config/bossConfig";
 import { getScaledEnemyStats } from "@/config/enemyStats";
+import { getEndgameBossHpMultiplierBonus } from "@/config/phaseConfig";
 import { getPointAtDistance, distance } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
 import { createEnemyInstance, REGEN_SUPPRESSION_MS, type EnemyInstance } from "@/entities/Enemy";
@@ -31,7 +32,11 @@ const DISABLE_DURATION_MS = 2000;
 export function createBossInstance(def: BossDefinition, waveNumber: number, nowMs: number): EnemyInstance {
   const bruteBaseline = getScaledEnemyStats("BRUTE", waveNumber);
   const start = getPointAtDistance(ENEMY_PATH, 0);
-  const hp = Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute);
+  // CORREÇÃO DE REQUISITOS (BOSS STALL FIX) — a small, bounded, ever-so-
+  // slowly-growing multiplier on top of the boss's normal HP baseline once
+  // the post-130 endgame rotation is underway (1 = no change everywhere
+  // else) — see phaseConfig.ts's own doc comment for the full rationale.
+  const hp = Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber));
 
   return {
     id: `boss-${nextBossInstanceId++}`,

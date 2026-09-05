@@ -1,5 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+
+// React 18's act() only suppresses its "not configured" warning when this
+// global is set — jsdom doesn't set it automatically the way a full
+// testing-library setup would.
+(globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 import { HUD } from "./HUD";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import type { HudSnapshot } from "@/engine/GameEngine";
@@ -38,6 +45,22 @@ function renderHud(hud: HudSnapshot): string {
       <HUD hud={hud} onSetSpeed={() => {}} onOpenInventory={() => {}} />
     </LanguageProvider>,
   );
+}
+
+function renderInteractive(initialHud: HudSnapshot): { container: HTMLDivElement; root: Root; rerender: (hud: HudSnapshot) => void } {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  const renderWith = (hud: HudSnapshot) =>
+    act(() => {
+      root.render(
+        <LanguageProvider>
+          <HUD hud={hud} onSetSpeed={() => {}} onOpenInventory={() => {}} />
+        </LanguageProvider>,
+      );
+    });
+  renderWith(initialHud);
+  return { container, root, rerender: renderWith };
 }
 
 /**
@@ -84,5 +107,71 @@ describe("HUD — Gems vs Gem Shards are visually and textually unambiguous (P2 
   it("a real tooltip on the Shards stat states the actual conversion rate (10 Shards = 1 Gem) — no invented number", () => {
     const html = renderHud(makeHud({ gems: 0, gemShards: 30 }));
     expect(html).toContain("10 Shards can be converted into 1 Gem");
+  });
+});
+
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Gold feedback fix. Gold
+ * gain no longer spawns a world-space canvas popup (rendering/vfx.ts's old
+ * spawnGoldPopup, removed) — it's a small HUD-anchored "+N" next to the
+ * existing Gold stat, diffing hud.gold across renders. Zero economy change:
+ * these tests only assert the presentational badge, never hud.gold itself.
+ */
+describe("HUD — Gold gain indicator (Gold feedback fix)", () => {
+  let containers: HTMLDivElement[] = [];
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    containers = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    for (const c of containers) c.remove();
+  });
+
+  function setup(gold: number) {
+    const { container, rerender } = renderInteractive(makeHud({ gold, gemShards: 0 }));
+    containers.push(container);
+    return { container, rerender };
+  }
+
+  it("shows nothing on the very first render (no prior gold to compare against)", () => {
+    const { container } = setup(1000);
+    expect(container.textContent).not.toMatch(/\+\d/);
+  });
+
+  it("shows +N right after gold increases, and clears again after the display window", () => {
+    const { container, rerender } = setup(1000);
+    rerender(makeHud({ gold: 1125, gemShards: 0 }));
+    expect(container.textContent).toContain("+125");
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(container.textContent).not.toMatch(/\+\d/);
+  });
+
+  it("aggregates multiple gains within the display window into ONE running total, not separate stacked badges", () => {
+    const { container, rerender } = setup(1000);
+    rerender(makeHud({ gold: 1050, gemShards: 0 }));
+    expect(container.textContent).toContain("+50");
+
+    act(() => {
+      vi.advanceTimersByTime(300); // still well inside the display window
+    });
+    rerender(makeHud({ gold: 1090, gemShards: 0 }));
+    // Aggregated: 50 (first gain) + 40 (second gain) = 90, shown as one badge.
+    expect(container.textContent).toContain("+90");
+    expect(container.textContent).not.toContain("+50");
+  });
+
+  it("never shows a gain indicator when Gold decreases (a purchase) or stays the same", () => {
+    const { container, rerender } = setup(1000);
+    rerender(makeHud({ gold: 800, gemShards: 0 }));
+    expect(container.textContent).not.toMatch(/\+\d/);
+
+    rerender(makeHud({ gold: 800, gemShards: 0 }));
+    expect(container.textContent).not.toMatch(/\+\d/);
   });
 });

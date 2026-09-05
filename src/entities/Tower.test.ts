@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { applySiegeDamage, createTowerInstance, resetTowerSurvival, tickTowerSurvivalRegen } from "./Tower";
+import {
+  applySiegeDamage,
+  canRespecSpecialization,
+  chooseSpecialization,
+  createTowerInstance,
+  getTowerStats,
+  resetTowerSurvival,
+  respecSpecialization,
+  tickTowerSurvivalRegen,
+} from "./Tower";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
+import { TOWER_TYPES } from "@/config/towerStats";
+import { getSpecializationsForTower } from "@/config/specializations";
 
 describe("Tower — survival (Master Implementation Pass spec section 12-13)", () => {
   it("a freshly-created tower starts at full HP/shield for its type", () => {
@@ -71,5 +82,77 @@ describe("Tower — survival (Master Implementation Pass spec section 12-13)", (
     const def = getTowerSurvivalDefinition("IRONWOOD");
     expect(tower.hp).toBe(def.maxHp);
     expect(tower.shieldHp).toBe(def.maxShield);
+  });
+});
+
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — mandatory permanent
+ * regression test: increasing masteryLevel must NEVER change a tower's
+ * combat stats. An earlier version of getTowerStats applied a Mastery
+ * bonus multiplier here; that mechanic has been removed entirely (see
+ * config/towerMastery.ts's doc comment) and this test exists specifically
+ * to prevent it — or anything like it — from silently coming back.
+ */
+describe("Tower — Mastery grants ZERO combat power (SEASON COMPETITIVA regression guard)", () => {
+  it("masteryLevel = 0 and masteryLevel = N produce EXACTLY the same damage/attackSpeed/range for every tower type, at every level", () => {
+    for (const type of TOWER_TYPES) {
+      for (const level of [1, 15, 30]) {
+        const baseline = createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, 0);
+        for (const masteryLevel of [1, 5, 50, 500, 1_000_000]) {
+          const withMastery = createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, masteryLevel);
+          expect(getTowerStats(withMastery)).toEqual(getTowerStats(baseline));
+        }
+      }
+    }
+  });
+
+  it("a tower's stats are unaffected by masteryLevel even while mutated in place (no other hidden power path)", () => {
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, null, 0, null, 0);
+    const before = getTowerStats(tower);
+    tower.masteryLevel = 999;
+    const after = getTowerStats(tower);
+    expect(after).toEqual(before);
+  });
+});
+
+describe("Tower — Specialization Respec Token (CORREÇÃO DE REQUISITOS)", () => {
+  it("cannot respec a tower with no specialization chosen, even with tokens available", () => {
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, null, 0, null, 5);
+    expect(canRespecSpecialization(tower, 0)).toBe(false);
+  });
+
+  it("cannot respec without an available token", () => {
+    const specId = getSpecializationsForTower("IRONWOOD")[0]!.id;
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, specId, 1, null, 4);
+    // masteryLevel 4 earns 0 tokens (interval is 5) — nothing available.
+    expect(canRespecSpecialization(tower, 0)).toBe(false);
+  });
+
+  it("respecSpecialization resets specializationId/Level to unchosen, and touches nothing else", () => {
+    const specId = getSpecializationsForTower("IRONWOOD")[0]!.id;
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 12, specId, 3, null, 5);
+    expect(canRespecSpecialization(tower, 0)).toBe(true);
+
+    const levelBefore = tower.level;
+    const masteryBefore = tower.masteryLevel;
+    const hpBefore = tower.hp;
+
+    respecSpecialization(tower);
+
+    expect(tower.specializationId).toBeNull();
+    expect(tower.specializationLevel).toBe(0);
+    // Permanent/unrelated progression is completely untouched.
+    expect(tower.level).toBe(levelBefore);
+    expect(tower.masteryLevel).toBe(masteryBefore);
+    expect(tower.hp).toBe(hpBefore);
+  });
+
+  it("chooseSpecialization still works normally after a respec — the player can pick a different path", () => {
+    const options = getSpecializationsForTower("IRONWOOD");
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 12, options[0]!.id, 2, null, 5);
+    respecSpecialization(tower);
+    expect(chooseSpecialization(tower, options[1]!.id)).toBe(true);
+    expect(tower.specializationId).toBe(options[1]!.id);
+    expect(tower.specializationLevel).toBe(1);
   });
 });

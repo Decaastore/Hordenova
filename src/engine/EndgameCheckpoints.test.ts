@@ -8,6 +8,7 @@ import { getPrestigeUpgradeCost } from "@/config/prestige";
 import { getMilestoneBonus } from "@/config/phaseConfig";
 import { hasUncappedGoldSink } from "@/config/goldSinks";
 import { hasUncappedGemSink } from "@/config/gemSinks";
+import { getSpecializationUpgradeCost } from "@/config/specializations";
 
 /**
  * Master Implementation Pass spec section 43-44 — the OBLIGATORY economy
@@ -54,12 +55,25 @@ describe("Economy simulation checkpoints (Master Implementation Pass spec sectio
     }
   });
 
-  it("Gold has a finite, real sink below the level cap at every checkpoint (CORREÇÃO DE REQUISITOS: Tower Mastery moved to Gems, so Gold's own uncapped-sink invariant is honestly false now — see goldSinks.ts's doc comment)", () => {
-    expect(hasUncappedGoldSink()).toBe(false);
+  it("Gold has a finite, real sink below the level cap at every checkpoint, AND (CORREÇÃO DE REQUISITOS SEASON COMPETITIVA) an uncapped one via Specialization — see goldSinks.ts's doc comment", () => {
+    expect(hasUncappedGoldSink()).toBe(true);
     for (const type of TOWER_TYPES) {
       const levelCost = getUpgradeCost(type, Math.floor(MAX_TOWER_LEVEL / 2));
       expect(levelCost).not.toBeNull();
       expect(Number.isFinite(levelCost)).toBe(true);
+    }
+  });
+
+  it("Specialization upgrade cost never overflows and always keeps growing, at any specialization level a save could ever reach", () => {
+    const specLevelCheckpoints = [0, 5, 30, 100, 2000, 10_000, 100_000, 1_000_000];
+    for (const type of TOWER_TYPES) {
+      let previous = 0;
+      for (const level of specLevelCheckpoints) {
+        const cost = getSpecializationUpgradeCost(type, level);
+        expect(Number.isFinite(cost)).toBe(true);
+        expect(cost).toBeGreaterThan(previous);
+        previous = cost;
+      }
     }
   });
 

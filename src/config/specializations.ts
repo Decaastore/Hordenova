@@ -18,10 +18,32 @@ import { TOWER_DEFINITIONS } from "./towerStats";
  * once a tower reaches SPECIALIZATION_UNLOCK_TOWER_LEVEL, the player picks
  * exactly one of that tower's paths (permanent for that tower instance —
  * a real, mutually-exclusive decision, not a toggle) and can then invest
- * gold into it independently of the tower's own level, from
- * MAX_SPECIALIZATION_LEVEL, each level buying a real behavior bonus (see
- * `applySpecializationToSpecial`). This is what gives a maxed-level build
- * genuine, ongoing decisions and a genuine, ongoing gold sink past level 30.
+ * gold into it independently of the tower's own level, each level buying a
+ * real behavior bonus (see `applySpecializationToSpecial`). This is what
+ * gives a maxed-level build genuine, ongoing decisions and a genuine,
+ * ongoing gold sink past level 30.
+ *
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — GOLD NEVER RUNS OUT OF A
+ * SINK, BUT POWER STAYS BOUNDED: this used to hard-stop at
+ * MAX_SPECIALIZATION_LEVEL=5 (getSpecializationUpgradeCost returned null),
+ * which is exactly why Gold went dry once every tower was fully built —
+ * Tower Level tops out at 30 (kept as-is, intentionally NOT rebuilt in this
+ * pass) and Specialization was the only other Gold sink, itself capped.
+ *
+ * The fix is deliberately NOT "uncap the level AND let its combat effect
+ * keep growing forever" — that would just trade one problem (Gold with no
+ * sink) for a worse one (`Gold -> infinite Specialization Level -> infinite
+ * DPS`). Instead the level (`specializationLevel`) and its COMBAT EFFECT are
+ * split: the level itself is now genuinely uncapped (getSpecializationUpgradeCost
+ * always returns a finite cost — see its own doc comment for the overflow-safe
+ * curve, the same compound-cap-plus-linear-tail pattern already used by
+ * towerMastery.ts/prestige.ts/enemyStats.ts), so Gold always has somewhere
+ * to go no matter how long a Season runs. But `applySpecializationToSpecial`
+ * clamps the level it actually reads to SPECIALIZATION_EFFECT_LEVEL_CAP (see
+ * that constant) — so the COMBAT BONUS stops growing at exactly the same
+ * point it always did (level 5, preserving all existing balance/tuning),
+ * regardless of how many levels past that a player's Gold has bought.
+ * "Level can keep growing forever; effective power cannot."
  *
  * Each tower ships 3 of the 4 example paths named in the spec (a
  * deliberately-scoped subset, not the full catalog) — the architecture
@@ -44,7 +66,17 @@ export type SpecializationId =
   | "STORMCALLER_ARCANE_SURGE"
   | "STORMCALLER_STORMLORD";
 
-export const MAX_SPECIALIZATION_LEVEL = 5;
+/**
+ * The specializationLevel at which `applySpecializationToSpecial`'s combat
+ * bonus stops growing — the SOFT CAP ON POWER (see this file's top doc
+ * comment). `specializationLevel` itself has no such cap: a tower can keep
+ * being leveled past this forever as a pure, always-available Gold sink,
+ * it just stops making the tower any stronger once its effect reaches this
+ * point. This exact value (5) is unchanged from the tuning this system
+ * shipped with, so every existing balance number for a "fully specialized"
+ * tower stays identical to before this correction.
+ */
+export const SPECIALIZATION_EFFECT_LEVEL_CAP = 5;
 export const SPECIALIZATION_UNLOCK_TOWER_LEVEL = 10;
 
 /**
@@ -111,19 +143,52 @@ export function isSpecializationForTower(id: SpecializationId, type: TowerType):
   return getSpecializationDefinition(id).towerType === type;
 }
 
+/** Original tuned linear rate for levels up to SPECIALIZATION_EFFECT_LEVEL_CAP — UNCHANGED so every existing balance number up to a "fully specialized" tower stays identical. */
+const SPECIALIZATION_LINEAR_COST_MULTIPLIER = 7;
+/**
+ * Beyond SPECIALIZATION_EFFECT_LEVEL_CAP, cost keeps growing forever via the
+ * exact same overflow-safety pattern as towerMastery.ts/prestige.ts/
+ * enemyStats.ts (compounding growth capped at a very high level index, pure
+ * linear tail beyond that) — genuinely uncapped, never Infinity/NaN, at any
+ * specialization level a save could ever reach. Calibrated against
+ * engine/ProgressionSimulation.test.ts's real-engine bot simulation, not
+ * guessed.
+ */
+const SPECIALIZATION_COST_GROWTH_FACTOR = 1.05;
+const SPECIALIZATION_COST_COMPOUND_LEVEL_CAP = 2000;
+const SPECIALIZATION_COST_LINEAR_TAIL_GROWTH = 0.5;
+
 /**
  * Gold cost to raise a specialization from `currentSpecLevel` to
  * `currentSpecLevel + 1` (0 -> 1 is the initial "choose this path" cost).
  * Deliberately steep relative to a normal level-up (base tower level costs
- * top out around upgradeCostBase * 30 * 0.75) — this is the NEW long-tail
- * sink meant to matter well past level 30, not a cheap add-on. Returns null
- * once MAX_SPECIALIZATION_LEVEL is reached.
+ * top out around upgradeCostBase * 30 * 0.75) — this is the long-tail sink
+ * meant to matter well past level 30.
+ *
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — never returns null anymore:
+ * this level track is now genuinely uncapped (Gold must always have
+ * somewhere to go — see hasUncappedGoldSink in goldSinks.ts), it's the
+ * combat EFFECT that stops growing past SPECIALIZATION_EFFECT_LEVEL_CAP,
+ * not the ability to keep buying levels (see applySpecializationToSpecial
+ * and this file's top doc comment). Levels within the original tuned range
+ * keep the EXACT original linear formula (byte-for-byte unchanged); only
+ * levels beyond it switch to the convex, overflow-safe curve.
  */
-export function getSpecializationUpgradeCost(type: TowerType, currentSpecLevel: number): number | null {
-  if (currentSpecLevel >= MAX_SPECIALIZATION_LEVEL) return null;
+export function getSpecializationUpgradeCost(type: TowerType, currentSpecLevel: number): number {
   const def = TOWER_DEFINITIONS[type];
   const targetLevel = currentSpecLevel + 1;
-  return Math.round(def.upgradeCostBase * 7 * targetLevel);
+
+  if (targetLevel <= SPECIALIZATION_EFFECT_LEVEL_CAP) {
+    return Math.round(def.upgradeCostBase * SPECIALIZATION_LINEAR_COST_MULTIPLIER * targetLevel);
+  }
+
+  const costAtCap = def.upgradeCostBase * SPECIALIZATION_LINEAR_COST_MULTIPLIER * SPECIALIZATION_EFFECT_LEVEL_CAP;
+  const levelsBeyondCap = targetLevel - SPECIALIZATION_EFFECT_LEVEL_CAP;
+  const cappedLevels = Math.min(levelsBeyondCap, SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
+  const compound = Math.pow(SPECIALIZATION_COST_GROWTH_FACTOR, cappedLevels);
+  const tailLevels = Math.max(0, levelsBeyondCap - SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
+  const linearTail = 1 + tailLevels * SPECIALIZATION_COST_LINEAR_TAIL_GROWTH;
+  return Math.round(costAtCap * compound * linearTail);
 }
 
 /**
@@ -139,7 +204,11 @@ export function applySpecializationToSpecial(
   specializationLevel: number,
 ): TowerSpecial {
   if (!specializationId || specializationLevel <= 0) return base;
-  const lvl = Math.min(specializationLevel, MAX_SPECIALIZATION_LEVEL);
+  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — THE soft cap on power:
+  // specializationLevel itself is uncapped (see getSpecializationUpgradeCost),
+  // but the level actually read by every branch below never exceeds this,
+  // so no branch's combat bonus can ever grow past what level 5 always gave.
+  const lvl = Math.min(specializationLevel, SPECIALIZATION_EFFECT_LEVEL_CAP);
 
   switch (specializationId) {
     case "IRONWOOD_EXECUTIONER": {

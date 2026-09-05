@@ -23,4 +23,22 @@ describe("gemSinks (Master Implementation Pass spec section 7/8/46)", () => {
     const ids = GEM_SINKS.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
   });
+
+  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the NEVER-P2W CONTRACT
+  // used to carry one deliberate exception (tower_mastery, because Mastery
+  // used to grant a real damage/attack-speed/range multiplier). Mastery no
+  // longer grants any combat stat (see config/towerMastery.ts), so the
+  // exception category was removed entirely — every sink must now be an
+  // ordinary CONVENIENCE or COSMETIC_PRESTIGE purchase, with no exceptions.
+  it("tower_mastery is an ordinary COSMETIC_PRESTIGE sink — the old COMBAT_POWER_MASTERY_EXCEPTION category no longer exists", () => {
+    const mastery = GEM_SINKS.find((s) => s.id === "tower_mastery");
+    expect(mastery).toBeDefined();
+    expect(mastery!.category).toBe("COSMETIC_PRESTIGE");
+  });
+
+  it("every registered Gem sink is CONVENIENCE or COSMETIC_PRESTIGE — no combat-power exception exists anymore", () => {
+    for (const sink of GEM_SINKS) {
+      expect(["CONVENIENCE", "COSMETIC_PRESTIGE"]).toContain(sink.category);
+    }
+  });
 });

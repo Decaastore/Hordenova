@@ -157,9 +157,11 @@ export interface SaveData {
   // `gold`/`currentWave` above. Tower Mastery and Tower Skin OWNERSHIP are
   // the opposite: permanent, account-wide, and untouched by that reset —
   // moved out of TowerLoadoutEntry (which IS wiped each season) into their
-  // own top-level fields here. Mastery is funded by GEMS, never Gold (a
-  // deliberate, explicit exception to the Gem economy's usual
-  // never-buys-power rule — see config/gemSinks.ts's doc comment for why).
+  // own top-level fields here. Mastery is funded by GEMS, never Gold — and
+  // (CORREÇÃO DE REQUISITOS, SEASON COMPETITIVA) it grants ZERO combat
+  // power, so this is no longer an exception to the Gem economy's
+  // never-buys-power rule at all: see config/towerMastery.ts's doc comment
+  // for what it actually grants (Respec Tokens + cosmetic tiers).
   // -----------------------------------------------------------------------
   /** Permanent per-tower-TYPE Mastery level (0 = never invested) — survives every Season reset. Applied to a freshly-placed tower of that type via GameEngine.instantiateTowerFromLoadout/placeTower. */
   towerMasteryLevels: Partial<Record<TowerType, number>>;
@@ -167,9 +169,21 @@ export interface SaveData {
   ownedTowerSkinIds: string[];
   /** Permanent per-tower-TYPE equipped-skin preference, auto-reapplied whenever a tower of that type is placed in a future Season — so an owned skin doesn't visually vanish just because the season reset the tower itself. Absent/undefined = default look. */
   equippedTowerSkinByType: Partial<Record<TowerType, string>>;
+
+  /**
+   * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
+   * Tokens spent so far, per tower TYPE. Mirrors towerMasteryLevels'
+   * exact shape/persistence philosophy: permanent, account-wide-by-type,
+   * survives every Season reset (specialization CHOICE is Season-scoped —
+   * lives in towerLoadout — but how many respecs have been spent is not).
+   * How many tokens are currently AVAILABLE is never stored — it's always
+   * derived as getAvailableRespecTokens(masteryLevel, spent) — so this
+   * field can only ever go up, never silently regrant a token on reload.
+   */
+  towerRespecTokensSpent: Partial<Record<TowerType, number>>;
 }
 
-export const SAVE_DATA_VERSION = 14;
+export const SAVE_DATA_VERSION = 15;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -213,6 +227,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   towerMasteryLevels: {},
   ownedTowerSkinIds: [],
   equippedTowerSkinByType: {},
+  towerRespecTokensSpent: {},
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -395,6 +410,18 @@ function parseTowerMasteryLevels(raw: unknown): Partial<Record<TowerType, number
   return result;
 }
 
+/** Self-healing parse for `towerRespecTokensSpent` — same shape/validation as parseTowerMasteryLevels (a per-TowerType non-negative-integer count). */
+function parseTowerRespecTokensSpent(raw: unknown): Partial<Record<TowerType, number>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Partial<Record<TowerType, number>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (VALID_TOWER_TYPES.has(key as TowerType) && typeof value === "number" && value >= 0) {
+      result[key as TowerType] = value;
+    }
+  }
+  return result;
+}
+
 /** Self-healing parse for `equippedTowerSkinByType` — drops any key that isn't a real TowerType, or a skin id that doesn't actually belong to that tower type. */
 function parseEquippedTowerSkinByType(raw: unknown): Partial<Record<TowerType, string>> {
   if (!raw || typeof raw !== "object") return {};
@@ -498,6 +525,10 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       towerMasteryLevels: parseTowerMasteryLevels(parsed.towerMasteryLevels),
       ownedTowerSkinIds: parseOwnedTowerSkinIds(parsed.ownedTowerSkinIds),
       equippedTowerSkinByType: parseEquippedTowerSkinByType(parsed.equippedTowerSkinByType),
+      // CORREÇÃO DE REQUISITOS (save v14 -> v15) — a pre-existing save never
+      // tracked respec tokens spent at all; 0 spent per type is the only
+      // correct default (nothing was ever spent before this field existed).
+      towerRespecTokensSpent: parseTowerRespecTokensSpent(parsed.towerRespecTokensSpent),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

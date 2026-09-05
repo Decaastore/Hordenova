@@ -233,6 +233,64 @@ describe("GameEngine — Active Idle progression", () => {
     expect(engine.getHudSnapshot().wave).toBeGreaterThan(30);
   });
 
+  /**
+   * CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — an escape by itself
+   * must NEVER freeze the run (proven above), but a real STREAK of escapes
+   * with zero kills in between is a genuinely different situation the
+   * player deserves to be told about explicitly, instead of it looking
+   * identical to one unlucky fight. A huge castleHpBonus keeps this
+   * deterministic reproduction alive across several boss escapes (an empty
+   * build, so every boss walks straight through) without ever tripping
+   * PROGRESSION_STOPPED, which would otherwise end the run before the
+   * streak could accumulate.
+   */
+  it("3 consecutive boss escapes with zero kills surface an explicit EndgameWallReport — a single escape does not, and the run never freezes", () => {
+    updateSave({ currentWave: 30, gold: 0, castleHpBonus: 1_000_000_000, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    engine.setSpeed(4);
+
+    let escapesSeen = 0;
+    let lastPhase = engine.getHudSnapshot().phase;
+    let iterations = 0;
+    const maxIterations = 400_000;
+
+    while (escapesSeen < 3 && iterations < maxIterations) {
+      engine.update(500);
+      iterations++;
+      const phase = engine.getHudSnapshot().phase;
+      // A BOSS_BATTLE -> RUNNING transition with no VICTORY in between (this
+      // empty build never kills anything) is exactly one escape.
+      if (lastPhase === "BOSS_BATTLE" && phase === "RUNNING") escapesSeen++;
+      lastPhase = phase;
+
+      if (escapesSeen === 1 || escapesSeen === 2) {
+        // Below the threshold — must stay null, and the run must keep
+        // ticking (phase is never some frozen/blocking value).
+        expect(engine.getEndgameWallReport()).toBeNull();
+      }
+    }
+
+    expect(iterations).toBeLessThan(maxIterations);
+    expect(escapesSeen).toBe(3);
+
+    const report = engine.getEndgameWallReport();
+    expect(report).not.toBeNull();
+    expect(report!.consecutiveEscapes).toBe(3);
+    expect(report!.bestWave).toBeGreaterThanOrEqual(30);
+    expect(report!.bestDamageFraction).toBeGreaterThanOrEqual(0);
+    expect(report!.bestDamageFraction).toBeLessThanOrEqual(1);
+    expect(report!.diagnosis.reasonKeys.length).toBeGreaterThan(0);
+
+    // Never freezes: the run is still actively progressing (RUNNING or
+    // beyond), not stuck waiting on the report the way PROGRESSION_STOPPED
+    // waits on retryPhase().
+    expect(engine.getHudSnapshot().phase).not.toBe("PROGRESSION_STOPPED");
+
+    engine.acknowledgeEndgameWallReport();
+    expect(engine.getEndgameWallReport()).toBeNull();
+  });
+
   it("a spawned mini-boss's ability actually fires (regression: it used to only tick the tracked main boss)", () => {
     // Wave 21 is Ancient Forest's 3rd configured mini-boss wave, and the
     // deterministic roster (wave % 6) resolves it to "gloom-jammer" —

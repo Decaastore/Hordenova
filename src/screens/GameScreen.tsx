@@ -16,6 +16,7 @@ import { InventoryPanel } from "@/ui/InventoryPanel";
 import { RouletteBanner } from "@/ui/RouletteBanner";
 import { RoulettePendingPrompt } from "@/ui/RoulettePendingPrompt";
 import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
+import { EndgameWallBanner } from "@/ui/EndgameWallBanner";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 
@@ -95,6 +96,9 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         <AscensionHudBadge />
         <BossBanner hud={hud} />
         <PhaseBanner phaseId={hud.phaseId} />
+        {engine.getEndgameWallReport() && (
+          <EndgameWallBanner report={engine.getEndgameWallReport()!} onDismiss={() => engine.acknowledgeEndgameWallReport()} />
+        )}
         {hud.pendingDiscoveryType && (
           <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={() => engine.acknowledgeDiscovery()} />
         )}
@@ -126,6 +130,9 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onPurchaseSkin={(skinId) => engine.purchaseTowerSkin(skinId)}
             isSkinOwned={(skinId) => engine.isTowerSkinOwned(skinId)}
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
+            respecTokensAvailable={engine.getAvailableRespecTokensForSelectedTower()}
+            canRespecSpecialization={engine.canRespecSelectedTowerSpecialization()}
+            onRespecSpecialization={() => engine.respecSelectedTowerSpecialization()}
           />
         )}
 

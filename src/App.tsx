@@ -23,13 +23,18 @@ export default function App() {
       {view === "GAME" ? (
         <GameScreen onExitToMenu={() => setView("HOME")} />
       ) : view === "SEASON" ? (
+        // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the ONLY "JOGAR"
+        // that goes straight into gameplay: the player is already looking
+        // at the current Season (name/theme/timer/best/ranking) before this
+        // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
+        // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
         <SeasonScreen onNavigate={navigate} onPlay={() => setView("GAME")} />
       ) : view === "WIKI" ? (
-        <WikiScreen onNavigate={navigate} onPlay={() => setView("GAME")} />
+        <WikiScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "NOVIDADES" ? (
-        <NovidadesScreen onNavigate={navigate} onPlay={() => setView("GAME")} />
+        <NovidadesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : (
-        <MainMenu onStart={() => setView("GAME")} onOpenWiki={() => setView("WIKI")} onOpenNovidades={() => setView("NOVIDADES")} />
+        <MainMenu onStart={() => setView("SEASON")} onOpenWiki={() => setView("WIKI")} onOpenNovidades={() => setView("NOVIDADES")} />
       )}
     </LanguageProvider>
   );

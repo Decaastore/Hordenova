@@ -8,13 +8,12 @@ import {
 import {
   getSpecializationUpgradeCost,
   isSpecializationForTower,
-  MAX_SPECIALIZATION_LEVEL,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
-import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "@/config/towerMastery";
+import { getAvailableRespecTokens, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import type { Vector2 } from "@/utils/geometry";
 
@@ -177,27 +176,21 @@ export function applySiegeDamage(tower: TowerInstance, rawDamage: number, disabl
  * The single choke point every combat call site reads a tower's effective
  * damage/attack-speed/range from (CombatSystem.ts's resolveNormalAttack,
  * resolveSpecialAttack, and every chain/crit/frozen-bonus damage
- * calculation) — which is exactly why layering Mastery's bonus multiplier
- * here, rather than in each of those call sites individually, is both the
- * lowest-risk integration AND the one place it can never be forgotten for
- * a future combat formula. See config/towerMastery.ts for why this stays a
- * uniform multiplier rather than touching any tower's identity-defining
- * special (crit/burn/freeze/chain) formulas.
+ * calculation).
+ *
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — masteryLevel is deliberately
+ * NEVER read here anymore. An earlier version of this function applied a
+ * uniform Mastery bonus multiplier on top of `levelStats`, which is exactly
+ * the "Gems -> Mastery -> +X% DPS" pattern the Season's competitive design
+ * forbids (Gems must never buy permanent combat power — see
+ * config/towerMastery.ts's doc comment for the full rationale and what
+ * Mastery grants instead). `getTowerStats` now returns the level-based
+ * stats completely unmodified regardless of masteryLevel — see this file's
+ * own permanent regression test ("masteryLevel never changes combat
+ * stats") that locks this in.
  */
 export function getTowerStats(tower: TowerInstance): TowerLevelStats {
-  const levelStats = getTowerLevelStats(tower.type, tower.level);
-  if (tower.masteryLevel <= 0) return levelStats;
-  const mastery = getMasteryBonusMultipliers(tower.masteryLevel);
-  return {
-    ...levelStats,
-    damage: round2(levelStats.damage * mastery.damage),
-    attackSpeed: round2(levelStats.attackSpeed * mastery.attackSpeed),
-    range: round2(levelStats.range * mastery.range),
-  };
-}
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
+  return getTowerLevelStats(tower.type, tower.level);
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +209,33 @@ export function getMasteryUpgradeCostFor(tower: TowerInstance): number {
 /** Mutates `tower` in place, incrementing its mastery level (caller owns gold deduction, exactly like upgradeTower above). */
 export function upgradeMastery(tower: TowerInstance): void {
   tower.masteryLevel += 1;
+}
+
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
+ * Token: the smallest structure needed to let Mastery grant a genuine,
+ * non-power reward. `respecTokensSpent` is owned by the caller (GameEngine,
+ * keyed per TowerType — see towerRespecTokensSpent — mirroring exactly how
+ * masteryLevel itself is already account-wide-by-type, not per placed
+ * instance) and passed in here rather than stored on TowerInstance, since
+ * the token pool is shared by every tower of a type just like Mastery is.
+ */
+export function canRespecSpecialization(tower: TowerInstance, respecTokensSpent: number): boolean {
+  return tower.specializationId !== null && getAvailableRespecTokens(tower.masteryLevel, respecTokensSpent) > 0;
+}
+
+/**
+ * Mutates `tower` in place: clears the chosen specialization path back to
+ * "not chosen" so the player may pick a different one. Deliberately touches
+ * ONLY specializationId/specializationLevel — level, masteryLevel, HP,
+ * equipped skin, and every other permanent field are left completely
+ * untouched (spec: "não apagar Mastery, status de desbloqueio, histórico,
+ * itens"). Caller owns checking canRespecSpecialization and incrementing
+ * its own respecTokensSpent counter.
+ */
+export function respecSpecialization(tower: TowerInstance): void {
+  tower.specializationId = null;
+  tower.specializationLevel = 0;
 }
 
 export function canUpgradeTower(tower: TowerInstance): boolean {
@@ -280,8 +300,15 @@ export function chooseSpecialization(tower: TowerInstance, id: SpecializationId)
   return true;
 }
 
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization level is now
+ * genuinely uncapped (Gold must always have somewhere to go); only the
+ * combat EFFECT stops growing past SPECIALIZATION_EFFECT_LEVEL_CAP (see
+ * config/specializations.ts). So "can upgrade" is simply "has a path
+ * chosen" — there is no longer a level at which this returns false.
+ */
 export function canUpgradeSpecialization(tower: TowerInstance): boolean {
-  return tower.specializationId !== null && tower.specializationLevel < MAX_SPECIALIZATION_LEVEL;
+  return tower.specializationId !== null;
 }
 
 export function getSpecializationUpgradeCostFor(tower: TowerInstance): number | null {

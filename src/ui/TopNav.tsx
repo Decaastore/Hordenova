@@ -17,10 +17,16 @@ interface TopNavProps {
  * per the Home/Wiki/Novidades architecture audit). Deliberately NOT shown
  * during GAME, which keeps its own HUD chrome untouched.
  *
- * "Jogar" always jumps straight into the game (there is a single permanent
- * save now — PRÓXIMA GRANDE FASE spec's "DECISÃO DEFINITIVA SOBRE
- * PROGRESSÃO" retired the old Infinite/Ascension mode-select step) — never
- * re-triggering Home's own portal transition a second time.
+ * "Jogar" (`onPlay`) is wired differently per screen by App.tsx —
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA): from Home/Wiki/Novidades it
+ * navigates to the Season screen first (never straight into gameplay — the
+ * player must see the current Season's name/theme/timer/best/ranking
+ * before a run starts), while from the Season screen itself it starts the
+ * run directly (INICIAR/CONTINUAR RUN), since "SEASON ATUAL" is already
+ * satisfied by being there. There is a single permanent save (PRÓXIMA
+ * GRANDE FASE spec's "DECISÃO DEFINITIVA SOBRE PROGRESSÃO" retired the old
+ * Infinite/Ascension mode-select step) — never re-triggering Home's own
+ * portal transition a second time.
  */
 export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   const { t } = useLanguage();

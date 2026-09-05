@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
@@ -35,12 +35,15 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           value={`${Math.ceil(hud.baseHp)} / ${hud.maxBaseHp}`}
           valueColor={hpColor}
         />
-        <Stat
-          icon={<CoinIcon color={PALETTE.gold} />}
-          label={t("hud.gold")}
-          value={String(hud.gold)}
-          valueColor={PALETTE.gold}
-        />
+        <div style={{ position: "relative" }}>
+          <Stat
+            icon={<CoinIcon color={PALETTE.gold} />}
+            label={t("hud.gold")}
+            value={String(hud.gold)}
+            valueColor={PALETTE.gold}
+          />
+          <GoldGainIndicator gold={hud.gold} />
+        </div>
         {/*
          * P2 UX fix — Gems and Gem Shards used to share ONE stat (`${gems}
          * (+${shards})`), so a "+5" that was actually 5 Gem Shards (see
@@ -129,6 +132,49 @@ function SfxControl() {
   );
 }
 
+const GOLD_GAIN_DISPLAY_MS = 900;
+
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Gold feedback fix. Previously,
+ * a Gold gain spawned a world-space canvas popup (rendering/vfx.ts's old
+ * spawnGoldPopup) anchored to an enemy's death position or the castle gate —
+ * exactly why it read as "behind/near the castle" instead of a clean HUD
+ * readout. This replaces that entirely with a small, fixed, HUD-anchored
+ * indicator: no canvas, no world-space coordinates, no camera shake, and the
+ * exact same "aggregate into one +N instead of many simultaneous texts"
+ * behavior (every gain within GOLD_GAIN_DISPLAY_MS of the last one adds onto
+ * the same pending total and resets the timer, rather than stacking separate
+ * badges). Purely presentational — reads hud.gold, never touches it.
+ */
+function GoldGainIndicator({ gold }: { gold: number }) {
+  const prevGoldRef = useRef(gold);
+  const [pending, setPending] = useState(0);
+  const clearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const delta = gold - prevGoldRef.current;
+    prevGoldRef.current = gold;
+    if (delta > 0) {
+      setPending((prev) => prev + delta);
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+      clearTimerRef.current = setTimeout(() => setPending(0), GOLD_GAIN_DISPLAY_MS);
+    }
+  }, [gold]);
+
+  useEffect(() => {
+    return () => {
+      if (clearTimerRef.current) clearTimeout(clearTimerRef.current);
+    };
+  }, []);
+
+  if (pending <= 0) return null;
+  return (
+    <div style={goldGainStyle} aria-live="polite">
+      +{pending}
+    </div>
+  );
+}
+
 function Stat({
   icon,
   label,
@@ -210,6 +256,21 @@ const valueStyle: CSSProperties = {
   fontWeight: 700,
   color: PALETTE.uiText,
   lineHeight: 1.3,
+};
+
+const goldGainStyle: CSSProperties = {
+  position: "absolute",
+  top: -4,
+  left: "calc(100% - 6px)",
+  padding: "1px 6px",
+  borderRadius: 8,
+  background: "rgba(232,193,90,0.16)",
+  border: `1px solid ${PALETTE.gold}`,
+  color: PALETTE.gold,
+  fontSize: 10.5,
+  fontWeight: 700,
+  whiteSpace: "nowrap",
+  pointerEvents: "none",
 };
 
 const inventoryButtonStyle: CSSProperties = {

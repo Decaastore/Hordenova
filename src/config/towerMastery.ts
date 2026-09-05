@@ -7,25 +7,33 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  * unlocks (multiShot/giantSlayer/wildfire/deepFreeze/arcaneSurge/etc, all
  * in towerStats.ts, all untouched) — Mastery is a SEPARATE, uncapped track
  * layered on top, exactly mirroring how config/specializations.ts already
- * layers an independent, optional gold-sink track next to level (same
- * "LEVEL stays pure growth, a second track buys real bonuses" shape), just
- * without that track's MAX_SPECIALIZATION_LEVEL cap.
+ * layers an independent, optional gold-sink track next to level.
  *
- * DESIGN DECISION — what Mastery actually buys: spec section 4 lists many
- * POSSIBLE small bonuses (damage/attack-speed/survival/ability/range/
- * efficiency) and explicitly warns against turning Mastery into "absurd
- * DPS" or a universal solution. Rather than threading a mastery bonus
- * through each tower's own special-ability formula (10+ separate call
- * sites across CombatSystem.ts, each risking quietly eroding that tower's
- * identity), Mastery applies ONE small, uniform, tower-agnostic power
- * multiplier (damage/attack-speed/range) through the exact same choke
- * point every combat call site already reads tower stats from
- * (entities/Tower.ts's getTowerStats) — see that file's own comment. Every
- * tower's IDENTITY still comes entirely from its level-scaled special
- * (crit/boss-damage, burn/AoE, slow/freeze, chain/armor-pen), which Mastery
- * never touches — a maxed Ironwood with 200 mastery levels is still
- * unambiguously the crit/boss-damage tower, just incrementally stronger
- * everywhere, exactly as the spec asks for ("incremental e controlado").
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — MASTERY NÃO COMPRA MAIS
+ * PODER: a versão anterior deste arquivo aplicava um multiplicador
+ * uniforme de damage/attackSpeed/range em `entities/Tower.ts`'s
+ * getTowerStats, crescendo linearmente com masteryLevel. Isso criava
+ * exatamente o padrão "Gems -> Mastery -> +X% DPS" que o design da Season
+ * competitiva proíbe (Gems nunca devem comprar poder de combate permanente
+ * — ver gemSinks.ts). Esse multiplicador foi REMOVIDO por completo:
+ * getTowerStats agora ignora masteryLevel inteiramente (ver o teste de
+ * regressão permanente em entities/Tower.test.ts que trava isso).
+ *
+ * NOVA FUNÇÃO DE MASTERY — o mesmo `masteryLevel`/mesma curva de custo em
+ * Gems foram mantidos (estrutura mínima necessária, spec explícita: "não
+ * inventar um sistema novo e desconectado"), mas o que ele concede mudou de
+ * "poder" para "prestígio/estratégia":
+ *   1. RESPEC TOKEN — a cada MASTERY_RESPEC_TOKEN_INTERVAL níveis (5) o
+ *      jogador ganha exatamente 1 token, calculado como uma função pura de
+ *      masteryLevel (getMasteryRespecTokensEarned), nunca um contador
+ *      incrementado à parte — por isso é IDEMPOTENTE: recarregar/reiniciar
+ *      nunca reconcede um token, o valor é sempre recomputado a partir do
+ *      nível atual menos os já gastos (ver getAvailableRespecTokens e
+ *      SaveData.towerRespecTokensSpent).
+ *   2. COSMÉTICO PERMANENTE — uma faixa visual (anel/aura/runas, ver
+ *      MASTERY_COSMETIC_TIERS) calculada DIRETAMENTE de masteryLevel, nunca
+ *      de stats de combate — puramente decorativo, lido apenas pelo
+ *      renderer (EntityRenderer/CanvasRenderer), nunca por CombatSystem.
  *
  * SAFETY: cost curve is convex (spec section 5: "não permitir comprar
  * milhares instantaneamente") but uses the exact same overflow-safety
@@ -33,7 +41,9 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  * level index, linear tail beyond it) — genuinely uncapped, never
  * Infinity/NaN, at any mastery level a save could ever reach. Calibrated
  * via engine/ProgressionSimulation.test.ts's real-engine bot simulation,
- * not guessed (spec section 5's own instruction).
+ * not guessed (spec section 5's own instruction). This cost curve itself is
+ * UNCHANGED by the competitive correction above — only what the level buys
+ * changed, not what it costs.
  *
  * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — CURRENCY CHANGED, CURVE
  * RE-CALIBRATED: Mastery moved from Gold to Gems (see gemSinks.ts), and
@@ -52,24 +62,59 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  * on the order of a Specialization unlock, growing from there.
  */
 
-/** Bonus multiplier growth per mastery level — small and linear, so DPS growth stays "controlado" and its real pacing comes from the cost curve below, not a bonus-side diminishing-returns curve. */
-const MASTERY_DAMAGE_PER_LEVEL = 0.004; // +0.4% damage per level
-const MASTERY_ATTACK_SPEED_PER_LEVEL = 0.002; // +0.2% attack speed per level
-const MASTERY_RANGE_PER_LEVEL = 0.001; // +0.1% range per level
+/** Every N mastery levels grants exactly 1 Specialization Respec Token (5 -> 1, 10 -> 2, 15 -> 3, ...). */
+export const MASTERY_RESPEC_TOKEN_INTERVAL = 5;
 
-export interface MasteryBonusMultipliers {
-  damage: number;
-  attackSpeed: number;
-  range: number;
+/**
+ * Pure function of `masteryLevel` — NEVER a stored/incremented counter, so
+ * it can never double-grant on a reload/restart. The engine tracks only how
+ * many of these have been SPENT (SaveData.towerRespecTokensSpent, same
+ * per-TowerType persistence shape as towerMasteryLevels) and subtracts that
+ * from this to get what's currently available (getAvailableRespecTokens).
+ */
+export function getMasteryRespecTokensEarned(masteryLevel: number): number {
+  return Math.floor(Math.max(0, masteryLevel) / MASTERY_RESPEC_TOKEN_INTERVAL);
 }
 
-/** Pure multipliers (1.0 = no change) for a given mastery level — entities/Tower.ts's getTowerStats applies these on top of the level-based TowerLevelStats. */
-export function getMasteryBonusMultipliers(masteryLevel: number): MasteryBonusMultipliers {
-  return {
-    damage: 1 + masteryLevel * MASTERY_DAMAGE_PER_LEVEL,
-    attackSpeed: 1 + masteryLevel * MASTERY_ATTACK_SPEED_PER_LEVEL,
-    range: 1 + masteryLevel * MASTERY_RANGE_PER_LEVEL,
-  };
+/** Tokens earned so far minus tokens already spent — never negative. */
+export function getAvailableRespecTokens(masteryLevel: number, tokensSpent: number): number {
+  return Math.max(0, getMasteryRespecTokensEarned(masteryLevel) - Math.max(0, tokensSpent));
+}
+
+export interface MasteryCosmeticTier {
+  /** Stable id — used as a rendering key, never shown raw to the player. */
+  id: string;
+  /** i18n key suffix — full key is `towerInfo.masteryCosmetic.${nameKey}`. */
+  nameKey: string;
+  /** Mastery level this tier unlocks at (inclusive). */
+  level: number;
+}
+
+/**
+ * Cosmetic tiers unlocked purely by masteryLevel — ring/aura/runes reward
+ * bands, spec section on "Mastery Cosmético". Deliberately never read by
+ * CombatSystem; only EntityRenderer/TowerInfoPanel ever call these.
+ */
+export const MASTERY_COSMETIC_TIERS: readonly MasteryCosmeticTier[] = [
+  { id: "ember_ring", nameKey: "emberRing", level: 5 },
+  { id: "veteran_aura", nameKey: "veteranAura", level: 15 },
+  { id: "runic_sigils", nameKey: "runicSigils", level: 30 },
+  { id: "ascendant_halo", nameKey: "ascendantHalo", level: 60 },
+  { id: "mythic_crown", nameKey: "mythicCrown", level: 120 },
+];
+
+/** Highest cosmetic tier reached at `masteryLevel`, or null if below the first tier's threshold. */
+export function getMasteryCosmeticTier(masteryLevel: number): MasteryCosmeticTier | null {
+  let current: MasteryCosmeticTier | null = null;
+  for (const tier of MASTERY_COSMETIC_TIERS) {
+    if (masteryLevel >= tier.level) current = tier;
+  }
+  return current;
+}
+
+/** The next tier still ahead of `masteryLevel` (for "next reward" UI), or null once every tier is unlocked. */
+export function getNextMasteryCosmeticTier(masteryLevel: number): MasteryCosmeticTier | null {
+  return MASTERY_COSMETIC_TIERS.find((tier) => masteryLevel < tier.level) ?? null;
 }
 
 const MASTERY_BASE_COST_MULTIPLIER = 0.5;

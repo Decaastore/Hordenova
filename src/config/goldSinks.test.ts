@@ -4,22 +4,28 @@ import { hasUncappedGemSink } from "./gemSinks";
 
 /**
  * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — Tower Mastery moved from
- * Gold to Gems (see gemSinks.ts's own doc comment for the deliberate,
- * explicit exception this represents). Gold is now Season-scoped and every
- * remaining Gold sink is finite, so hasUncappedGoldSink() is correctly
- * false — the Gem economy is what carries the "always somewhere to spend"
- * invariant now.
+ * Gold to Gems (see gemSinks.ts's own doc comment — CORREÇÃO DE REQUISITOS
+ * SEASON COMPETITIVA later removed the combat-power exception this used to
+ * represent; Mastery is now an ordinary cosmetic/prestige Gems purchase).
+ *
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — for a while, both remaining
+ * Gold sinks (Tower Level, Specialization) were finite, so Gold ran dry once
+ * a build was fully maxed. Specialization's level cap was removed (its
+ * combat EFFECT still caps at the same point it always did — see
+ * SPECIALIZATION_EFFECT_LEVEL_CAP), so hasUncappedGoldSink() is true again.
  */
 describe("goldSinks (Master Implementation Pass spec section 6/45, CORREÇÃO DE REQUISITOS)", () => {
   it("Tower Mastery is NOT a Gold sink anymore — it moved to gemSinks.ts", () => {
     expect(GOLD_SINKS.find((s) => s.id === "tower_mastery")).toBeUndefined();
   });
 
-  it("hasUncappedGoldSink is honestly false — every remaining Gold sink (Tower Level, Specialization) is finite", () => {
-    expect(hasUncappedGoldSink()).toBe(false);
+  it("hasUncappedGoldSink is true — Specialization is now a genuinely uncapped Gold sink (combat effect still capped)", () => {
+    expect(hasUncappedGoldSink()).toBe(true);
+    expect(GOLD_SINKS.find((s) => s.id === "specialization")?.uncapped).toBe(true);
+    expect(GOLD_SINKS.find((s) => s.id === "tower_level")?.uncapped).toBe(false);
   });
 
-  it("the overall economy still has SOME uncapped sink overall — Gems carry that invariant now, not Gold", () => {
+  it("the overall economy also still has an uncapped Gem sink (Mastery/Prestige)", () => {
     expect(hasUncappedGemSink()).toBe(true);
   });
 

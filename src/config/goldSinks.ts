@@ -15,16 +15,23 @@
  * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): `tower_mastery` moved OUT
  * of this registry and into gemSinks.ts — Tower Mastery is now permanent
  * account-wide progression funded by Gems, never Gold (see that file's own
- * doc comment for why). This is an honest, load-bearing consequence worth
- * stating plainly: Gold is now Season-scoped (resets every 30 days, see
- * AscensionManager.syncSeasonIfNeeded) and, with Mastery gone, every
- * remaining Gold sink here is FINITE (Tower Level caps at MAX_TOWER_LEVEL,
- * Specialization caps at MAX_SPECIALIZATION_LEVEL) — hasUncappedGoldSink()
- * below now correctly returns false. A player who maxes every tower's level
- * and specialization early in a Season has nothing left to spend Gold on
- * for the remainder of that Season. This was a known, explicit trade-off of
- * the correction, not an oversight — no unrequested new Gold sink was
- * invented to paper over it.
+ * doc comment for why). This left, for a while, an honest but unwanted
+ * consequence: Gold is Season-scoped (resets every 30 days, see
+ * AscensionManager.syncSeasonIfNeeded) and, with Mastery gone, both
+ * remaining Gold sinks were FINITE (Tower Level caps at MAX_TOWER_LEVEL,
+ * Specialization capped at 5) — a player who maxed every tower's level and
+ * specialization early in a Season had nothing left to spend Gold on for
+ * the rest of that Season.
+ *
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — FIXED, not papered over: no
+ * new Gold sink was invented. `specialization` (config/specializations.ts)
+ * had its level cap removed — Gold can always buy another specialization
+ * level, forever — while its COMBAT EFFECT stays capped at exactly the same
+ * point it always was (see SPECIALIZATION_EFFECT_LEVEL_CAP), so this is not
+ * `Gold -> infinite power`, only `Gold -> infinite (but harmless) sink`.
+ * Tower Level (`tower_level`) is deliberately left alone — MAX_TOWER_LEVEL=30
+ * and its visual/unlock ladder are untouched by this correction.
+ * `hasUncappedGoldSink()` below now correctly returns true again.
  */
 
 export type GoldSinkCategory = "TOWER_LEVEL" | "SPECIALIZATION";
@@ -40,10 +47,10 @@ export interface GoldSinkDefinition {
 
 export const GOLD_SINKS: readonly GoldSinkDefinition[] = [
   { id: "tower_level", category: "TOWER_LEVEL", i18nKey: "TOWER_LEVEL", uncapped: false },
-  { id: "specialization", category: "SPECIALIZATION", i18nKey: "SPECIALIZATION", uncapped: false },
+  { id: "specialization", category: "SPECIALIZATION", i18nKey: "SPECIALIZATION", uncapped: true },
 ];
 
-/** Spec section 45's Gold Economy Invariant, made checkable: true as long as at least one UNCAPPED sink exists — Gold can never structurally run out of somewhere to go, regardless of account age/level/wealth. Deliberately false now — see this file's own doc comment above. */
+/** Spec section 45's Gold Economy Invariant, made checkable: true as long as at least one UNCAPPED sink exists — Gold can never structurally run out of somewhere to go, regardless of account age/level/wealth. */
 export function hasUncappedGoldSink(): boolean {
   return GOLD_SINKS.some((sink) => sink.uncapped);
 }

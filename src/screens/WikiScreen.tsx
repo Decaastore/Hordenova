@@ -5,7 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { TOWER_DEFINITIONS, TOWER_TYPES, TOWER_SPECIALS, getTowerLevelStats, MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/config/specializations";
-import { getMasteryBonusMultipliers, getMasteryUpgradeCost } from "@/config/towerMastery";
+import { getMasteryCosmeticTier, getMasteryRespecTokensEarned, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS, ENEMY_TYPES } from "@/config/enemyStats";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { CASTLE_TIERS } from "@/config/castleConfig";
@@ -262,6 +262,14 @@ function ItemsSection() {
   );
 }
 
+/**
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery no longer buys any
+ * combat stat, so this section no longer shows "+X% Damage/Attack Speed/
+ * Range" (that text described a mechanic that has been removed — see
+ * config/towerMastery.ts). It now truthfully documents what Mastery
+ * actually is: a permanent, Gems-funded prestige track that grants
+ * Specialization Respec Tokens and purely-cosmetic visual tiers.
+ */
 function ProgressionSection() {
   const { t } = useLanguage();
   return (
@@ -269,17 +277,28 @@ function ProgressionSection() {
       <h3 style={groupHeaderStyle}>{t("wiki.masteryTitle")}</h3>
       <p style={descStyle}>{t("wiki.masteryHint")}</p>
       <div style={gridStyle}>
-        {[1, 10, 50, 100].map((level) => {
-          const bonus = getMasteryBonusMultipliers(level);
+        {[1, 5, 15, 30, 60, 100, 120].map((level) => {
+          const tier = getMasteryCosmeticTier(level);
           return (
             <Card key={level} title={t("wiki.level") + " " + level}>
-              <StatRow label={t("wiki.damage")} value={`+${((bonus.damage - 1) * 100).toFixed(1)}%`} />
-              <StatRow label={t("wiki.attackSpeed")} value={`+${((bonus.attackSpeed - 1) * 100).toFixed(1)}%`} />
-              <StatRow label={t("wiki.range")} value={`+${((bonus.range - 1) * 100).toFixed(1)}%`} />
+              <StatRow label={t("wiki.masteryRespecTokens")} value={getMasteryRespecTokensEarned(level)} />
+              <StatRow
+                label={t("wiki.masteryCosmeticTier")}
+                value={tier ? t(`towerInfo.masteryCosmetic.${tier.nameKey}` as TranslationKey) : t("wiki.masteryCosmeticNone")}
+              />
               <StatRow label={`${t("wiki.upgradeCostBase")} (${t("hud.gems")})`} value={getMasteryUpgradeCost("IRONWOOD", level)} />
             </Card>
           );
         })}
+      </div>
+
+      <h3 style={groupHeaderStyle}>{t("wiki.masteryCosmeticTiersTitle")}</h3>
+      <div style={gridStyle}>
+        {MASTERY_COSMETIC_TIERS.map((tier) => (
+          <Card key={tier.id} title={t(`towerInfo.masteryCosmetic.${tier.nameKey}` as TranslationKey)}>
+            <StatRow label={t("wiki.level")} value={tier.level} />
+          </Card>
+        ))}
       </div>
     </>
   );
