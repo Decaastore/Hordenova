@@ -147,6 +147,7 @@ function runGreedyBot(
   avgTowerLevel: number;
   avgMasteryLevel: number;
   avgSpecializationLevel: number;
+  bossesDefeatedTotal: number;
 } {
   // Combat rolls crit/freeze/etc chances off the real, global Math.random()
   // (see engine/CombatSystem.ts) — pinning it to a deterministic sequence

@@ -5,6 +5,8 @@ import type { TranslationKey } from "@/i18n/translate";
 
 interface PhaseBannerProps {
   phaseId: string;
+  /** The stable, translatable key for this phase's name/tagline — see HudSnapshot.phaseI18nKey's own doc comment for why this differs from `phaseId` during a post-130 endgame rotation lap. */
+  phaseI18nKey: string;
 }
 
 const VISIBLE_MS = 4200;
@@ -16,7 +18,7 @@ const VISIBLE_MS = 4200;
  * from `phaseId` changing, no engine-side "just crossed" bookkeeping needed.
  * Doesn't fire on first mount (arriving mid-phase on load isn't "entering").
  */
-export function PhaseBanner({ phaseId }: PhaseBannerProps) {
+export function PhaseBanner({ phaseId, phaseI18nKey }: PhaseBannerProps) {
   const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
   const prevPhaseId = useRef<string | null>(null);
@@ -36,8 +38,8 @@ export function PhaseBanner({ phaseId }: PhaseBannerProps) {
   return (
     <div style={containerStyle}>
       <div style={eyebrowStyle}>{t("phaseBanner.entering")}</div>
-      <div style={nameStyle}>{t(`phases.${phaseId}.name` as TranslationKey)}</div>
-      <div style={taglineStyle}>{t(`phases.${phaseId}.tagline` as TranslationKey)}</div>
+      <div style={nameStyle}>{t(`phases.${phaseI18nKey}.name` as TranslationKey)}</div>
+      <div style={taglineStyle}>{t(`phases.${phaseI18nKey}.tagline` as TranslationKey)}</div>
     </div>
   );
 }

@@ -16,6 +16,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     phase: "RUNNING",
     wave: 14,
     phaseId: "whispering-woods",
+    phaseI18nKey: "whispering-woods",
     gold: 1000,
     gems: 125,
     gemShards: 5,

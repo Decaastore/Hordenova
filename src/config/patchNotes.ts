@@ -50,6 +50,18 @@ export interface PatchNoteVersion {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteVersion[] = [
   {
+    id: "v5",
+    dateIso: "2026-09-05",
+    items: [
+      { type: "CHANGE", category: "INTERFACE", i18nKey: "homeRedesign" },
+      { type: "NEW", category: "INTERFACE", i18nKey: "rankingScreen" },
+      { type: "CHANGE", category: "INTERFACE", i18nKey: "seasonOverviewEnriched" },
+      { type: "FIX", category: "SYSTEMS", i18nKey: "ambientMusicClickFix" },
+      { type: "CHANGE", category: "CONTENT", i18nKey: "enemyAnatomyPass" },
+      { type: "FIX", category: "INTERFACE", i18nKey: "endgamePhaseNameFix" },
+    ],
+  },
+  {
     id: "v4",
     dateIso: "2026-09-04",
     items: [

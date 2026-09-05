@@ -95,7 +95,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
         <AscensionHudBadge />
         <BossBanner hud={hud} />
-        <PhaseBanner phaseId={hud.phaseId} />
+        <PhaseBanner phaseId={hud.phaseId} phaseI18nKey={hud.phaseI18nKey} />
         {engine.getEndgameWallReport() && (
           <EndgameWallBanner report={engine.getEndgameWallReport()!} onDismiss={() => engine.acknowledgeEndgameWallReport()} />
         )}

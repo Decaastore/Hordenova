@@ -20,6 +20,7 @@ export const en = {
     home: "Home",
     play: "Play",
     season: "Season",
+    ranking: "Ranking",
     wiki: "Wiki",
     novidades: "News",
   },
@@ -30,6 +31,7 @@ export const en = {
     bestWave: "BEST WAVE",
     wikiLink: "Explore the Wiki",
     novidadesLink: "See what's new",
+    scrollHint: "More below",
   },
   hud: {
     wave: "PHASE",
@@ -411,6 +413,24 @@ export const en = {
     yourBest: "Your Season Best",
     notYetParticipating: "Play a wave this Season to enter the ranking.",
     viewCollection: "COLLECTION & HISTORY",
+    yourPosition: "Your Position",
+    seasonScore: "Season Score",
+    prestigeTitle: "Prestige",
+    bestPhase: "Best Phase",
+    bossesDefeated: "Bosses Defeated",
+    viewRanking: "VIEW RANKING",
+  },
+  ranking: {
+    title: "RANKING",
+    subtitle: "Every number here is your own real progress — HORDENOVA has no live leaderboard server yet, so nothing here is ever a fabricated opponent.",
+    yourSeasonScore: "Your Season Score",
+    scoreBasis: "Based on your highest wave reached this Season",
+    yourPosition: "Your Position",
+    noBackendYet: "Not available without a server",
+    honestNote: "A real Top 50 ranking (with other players' positions, distance to the next rank, and live movement) requires a backend HORDENOVA doesn't have yet. This screen will show it the moment one exists — never a fabricated one before then.",
+    prestigeHint: "Next Prestige level costs {cost} Gems — purely cosmetic status, never combat power.",
+    tiersTitle: "Ranking Tiers (reserved for real data)",
+    tiersNote: "These are the tier bands the ranking will use once a real leaderboard exists.",
   },
   ascension: {
     seasonThemes: {
@@ -506,13 +526,14 @@ export const en = {
   },
   goldSinks: {
     TOWER_LEVEL: { name: "Tower Level", description: "Levels a single tower up to Level 30 — damage, attack speed and range all grow with each level." },
-    SPECIALIZATION: { name: "Specialization Path", description: "Levels a tower's chosen Specialization path up to level 5, once unlocked at tower Level 10." },
-    TOWER_MASTERY: { name: "Tower Mastery", description: "An uncapped track past Level 30: a small, uniform damage/attack-speed/range bonus per level, at an ever-rising Gold cost." },
+    SPECIALIZATION: { name: "Specialization Path", description: "An uncapped Gold sink: the level keeps climbing forever, but its combat effect is capped at level 5 — extra levels buy competitive Gold-spending, never runaway power." },
   },
   gemSinks: {
     SPECIALIZATION_UNLOCK: { name: "Specialization Unlock", description: "Unlocks a tower's Specialization path (the CHOICE only — leveling it up afterward costs Gold)." },
     INVENTORY_EXPANSION: { name: "Inventory Expansion", description: "Reserved for a future inventory-capacity purchase. Not yet available." },
     PROFILE_PRESTIGE: { name: "Profile Prestige", description: "An uncapped, purely cosmetic prestige tier and color band. Never affects combat power." },
+    TOWER_MASTERY: { name: "Tower Mastery", description: "An uncapped permanent track past Level 30: grants a Specialization Respec Token every 5 levels and purely cosmetic visual tiers. Never damage, attack speed, or range." },
+    TOWER_SKIN: { name: "Tower Skin", description: "Purely cosmetic reskins for a tower's appearance. Never affects combat stats." },
   },
   castleTiers: {
     INTACT: "Intact",
@@ -604,6 +625,14 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v5: {
+        homeRedesign: "Home now has a real top navigation bar (Play/Season/Ranking/Wiki/News) and a portal section below the hero with live Season, Ranking, Wiki and News teasers — no longer a single empty-feeling screen.",
+        rankingScreen: "Added a dedicated Ranking screen showing your own Season Score and Prestige — honestly marked as unavailable without a server, never a fabricated leaderboard.",
+        seasonOverviewEnriched: "The Season screen now shows Season Score, Bosses Defeated, Best Phase, a season-progress bar, and your Prestige tier alongside the existing Play/Collection actions.",
+        ambientMusicClickFix: "Rebuilt the Home ambient pad with richer harmonics and a slow volume swell, and fixed an audible click/pop when the music stopped or was muted.",
+        enemyAnatomyPass: "Runner, Brute and Shieldbearer were rebuilt with real anatomy (jointed legs, arms, a head) — they no longer reuse a bare triangle/ellipse/shield-polygon shape.",
+        endgamePhaseNameFix: "Fixed the phase name showing as a raw, untranslated key during the post-wave-130 boss rotation.",
+      },
       v4: {
         rouletteAutoGrant: "The wave-milestone Roulette no longer grants its reward automatically — it now waits, visibly, until you actually spin it.",
         castleHpDrift: "Fixed Castle HP silently increasing without an actual Roulette win behind it.",

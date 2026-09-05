@@ -21,6 +21,7 @@ export const ptBR: TranslationSchema = {
     home: "Início",
     play: "Jogar",
     season: "Season",
+    ranking: "Ranking",
     wiki: "Wiki",
     novidades: "Novidades",
   },
@@ -31,6 +32,7 @@ export const ptBR: TranslationSchema = {
     bestWave: "MELHOR ONDA",
     wikiLink: "Explorar a Wiki",
     novidadesLink: "Ver novidades",
+    scrollHint: "Mais abaixo",
   },
   hud: {
     wave: "FASE",
@@ -412,6 +414,24 @@ export const ptBR: TranslationSchema = {
     yourBest: "Seu Melhor da Season",
     notYetParticipating: "Jogue uma onda nesta Season para entrar no ranking.",
     viewCollection: "COLEÇÃO E HISTÓRICO",
+    yourPosition: "Sua Posição",
+    seasonScore: "Season Score",
+    prestigeTitle: "Prestígio",
+    bestPhase: "Melhor Fase",
+    bossesDefeated: "Bosses Derrotados",
+    viewRanking: "VER RANKING",
+  },
+  ranking: {
+    title: "RANKING",
+    subtitle: "Todo número aqui é seu progresso real — HORDENOVA ainda não tem um servidor de ranking ao vivo, então nada aqui é um oponente fabricado.",
+    yourSeasonScore: "Seu Season Score",
+    scoreBasis: "Baseado na maior wave alcançada nesta Season",
+    yourPosition: "Sua Posição",
+    noBackendYet: "Indisponível sem um servidor",
+    honestNote: "Um ranking Top 50 real (com a posição de outros jogadores, distância para o próximo posto e movimento ao vivo) exige um backend que o HORDENOVA ainda não tem. Esta tela vai mostrar isso no momento em que existir — nunca um ranking fabricado antes disso.",
+    prestigeHint: "O próximo nível de Prestígio custa {cost} Gemas — status puramente cosmético, nunca poder de combate.",
+    tiersTitle: "Tiers de Ranking (reservados para dados reais)",
+    tiersNote: "Estas são as faixas de tier que o ranking usará quando um leaderboard real existir.",
   },
   ascension: {
     seasonThemes: {
@@ -507,13 +527,14 @@ export const ptBR: TranslationSchema = {
   },
   goldSinks: {
     TOWER_LEVEL: { name: "Nível da Torre", description: "Eleva uma torre até o Nível 30 — dano, velocidade de ataque e alcance crescem a cada nível." },
-    SPECIALIZATION: { name: "Caminho de Especialização", description: "Evolui o caminho de Especialização escolhido de uma torre até o nível 5, uma vez desbloqueado no Nível 10 da torre." },
-    TOWER_MASTERY: { name: "Maestria da Torre", description: "Uma trilha sem limite após o Nível 30: um pequeno bônus uniforme de dano/velocidade/alcance por nível, com custo em Ouro sempre crescente." },
+    SPECIALIZATION: { name: "Caminho de Especialização", description: "Um sink de Ouro sem limite: o nível sobe para sempre, mas o efeito de combate é limitado no nível 5 — níveis extras compram gasto competitivo de Ouro, nunca poder infinito." },
   },
   gemSinks: {
     SPECIALIZATION_UNLOCK: { name: "Desbloqueio de Especialização", description: "Desbloqueia o caminho de Especialização de uma torre (apenas a ESCOLHA — evoluí-lo depois custa Ouro)." },
     INVENTORY_EXPANSION: { name: "Expansão de Inventário", description: "Reservado para uma futura compra de capacidade de inventário. Ainda não disponível." },
     PROFILE_PRESTIGE: { name: "Prestígio de Perfil", description: "Um nível de prestígio sem limite, puramente cosmético. Nunca afeta o poder de combate." },
+    TOWER_MASTERY: { name: "Maestria da Torre", description: "Uma trilha permanente sem limite após o Nível 30: concede um Token de Respec de Especialização a cada 5 níveis e tiers visuais puramente cosméticos. Nunca dano, velocidade de ataque ou alcance." },
+    TOWER_SKIN: { name: "Skin de Torre", description: "Reskins puramente cosméticos para a aparência de uma torre. Nunca afeta os atributos de combate." },
   },
   castleTiers: {
     INTACT: "Intacto",
@@ -605,6 +626,14 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v5: {
+        homeRedesign: "A Home agora tem uma navegação superior real (Jogar/Season/Ranking/Wiki/Novidades) e uma seção de portal abaixo do hero com resumos ao vivo de Season, Ranking, Wiki e Novidades — não é mais uma tela única com sensação de vazia.",
+        rankingScreen: "Adicionada uma tela de Ranking dedicada mostrando seu próprio Season Score e Prestígio — marcada honestamente como indisponível sem servidor, nunca um ranking fabricado.",
+        seasonOverviewEnriched: "A tela de Season agora mostra Season Score, Bosses Derrotados, Melhor Fase, uma barra de progresso da season e seu tier de Prestígio junto às ações existentes de Jogar/Coleção.",
+        ambientMusicClickFix: "Reconstruído o pad ambiente da Home com harmônicos mais ricos e uma variação lenta de volume, e corrigido um clique/estalo audível ao parar ou mutar a música.",
+        enemyAnatomyPass: "Runner, Brute e Shieldbearer foram reconstruídos com anatomia real (pernas articuladas, braços, cabeça) — não reaproveitam mais um triângulo/elipse/polígono de escudo genérico.",
+        endgamePhaseNameFix: "Corrigido o nome da fase aparecendo como uma chave crua e não traduzida durante a rotação de bosses pós-wave-130.",
+      },
       v4: {
         rouletteAutoGrant: "A Roleta de marco de onda não concede mais sua recompensa automaticamente — agora ela espera, de forma visível, até você realmente girar.",
         castleHpDrift: "Corrigido o HP do Castelo aumentando silenciosamente sem uma vitória real na Roleta por trás disso.",

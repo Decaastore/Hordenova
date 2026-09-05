@@ -2,6 +2,7 @@ import { useState } from "react";
 import { MainMenu } from "./screens/MainMenu";
 import { GameScreen } from "./screens/GameScreen";
 import { SeasonScreen } from "./screens/SeasonScreen";
+import { RankingScreen } from "./screens/RankingScreen";
 import { WikiScreen } from "./screens/WikiScreen";
 import { NovidadesScreen } from "./screens/NovidadesScreen";
 import { LanguageProvider } from "./i18n/LanguageContext";
@@ -29,12 +30,14 @@ export default function App() {
         // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
         // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
         <SeasonScreen onNavigate={navigate} onPlay={() => setView("GAME")} />
+      ) : view === "RANKING" ? (
+        <RankingScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "WIKI" ? (
         <WikiScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "NOVIDADES" ? (
         <NovidadesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : (
-        <MainMenu onStart={() => setView("SEASON")} onOpenWiki={() => setView("WIKI")} onOpenNovidades={() => setView("NOVIDADES")} />
+        <MainMenu onStart={() => setView("SEASON")} onNavigate={navigate} />
       )}
     </LanguageProvider>
   );

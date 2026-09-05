@@ -1,16 +1,21 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { loadSave } from "@/engine/SaveSystem";
+import { getAscensionStatus } from "@/engine/AscensionManager";
+import { formatDurationShort } from "@/utils/formatDuration";
+import { PATCH_NOTES } from "@/config/patchNotes";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import type { TranslationKey } from "@/i18n/translate";
 import { LanguageSelector } from "@/ui/LanguageSelector";
 import { MusicControl } from "@/ui/MusicControl";
+import { TopNav, type NavView } from "@/ui/TopNav";
+import { TrophyIcon, BookIcon, ScrollIcon, ShieldIcon } from "@/ui/icons";
 import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
 import { audioManager } from "@/audio/AudioManager";
 
 interface MainMenuProps {
   onStart: () => void;
-  onOpenWiki: () => void;
-  onOpenNovidades: () => void;
+  onNavigate: (view: NavView) => void;
 }
 
 /**
@@ -22,11 +27,14 @@ interface MainMenuProps {
  * before `onStart` fires — "entering the world of HORDENOVA" rather than
  * a plain screen swap.
  */
-export function MainMenu({ onStart, onOpenWiki, onOpenNovidades }: MainMenuProps) {
+export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
   const save = loadSave();
   const [hover, setHover] = useState(false);
   const [transitionAt, setTransitionAt] = useState<number | null>(null);
   const { t } = useLanguage();
+  const status = useMemo(() => getAscensionStatus(), []);
+  const latestPatch = PATCH_NOTES[0];
+  const latestPatchTeaserItem = latestPatch?.items[0];
 
   // Ambient music (spec: "iniciar após interação do usuário, se bloqueado,
   // nunca lançar erro") — browsers block AudioContext until a genuine user
@@ -62,26 +70,36 @@ export function MainMenu({ onStart, onOpenWiki, onOpenNovidades }: MainMenuProps
   return (
     <div style={rootStyle}>
       <style>{SCENE_KEYFRAMES}</style>
-      <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.4)" : "scale(1)" }}>
-        <MenuBackground transitionAt={transitionAt} />
-        <div style={scrimStyle} />
-      </div>
-
-      <div
-        style={{
-          ...flashStyle,
-          opacity: transitionAt !== null ? 1 : 0,
-        }}
-        aria-hidden="true"
-      />
-
-      <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
-        <LanguageSelector />
-        <div style={musicControlWrapStyle}>
-          <MusicControl />
+      <div style={heroStyle}>
+        <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.4)" : "scale(1)" }}>
+          <MenuBackground transitionAt={transitionAt} />
+          <div style={scrimStyle} />
         </div>
 
-        <div style={contentStyle}>
+        <div
+          style={{
+            ...flashStyle,
+            opacity: transitionAt !== null ? 1 : 0,
+          }}
+          aria-hidden="true"
+        />
+
+        <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
+          <div style={topNavWrapStyle}>
+            <TopNav
+              active="HOME"
+              onNavigate={onNavigate}
+              onPlay={handlePlay}
+              rightSlot={
+                <>
+                  <LanguageSelector inline />
+                  <MusicControl />
+                </>
+              }
+            />
+          </div>
+
+          <div style={contentStyle}>
           <div style={titleBlockStyle}>
             <div style={titleGlowStyle} aria-hidden="true" />
             <div style={titleStyle}>HORDENOVA</div>
@@ -140,20 +158,93 @@ export function MainMenu({ onStart, onOpenWiki, onOpenNovidades }: MainMenuProps
             <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
           </div>
 
-          <div style={secondaryLinksStyle}>
-            <button style={secondaryLinkStyle} onClick={onOpenWiki}>
-              {t("menu.wikiLink")}
-            </button>
-            <span style={secondaryLinkDividerStyle} aria-hidden="true">
-              ·
-            </span>
-            <button style={secondaryLinkStyle} onClick={onOpenNovidades}>
-              {t("menu.novidadesLink")}
-            </button>
+          <div style={scrollHintStyle} aria-hidden="true">
+            <span>{t("menu.scrollHint")}</span>
+            <span style={scrollHintArrowStyle}>▾</span>
+          </div>
           </div>
         </div>
       </div>
+
+      <div style={portalSectionStyle}>
+        <div style={portalGridStyle}>
+          <PortalCard
+            icon={<ShieldIcon size={22} color={PALETTE.uiAccentBright} />}
+            eyebrow={t("season.title", { number: status.seasonNumber })}
+            title={t(`ascension.seasonThemes.${status.themeNameKey}` as TranslationKey)}
+            body={t("season.endsIn", { time: formatDurationShort(status.timeRemainingMs) })}
+            cta={t("nav.season")}
+            onClick={() => onNavigate("SEASON")}
+            accent={PALETTE.gold}
+          />
+          <PortalCard
+            icon={<TrophyIcon size={22} color={PALETTE.gold} />}
+            eyebrow={t("nav.ranking")}
+            title={t("ranking.yourSeasonScore")}
+            body={String(status.seasonBestWave)}
+            cta={t("ranking.title")}
+            onClick={() => onNavigate("RANKING")}
+            accent={PALETTE.gold}
+          />
+          <PortalCard
+            icon={<BookIcon size={22} color={PALETTE.uiAccentBright} />}
+            eyebrow={t("nav.wiki")}
+            title={t("menu.wikiLink")}
+            body={t("wiki.subtitle")}
+            cta={t("nav.wiki")}
+            onClick={() => onNavigate("WIKI")}
+            accent={PALETTE.uiAccent}
+          />
+          <PortalCard
+            icon={<ScrollIcon size={22} color={PALETTE.success} />}
+            eyebrow={latestPatch ? latestPatch.id : t("nav.novidades")}
+            title={t("menu.novidadesLink")}
+            body={
+              latestPatchTeaserItem
+                ? t(`novidades.entries.${latestPatch!.id}.${latestPatchTeaserItem.i18nKey}` as TranslationKey)
+                : t("novidades.subtitle")
+            }
+            cta={t("nav.novidades")}
+            onClick={() => onNavigate("NOVIDADES")}
+            accent={PALETTE.success}
+          />
+        </div>
+      </div>
     </div>
+  );
+}
+
+interface PortalCardProps {
+  icon: ReactNode;
+  eyebrow: string;
+  title: string;
+  body: string;
+  cta: string;
+  onClick: () => void;
+  accent: string;
+}
+
+/** One tile in the below-the-fold portal grid — spec point 10: Season/Ranking/Wiki/Novidades must never be hidden, each gets a real teaser of live data plus a direct CTA into its own screen. */
+function PortalCard({ icon, eyebrow, title, body, cta, onClick, accent }: PortalCardProps) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        ...portalCardStyle,
+        borderColor: hover ? accent : PALETTE.uiPanelBorder,
+        transform: hover ? "translateY(-3px)" : "translateY(0)",
+        boxShadow: hover ? `0 10px 26px rgba(0,0,0,0.45), 0 0 0 1px ${accent}55` : "0 6px 16px rgba(0,0,0,0.35)",
+      }}
+    >
+      <div style={portalCardIconStyle}>{icon}</div>
+      <div style={{ ...portalCardEyebrowStyle, color: accent }}>{eyebrow}</div>
+      <div style={portalCardTitleStyle}>{title}</div>
+      <div style={portalCardBodyStyle}>{body}</div>
+      <div style={{ ...portalCardCtaStyle, color: accent }}>{cta} →</div>
+    </button>
   );
 }
 
@@ -170,6 +261,10 @@ const SCENE_KEYFRAMES = `
   0% { transform: translate(-50%, -50%) scale(0.75); opacity: 0.8; }
   100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
 }
+@keyframes hordenova-scroll-bounce {
+  0%, 100% { transform: translateY(0); opacity: 0.6; }
+  50% { transform: translateY(4px); opacity: 1; }
+}
 `;
 
 const PLAY_PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -178,8 +273,111 @@ const rootStyle: CSSProperties = {
   position: "relative",
   width: "100%",
   height: "100%",
-  overflow: "hidden",
+  overflowY: "auto",
+  overflowX: "hidden",
   background: PALETTE.mapBackgroundFallback,
+};
+
+/** Full-viewport cinematic hero — exactly one screen tall, so MenuBackground's window-size-driven canvas sizing keeps working unchanged; the portal section lives entirely below it. */
+const heroStyle: CSSProperties = {
+  position: "relative",
+  width: "100%",
+  height: "100vh",
+  overflow: "hidden",
+  flexShrink: 0,
+};
+
+/** Overlays TopNav across the very top of the hero, above the cinematic background. */
+const topNavWrapStyle: CSSProperties = {
+  position: "absolute",
+  top: 0,
+  left: 0,
+  right: 0,
+  zIndex: 6,
+};
+
+const scrollHintStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+  gap: 2,
+  fontSize: 9.5,
+  fontWeight: 700,
+  letterSpacing: 1.6,
+  textTransform: "uppercase",
+  color: PALETTE.uiTextDim,
+  opacity: 0.75,
+  marginTop: 4,
+};
+
+const scrollHintArrowStyle: CSSProperties = {
+  fontSize: 12,
+  animation: "hordenova-scroll-bounce 1.6s ease-in-out infinite",
+};
+
+/** Below-the-fold portal grid — spec point 10: Season/Ranking/Wiki/Novidades must be presented, never hidden. Continues the hero's dark tone so the page reads as one coherent site, not two stitched screens. */
+const portalSectionStyle: CSSProperties = {
+  position: "relative",
+  width: "100%",
+  padding: "clamp(28px, 6vh, 56px) clamp(20px, 6vw, 64px) clamp(48px, 8vh, 80px)",
+  boxSizing: "border-box",
+  background: "linear-gradient(180deg, #150f09 0%, #1c140c 100%)",
+};
+
+const portalGridStyle: CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: "clamp(14px, 2vw, 22px)",
+  maxWidth: 1080,
+  margin: "0 auto",
+};
+
+const portalCardStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 6,
+  textAlign: "left",
+  padding: "18px 20px",
+  borderRadius: 14,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "linear-gradient(160deg, rgba(43,29,18,0.92), rgba(24,17,10,0.96))",
+  color: PALETTE.uiText,
+  cursor: "pointer",
+  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
+};
+
+const portalCardIconStyle: CSSProperties = {
+  marginBottom: 4,
+};
+
+const portalCardEyebrowStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: 1.4,
+  textTransform: "uppercase",
+};
+
+const portalCardTitleStyle: CSSProperties = {
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 16,
+  fontWeight: 700,
+  color: PALETTE.uiAccentBright,
+};
+
+const portalCardBodyStyle: CSSProperties = {
+  fontSize: 11.5,
+  lineHeight: 1.5,
+  color: PALETTE.uiTextDim,
+  minHeight: "2.6em",
+};
+
+const portalCardCtaStyle: CSSProperties = {
+  marginTop: 6,
+  fontSize: 11,
+  fontWeight: 800,
+  letterSpacing: 0.8,
+  textTransform: "uppercase",
 };
 
 const zoomWrapStyle: CSSProperties = {
@@ -269,14 +467,6 @@ const subtitleStyle: CSSProperties = {
   textShadow: "0 2px 6px rgba(20,12,0,0.85)",
 };
 
-/** Mirrors LanguageSelector's own absolute top-right positioning, at top-left. */
-const musicControlWrapStyle: CSSProperties = {
-  position: "absolute",
-  top: "clamp(12px, 2.4vh, 20px)",
-  left: "clamp(12px, 2.4vw, 22px)",
-  zIndex: 2,
-};
-
 /** A short, honest one-line pitch — spec: Home must sell the adventure, not just be a menu. */
 const descriptionStyle: CSSProperties = {
   marginTop: "clamp(6px, 1.2vh, 12px)",
@@ -287,30 +477,6 @@ const descriptionStyle: CSSProperties = {
   lineHeight: 1.5,
   color: PALETTE.uiTextDim,
   textShadow: "0 2px 6px rgba(20,12,0,0.85)",
-};
-
-const secondaryLinksStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 10,
-  fontSize: "clamp(10px, 1.1vw, 11.5px)",
-};
-
-const secondaryLinkStyle: CSSProperties = {
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontWeight: 700,
-  letterSpacing: 0.6,
-  color: PALETTE.uiTextDim,
-  textDecoration: "underline",
-  textUnderlineOffset: 3,
-  padding: 0,
-};
-
-const secondaryLinkDividerStyle: CSSProperties = {
-  color: PALETTE.uiTextDim,
-  opacity: 0.6,
 };
 
 const playWrapStyle: CSSProperties = {

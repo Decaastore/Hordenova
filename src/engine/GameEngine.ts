@@ -105,8 +105,10 @@ const ENDGAME_WALL_ESCAPE_THRESHOLD = 3;
 export interface HudSnapshot {
   phase: RunPhase;
   wave: number;
-  /** Current phase's id (config/phaseConfig.ts) — also its i18n key (`phases.<phaseId>.name`) and its biome's registry key. */
+  /** Current phase's id (config/phaseConfig.ts) — unique per rendered phase INSTANCE (a post-130 endgame lap gets its own suffixed id, e.g. `VOLCANIC_WASTES_ENDGAME_LAP1`), so this is NOT a valid i18n key on its own — see `phaseI18nKey` for that. */
   phaseId: string;
+  /** The stable, hand-authored i18n key (`phases.<phaseI18nKey>.name`) — always one of the original PHASES entries' own id, even during an endgame rotation lap that reuses it under a suffixed `phaseId`. Use this, never `phaseId`, for any translated phase name/tagline. */
+  phaseI18nKey: string;
   gold: number;
   /** Progression 2.0 — the convenience/cosmetics currency (spec section 33). Shown in the HUD, never spendable on power. */
   gems: number;
@@ -1502,6 +1504,7 @@ export class GameEngine {
       phase: this.phase,
       wave: this.wave.currentWave,
       phaseId: getPhaseForWave(this.wave.currentWave).id,
+      phaseI18nKey: getPhaseForWave(this.wave.currentWave).i18nKey,
       gold: this.gold,
       gems: this.gems,
       gemShards: this.gemShards,

@@ -1,34 +1,35 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 
-export type NavView = "HOME" | "SEASON" | "WIKI" | "NOVIDADES";
+export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES";
 
 interface TopNavProps {
   active: NavView;
   onNavigate: (view: NavView) => void;
   onPlay: () => void;
+  /** Optional utility controls (LanguageSelector/MusicControl) rendered at the far right — only the Home screen currently uses this, so other screens stay unchanged. */
+  rightSlot?: ReactNode;
 }
 
 /**
- * Persistent top navigation shown on the Home/Season/Wiki/Novidades screens
- * (see App.tsx) — the game had zero shared chrome outside active gameplay
- * before this (each screen built its own full-bleed layout from scratch,
- * per the Home/Wiki/Novidades architecture audit). Deliberately NOT shown
- * during GAME, which keeps its own HUD chrome untouched.
+ * Persistent top navigation shown on every non-gameplay screen (Home,
+ * Season, Ranking, Wiki, Novidades — see App.tsx) — spec rule "tudo que
+ * possui uma abertura/página própria deve estar acessível diretamente na
+ * navegação superior da Home" now includes RANKING alongside the
+ * pre-existing destinations. Deliberately NOT shown during GAME, which
+ * keeps its own HUD chrome untouched.
  *
  * "Jogar" (`onPlay`) is wired differently per screen by App.tsx —
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA): from Home/Wiki/Novidades it
- * navigates to the Season screen first (never straight into gameplay — the
- * player must see the current Season's name/theme/timer/best/ranking
- * before a run starts), while from the Season screen itself it starts the
- * run directly (INICIAR/CONTINUAR RUN), since "SEASON ATUAL" is already
- * satisfied by being there. There is a single permanent save (PRÓXIMA
- * GRANDE FASE spec's "DECISÃO DEFINITIVA SOBRE PROGRESSÃO" retired the old
- * Infinite/Ascension mode-select step) — never re-triggering Home's own
- * portal transition a second time.
+ * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA): from Home/Ranking/Wiki/
+ * Novidades it navigates to the Season screen first (never straight into
+ * gameplay — the player must see the current Season's name/theme/timer/
+ * best/ranking before a run starts), while from the Season screen itself
+ * it starts the run directly (INICIAR/CONTINUAR RUN), since "SEASON ATUAL"
+ * is already satisfied by being there. There is a single permanent save —
+ * never re-triggering Home's own portal transition a second time.
  */
-export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
+export function TopNav({ active, onNavigate, onPlay, rightSlot }: TopNavProps) {
   const { t } = useLanguage();
 
   return (
@@ -41,8 +42,10 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
           {t("nav.play")}
         </button>
         <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
+        <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
         <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
         <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
+        {rightSlot && <div style={rightSlotStyle}>{rightSlot}</div>}
       </div>
     </nav>
   );
@@ -100,7 +103,7 @@ const brandStyle: CSSProperties = {
 const linksStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
-  gap: "clamp(14px, 2.4vw, 30px)",
+  gap: "clamp(12px, 2vw, 26px)",
 };
 
 const linkStyle: CSSProperties = {
@@ -124,4 +127,10 @@ const playLinkStyle: CSSProperties = {
   padding: "8px 18px",
   borderRadius: 8,
   boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
+};
+
+const rightSlotStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  marginLeft: "clamp(4px, 1vw, 10px)",
 };

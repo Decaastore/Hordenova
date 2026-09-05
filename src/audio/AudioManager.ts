@@ -32,36 +32,92 @@ interface MusicGraph {
 }
 
 /**
- * A slow, wholly original, procedurally-generated ambient pad — never a
- * recording, never based on or resembling any existing game's soundtrack
- * (explicitly not Zelda or any other IP). Built from four sustained
- * detuned sine/triangle tones (a D-minor-ish drone: D2/A2/D3/F3) each
- * slowly wobbled by its own slow LFO on detune for gentle movement, plus a
- * soft filtered-noise layer for a "wind/fog" texture — no melody, no
- * rhythm, nothing recognizable to copy or be copied. Because it's
- * synthesized live rather than a looping file, there's no seam/loop-point
- * to ever click or repeat noticeably.
+ * PRODUÇÃO VISUAL spec section 11 — the original 4-sine-oscillator drone
+ * read as a flat, static "test tone" rather than dark-fantasy/epic music,
+ * and `stopMusic()`'s hard `osc.stop()` (no fade) produced an audible
+ * click/pop on every screen transition — exactly the "efeito que pareça
+ * erro de sistema" the direction explicitly forbids. This rebuild keeps
+ * the same "no recording, no melody, no loop-point" honesty (still wholly
+ * synthesized live, never resembling any existing game's soundtrack) but
+ * fixes both root causes:
+ *
+ * 1. Richer harmonic content instead of pure sines — each pad voice sums a
+ *    fundamental sine with a quiet detuned sub-octave and a very quiet 2nd
+ *    harmonic (triangle), which is what separates an organ-like "pad" from
+ *    a lab test tone.
+ * 2. A slow (40-70s) volume "breathing" swell per voice so the texture
+ *    feels alive rather than a held, static drone that can start to grate.
+ * 3. A single very quiet high tension tone (a tritone above the root) far
+ *    below the main chord in level — the classic "unease" interval in
+ *    dark/horror scoring, kept subtle enough to read as atmosphere, not
+ *    dissonant noise.
+ * 4. A sparse, randomly-timed distant "bell" (a short sine with a slow
+ *    exponential decay) every 18-32s — enough incidental movement to avoid
+ *    "loop irritante" without ever becoming a melody or rhythm.
+ * 5. `stop()` no longer clicks — see stopMusic() below, which now fades
+ *    `masterGain` to 0 before tearing down the graph.
  */
 function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGraph {
   const masterGain = ctx.createGain();
   masterGain.gain.value = initialGain;
   masterGain.connect(ctx.destination);
 
-  const voiceFreqs = [73.42, 110.0, 146.83, 174.61]; // D2, A2, D3, F3
+  const voiceFreqs = [73.42, 110.0, 146.83, 174.61]; // D2, A2, D3, F3 — a D-minor-ish drone
   const stopFns: Array<() => void> = [];
+  const cleanupFns: Array<() => void> = [];
 
   for (const freq of voiceFreqs) {
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = freq;
-
     const voiceGain = ctx.createGain();
     voiceGain.gain.value = 0;
-    voiceGain.gain.linearRampToValueAtTime(1 / voiceFreqs.length, ctx.currentTime + 3); // slow fade-in, no jarring onset
+    voiceGain.gain.linearRampToValueAtTime(1 / voiceFreqs.length, ctx.currentTime + 5); // slow 5s fade-in, no jarring onset
 
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = 800;
+    filter.frequency.value = 900;
+    filter.connect(voiceGain);
+    voiceGain.connect(masterGain);
+
+    // Slow volume "breathing" — a gentle sine LFO on this voice's own gain
+    // stage (multiplicative, via a second gain node) keeps the pad from
+    // reading as a held, static drone.
+    const breathGain = ctx.createGain();
+    breathGain.gain.value = 1;
+    const breathLfo = ctx.createOscillator();
+    breathLfo.type = "sine";
+    breathLfo.frequency.value = 1 / (40 + Math.random() * 30); // one cycle every 40-70s
+    const breathDepth = ctx.createGain();
+    breathDepth.gain.value = 0.18; // modulates +/-18% around unity — audible movement, never a full swell to silence
+    breathLfo.connect(breathDepth);
+    breathDepth.connect(breathGain.gain);
+    breathGain.connect(filter);
+    breathLfo.start();
+    stopFns.push(() => breathLfo.stop());
+
+    // Fundamental sine.
+    const fundamental = ctx.createOscillator();
+    fundamental.type = "sine";
+    fundamental.frequency.value = freq;
+    fundamental.connect(breathGain);
+
+    // A quiet sub-octave sine underneath — adds weight/"ameaçador" body
+    // without thickening the harmonic content into mud.
+    const subGain = ctx.createGain();
+    subGain.gain.value = 0.35;
+    const sub = ctx.createOscillator();
+    sub.type = "sine";
+    sub.frequency.value = freq / 2;
+    sub.connect(subGain);
+    subGain.connect(breathGain);
+
+    // A very quiet triangle at the 2nd harmonic — this is what gives the
+    // tone an organ/choir-like character instead of a pure lab sine.
+    const harmonicGain = ctx.createGain();
+    harmonicGain.gain.value = 0.12;
+    const harmonic = ctx.createOscillator();
+    harmonic.type = "triangle";
+    harmonic.frequency.value = freq * 2;
+    harmonic.connect(harmonicGain);
+    harmonicGain.connect(breathGain);
 
     // A slow LFO on detune (a few cents, well under a semitone) gives the
     // pad gentle, organic movement instead of a static, robotic drone.
@@ -71,19 +127,40 @@ function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGrap
     const lfoGain = ctx.createGain();
     lfoGain.gain.value = 4;
     lfo.connect(lfoGain);
-    lfoGain.connect(osc.detune);
+    lfoGain.connect(fundamental.detune);
+    lfoGain.connect(sub.detune);
+    lfoGain.connect(harmonic.detune);
 
-    osc.connect(filter);
-    filter.connect(voiceGain);
-    voiceGain.connect(masterGain);
-
-    osc.start();
+    fundamental.start();
+    sub.start();
+    harmonic.start();
     lfo.start();
     stopFns.push(() => {
-      osc.stop();
+      fundamental.stop();
+      sub.stop();
+      harmonic.stop();
       lfo.stop();
     });
   }
+
+  // A single, very quiet tritone tension tone above the root (D2 * sqrt(2)
+  // ~= Ab2/G#2) — the classic dark/horror-scoring "unease" interval, kept
+  // far enough below the main chord's level to read as atmosphere rather
+  // than a wrong note.
+  const tensionGain = ctx.createGain();
+  tensionGain.gain.value = 0;
+  tensionGain.gain.linearRampToValueAtTime(0.05, ctx.currentTime + 8);
+  const tensionFilter = ctx.createBiquadFilter();
+  tensionFilter.type = "lowpass";
+  tensionFilter.frequency.value = 700;
+  const tension = ctx.createOscillator();
+  tension.type = "sine";
+  tension.frequency.value = 73.42 * Math.SQRT2;
+  tension.connect(tensionFilter);
+  tensionFilter.connect(tensionGain);
+  tensionGain.connect(masterGain);
+  tension.start();
+  stopFns.push(() => tension.stop());
 
   // Soft filtered white noise — a distant "wind/fog" texture under the pad.
   const noiseBuffer = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
@@ -103,10 +180,39 @@ function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGrap
   noise.start();
   stopFns.push(() => noise.stop());
 
+  // A sparse, randomly-timed distant bell — a short sine burst with a slow
+  // exponential decay, spaced 18-32s apart. Deliberately irregular timing
+  // (re-rolled after every hit) so it never reads as a loop or a rhythm.
+  let bellTimer: ReturnType<typeof setTimeout> | null = null;
+  const scheduleBell = () => {
+    const delayMs = (18 + Math.random() * 14) * 1000;
+    bellTimer = setTimeout(() => {
+      const bellFreq = [220, 293.66, 349.23][Math.floor(Math.random() * 3)]!; // A3, D4, F4 — stays inside the same D-minor color
+      const bellOsc = ctx.createOscillator();
+      bellOsc.type = "sine";
+      bellOsc.frequency.value = bellFreq;
+      const bellGain = ctx.createGain();
+      const now = ctx.currentTime;
+      bellGain.gain.setValueAtTime(0, now);
+      bellGain.gain.linearRampToValueAtTime(0.06, now + 0.3); // soft mallet attack, never a sharp transient
+      bellGain.gain.exponentialRampToValueAtTime(0.0001, now + 6); // long, slow decay — "distant" rather than "alert"
+      bellOsc.connect(bellGain);
+      bellGain.connect(masterGain);
+      bellOsc.start(now);
+      bellOsc.stop(now + 6.2);
+      scheduleBell();
+    }, delayMs);
+  };
+  scheduleBell();
+  cleanupFns.push(() => {
+    if (bellTimer) clearTimeout(bellTimer);
+  });
+
   return {
     ctx,
     masterGain,
     stop: () => {
+      for (const cleanup of cleanupFns) cleanup();
       for (const stop of stopFns) {
         try {
           stop();
@@ -117,6 +223,9 @@ function buildAmbientPadGraph(ctx: AudioContext, initialGain: number): MusicGrap
     },
   };
 }
+
+/** How long stopMusic()'s fade-out takes before the graph is actually torn down — long enough that the gain ramp reaches silence smoothly, short enough that navigating away from Home doesn't leave an audible tail. */
+const MUSIC_STOP_FADE_MS = 350;
 
 export interface PlayOptions {
   /** Extra playback-rate multiplier on top of the asset's own random pitch variance — e.g. a lower pitch for a heavier/bigger enemy reusing the generic hit sound. */
@@ -206,26 +315,55 @@ export class AudioManager {
     }
   }
 
-  /** Stops and fully tears down the ambient pad graph (oscillators, filters, the AudioContext itself). Safe to call even if music was never started. */
+  /**
+   * Stops and fully tears down the ambient pad graph (oscillators, filters,
+   * the AudioContext itself). Safe to call even if music was never started.
+   * Fades `masterGain` to 0 first — calling `osc.stop()` on a live sine wave
+   * produces an audible click/pop at the discontinuity, which is exactly
+   * the "efeito que pareça erro de sistema" the direction forbids. The
+   * graph is torn down `MUSIC_STOP_FADE_MS` later, once the fade has
+   * actually reached silence; `isMusicPlaying()` reports stopped
+   * immediately since `this.musicGraph` is cleared synchronously here.
+   */
   stopMusic(): void {
     if (!this.musicGraph) return;
     const graph = this.musicGraph;
     this.musicGraph = null;
     try {
-      graph.stop();
-      graph.ctx.close().catch(() => {});
+      const now = graph.ctx.currentTime;
+      graph.masterGain.gain.cancelScheduledValues(now);
+      graph.masterGain.gain.setValueAtTime(graph.masterGain.gain.value, now);
+      graph.masterGain.gain.linearRampToValueAtTime(0, now + MUSIC_STOP_FADE_MS / 1000);
     } catch {
-      // Already torn down — never throw.
+      // Fall through to immediate teardown below if ramping itself fails.
     }
+    setTimeout(() => {
+      try {
+        graph.stop();
+        graph.ctx.close().catch(() => {});
+      } catch {
+        // Already torn down — never throw.
+      }
+    }, MUSIC_STOP_FADE_MS);
   }
 
   isMusicPlaying(): boolean {
     return this.musicGraph !== null;
   }
 
+  /** Ramps `masterGain` to `target` over a short, click-free transition instead of an instant value jump — the same click/pop risk `stopMusic()`'s doc comment describes applies to any sudden gain change, not just a full stop. */
+  private rampMusicGainTo(target: number): void {
+    if (!this.musicGraph) return;
+    const { ctx, masterGain } = this.musicGraph;
+    const now = ctx.currentTime;
+    masterGain.gain.cancelScheduledValues(now);
+    masterGain.gain.setValueAtTime(masterGain.gain.value, now);
+    masterGain.gain.linearRampToValueAtTime(target, now + 0.12);
+  }
+
   setMusicVolume(volume: number): void {
     this.musicVolume = Math.max(0, Math.min(1, volume));
-    if (this.musicGraph) this.musicGraph.masterGain.gain.value = this.effectiveMusicGain();
+    this.rampMusicGainTo(this.effectiveMusicGain());
   }
 
   getMusicVolume(): number {
@@ -234,7 +372,7 @@ export class AudioManager {
 
   setMusicMuted(muted: boolean): void {
     this.musicMuted = muted;
-    if (this.musicGraph) this.musicGraph.masterGain.gain.value = this.effectiveMusicGain();
+    this.rampMusicGainTo(this.effectiveMusicGain());
   }
 
   isMusicMuted(): boolean {

@@ -3,12 +3,17 @@ import { LANGUAGE_CODES, LANGUAGE_META, type LanguageCode } from "@/i18n";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { PALETTE } from "@/rendering/theme";
 
+interface LanguageSelectorProps {
+  /** Renders in normal document flow (for embedding in TopNav's rightSlot) instead of self-positioning absolutely in a screen's top-right corner. */
+  inline?: boolean;
+}
+
 /**
  * Small config-tool style language switch — deliberately not a big button,
  * per spec ("não transformar o seletor em um botão grande"). Sits in a
  * corner of the main menu so it never competes with the PLAY button.
  */
-export function LanguageSelector() {
+export function LanguageSelector({ inline = false }: LanguageSelectorProps = {}) {
   const { language, setLanguage, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -32,7 +37,7 @@ export function LanguageSelector() {
   const current = LANGUAGE_META[language];
 
   return (
-    <div ref={rootRef} style={rootStyle}>
+    <div ref={rootRef} style={inline ? inlineRootStyle : rootStyle}>
       <button
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
@@ -99,6 +104,11 @@ const rootStyle: CSSProperties = {
   top: "clamp(12px, 2.4vh, 20px)",
   right: "clamp(12px, 2.4vw, 22px)",
   zIndex: 2,
+};
+
+/** Used inside TopNav's rightSlot — normal flow, no self-positioning. */
+const inlineRootStyle: CSSProperties = {
+  position: "relative",
 };
 
 const triggerStyle: CSSProperties = {

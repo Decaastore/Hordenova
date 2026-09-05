@@ -27,7 +27,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           icon={<WaveIcon color={PALETTE.uiAccent} />}
           label={t("hud.wave")}
           value={String(hud.wave)}
-          sublabel={t(`phases.${hud.phaseId}.name` as TranslationKey)}
+          sublabel={t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)}
         />
         <Stat
           icon={<ShieldIcon color={hpColor} />}

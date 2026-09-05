@@ -199,7 +199,16 @@ describe("AudioManager — ambient music (Home screen)", () => {
  */
 class FakeAudioParam {
   value = 0;
-  linearRampToValueAtTime(): void {}
+  setValueAtTime(value: number): void {
+    this.value = value;
+  }
+  linearRampToValueAtTime(value: number): void {
+    this.value = value;
+  }
+  exponentialRampToValueAtTime(value: number): void {
+    this.value = value;
+  }
+  cancelScheduledValues(): void {}
 }
 class FakeAudioNode {
   connect(): void {}

@@ -120,6 +120,37 @@ export function NoteIcon({ size = 14, color = "currentColor", style, muted = fal
   );
 }
 
+export function TrophyIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M7 4h10v5a5 5 0 0 1-10 0V4Z" stroke={color} strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M7 5H4v2a3 3 0 0 0 3 3M17 5h3v2a3 3 0 0 1-3 3" stroke={color} strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M12 14v3M9 20h6M9.5 20c0-1.8.9-2.7 2.5-3 1.6.3 2.5 1.2 2.5 3" stroke={color} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function BookIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M4 5.5C4 4.7 4.7 4 5.5 4H12v16H5.5c-.8 0-1.5-.7-1.5-1.5v-13Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H12v16h6.5c.8 0 1.5-.7 1.5-1.5v-13Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 4v16" stroke={color} strokeWidth="1.2" opacity="0.5" />
+    </svg>
+  );
+}
+
+export function ScrollIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M6 4a2 2 0 0 0-2 2 2 2 0 0 0 2 2h1V4H6Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M18 20a2 2 0 0 0 2-2 2 2 0 0 0-2-2h-1v4h1Z" stroke={color} strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M7 4h11v14a2 2 0 0 1-2 2H7" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M9 9h6M9 12.5h6" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.7" />
+    </svg>
+  );
+}
+
 export function SkullIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

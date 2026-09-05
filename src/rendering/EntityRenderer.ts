@@ -1413,10 +1413,10 @@ export function drawEnemy(
       drawRunner(ctx, theme, timeMs);
       break;
     case "BRUTE":
-      drawBrute(ctx, theme);
+      drawBrute(ctx, theme, timeMs);
       break;
     case "SHIELDBEARER":
-      drawShieldbearer(ctx, theme);
+      drawShieldbearer(ctx, theme, timeMs);
       break;
     // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
     // Progression archetype now has its own bespoke silhouette (see their
@@ -1880,79 +1880,262 @@ export function drawCrawler(
   }
 }
 
+/**
+ * PRODUÇÃO VISUAL spec section 13 — this used to be a bare triangle with a
+ * dot for an eye (exactly the "forma geométrica" complaint). Rebuilt to the
+ * same anatomy tier as Crawler: a lean, low-slung sprinting body on four
+ * long jointed legs in a full gallop stride, a tapering whip-tail, and a
+ * distinct head with a forward jaw and a single glowing eye.
+ */
 function drawRunner(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["RUNNER"], timeMs: number): void {
-  ctx.strokeStyle = `rgba(217,194,70,${0.35 + 0.15 * Math.sin(timeMs / 80)})`;
-  ctx.lineWidth = 1.4;
+  const stride = Math.sin(timeMs / 65);
+  const bob = Math.abs(Math.cos(timeMs / 65)) * 0.7;
+
+  ctx.save();
+  ctx.translate(0, -bob);
+
+  // Speed lines trailing a real sprinting body, not a floating shape.
+  ctx.strokeStyle = `rgba(217,194,70,${0.3 + 0.15 * Math.sin(timeMs / 80)})`;
+  ctx.lineWidth = 1.2;
+  ctx.lineCap = "round";
   for (const offset of [-3, 0, 3]) {
     ctx.beginPath();
-    ctx.moveTo(-6, offset);
-    ctx.lineTo(-13, offset * 1.4);
+    ctx.moveTo(-8, offset);
+    ctx.lineTo(-15, offset * 1.4);
     ctx.stroke();
   }
 
-  ctx.fillStyle = theme.body;
+  // Four long, jointed legs in a full gallop stride — the front pair
+  // reaching forward while the back pair drives backward (and vice versa
+  // on the next phase), the read that separates a sprinting hound from a
+  // static wedge.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 1.3;
+  ctx.lineCap = "round";
+  const legs: ReadonlyArray<readonly [number, number, number]> = [
+    [5, 1, stride],
+    [5, -1, -stride],
+    [-4, 1, -stride],
+    [-4, -1, stride],
+  ];
+  for (const [hipX, side, phase] of legs) {
+    const kneeX = hipX + phase * 3;
+    const kneeY = side * 5;
+    const footX = hipX + phase * 5.5;
+    const footY = side * 8.5;
+    ctx.beginPath();
+    ctx.moveTo(hipX, side * 2.2);
+    ctx.lineTo(kneeX, kneeY);
+    ctx.lineTo(footX, footY);
+    ctx.stroke();
+  }
+
+  // Low, lean torso, tapering front-to-back like a sprinting hound.
+  const bodyGradient = ctx.createLinearGradient(-9, -3.5, 9, 3.5);
+  bodyGradient.addColorStop(0, theme.dark);
+  bodyGradient.addColorStop(0.5, theme.body);
+  bodyGradient.addColorStop(1, theme.accent);
+  ctx.fillStyle = bodyGradient;
   ctx.beginPath();
   ctx.moveTo(9, 0);
-  ctx.lineTo(-6, -5);
-  ctx.lineTo(-9, 0);
-  ctx.lineTo(-6, 5);
+  ctx.quadraticCurveTo(7, -3.6, 1, -3.2);
+  ctx.quadraticCurveTo(-6, -3, -9, -1);
+  ctx.quadraticCurveTo(-6, 3, 1, 3.2);
+  ctx.quadraticCurveTo(7, 3.6, 9, 0);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.arc(6, 0, 1.6, 0, Math.PI * 2);
-  ctx.fill();
-}
+  ctx.strokeStyle = "#000000";
+  ctx.globalAlpha = 0.3;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(1, -3.2);
+      ctx.lineTo(-6, -3);
+    },
+    theme.accent,
+    0.7,
+    0.35,
+  );
 
-function drawBrute(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["BRUTE"]): void {
+  // Tapering tail whipping with the stride.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(-8, 0);
+  ctx.quadraticCurveTo(-11, stride * 2.2, -14, stride * 3.8);
+  ctx.stroke();
+
+  // Narrow head with a forward-jutting jaw and a single glowing eye.
   ctx.fillStyle = theme.body;
   ctx.beginPath();
-  ctx.ellipse(0, 0, 13, 10, 0, 0, Math.PI * 2);
+  ctx.moveTo(8.5, -2);
+  ctx.lineTo(14, 0);
+  ctx.lineTo(8.5, 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = 0.6 + 0.4 * Math.sin(timeMs / 150);
+  ctx.beginPath();
+  ctx.arc(10.5, 0, 1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+/**
+ * PRODUÇÃO VISUAL spec section 13 — this used to be a plain ellipse with a
+ * diamond chest plate glued on and a stray triangle "snout" floating off
+ * to the side (a shape with a sticker, not a creature). Rebuilt with real
+ * anatomy: stumpy stomping legs, thick hanging forearms with clenched
+ * knuckles, and a distinct sunken head with a heavy jaw and two eyes,
+ * while keeping the riveted chest plate that already read well.
+ */
+function drawBrute(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["BRUTE"], timeMs: number): void {
+  const breathe = Math.sin(timeMs / 500) * 0.4;
+  const stomp = Math.sin(timeMs / 260);
+
+  ctx.save();
+
+  // Thick, stumpy legs — a slow, heavy stomping gait.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1] as const) {
+    const footY = side * (9 + stomp * side * 1.2);
+    ctx.beginPath();
+    ctx.moveTo(-2, side * 6.5);
+    ctx.lineTo(-3, footY);
+    ctx.stroke();
+  }
+
+  // Squat, hunched torso.
+  ctx.fillStyle = theme.body;
+  ctx.beginPath();
+  ctx.ellipse(-1, 0, 11, 8.5 + breathe, 0, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
-  ctx.ellipse(-2, -7, 6, 3.5, -0.2, 0, Math.PI * 2);
+  ctx.ellipse(-3, -6.5, 5.5, 3.2, -0.2, 0, Math.PI * 2);
   ctx.fill();
   ctx.beginPath();
-  ctx.ellipse(-2, 7, 6, 3.5, 0.2, 0, Math.PI * 2);
+  ctx.ellipse(-3, 6.5, 5.5, 3.2, 0.2, 0, Math.PI * 2);
   ctx.fill();
 
   // Riveted chest plate — armored bulk, not just a bigger blob.
   ctx.fillStyle = "#8a8272";
   ctx.beginPath();
-  ctx.moveTo(-6, -6);
-  ctx.lineTo(6, -5);
-  ctx.lineTo(4, 6);
-  ctx.lineTo(-4, 6);
+  ctx.moveTo(-7, -5.5);
+  ctx.lineTo(4, -4.8);
+  ctx.lineTo(2.5, 5.5);
+  ctx.lineTo(-5, 5.5);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = theme.dark;
   for (const [px, py] of [
-    [-4, -3],
-    [3, -2],
-    [-2, 3],
-    [2, 4],
+    [-5, -3],
+    [1.5, -2],
+    [-3, 3],
+    [0.5, 3.8],
   ] as const) {
     ctx.beginPath();
     ctx.arc(px, py, 0.9, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.moveTo(13, -3);
-  ctx.lineTo(19, 0);
-  ctx.lineTo(13, 3);
-  ctx.closePath();
-  ctx.fill();
-}
+  // Two thick forearms hanging low with clenched knuckles — the "brute
+  // strength" read a bare ellipse never had.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 3;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(2, side * 6.5);
+    ctx.quadraticCurveTo(7, side * 9.5 + stomp * side * 0.8, 6, side * 12.5);
+    ctx.stroke();
+    ctx.fillStyle = theme.dark;
+    ctx.beginPath();
+    ctx.arc(6, side * 12.5, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
-function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["SHIELDBEARER"]): void {
+  // Small sunken head set low into the shoulders — a heavy jaw and two
+  // dim, glowing eyes instead of a stray floating triangle.
+  ctx.fillStyle = theme.dark;
+  ctx.beginPath();
+  ctx.ellipse(9.5, 0, 3.6, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = theme.body;
   ctx.beginPath();
-  ctx.ellipse(-1, 0, 8, 6.5, 0, 0, Math.PI * 2);
+  ctx.ellipse(9, 2.4, 2.6, 1.6, 0.3, 0, Math.PI * 2);
   ctx.fill();
+  ctx.fillStyle = theme.accent;
+  ctx.globalAlpha = 0.85;
+  ctx.beginPath();
+  ctx.arc(11, -1.3, 0.9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(11, 1.3, 0.9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+/**
+ * PRODUÇÃO VISUAL spec section 13 — this used to be a body blob with a
+ * shield polygon glued beside it and a single floating eye (no arm holding
+ * the shield, no legs, no head). Rebuilt with real anatomy: sturdy legs, a
+ * bent arm gripping the shield from behind, and a small head peeking above
+ * it — the shield reads as equipment a creature carries, not a sticker.
+ */
+function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["SHIELDBEARER"], timeMs: number): void {
+  const breathe = Math.sin(timeMs / 600) * 0.3;
+  const shuffle = Math.sin(timeMs / 340) * 0.5;
+
+  ctx.save();
+
+  // Sturdy legs — a slow defensive shuffle, not a static float.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 2.2;
+  ctx.lineCap = "round";
+  for (const side of [-1, 1] as const) {
+    ctx.beginPath();
+    ctx.moveTo(-2, side * 5);
+    ctx.lineTo(-3 + shuffle * side, side * 8.5);
+    ctx.stroke();
+  }
+
+  // Torso.
+  ctx.fillStyle = theme.body;
+  ctx.beginPath();
+  ctx.ellipse(-2, 0, 7.5, 6.2 + breathe, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = theme.dark;
+  ctx.globalAlpha = 0.35;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Bent arm gripping the shield from behind — a real limb, not a floating panel.
+  ctx.strokeStyle = theme.dark;
+  ctx.lineWidth = 2.4;
+  ctx.lineCap = "round";
+  ctx.beginPath();
+  ctx.moveTo(2, -3);
+  ctx.quadraticCurveTo(6, -2, 6.5, 1);
+  ctx.stroke();
 
   // Large shield facing the direction of travel.
   const shieldGradient = ctx.createLinearGradient(6, -9, 6, 9);
@@ -1970,15 +2153,23 @@ function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_TH
   ctx.strokeStyle = theme.dark;
   ctx.lineWidth = 1;
   ctx.stroke();
-
+  // A rivet boss at the shield's center — the material read.
   ctx.fillStyle = theme.dark;
   ctx.beginPath();
-  ctx.arc(-4, 0, 3, 0, Math.PI * 2);
+  ctx.arc(6.5, 0, 1.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Small head peeking above the shoulders, behind the shield's rim.
+  ctx.fillStyle = theme.dark;
+  ctx.beginPath();
+  ctx.ellipse(-2, -6.5, 3, 3.4, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = theme.accent;
   ctx.beginPath();
-  ctx.arc(-4, -1.2, 1.1, 0, Math.PI * 2);
+  ctx.arc(-0.5, -7, 1, 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.restore();
 }
 
 /**
