@@ -364,3 +364,117 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
     }
   });
 });
+
+/**
+ * CORREÇÃO P0 — autoplay: a fresh `AudioContext` in a real browser starts
+ * `suspended` until a genuine user gesture, exactly like this fake's
+ * `state` starts here. These tests are the "logic tests" the fix calls
+ * for — deterministic, no dependency on a real browser's actual autoplay
+ * heuristics (that part is `real browser verification`, done separately;
+ * see the live-browser checks in this round's own report, not here).
+ */
+class SuspendedThenResumableAudioContext extends FakeAudioContext {
+  state: "running" | "suspended" | "closed" = "suspended";
+  resumeCallCount = 0;
+  resume(): Promise<void> {
+    this.resumeCallCount++;
+    // Deliberately deferred (a real browser's resume() is asynchronous too
+    // — `state` does not flip the instant resume() is called) so a test
+    // can observe the genuinely-still-blocked moment right after calling
+    // playAmbientMusic(), before awaiting this promise to settle.
+    return Promise.resolve().then(() => {
+      this.state = "running";
+    });
+  }
+}
+
+describe("AudioManager — autoplay blocked vs. resumed on first gesture (CORREÇÃO P0)", () => {
+  let originalAudioContext: unknown;
+
+  beforeEach(() => {
+    originalAudioContext = (window as unknown as { AudioContext?: unknown }).AudioContext;
+  });
+
+  afterEach(() => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+  });
+
+  it("autoplay ALLOWED: a context that starts running is reported as genuinely playing right away", () => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext; // starts "running"
+    const manager = new AudioManager();
+    manager.playAmbientMusic();
+    expect(manager.isMusicPlaying()).toBe(true);
+    expect(manager.isMusicAutoplayBlocked()).toBe(false);
+  });
+
+  it("autoplay BLOCKED: a context that starts suspended is never reported as playing, and is explicitly flagged as autoplay-blocked — not confused with muted or volume 0", () => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = SuspendedThenResumableAudioContext;
+    const manager = new AudioManager();
+    manager.setMusicMuted(false);
+    manager.setMusicVolume(1);
+
+    manager.playAmbientMusic(); // the mount-time autoplay attempt — browser blocks it
+
+    expect(manager.isMusicPlaying()).toBe(false);
+    expect(manager.isMusicAutoplayBlocked()).toBe(true);
+    // Explicitly NOT the same state as muted/volume-0 — those flags are untouched.
+    expect(manager.isMusicMuted()).toBe(false);
+    expect(manager.getMusicVolume()).toBe(1);
+  });
+
+  it("FIRST GESTURE resumes the SAME context in place — no second AudioContext, no second graph — and music becomes genuinely audible once the browser's resume() settles", async () => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = SuspendedThenResumableAudioContext;
+    const manager = new AudioManager();
+
+    manager.playAmbientMusic(); // mount-time attempt — blocked
+    expect(manager.isMusicPlaying()).toBe(false);
+
+    manager.playAmbientMusic(); // simulates MainMenu's first-gesture handler calling this again
+    await Promise.resolve(); // let the (asynchronous, just like a real browser's) resume() settle
+    expect(manager.isMusicPlaying()).toBe(true);
+    expect(manager.isMusicAutoplayBlocked()).toBe(false);
+  });
+
+  it("calling playAmbientMusic() many times while still blocked (simulating several early gesture attempts) never creates more than one AudioContext", () => {
+    let contextsCreated = 0;
+    class CountingContext extends SuspendedThenResumableAudioContext {
+      constructor() {
+        super();
+        contextsCreated++;
+      }
+      resume(): Promise<void> {
+        // Stays blocked for these calls — resume() itself doesn't guarantee success on a real browser either.
+        this.resumeCallCount++;
+        return Promise.resolve();
+      }
+    }
+    (window as unknown as { AudioContext: unknown }).AudioContext = CountingContext;
+    const manager = new AudioManager();
+
+    manager.playAmbientMusic();
+    manager.playAmbientMusic();
+    manager.playAmbientMusic();
+    manager.playAmbientMusic();
+
+    expect(contextsCreated).toBe(1);
+    expect(manager.isMusicPlaying()).toBe(false); // this fake never actually flips to "running"
+  });
+
+  it("mute/unmute and volume stay independent of, and unaffected by, the autoplay-blocked/resumed transition", async () => {
+    (window as unknown as { AudioContext: unknown }).AudioContext = SuspendedThenResumableAudioContext;
+    const manager = new AudioManager();
+    manager.setMusicVolume(0.35);
+    manager.setMusicMuted(true);
+
+    manager.playAmbientMusic(); // blocked
+    expect(manager.isMusicMuted()).toBe(true);
+    expect(manager.getMusicVolume()).toBe(0.35);
+
+    manager.playAmbientMusic(); // first-gesture resume
+    await Promise.resolve(); // let the (asynchronous) resume() settle
+    expect(manager.isMusicPlaying()).toBe(true); // context is running...
+    // ...but the player's own mute choice must still be respected — playing doesn't imply audible.
+    expect(manager.isMusicMuted()).toBe(true);
+    expect(manager.getMusicVolume()).toBe(0.35);
+  });
+});

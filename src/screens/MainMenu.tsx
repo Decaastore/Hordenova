@@ -36,14 +36,23 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
   const latestPatch = PATCH_NOTES[0];
   const latestPatchTeaserItem = latestPatch?.items[0];
 
-  // Ambient music (spec: "iniciar após interação do usuário, se bloqueado,
-  // nunca lançar erro") — browsers block AudioContext until a genuine user
-  // gesture, so this attaches a one-time listener for the FIRST interaction
-  // anywhere on the page rather than requiring the player to specifically
-  // find a "play music" button. playAmbientMusic()/unlock() never throw
-  // even if Web Audio is unavailable (see AudioManager.ts). Scoped to the
-  // Home screen only — stops the moment the player navigates away.
+  // CORREÇÃO P0 (autoplay): the music must not depend on the player finding
+  // a "play music" button. Two-step, in this exact order:
+  //   1. Try to start it the instant Home mounts — a real autoplay attempt.
+  //      Some browsers/sessions allow this outright; even when blocked, it
+  //      still creates the real (suspended) AudioContext up front instead
+  //      of waiting for a gesture to build everything from scratch.
+  //   2. Fall back to the FIRST interaction anywhere on the page — not
+  //      specifically the music control, not specifically PLAY — pointer,
+  //      touch, or keyboard. playAmbientMusic() is idempotent (see
+  //      AudioManager.ts): if step 1 already got a graph running, this is
+  //      a no-op; if the browser blocked it, this resumes that SAME
+  //      context in place — never a second AudioContext, never a second
+  //      procedural graph, never overlapping music.
+  // Scoped to the Home screen only — stops the moment the player navigates away.
   useEffect(() => {
+    audioManager.playAmbientMusic();
+
     const startMusic = () => {
       audioManager.unlock();
       audioManager.playAmbientMusic();
@@ -62,7 +71,12 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
     // Audio spec section 12: unlock synchronously inside the real click
     // handler (not a later setTimeout callback) — this is exactly the
     // user-gesture browsers require before allowing programmatic audio.
+    // Also resumes the music directly (belt-and-suspenders alongside the
+    // window-level gesture listener above): clicking PLAY must be enough
+    // on its own to release blocked audio, never require a separate click
+    // on the music control first.
     audioManager.unlock();
+    audioManager.playAmbientMusic();
     setTransitionAt(performance.now());
     window.setTimeout(onStart, TRANSITION_DURATION_MS);
   };

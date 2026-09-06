@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { audioManager } from "@/audio/AudioManager";
@@ -18,6 +18,18 @@ export function MusicControl() {
   const { t } = useLanguage();
   const [volume, setVolume] = useState(getMusicVolume);
   const [muted, setMuted] = useState(isMusicMuted);
+
+  // CORREÇÃO P0 (autoplay): `AudioContext.resume()` resolves asynchronously
+  // — often well after the gesture that triggered it — so `isMusicPlaying()`
+  // can flip from false to true with no state change of this component's
+  // own to re-render on. A light poll is the simplest way to keep the
+  // "genuinely audible" dot honest without wiring a bespoke event/observer
+  // through AudioManager for what is purely a cosmetic indicator.
+  const [, forceRerender] = useState(0);
+  useEffect(() => {
+    const id = window.setInterval(() => forceRerender((n) => n + 1), 500);
+    return () => window.clearInterval(id);
+  }, []);
 
   const cycleVolume = () => {
     const currentIndex = MUSIC_VOLUME_STEPS.indexOf(volume as (typeof MUSIC_VOLUME_STEPS)[number]);

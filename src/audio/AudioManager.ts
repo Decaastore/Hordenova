@@ -434,16 +434,39 @@ export class AudioManager {
 
   /**
    * Starts the Home screen's adventure theme (see buildAdventureThemeGraph
-   * and tryPlayRealTrackFile above). Idempotent — calling this while
-   * already playing is a no-op rather than layering a second graph.
-   * Like `unlock()`, this must be called from a
-   * real user-gesture handler (a click, a keydown) — browsers block
-   * `AudioContext` creation/resume otherwise. Never throws: an unsupported
+   * and tryPlayRealTrackFile above).
+   *
+   * CORREÇÃO P0 (autoplay): this is meant to be called TWICE in the normal
+   * flow, by design — once immediately on Home mount (a genuine autoplay
+   * attempt: some browsers allow it outright, and even when blocked this
+   * is what gets a real `AudioContext` sitting in `suspended` state ready
+   * to go), and once more from the very first user gesture anywhere on the
+   * page (see MainMenu.tsx). The two calls are NOT symmetric: if a graph
+   * already exists, this does not rebuild it — it just resumes the
+   * existing (possibly browser-suspended) context in place. That's what
+   * makes the second call "instant" instead of a fresh cold start, and
+   * it's why calling this from any number of gesture handlers is always
+   * safe — never a second AudioContext, never a second procedural graph,
+   * never a duplicated `<audio>` element. Never throws: an unsupported
    * environment (no Web Audio API, e.g. this repo's vitest/jsdom tests) or
-   * a blocked/suspended context both just result in silence.
+   * a still-blocked context both just result in silence.
    */
   playAmbientMusic(): void {
-    if (this.musicGraph) return;
+    if (this.musicGraph) {
+      // Graph already exists — this call is a later gesture (or a second
+      // mount-time attempt) trying to RESUME it, never to recreate it.
+      // A context can be here for two different reasons: still suspended
+      // because the very first attempt was true autoplay with no gesture
+      // yet, or already suspended again later (e.g. the tab lost audio
+      // focus) — `resume()` is the correct response to both, and is a
+      // harmless no-op if it's already running.
+      if (this.musicGraph.ctx.state === "suspended") {
+        this.musicGraph.ctx.resume().catch(() => {
+          // Still blocked — stays silent until the next gesture retries.
+        });
+      }
+      return;
+    }
     const Ctor = getAudioContextConstructor();
     if (!Ctor) return;
 
@@ -527,8 +550,23 @@ export class AudioManager {
     }, MUSIC_STOP_FADE_MS);
   }
 
+  /**
+   * CORREÇÃO P0 (autoplay): genuinely audible right now — not just "a
+   * graph object exists". A graph can exist while its `AudioContext` sits
+   * `suspended` (autoplay blocked, waiting on the first gesture — see
+   * playAmbientMusic()), which must never be reported as "playing". This
+   * is the one true signal the UI (MusicControl's indicator dot) should
+   * read to distinguish "actually audible" from "muted"/"volume 0" (both
+   * separate, independent flags — see isMusicMuted/getMusicVolume) or
+   * "autoplay still blocked" (see isMusicAutoplayBlocked below).
+   */
   isMusicPlaying(): boolean {
-    return this.musicGraph !== null;
+    return this.musicGraph !== null && this.musicGraph.ctx.state === "running";
+  }
+
+  /** True only while a music graph exists but the browser hasn't yet allowed it to run — i.e. waiting on the first real user gesture. False both before any attempt has been made and once audio is actually flowing; never confused with the independent musicMuted/musicVolume flags. */
+  isMusicAutoplayBlocked(): boolean {
+    return this.musicGraph !== null && this.musicGraph.ctx.state !== "running";
   }
 
   /** Ramps `masterGain` to `target` over a short, click-free transition instead of an instant value jump — the same click/pop risk `stopMusic()`'s doc comment describes applies to any sudden gain change, not just a full stop. */
