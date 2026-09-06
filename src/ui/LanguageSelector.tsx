@@ -4,7 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { PALETTE } from "@/rendering/theme";
 
 interface LanguageSelectorProps {
-  /** Renders in normal document flow (for embedding in TopNav's rightSlot) instead of self-positioning absolutely in a screen's top-right corner. */
+  /** Renders in normal document flow (for embedding at the right of TopNav) instead of self-positioning absolutely in a screen's top-right corner. */
   inline?: boolean;
 }
 
@@ -106,7 +106,7 @@ const rootStyle: CSSProperties = {
   zIndex: 2,
 };
 
-/** Used inside TopNav's rightSlot — normal flow, no self-positioning. */
+/** Used inside TopNav — normal flow, no self-positioning. */
 const inlineRootStyle: CSSProperties = {
   position: "relative",
 };

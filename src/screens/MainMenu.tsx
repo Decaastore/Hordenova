@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
 import { formatDurationShort } from "@/utils/formatDuration";
@@ -6,8 +6,6 @@ import { PATCH_NOTES } from "@/config/patchNotes";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { LanguageSelector } from "@/ui/LanguageSelector";
-import { MusicControl } from "@/ui/MusicControl";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { TrophyIcon, BookIcon, ScrollIcon, ShieldIcon } from "@/ui/icons";
 import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
@@ -35,36 +33,6 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
   const status = useMemo(() => getAscensionStatus(), []);
   const latestPatch = PATCH_NOTES[0];
   const latestPatchTeaserItem = latestPatch?.items[0];
-
-  // CORREÇÃO P0 (autoplay): the music must not depend on the player finding
-  // a "play music" button. Two-step, in this exact order:
-  //   1. Try to start it the instant Home mounts — a real autoplay attempt.
-  //      Some browsers/sessions allow this outright; even when blocked, it
-  //      still creates the real (suspended) AudioContext up front instead
-  //      of waiting for a gesture to build everything from scratch.
-  //   2. Fall back to the FIRST interaction anywhere on the page — not
-  //      specifically the music control, not specifically PLAY — pointer,
-  //      touch, or keyboard. playAmbientMusic() is idempotent (see
-  //      AudioManager.ts): if step 1 already got a graph running, this is
-  //      a no-op; if the browser blocked it, this resumes that SAME
-  //      context in place — never a second AudioContext, never a second
-  //      procedural graph, never overlapping music.
-  // Scoped to the Home screen only — stops the moment the player navigates away.
-  useEffect(() => {
-    audioManager.playAmbientMusic();
-
-    const startMusic = () => {
-      audioManager.unlock();
-      audioManager.playAmbientMusic();
-    };
-    window.addEventListener("pointerdown", startMusic, { once: true });
-    window.addEventListener("keydown", startMusic, { once: true });
-    return () => {
-      window.removeEventListener("pointerdown", startMusic);
-      window.removeEventListener("keydown", startMusic);
-      audioManager.stopMusic();
-    };
-  }, []);
 
   const handlePlay = () => {
     if (transitionAt !== null) return;
@@ -100,17 +68,7 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
 
         <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
           <div style={topNavWrapStyle}>
-            <TopNav
-              active="HOME"
-              onNavigate={onNavigate}
-              onPlay={handlePlay}
-              rightSlot={
-                <>
-                  <LanguageSelector inline />
-                  <MusicControl />
-                </>
-              }
-            />
+            <TopNav active="HOME" onNavigate={onNavigate} onPlay={handlePlay} />
           </div>
 
           <div style={contentStyle}>

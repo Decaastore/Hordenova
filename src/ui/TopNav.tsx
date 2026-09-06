@@ -1,6 +1,8 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { LanguageSelector } from "./LanguageSelector";
+import { MusicControl } from "./MusicControl";
 
 export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES";
 
@@ -8,8 +10,6 @@ interface TopNavProps {
   active: NavView;
   onNavigate: (view: NavView) => void;
   onPlay: () => void;
-  /** Optional utility controls (LanguageSelector/MusicControl) rendered at the far right — only the Home screen currently uses this, so other screens stay unchanged. */
-  rightSlot?: ReactNode;
 }
 
 /**
@@ -29,7 +29,7 @@ interface TopNavProps {
  * is already satisfied by being there. There is a single permanent save —
  * never re-triggering Home's own portal transition a second time.
  */
-export function TopNav({ active, onNavigate, onPlay, rightSlot }: TopNavProps) {
+export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   const { t } = useLanguage();
 
   return (
@@ -45,7 +45,15 @@ export function TopNav({ active, onNavigate, onPlay, rightSlot }: TopNavProps) {
         <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
         <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
         <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
-        {rightSlot && <div style={rightSlotStyle}>{rightSlot}</div>}
+        {/* MÚSICA GLOBAL spec section 22 — the ambient-music control (and the
+            language selector alongside it) needs to be reachable from every
+            page the global track now plays on, not just Home, so this lives
+            here unconditionally instead of being an opt-in slot each screen
+            has to remember to fill. */}
+        <div style={rightSlotStyle}>
+          <LanguageSelector inline />
+          <MusicControl />
+        </div>
       </div>
     </nav>
   );

@@ -28,6 +28,7 @@ function getAudioContextConstructor(): typeof AudioContext | null {
 interface MusicGraph {
   ctx: AudioContext;
   masterGain: GainNode;
+  trackId: AmbientTrackId;
   stop: () => void;
 }
 
@@ -57,6 +58,26 @@ interface MusicGraph {
 
 /** Where a real, licensed music file would go — dropping a file at this path in `public/` makes `playAmbientMusic()` use it automatically instead of the procedural composition below (see `tryPlayRealTrackFile`). No such file exists in this project today; this constant does not claim otherwise. */
 const HOME_THEME_ASSET_URL = "/audio/music/home-theme.ogg";
+
+/**
+ * MÚSICA GLOBAL spec section 24 — "preparar para o futuro": today there is
+ * exactly one ambient track ("home", used site-wide — see `playAmbientMusic`
+ * below and `App.tsx`'s global lifecycle), but the graph-management code
+ * (creation, shared masterGain, real-file-then-procedural-fallback, click-
+ * free stop, resume-on-gesture) has zero knowledge of WHICH track it's
+ * playing — it just asks this registry for an asset URL + a procedural
+ * builder by id. Adding a second track later (a gameplay theme, an event
+ * theme, an area-specific theme) means adding one more entry here and
+ * wiring whatever screen/event should request it — never touching the
+ * lifecycle/graph code itself.
+ */
+type AmbientTrackId = "home";
+interface AmbientTrackDefinition {
+  /** Where a real, licensed file for this track would go (see HOME_THEME_ASSET_URL's doc comment — none exist yet for any track). */
+  assetUrl: string;
+  /** Builds this track's procedural fallback graph — same signature buildAdventureThemeGraph already has, so a future track just supplies its own builder function here. */
+  buildProceduralGraph: (ctx: AudioContext, destination: AudioNode) => { stop: () => void };
+}
 
 /** Standard equal-tempered pitches (A4=440Hz) used by the composition below. */
 const NOTE: Record<string, number> = {
@@ -322,6 +343,14 @@ function buildAdventureThemeGraph(ctx: AudioContext, destination: AudioNode): { 
   };
 }
 
+/** The track registry described above — one entry today, extensible without touching any graph/lifecycle code. */
+const AMBIENT_TRACKS: Record<AmbientTrackId, AmbientTrackDefinition> = {
+  home: {
+    assetUrl: HOME_THEME_ASSET_URL,
+    buildProceduralGraph: buildAdventureThemeGraph,
+  },
+};
+
 /**
  * Attempts to play a real, licensed music file at `url` through the given
  * master gain (so volume/mute controls apply identically to a real asset
@@ -433,44 +462,57 @@ export class AudioManager {
   }
 
   /**
-   * Starts the Home screen's adventure theme (see buildAdventureThemeGraph
-   * and tryPlayRealTrackFile above).
+   * Starts (or resumes) the given ambient track — "home" by default, the
+   * only one that exists today (see AMBIENT_TRACKS above for how a future
+   * second track would slot in).
    *
-   * CORREÇÃO P0 (autoplay): this is meant to be called TWICE in the normal
-   * flow, by design — once immediately on Home mount (a genuine autoplay
-   * attempt: some browsers allow it outright, and even when blocked this
-   * is what gets a real `AudioContext` sitting in `suspended` state ready
-   * to go), and once more from the very first user gesture anywhere on the
-   * page (see MainMenu.tsx). The two calls are NOT symmetric: if a graph
-   * already exists, this does not rebuild it — it just resumes the
-   * existing (possibly browser-suspended) context in place. That's what
-   * makes the second call "instant" instead of a fresh cold start, and
-   * it's why calling this from any number of gesture handlers is always
-   * safe — never a second AudioContext, never a second procedural graph,
-   * never a duplicated `<audio>` element. Never throws: an unsupported
-   * environment (no Web Audio API, e.g. this repo's vitest/jsdom tests) or
-   * a still-blocked context both just result in silence.
+   * CORREÇÃO P0 (autoplay): this is meant to be called repeatedly in the
+   * normal flow, by design — once immediately on app boot (a genuine
+   * autoplay attempt: some browsers allow it outright, and even when
+   * blocked this is what gets a real `AudioContext` sitting in `suspended`
+   * state ready to go), and again from the very first user gesture
+   * anywhere on the page, and again every time App.tsx's global lifecycle
+   * re-enters a non-gameplay screen (see App.tsx and MÚSICA GLOBAL spec
+   * sections 18-21). These calls are NOT symmetric: if a graph already
+   * exists for the SAME track, this does not rebuild it — it just resumes
+   * the existing (possibly browser-suspended) context in place. That's
+   * what makes a later call "instant" instead of a fresh cold start, why
+   * navigating Home->Wiki->Novidades->Home never restarts or duplicates
+   * the music, and why calling this from any number of gesture/lifecycle
+   * handlers is always safe — never a second AudioContext, never a second
+   * procedural graph, never a duplicated `<audio>` element. Never throws:
+   * an unsupported environment (no Web Audio API, e.g. this repo's
+   * vitest/jsdom tests) or a still-blocked context both just result in
+   * silence.
    */
-  playAmbientMusic(): void {
+  playAmbientMusic(trackId: AmbientTrackId = "home"): void {
     if (this.musicGraph) {
-      // Graph already exists — this call is a later gesture (or a second
-      // mount-time attempt) trying to RESUME it, never to recreate it.
-      // A context can be here for two different reasons: still suspended
-      // because the very first attempt was true autoplay with no gesture
-      // yet, or already suspended again later (e.g. the tab lost audio
-      // focus) — `resume()` is the correct response to both, and is a
-      // harmless no-op if it's already running.
-      if (this.musicGraph.ctx.state === "suspended") {
-        this.musicGraph.ctx.resume().catch(() => {
-          // Still blocked — stays silent until the next gesture retries.
-        });
+      if (this.musicGraph.trackId !== trackId) {
+        // Not reachable today (only one track exists) — the seam a future
+        // second track hooks into: swap graphs instead of resuming this one.
+        this.stopMusic();
+      } else {
+        // Graph already exists for this same track — this call is a later
+        // gesture, a repeat mount-time attempt, or a return to a
+        // non-gameplay screen, all trying to RESUME it, never to recreate
+        // it. A context can be suspended for two different reasons: still
+        // blocked because the very first attempt was true autoplay with no
+        // gesture yet, or suspended again later (e.g. the tab lost audio
+        // focus) — `resume()` is the correct response to both, and is a
+        // harmless no-op if it's already running.
+        if (this.musicGraph.ctx.state === "suspended") {
+          this.musicGraph.ctx.resume().catch(() => {
+            // Still blocked — stays silent until the next gesture retries.
+          });
+        }
+        return;
       }
-      return;
     }
     const Ctor = getAudioContextConstructor();
     if (!Ctor) return;
 
     try {
+      const track = AMBIENT_TRACKS[trackId];
       const ctx = new Ctor();
       const masterGain = ctx.createGain();
       masterGain.gain.value = 0;
@@ -481,20 +523,21 @@ export class AudioManager {
       let realAudioEl: HTMLAudioElement | null = null;
       let stopped = false;
 
-      // Prefer a real, licensed track the moment one exists at
-      // HOME_THEME_ASSET_URL (see its doc comment) — falls back to the
-      // procedural composition the instant that file fails to load
-      // (today, always: no such file exists in this project). Guarded by
-      // `stopped` so a slow/late fallback callback can never start a
+      // Prefer a real, licensed track the moment one exists at this
+      // track's assetUrl (see HOME_THEME_ASSET_URL's doc comment) — falls
+      // back to the procedural composition the instant that file fails to
+      // load (today, always: no such file exists in this project). Guarded
+      // by `stopped` so a slow/late fallback callback can never start a
       // graph after stopMusic() has already torn this one down.
-      realAudioEl = tryPlayRealTrackFile(ctx, HOME_THEME_ASSET_URL, masterGain, () => {
+      realAudioEl = tryPlayRealTrackFile(ctx, track.assetUrl, masterGain, () => {
         if (stopped || proceduralStop) return;
-        proceduralStop = buildAdventureThemeGraph(ctx, masterGain).stop;
+        proceduralStop = track.buildProceduralGraph(ctx, masterGain).stop;
       });
 
       this.musicGraph = {
         ctx,
         masterGain,
+        trackId,
         stop: () => {
           stopped = true;
           if (realAudioEl) {
