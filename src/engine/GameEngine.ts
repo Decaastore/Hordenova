@@ -39,6 +39,9 @@ import {
   upgradeSpecialization as upgradeSpecializationEntity,
   equipSkin as equipSkinEntity,
   canPurchaseSkin as canPurchaseSkinEntity,
+  canUnlockMastery,
+  unlockMastery as unlockMasteryEntity,
+  canUpgradeMastery,
   getMasteryUpgradeCostFor,
   upgradeMastery as upgradeMasteryEntity,
   canRespecSpecialization,
@@ -48,7 +51,7 @@ import {
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import { getAvailableRespecTokens } from "@/config/towerMastery";
+import { getAvailableRespecTokens, MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import {
@@ -641,24 +644,53 @@ export class GameEngine {
    * they'd rather spread spending out, exactly like Specialization already
    * works once its own level gate is passed.
    *
-   * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE / SEASON COMPETITIVA):
-   * Mastery is PERMANENT and funded by GEMS, never Gold — but grants ZERO
-   * combat power (see config/towerMastery.ts's doc comment for what it
-   * grants instead: Specialization Respec Tokens + cosmetic-only visual
-   * tiers). This is therefore an ordinary Gems purchase, not an exception
-   * to the "Gems never buy combat power" contract. The level lives in
-   * `this.towerMasteryLevels` (keyed by TYPE, not by tower instance),
-   * applied to every placed tower of that type immediately so two Ironwood
-   * towers never silently disagree on their own Mastery level.
+   * INFINITE BALANCE OVERHAUL — Mastery now mirrors Specialization's shape
+   * exactly: a one-time MASTERY_UNLOCK_GEM_COST Gems purchase (0 -> 1,
+   * handled by unlockSelectedTowerMastery below) opens the track, then this
+   * method is Gold-only forever (1 -> 2 -> ... no max level). It also grants
+   * real, small, bounded-weighted combat effects again — see
+   * config/towerMastery.ts's getMasteryBonuses doc comment for why this is
+   * still not "Gems buy power": Gems only ever buy the one-time access. The
+   * level lives in `this.towerMasteryLevels` (keyed by TYPE, not by tower
+   * instance), applied to every placed tower of that type immediately so
+   * two Ironwood towers never silently disagree on their own Mastery level.
    */
+  canUnlockSelectedTowerMastery(): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    return !!tower && canUnlockMastery(tower);
+  }
+
+  /** Pays the one-time MASTERY_UNLOCK_GEM_COST Gems to set the selected tower's TYPE mastery level to 1. */
+  unlockSelectedTowerMastery(): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canUnlockMastery(tower)) return false;
+    if (!this.canAffordGems(MASTERY_UNLOCK_GEM_COST)) return false;
+
+    const unlocked = unlockMasteryEntity(tower);
+    if (!unlocked) return false;
+
+    this.spendGems(MASTERY_UNLOCK_GEM_COST, `tower_mastery:${tower.type}`);
+    this.towerMasteryLevels[tower.type] = tower.masteryLevel;
+    for (const other of this.towers) {
+      if (other.type === tower.type && other.id !== tower.id) other.masteryLevel = tower.masteryLevel;
+    }
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** GOLD-funded, uncapped upgrade of the selected tower's TYPE mastery level (1 -> 2 -> ... forever). Use unlockSelectedTowerMastery for the initial 0 -> 1 Gems unlock instead. */
   upgradeSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower) return false;
+    if (!tower || !canUpgradeMastery(tower)) return false;
 
     const cost = getMasteryUpgradeCostFor(tower);
-    if (!this.spendGems(cost, `tower_mastery:${tower.type}`)) return false;
+    if (this.gold < cost) return false;
 
+    this.gold -= cost;
     upgradeMasteryEntity(tower);
     this.towerMasteryLevels[tower.type] = tower.masteryLevel;
     for (const other of this.towers) {

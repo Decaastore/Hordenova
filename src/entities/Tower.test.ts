@@ -10,8 +10,9 @@ import {
   tickTowerSurvivalRegen,
 } from "./Tower";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
-import { TOWER_TYPES } from "@/config/towerStats";
+import { getTowerLevelStats, TOWER_TYPES } from "@/config/towerStats";
 import { getSpecializationsForTower } from "@/config/specializations";
+import { getMasteryBonuses } from "@/config/towerMastery";
 
 describe("Tower — survival (Master Implementation Pass spec section 12-13)", () => {
   it("a freshly-created tower starts at full HP/shield for its type", () => {
@@ -86,32 +87,60 @@ describe("Tower — survival (Master Implementation Pass spec section 12-13)", (
 });
 
 /**
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — mandatory permanent
- * regression test: increasing masteryLevel must NEVER change a tower's
- * combat stats. An earlier version of getTowerStats applied a Mastery
- * bonus multiplier here; that mechanic has been removed entirely (see
- * config/towerMastery.ts's doc comment) and this test exists specifically
- * to prevent it — or anything like it — from silently coming back.
+ * INFINITE BALANCE OVERHAUL — mandatory permanent regression test, replacing
+ * the old "Mastery grants ZERO combat power" guard now that Mastery has a
+ * real (small, bounded-weighted, diminishing-returns) combat effect again
+ * (see config/towerMastery.ts's getMasteryBonuses doc comment). What must
+ * never regress: masteryLevel 0 is a true no-op (byte-identical to no
+ * Mastery at all), a higher masteryLevel always strictly increases damage/
+ * attackSpeed/range (never decreases, never flat), and the increase always
+ * matches getMasteryBonuses's own multipliers exactly — i.e. there is no
+ * second, hidden power path beyond this one formula.
  */
-describe("Tower — Mastery grants ZERO combat power (SEASON COMPETITIVA regression guard)", () => {
-  it("masteryLevel = 0 and masteryLevel = N produce EXACTLY the same damage/attackSpeed/range for every tower type, at every level", () => {
+describe("Tower — Mastery grants a small, real, growing combat bonus (INFINITE BALANCE OVERHAUL)", () => {
+  it("masteryLevel = 0 produces EXACTLY the same damage/attackSpeed/range as the raw level-based stats (a true no-op)", () => {
     for (const type of TOWER_TYPES) {
       for (const level of [1, 15, 30]) {
-        const baseline = createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, 0);
-        for (const masteryLevel of [1, 5, 50, 500, 1_000_000]) {
-          const withMastery = createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, masteryLevel);
-          expect(getTowerStats(withMastery)).toEqual(getTowerStats(baseline));
-        }
+        const tower = createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, 0);
+        expect(getTowerStats(tower)).toEqual(getTowerLevelStats(type, level));
       }
     }
   });
 
-  it("a tower's stats are unaffected by masteryLevel even while mutated in place (no other hidden power path)", () => {
-    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, null, 0, null, 0);
-    const before = getTowerStats(tower);
-    tower.masteryLevel = 999;
-    const after = getTowerStats(tower);
-    expect(after).toEqual(before);
+  it("higher masteryLevel strictly and monotonically increases damage/attackSpeed/range, matching getMasteryBonuses exactly", () => {
+    for (const type of TOWER_TYPES) {
+      const level = 15;
+      const zero = getTowerStats(createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, 0));
+      let previousDamage = zero.damage;
+      let previousSpeed = zero.attackSpeed;
+      let previousRange = zero.range;
+      for (const masteryLevel of [1, 5, 50, 500, 1_000_000]) {
+        const stats = getTowerStats(createTowerInstance("slot-1", type, { x: 0, y: 0 }, level, null, 0, null, masteryLevel));
+        expect(stats.damage).toBeGreaterThan(previousDamage);
+        expect(stats.attackSpeed).toBeGreaterThan(previousSpeed);
+        expect(stats.range).toBeGreaterThan(previousRange);
+
+        const bonuses = getMasteryBonuses(masteryLevel);
+        expect(stats.damage).toBeCloseTo(Math.round(zero.damage * bonuses.damageMultiplier * 100) / 100, 2);
+        expect(stats.attackSpeed).toBeCloseTo(Math.round(zero.attackSpeed * bonuses.attackSpeedMultiplier * 100) / 100, 2);
+        expect(stats.range).toBeCloseTo(Math.round(zero.range * bonuses.rangeMultiplier * 100) / 100, 2);
+
+        previousDamage = stats.damage;
+        previousSpeed = stats.attackSpeed;
+        previousRange = stats.range;
+      }
+    }
+  });
+
+  it("Mastery's damage bonus is deliberately the SMALLEST of its per-point weights — never the dominant lever, at any level", () => {
+    for (const masteryLevel of [1, 10, 100, 1000, 1_000_000]) {
+      const bonuses = getMasteryBonuses(masteryLevel);
+      const damageGrowth = bonuses.damageMultiplier - 1;
+      const attackSpeedGrowth = bonuses.attackSpeedMultiplier - 1;
+      const rangeGrowth = bonuses.rangeMultiplier - 1;
+      expect(damageGrowth).toBeLessThan(attackSpeedGrowth);
+      expect(damageGrowth).toBeLessThan(rangeGrowth);
+    }
   });
 });
 

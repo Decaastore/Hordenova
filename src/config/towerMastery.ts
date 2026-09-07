@@ -1,66 +1,56 @@
 import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
 
 /**
- * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the sink
- * that exists past MAX_TOWER_LEVEL (30). Level 30 stays the last
- * VISUAL evolution and the last step of the existing level-driven special
- * unlocks (multiShot/giantSlayer/wildfire/deepFreeze/arcaneSurge/etc, all
- * in towerStats.ts, all untouched) — Mastery is a SEPARATE, uncapped track
- * layered on top, exactly mirroring how config/specializations.ts already
- * layers an independent, optional gold-sink track next to level.
+ * TOWER MASTERY — the account-wide, per-TOWER-TYPE progression track that
+ * exists past MAX_TOWER_LEVEL (30). Level 30 stays the last VISUAL evolution
+ * and the last of the level-driven special unlocks (multiShot/giantSlayer/
+ * wildfire/deepFreeze/arcaneSurge/etc, all in towerStats.ts, all untouched)
+ * — Mastery is a SEPARATE, uncapped track layered on top, exactly mirroring
+ * how config/specializations.ts layers an independent optional track next to
+ * level.
  *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — MASTERY NÃO COMPRA MAIS
- * PODER: a versão anterior deste arquivo aplicava um multiplicador
- * uniforme de damage/attackSpeed/range em `entities/Tower.ts`'s
- * getTowerStats, crescendo linearmente com masteryLevel. Isso criava
- * exatamente o padrão "Gems -> Mastery -> +X% DPS" que o design da Season
- * competitiva proíbe (Gems nunca devem comprar poder de combate permanente
- * — ver gemSinks.ts). Esse multiplicador foi REMOVIDO por completo:
- * getTowerStats agora ignora masteryLevel inteiramente (ver o teste de
- * regressão permanente em entities/Tower.test.ts que trava isso).
+ * ============================================================================
+ * INFINITE BALANCE OVERHAUL — what changed and why.
+ * ============================================================================
  *
- * NOVA FUNÇÃO DE MASTERY — o mesmo `masteryLevel`/mesma curva de custo em
- * Gems foram mantidos (estrutura mínima necessária, spec explícita: "não
- * inventar um sistema novo e desconectado"), mas o que ele concede mudou de
- * "poder" para "prestígio/estratégia":
- *   1. RESPEC TOKEN — a cada MASTERY_RESPEC_TOKEN_INTERVAL níveis (5) o
- *      jogador ganha exatamente 1 token, calculado como uma função pura de
- *      masteryLevel (getMasteryRespecTokensEarned), nunca um contador
- *      incrementado à parte — por isso é IDEMPOTENTE: recarregar/reiniciar
- *      nunca reconcede um token, o valor é sempre recomputado a partir do
- *      nível atual menos os já gastos (ver getAvailableRespecTokens e
- *      SaveData.towerRespecTokensSpent).
- *   2. COSMÉTICO PERMANENTE — uma faixa visual (anel/aura/runas, ver
- *      MASTERY_COSMETIC_TIERS) calculada DIRETAMENTE de masteryLevel, nunca
- *      de stats de combate — puramente decorativo, lido apenas pelo
- *      renderer (EntityRenderer/CanvasRenderer), nunca por CombatSystem.
+ * BEFORE: Mastery cost Gems at EVERY level, forever, and granted ZERO combat
+ * effect (Respec Tokens + a cosmetic tier only). That combination is what
+ * produced the documented chicken-and-egg: the only Gem Shard sources were
+ * boss/mini-boss kills, the wall stopped exactly those kills, and the one
+ * thing Gems could be spent on did nothing to break the wall. A permanently
+ * powerless track also meant player power was structurally bounded, which is
+ * half of why the wall was unavoidable at all.
  *
- * SAFETY: cost curve is convex (spec section 5: "não permitir comprar
- * milhares instantaneamente") but uses the exact same overflow-safety
- * pattern as enemyStats.ts's HP scaling (compounding capped at a very high
- * level index, linear tail beyond it) — genuinely uncapped, never
- * Infinity/NaN, at any mastery level a save could ever reach. Calibrated
- * via engine/ProgressionSimulation.test.ts's real-engine bot simulation,
- * not guessed (spec section 5's own instruction). This cost curve itself is
- * UNCHANGED by the competitive correction above — only what the level buys
- * changed, not what it costs.
+ * NOW, mirroring Specialization's own shape exactly (one premium unlock, then
+ * a pure Gold track):
+ *   1. UNLOCK — one flat, one-time MASTERY_UNLOCK_GEM_COST Gems payment per
+ *      TOWER TYPE (not per placed tower — Mastery has always been account-
+ *      wide-by-type, see GameEngine.towerMasteryLevels; that scope is
+ *      deliberately unchanged). Paying it sets masteryLevel to 1.
+ *   2. EVERY LEVEL AFTER — Gold, forever, via getMasteryUpgradeCost. No max
+ *      level, no cap of any kind.
+ *   3. REAL BUT DELIBERATELY NON-DPS-LED EFFECT — see getMasteryBonuses.
  *
- * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — CURRENCY CHANGED, CURVE
- * RE-CALIBRATED: Mastery moved from Gold to Gems (see gemSinks.ts), and
- * MASTERY_BASE_COST_MULTIPLIER was rescaled down from its old Gold-shaped
- * value (240) to a Gems-appropriate one — Gems and Gold are wildly
- * different orders of magnitude in this economy (a Specialization unlock
- * is a flat 25 Gems; Profile Prestige starts at 3 Gems), and Gem Shards
- * only trickle in from boss/mini-boss kills (5/2 shards, 10 shards = 1 Gem
- * — see GameEngine's addGemShards call sites). Reusing the old Gold-scaled
- * multiplier verbatim (as a naive "just swap the currency" change would)
- * made even Mastery's FIRST level cost ~10,000 Gems — realistically
- * unreachable, which engine/ProgressionSimulation.test.ts's real 48-simulated-
- * hour bot run caught directly (avgMasteryLevel stayed exactly 0). This
- * value was re-tuned against that same test until Mastery became a
- * genuinely reachable-but-meaningful Gems sink again — first level costs
- * on the order of a Specialization unlock, growing from there.
+ * IS THIS "GEMS BUY POWER"? No, in exactly the same sense Specialization
+ * isn't: Gems buy ACCESS to a track (a one-time unlock a free player reaches
+ * from ordinary milestone/boss Gem Shard income — see
+ * config/phaseConfig.ts's endgame milestone shards), and Gold — the purely
+ * earned, Season-scoped currency — buys every point of power in it. A
+ * larger Gem stockpile buys the unlock earlier, never higher.
+ *
+ * The Respec Token and cosmetic-tier rewards below are UNCHANGED; Mastery
+ * still grants them on the same intervals it always did.
  */
+
+/**
+ * One-time Gems price to unlock the Mastery track for a tower TYPE. Flat (not
+ * scaled by type/level) for the same reason SPECIALIZATION_UNLOCK_GEM_COST is
+ * flat: it is one clear premium decision, not a second Gold-shaped curve
+ * denominated in Gems. Tuned against real Gem Shard income (boss 5 / mini-boss
+ * 2 / milestone, 10 shards = 1 Gem) so a F2P player unlocks their first
+ * Mastery track inside the first content phases, not after the wall.
+ */
+export const MASTERY_UNLOCK_GEM_COST = 6;
 
 /** Every N mastery levels grants exactly 1 Specialization Respec Token (5 -> 1, 10 -> 2, 15 -> 3, ...). */
 export const MASTERY_RESPEC_TOKEN_INTERVAL = 5;
@@ -92,8 +82,8 @@ export interface MasteryCosmeticTier {
 
 /**
  * Cosmetic tiers unlocked purely by masteryLevel — ring/aura/runes reward
- * bands, spec section on "Mastery Cosmético". Deliberately never read by
- * CombatSystem; only EntityRenderer/TowerInfoPanel ever call these.
+ * bands. Deliberately never read by CombatSystem; only EntityRenderer/
+ * TowerInfoPanel ever call these.
  */
 export const MASTERY_COSMETIC_TIERS: readonly MasteryCosmeticTier[] = [
   { id: "ember_ring", nameKey: "emberRing", level: 5 },
@@ -117,24 +107,133 @@ export function getNextMasteryCosmeticTier(masteryLevel: number): MasteryCosmeti
   return MASTERY_COSMETIC_TIERS.find((tier) => masteryLevel < tier.level) ?? null;
 }
 
-const MASTERY_BASE_COST_MULTIPLIER = 0.5;
-const MASTERY_COST_GROWTH_FACTOR = 1.05;
-/** Numerical safety (same technique as enemyStats.ts HP\_COMPOUND_WAVE_INDEX_CAP): compounding growth stops accelerating beyond this mastery level, but cost keeps climbing forever via the linear tail below — never Infinity/NaN at any mastery level, "SEM CAP REAL" on progression while staying finite. */
-const MASTERY_COST_COMPOUND_LEVEL_CAP = 2000;
-/** Cost growth rate applied per level once past the compounding cap — purely linear, so it can never overflow no matter how many levels a save accumulates. */
-const MASTERY_COST_LINEAR_TAIL_GROWTH = 0.5;
+// ---------------------------------------------------------------------------
+// Mastery effect — the diminishing-returns scale and what it buys.
+// ---------------------------------------------------------------------------
 
 /**
- * Gems cost to go from `currentMasteryLevel` to `currentMasteryLevel + 1`.
- * No max level — always returns a real (finite) number. `currentMasteryLevel`
- * is expected to be >= 0.
+ * Same construction as config/specializations.ts's specializationEffectScale
+ * (deliberately: one diminishing-returns technique in this codebase, not
+ * two), with its own exponent so the two tracks FEEL different rather than
+ * being the same curve twice.
+ *
+ *   scale(L) = (L0 / s) * ((1 + L / L0) ^ s - 1)
+ *
+ * scale(L) -> L for small L, and ~ L^s forever after. Never flat, never
+ * capped, never Infinity/NaN.
+ *
+ * MASTERY_EFFECT_EXPONENT is set slightly below Specialization's so that
+ * Specialization stays the sharper, identity-defining investment and Mastery
+ * reads as the broader, slower account-wide one.
+ */
+export const MASTERY_EFFECT_EXPONENT = 0.45;
+export const MASTERY_EFFECT_SCALE = 20;
+
+export function masteryEffectScale(masteryLevel: number): number {
+  const l = Math.max(0, masteryLevel);
+  const s = MASTERY_EFFECT_EXPONENT;
+  const l0 = MASTERY_EFFECT_SCALE;
+  return (l0 / s) * (Math.pow(1 + l / l0, s) - 1);
+}
+
+export interface MasteryBonuses {
+  /** Multiplier on tower damage. Modest by design — see this interface's doc comment. */
+  damageMultiplier: number;
+  /** Multiplier on attacks per second. */
+  attackSpeedMultiplier: number;
+  /** Multiplier on range — the headline effect: coverage, not raw numbers. */
+  rangeMultiplier: number;
+  /** Fraction (0..1) taken off every Gold price a tower of this type charges (level, specialization). Efficiency, not damage. */
+  goldCostReduction: number;
+  /** Fraction (0..1) of incoming Boss Siege damage this tower type shrugs off. Resistance, not damage. */
+  siegeResistance: number;
+}
+
+/**
+ * WHY THIS IS NOT "JUST MORE DPS" — the requirement was explicit, so the
+ * weighting is explicit too. Per unit of `masteryEffectScale`:
+ *   range           +0.60%   <- the largest per-point effect
+ *   gold efficiency +0.50%   <- pure economy, zero combat math
+ *   siege resistance+0.50%   <- survivability against the one boss mechanic
+ *                               that attacks the BUILD instead of the base
+ *   attack speed    +0.45%
+ *   damage          +0.25%   <- deliberately the SMALLEST
+ *
+ * Range is first on purpose: this map is a single serpentine path with 12
+ * fixed slots, so idealized "everything always in range" DPS is 2-4x the real
+ * measured DPS. Range is therefore the stat that converts into real damage
+ * MOST efficiently, and it does so by fixing coverage/positioning — the
+ * actual structural weakness of the map — rather than by inflating a number.
+ * Gold efficiency compounds into every other track (more Specialization
+ * levels per wave farmed) without ever touching a combat formula.
+ *
+ * goldCostReduction and siegeResistance are bounded fractions (a >100% price
+ * cut, or literal immunity, is not a meaningful game state). The three
+ * multiplicative stats are unbounded and keep growing forever, so no mastery
+ * level is ever a dead purchase.
+ */
+const MASTERY_DAMAGE_PER_POINT = 0.0025;
+const MASTERY_ATTACK_SPEED_PER_POINT = 0.0045;
+const MASTERY_RANGE_PER_POINT = 0.006;
+const MASTERY_GOLD_DISCOUNT_PER_POINT = 0.005;
+const MASTERY_GOLD_DISCOUNT_MAX = 0.5;
+const MASTERY_SIEGE_RESISTANCE_PER_POINT = 0.005;
+const MASTERY_SIEGE_RESISTANCE_MAX = 0.8;
+
+export function getMasteryBonuses(masteryLevel: number): MasteryBonuses {
+  const scale = masteryEffectScale(masteryLevel);
+  return {
+    damageMultiplier: 1 + scale * MASTERY_DAMAGE_PER_POINT,
+    attackSpeedMultiplier: 1 + scale * MASTERY_ATTACK_SPEED_PER_POINT,
+    rangeMultiplier: 1 + scale * MASTERY_RANGE_PER_POINT,
+    goldCostReduction: Math.min(MASTERY_GOLD_DISCOUNT_MAX, scale * MASTERY_GOLD_DISCOUNT_PER_POINT),
+    siegeResistance: Math.min(MASTERY_SIEGE_RESISTANCE_MAX, scale * MASTERY_SIEGE_RESISTANCE_PER_POINT),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Mastery cost — Gold, forever.
+// ---------------------------------------------------------------------------
+
+/**
+ * Same structure as config/prestige.ts's getPrestigeUpgradeCost and
+ * config/specializations.ts's getSpecializationUpgradeCost: compounding growth
+ * capped at a level-index ceiling, then a purely linear tail. The ceiling is
+ * what makes the curve overflow-proof (a raw Math.pow over an unbounded level
+ * eventually reaches Infinity, which would turn "expensive" into "impossible"
+ * — see prestige.ts's own comment); the linear tail is what keeps the curve
+ * ASYMPTOTICALLY LINEAR in the level, which is the property the whole no-wall
+ * proof rests on (cumulative Gold grows ~wave^2, so a linear per-level price
+ * means the affordable level grows ~linearly with wave, which is exactly the
+ * input masteryEffectScale needs).
+ *
+ * The tail slope is ln(GROWTH_FACTOR) so the curve's slope is continuous at
+ * the ceiling — no price cliff.
+ *
+ * Mastery is per TOWER TYPE while Specialization is per placed tower, so the
+ * same Gold buys 12 Specialization tracks but only 4 Mastery tracks — the
+ * base multiplier below is set higher than Specialization's accordingly, so
+ * neither track trivially dominates the other as a Gold destination.
+ */
+const MASTERY_BASE_COST_MULTIPLIER = 16;
+const MASTERY_COST_GROWTH_FACTOR = 1.06;
+const MASTERY_COST_COMPOUND_LEVEL_CAP = 50;
+const MASTERY_COST_LINEAR_TAIL_GROWTH = Math.log(MASTERY_COST_GROWTH_FACTOR);
+
+/**
+ * GOLD cost to go from `currentMasteryLevel` to `currentMasteryLevel + 1`.
+ * Only meaningful once the track is unlocked (level >= 1); level 0 -> 1 is
+ * the one-time MASTERY_UNLOCK_GEM_COST Gems purchase instead. No max level —
+ * always returns a real, finite, strictly increasing number.
  */
 export function getMasteryUpgradeCost(type: TowerType, currentMasteryLevel: number): number {
   const def = TOWER_DEFINITIONS[type];
-  const targetLevel = currentMasteryLevel + 1;
+  const targetLevel = Math.max(1, currentMasteryLevel + 1);
+  const base = def.upgradeCostBase * MASTERY_BASE_COST_MULTIPLIER;
+
   const cappedLevel = Math.min(targetLevel, MASTERY_COST_COMPOUND_LEVEL_CAP);
-  const compound = Math.pow(MASTERY_COST_GROWTH_FACTOR, cappedLevel);
+  const compound = Math.pow(MASTERY_COST_GROWTH_FACTOR, cappedLevel - 1);
   const tailLevels = Math.max(0, targetLevel - MASTERY_COST_COMPOUND_LEVEL_CAP);
   const linearTail = 1 + tailLevels * MASTERY_COST_LINEAR_TAIL_GROWTH;
-  return Math.round(def.upgradeCostBase * MASTERY_BASE_COST_MULTIPLIER * compound * linearTail);
+  return Math.round(base * compound * linearTail) + targetLevel;
 }

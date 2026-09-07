@@ -23,27 +23,19 @@ import { TOWER_DEFINITIONS } from "./towerStats";
  * gives a maxed-level build genuine, ongoing decisions and a genuine,
  * ongoing gold sink past level 30.
  *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — GOLD NEVER RUNS OUT OF A
- * SINK, BUT POWER STAYS BOUNDED: this used to hard-stop at
- * MAX_SPECIALIZATION_LEVEL=5 (getSpecializationUpgradeCost returned null),
- * which is exactly why Gold went dry once every tower was fully built —
- * Tower Level tops out at 30 (kept as-is, intentionally NOT rebuilt in this
- * pass) and Specialization was the only other Gold sink, itself capped.
+ * INFINITE BALANCE OVERHAUL — NO LEVEL CAP AND NO EFFECT CAP. A previous
+ * pass split the two: the LEVEL was uncapped (so Gold always had a sink) but
+ * `applySpecializationToSpecial` clamped the level it actually read to 5, so
+ * a fully-built army's DPS was a hard constant. Against an ever-growing enemy
+ * HP curve that made a permanent wall inevitable — and real simulation found
+ * it at wave ~450-460.
  *
- * The fix is deliberately NOT "uncap the level AND let its combat effect
- * keep growing forever" — that would just trade one problem (Gold with no
- * sink) for a worse one (`Gold -> infinite Specialization Level -> infinite
- * DPS`). Instead the level (`specializationLevel`) and its COMBAT EFFECT are
- * split: the level itself is now genuinely uncapped (getSpecializationUpgradeCost
- * always returns a finite cost — see its own doc comment for the overflow-safe
- * curve, the same compound-cap-plus-linear-tail pattern already used by
- * towerMastery.ts/prestige.ts/enemyStats.ts), so Gold always has somewhere
- * to go no matter how long a Season runs. But `applySpecializationToSpecial`
- * clamps the level it actually reads to SPECIALIZATION_EFFECT_LEVEL_CAP (see
- * that constant) — so the COMBAT BONUS stops growing at exactly the same
- * point it always did (level 5, preserving all existing balance/tuning),
- * regardless of how many levels past that a player's Gold has bought.
- * "Level can keep growing forever; effective power cannot."
+ * Both caps are now gone. The level is uncapped (cost keeps climbing forever,
+ * see getSpecializationUpgradeCost) AND the combat effect is uncapped, but
+ * the effect is routed through `specializationEffectScale` — a strictly
+ * increasing, never-flat, diminishing-returns curve. "Cada level exige mais e
+ * entrega um ganho cuidadosamente menor", forever, instead of "levels are
+ * free money with no effect past 5".
  *
  * Each tower ships 3 of the 4 example paths named in the spec (a
  * deliberately-scoped subset, not the full catalog) — the architecture
@@ -66,18 +58,64 @@ export type SpecializationId =
   | "STORMCALLER_ARCANE_SURGE"
   | "STORMCALLER_STORMLORD";
 
-/**
- * The specializationLevel at which `applySpecializationToSpecial`'s combat
- * bonus stops growing — the SOFT CAP ON POWER (see this file's top doc
- * comment). `specializationLevel` itself has no such cap: a tower can keep
- * being leveled past this forever as a pure, always-available Gold sink,
- * it just stops making the tower any stronger once its effect reaches this
- * point. This exact value (5) is unchanged from the tuning this system
- * shipped with, so every existing balance number for a "fully specialized"
- * tower stays identical to before this correction.
- */
-export const SPECIALIZATION_EFFECT_LEVEL_CAP = 5;
 export const SPECIALIZATION_UNLOCK_TOWER_LEVEL = 10;
+
+/**
+ * ============================================================================
+ * INFINITE BALANCE OVERHAUL — Specialization effect scaling.
+ * ============================================================================
+ *
+ * The old `SPECIALIZATION_EFFECT_LEVEL_CAP = 5` hard clamp is GONE. It was a
+ * literal `Math.min` inside `applySpecializationToSpecial`, and it is the
+ * single reason a maxed build's DPS was a fixed constant — which, against an
+ * ever-growing enemy HP curve, made a permanent wall unavoidable.
+ *
+ * Every path's bonus is now driven by `specializationEffectScale(level)`
+ * instead of by the raw level:
+ *
+ *   scale(L) = (L0 / s) * ((1 + L / L0) ^ s - 1)
+ *
+ * with s = SPECIALIZATION_EFFECT_EXPONENT (< 1) and L0 =
+ * SPECIALIZATION_EFFECT_SCALE. Two properties make this the right shape:
+ *
+ *  1. scale(L) -> L as L -> 0 (a first-order Taylor identity), so levels 1-5
+ *     keep almost EXACTLY the bonuses this system originally shipped with —
+ *     nothing about the hand-tuned early game changes perceptibly.
+ *  2. scale(L) ~ (L0^(1-s)/s) * L^s as L -> infinity: never flat, never
+ *     capped, but every further level delivers a carefully smaller increment
+ *     than the one before it. Level 1000 and level 10000 both still buy real
+ *     power; the 10000th just buys much less than the 10th did.
+ *
+ * WHY s ~ 0.5 SPECIFICALLY: cumulative Gold income grows ~quadratically with
+ * wave number, and the Gold cost of a Specialization level is asymptotically
+ * LINEAR in the level (see getSpecializationUpgradeCost), so the level a
+ * player can afford grows ~linearly with wave number. A sqrt-shaped effect
+ * therefore grows ~sqrt(wave) per track; Specialization and Mastery stack
+ * multiplicatively, so combined player power grows ~wave^0.95 — comfortably
+ * above enemy HP's wave^0.72 (config/enemyStats.ts). That inequality, not a
+ * tuned constant, is what makes the wall structurally impossible.
+ *
+ * A few branches below still clamp a specific FIELD (critChance,
+ * freezeChance, slowPercent, armorPenetration). Those are not power caps —
+ * they are probabilities/fractions that are mechanically meaningless above
+ * their bound (a 130% chance to freeze is not a thing). Every one of those
+ * paths also scales an UNBOUNDED companion field (duration, penetration
+ * carrier, extra projectiles), so no path ever stops rewarding investment.
+ */
+export const SPECIALIZATION_EFFECT_EXPONENT = 0.5;
+export const SPECIALIZATION_EFFECT_SCALE = 10;
+
+/**
+ * Diminishing-returns multiplier applied in place of the raw specialization
+ * level everywhere in `applySpecializationToSpecial`. Strictly increasing and
+ * unbounded in `level`; never NaN/Infinity for any finite level.
+ */
+export function specializationEffectScale(level: number): number {
+  const l = Math.max(0, level);
+  const s = SPECIALIZATION_EFFECT_EXPONENT;
+  const l0 = SPECIALIZATION_EFFECT_SCALE;
+  return (l0 / s) * (Math.pow(1 + l / l0, s) - 1);
+}
 
 /**
  * Visual Overhaul spec section 21/22: specialization is a strategic
@@ -91,7 +129,7 @@ export const SPECIALIZATION_UNLOCK_TOWER_LEVEL = 10;
  * mini-boss 2, milestone wave ~1-3, 10 shards/Gem) so a single
  * specialization unlock is a genuine mid-game goal, not an instant spend.
  */
-export const SPECIALIZATION_UNLOCK_GEM_COST = 25;
+export const SPECIALIZATION_UNLOCK_GEM_COST = 8;
 
 export interface SpecializationDefinition {
   id: SpecializationId;
@@ -143,52 +181,50 @@ export function isSpecializationForTower(id: SpecializationId, type: TowerType):
   return getSpecializationDefinition(id).towerType === type;
 }
 
-/** Original tuned linear rate for levels up to SPECIALIZATION_EFFECT_LEVEL_CAP — UNCHANGED so every existing balance number up to a "fully specialized" tower stays identical. */
+/** Original tuned rate for the first levels — UNCHANGED, so the hand-tuned early Specialization prices stay exactly what they always were. */
 const SPECIALIZATION_LINEAR_COST_MULTIPLIER = 7;
 /**
- * Beyond SPECIALIZATION_EFFECT_LEVEL_CAP, cost keeps growing forever via the
- * exact same overflow-safety pattern as towerMastery.ts/prestige.ts/
- * enemyStats.ts (compounding growth capped at a very high level index, pure
- * linear tail beyond that) — genuinely uncapped, never Infinity/NaN, at any
- * specialization level a save could ever reach. Calibrated against
- * engine/ProgressionSimulation.test.ts's real-engine bot simulation, not
- * guessed.
+ * INFINITE BALANCE OVERHAUL — Gold cost curve.
+ *
+ * Same STRUCTURE config/prestige.ts's getPrestigeUpgradeCost established for
+ * this codebase (compounding growth capped at a level-index ceiling, then a
+ * purely linear tail beyond it — see that file for why: a raw Math.pow over
+ * an unbounded level would eventually overflow to Infinity, which would make
+ * the sink literally unbuyable rather than merely expensive), with constants
+ * tuned for this system instead of copied.
+ *
+ * The tuning target is the ASYMPTOTIC SHAPE, and it is deliberate: past
+ * SPECIALIZATION_COST_COMPOUND_LEVEL_CAP the cost grows LINEARLY in the
+ * level forever. Cumulative Gold income grows ~quadratically with wave
+ * number, so a linear per-level cost means the affordable level grows
+ * ~linearly with wave number, which is precisely the input the sqrt-shaped
+ * effect curve above needs to keep player power ahead of enemy HP forever.
+ * A convex (quadratic-or-worse) tail here would break that inequality and
+ * quietly re-introduce a wall thousands of waves later.
+ *
+ * SPECIALIZATION_COST_LINEAR_TAIL_GROWTH is set to ln(GROWTH_FACTOR) so the
+ * curve's slope is continuous at the ceiling — no price cliff at level 40.
  */
-const SPECIALIZATION_COST_GROWTH_FACTOR = 1.05;
-const SPECIALIZATION_COST_COMPOUND_LEVEL_CAP = 2000;
-const SPECIALIZATION_COST_LINEAR_TAIL_GROWTH = 0.5;
+const SPECIALIZATION_COST_GROWTH_FACTOR = 1.06;
+const SPECIALIZATION_COST_COMPOUND_LEVEL_CAP = 50;
+const SPECIALIZATION_COST_LINEAR_TAIL_GROWTH = Math.log(SPECIALIZATION_COST_GROWTH_FACTOR);
 
 /**
  * Gold cost to raise a specialization from `currentSpecLevel` to
- * `currentSpecLevel + 1` (0 -> 1 is the initial "choose this path" cost).
- * Deliberately steep relative to a normal level-up (base tower level costs
- * top out around upgradeCostBase * 30 * 0.75) — this is the long-tail sink
- * meant to matter well past level 30.
- *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — never returns null anymore:
- * this level track is now genuinely uncapped (Gold must always have
- * somewhere to go — see hasUncappedGoldSink in goldSinks.ts), it's the
- * combat EFFECT that stops growing past SPECIALIZATION_EFFECT_LEVEL_CAP,
- * not the ability to keep buying levels (see applySpecializationToSpecial
- * and this file's top doc comment). Levels within the original tuned range
- * keep the EXACT original linear formula (byte-for-byte unchanged); only
- * levels beyond it switch to the convex, overflow-safe curve.
+ * `currentSpecLevel + 1`. Never returns null and never stops growing — Gold
+ * always has somewhere to go (see hasUncappedGoldSink in goldSinks.ts), at
+ * any specialization level a save could ever reach.
  */
 export function getSpecializationUpgradeCost(type: TowerType, currentSpecLevel: number): number {
   const def = TOWER_DEFINITIONS[type];
-  const targetLevel = currentSpecLevel + 1;
+  const targetLevel = Math.max(1, currentSpecLevel + 1);
+  const base = def.upgradeCostBase * SPECIALIZATION_LINEAR_COST_MULTIPLIER;
 
-  if (targetLevel <= SPECIALIZATION_EFFECT_LEVEL_CAP) {
-    return Math.round(def.upgradeCostBase * SPECIALIZATION_LINEAR_COST_MULTIPLIER * targetLevel);
-  }
-
-  const costAtCap = def.upgradeCostBase * SPECIALIZATION_LINEAR_COST_MULTIPLIER * SPECIALIZATION_EFFECT_LEVEL_CAP;
-  const levelsBeyondCap = targetLevel - SPECIALIZATION_EFFECT_LEVEL_CAP;
-  const cappedLevels = Math.min(levelsBeyondCap, SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
-  const compound = Math.pow(SPECIALIZATION_COST_GROWTH_FACTOR, cappedLevels);
-  const tailLevels = Math.max(0, levelsBeyondCap - SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
+  const cappedLevel = Math.min(targetLevel, SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
+  const compound = Math.pow(SPECIALIZATION_COST_GROWTH_FACTOR, cappedLevel - 1);
+  const tailLevels = Math.max(0, targetLevel - SPECIALIZATION_COST_COMPOUND_LEVEL_CAP);
   const linearTail = 1 + tailLevels * SPECIALIZATION_COST_LINEAR_TAIL_GROWTH;
-  return Math.round(costAtCap * compound * linearTail);
+  return Math.round(base * compound * linearTail) + targetLevel;
 }
 
 /**
@@ -204,11 +240,15 @@ export function applySpecializationToSpecial(
   specializationLevel: number,
 ): TowerSpecial {
   if (!specializationId || specializationLevel <= 0) return base;
-  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — THE soft cap on power:
-  // specializationLevel itself is uncapped (see getSpecializationUpgradeCost),
-  // but the level actually read by every branch below never exceeds this,
-  // so no branch's combat bonus can ever grow past what level 5 always gave.
-  const lvl = Math.min(specializationLevel, SPECIALIZATION_EFFECT_LEVEL_CAP);
+  // INFINITE BALANCE OVERHAUL — the old `Math.min(level, 5)` power clamp is
+  // gone. `lvl` is the diminishing-returns SCALE of the invested level, not
+  // the level itself: it equals the level almost exactly for the first few
+  // levels (so the original tuning is preserved) and keeps growing forever
+  // afterwards, just more and more slowly. See specializationEffectScale.
+  const lvl = specializationEffectScale(specializationLevel);
+  // Extra targets/stacks are integer step unlocks, so they read the RAW level
+  // (a scale of 2.98 at level 3 would otherwise silently miss its own gate).
+  const rawLvl = specializationLevel;
 
   switch (specializationId) {
     case "IRONWOOD_EXECUTIONER": {
@@ -221,14 +261,24 @@ export function applySpecializationToSpecial(
     }
     case "IRONWOOD_BREAKER": {
       const b = base as Extract<TowerSpecial, { type: "IRONWOOD" }>;
-      return { ...b, bonusArmorPenetration: round2(lvl * 0.1) };
+      return {
+        ...b,
+        // Armor penetration is a fraction — mechanically meaningless above 1.
+        // The unbounded companion (flat crit multiplier) is what keeps this
+        // path rewarding investment once penetration is effectively total.
+        bonusArmorPenetration: round2(Math.min(0.95, lvl * 0.1)),
+        critMultiplier: round2(b.critMultiplier + lvl * 0.04),
+      };
     }
     case "IRONWOOD_VANGUARD": {
       const b = base as Extract<TowerSpecial, { type: "IRONWOOD" }>;
       return {
         ...b,
         critChance: round2(Math.min(0.75, b.critChance + lvl * 0.02)),
-        bonusProjectiles: lvl >= 3 ? 1 : 0,
+        // One extra projectile at level 3, then one more every time the
+        // diminishing-returns scale crosses another VANGUARD_PROJECTILE_STEP
+        // — genuinely unbounded, but ever slower to earn.
+        bonusProjectiles: rawLvl >= 3 ? 1 + Math.floor(lvl / VANGUARD_PROJECTILE_STEP) : 0,
       };
     }
     case "INFERNO_WILDFIRE": {
@@ -236,12 +286,16 @@ export function applySpecializationToSpecial(
       return {
         ...b,
         burnDamagePerSecond: round2(b.burnDamagePerSecond * (1 + lvl * 0.15)),
-        burnMaxStacks: lvl >= 4 ? b.burnMaxStacks + 1 : b.burnMaxStacks,
+        burnMaxStacks: rawLvl >= 4 ? b.burnMaxStacks + 1 + Math.floor(lvl / WILDFIRE_STACK_STEP) : b.burnMaxStacks,
       };
     }
     case "INFERNO_CORE": {
       const b = base as Extract<TowerSpecial, { type: "INFERNO" }>;
-      return { ...b, aoeRadius: round2(b.aoeRadius * (1 + lvl * 0.1)) };
+      return {
+        ...b,
+        aoeRadius: round2(b.aoeRadius * (1 + lvl * 0.1)),
+        burnDamagePerSecond: round2(b.burnDamagePerSecond * (1 + lvl * 0.05)),
+      };
     }
     case "INFERNO_DETONATOR": {
       const b = base as Extract<TowerSpecial, { type: "INFERNO" }>;
@@ -252,7 +306,10 @@ export function applySpecializationToSpecial(
       return {
         ...b,
         freezeChance: round2(Math.min(0.7, b.freezeChance + lvl * 0.05)),
-        freezeDurationMs: b.freezeDurationMs + lvl * 150,
+        freezeDurationMs: Math.round(b.freezeDurationMs + lvl * 150),
+        // Unbounded companion: a frozen target takes ever more damage, so
+        // investment keeps paying once the freeze CHANCE itself is saturated.
+        frozenBonusDamageMultiplier: round2(lvl * 0.06),
       };
     }
     case "FROSTBORN_PERMAFROST": {
@@ -260,7 +317,8 @@ export function applySpecializationToSpecial(
       return {
         ...b,
         slowPercent: round2(Math.min(0.85, b.slowPercent + lvl * 0.03)),
-        slowDurationMs: b.slowDurationMs + lvl * 200,
+        slowDurationMs: Math.round(b.slowDurationMs + lvl * 200),
+        frozenBonusDamageMultiplier: round2(lvl * 0.04),
       };
     }
     case "FROSTBORN_SHATTER": {
@@ -271,7 +329,7 @@ export function applySpecializationToSpecial(
       const b = base as Extract<TowerSpecial, { type: "STORMCALLER" }>;
       return {
         ...b,
-        chainTargets: lvl >= 3 ? b.chainTargets + 1 : b.chainTargets,
+        chainTargets: rawLvl >= 3 ? b.chainTargets + 1 + Math.floor(lvl / CHAINBREAKER_TARGET_STEP) : b.chainTargets,
         chainFalloff: round2(Math.min(0.92, b.chainFalloff + lvl * 0.03)),
       };
     }
@@ -281,10 +339,24 @@ export function applySpecializationToSpecial(
     }
     case "STORMCALLER_STORMLORD": {
       const b = base as Extract<TowerSpecial, { type: "STORMCALLER" }>;
-      return { ...b, armorPenetration: round2(Math.min(0.9, b.armorPenetration + lvl * 0.06)) };
+      return {
+        ...b,
+        armorPenetration: round2(Math.min(0.9, b.armorPenetration + lvl * 0.06)),
+        bonusFlatDamage: round2(lvl * 0.8),
+      };
     }
   }
 }
+
+/**
+ * How much diminishing-returns SCALE each further step of an integer-valued
+ * bonus costs. These are the only "step" unlocks left in the system; every
+ * other field grows continuously. Deliberately large, because an extra
+ * projectile/chain/burn-stack is worth far more than a linear stat point.
+ */
+const VANGUARD_PROJECTILE_STEP = 25;
+const WILDFIRE_STACK_STEP = 30;
+const CHAINBREAKER_TARGET_STEP = 25;
 
 function round2(value: number): number {
   return Math.round(value * 100) / 100;

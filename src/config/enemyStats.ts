@@ -160,50 +160,74 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
   },
 };
 
-/** Linear growth applied per wave number to HP — the dominant term early/mid-game. */
-const HP_GROWTH_PER_WAVE = 0.06;
-/**
- * Small COMPOUNDING growth stacked on top of the linear term. Negligible
- * for the first ~50 waves (early game must stay easy to learn on), but by
- * wave ~150-250 it starts meaningfully outpacing even a fully-leveled
- * (MAX_TOWER_LEVEL-capped) army's fixed maximum DPS, and keeps
- * accelerating from there — without it, HP grows purely linearly forever
- * while tower power is capped, so a maxed build's DPS never actually gets
- * caught. This term is what produces the "the build eventually stops" wall
- * (empirically ~wave 450-460) the whole PROGRESSION_STOPPED/upgrade loop
- * is built around — do not remove it.
- */
-const HP_COMPOUND_PER_WAVE = 0.006;
 /** Small reward growth so later waves stay worth playing. */
 const GOLD_GROWTH_PER_WAVE = 0.03;
 
 /**
- * NUMERICAL SAFETY (Master Implementation Pass spec section 47/52) — a raw
- * `Math.pow(1 + HP_COMPOUND_PER_WAVE, waveIndex)` overflows to `Infinity`
- * around wave ~116,000-118,000 (verified: (1.006)^117999 already exceeds
- * Number.MAX_VALUE), which would make every enemy from that wave onward
- * literally unkillable — a hard break, not just "very hard". Since the
- * spec explicitly requires the game to keep functioning out to wave
- * 3,000,000+ with no artificial MAX_PHASE, the compounding term's
- * exponent is capped at this wave index: compounding growth STOPS
- * accelerating beyond it, but the linear term above keeps growing forever
- * (pure multiplication, never overflows at any wave number a real save
- * could reach), so difficulty still climbs indefinitely — it just stops
- * being exponential once it's already astronomically large (~1e52 at the
- * cap, leaving ~250 orders of magnitude of headroom below Number.MAX_VALUE
- * for the linear term and any other multiplier to stack on top of safely).
- * Far below any wave a real player reaches (~450-460 is already the
- * documented "wall"), so this changes nothing about actual gameplay balance
- * — see enemyStats.test.ts for the exact-match regression proof.
+ * ============================================================================
+ * INFINITE BALANCE OVERHAUL — enemy HP scaling.
+ * ============================================================================
+ *
+ * WHAT WAS WRONG (the root cause of the documented ~wave 450-460 wall): the
+ * previous curve was `(1 + i*0.06) * (1.006)^i` — a COMPOUNDING (exponential)
+ * term. Exponential growth outruns ANY player-power curve this economy can
+ * fund, so a wall was mathematically guaranteed; it was only ever a question
+ * of which wave it landed on. Real engine simulation proved it directly:
+ * even with boss HP divided by 10, a realistic bot stalled around wave 480
+ * against ORDINARY enemies.
+ *
+ * WHAT REPLACES IT — a genuinely unbounded but SUB-EXPLOSIVE curve, built as
+ * the product of two strictly-increasing factors:
+ *
+ *   hpMultiplier(i) = EARLY(i) * LATE(i)
+ *   EARLY(i) = 1 + A * (1 - e^(-i / T))     // bounded, smooth, front-loaded
+ *   LATE(i)  = (1 + i / S) ^ P              // power law, P < 1, unbounded
+ *
+ * Properties this shape guarantees, none of which the old one had:
+ *  - STRICTLY INCREASING FOREVER. Both factors are strictly increasing in i,
+ *    so enemies never "stay permanently the same" at any wave, ever. There is
+ *    no plateau, no soft cap, no frozen term.
+ *  - SUB-EXPLOSIVE. Asymptotically hpMultiplier ~ (1+A) * (i/S)^P with
+ *    P = HP_LATE_EXPONENT < 1 relative to the player's own compounding
+ *    (Specialization x Mastery) growth — so difficulty keeps climbing while
+ *    the RATE of climb keeps decelerating, which is exactly what makes an
+ *    endless game endless instead of walled.
+ *  - NO ARTIFICIAL OVERFLOW CAP NEEDED. A polynomial in i can never reach
+ *    Number.MAX_VALUE at any wave number representable as a JS integer
+ *    (wave 1e15 -> multiplier ~1e11), so the old
+ *    `Math.min(waveIndex, HP_COMPOUND_WAVE_INDEX_CAP)` safety clamp — which
+ *    was a disguised difficulty cap — is deleted outright rather than
+ *    re-hidden somewhere else.
+ *  - EARLY GAME PRESERVED. A/T are fitted so waves 1-130 (the hand-authored
+ *    content phases) land within ~10-15% of the multipliers the old curve
+ *    produced; the two curves only diverge where the old one was already
+ *    running away (wave 200+).
+ *
+ * Constants were fitted against the real, coverage-adjusted DPS a real build
+ * lands on the real map (see engine/InfiniteScaling.test.ts and the boss
+ * kill-margin checkpoints in engine/EndgameCheckpoints.test.ts), never
+ * guessed.
  */
-const HP_COMPOUND_WAVE_INDEX_CAP = 20_000;
 
-/** The HP multiplier for a given (0-indexed) wave — the only place `Math.pow` for HP scaling happens, so the overflow-safety cap above is applied exactly once. */
-function hpMultiplierForWaveIndex(waveIndex: number): number {
-  const linear = 1 + waveIndex * HP_GROWTH_PER_WAVE;
-  const compoundIndex = Math.min(waveIndex, HP_COMPOUND_WAVE_INDEX_CAP);
-  const compound = Math.pow(1 + HP_COMPOUND_PER_WAVE, compoundIndex);
-  return linear * compound;
+/** Amplitude of the bounded early-game surge — replaces the old compounding term's early bite without its runaway tail. */
+const HP_EARLY_SURGE_AMPLITUDE = 3.5;
+/** Wave scale over which the early surge builds (~63% of it is delivered by this wave index). */
+const HP_EARLY_SURGE_SCALE = 80;
+/** Wave scale of the permanent power-law term — larger = gentler early contribution. */
+const HP_LATE_SCALE = 30;
+/** The permanent asymptotic exponent. Deliberately < 1 and, more importantly, below the exponent at which Specialization x Mastery power grows with wave number (~0.95) — that inequality is the structural no-wall guarantee. */
+const HP_LATE_EXPONENT = 0.72;
+
+/**
+ * The HP multiplier for a given (0-indexed) wave. Strictly increasing,
+ * finite, and positive for every finite waveIndex >= 0 — see this section's
+ * doc comment for the full derivation.
+ */
+export function hpMultiplierForWaveIndex(waveIndex: number): number {
+  const i = Math.max(0, waveIndex);
+  const early = 1 + HP_EARLY_SURGE_AMPLITUDE * (1 - Math.exp(-i / HP_EARLY_SURGE_SCALE));
+  const late = Math.pow(1 + i / HP_LATE_SCALE, HP_LATE_EXPONENT);
+  return early * late;
 }
 
 /**

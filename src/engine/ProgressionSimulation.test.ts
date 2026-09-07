@@ -4,6 +4,8 @@ import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import {
+  canUnlockMastery,
+  canUpgradeMastery,
   canUpgradeSpecialization,
   getSpecializationUpgradeCostFor,
   getTowerUpgradeCost,
@@ -11,6 +13,7 @@ import {
   type TowerInstance,
 } from "@/entities/Tower";
 import { getSpecializationsForTower, SPECIALIZATION_UNLOCK_GEM_COST } from "@/config/specializations";
+import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 
 /**
  * Progression 2.0 spec section 3/4 — the exact problem this whole
@@ -27,23 +30,21 @@ import { getSpecializationsForTower, SPECIALIZATION_UNLOCK_GEM_COST } from "@/co
 type Action =
   | { kind: "build"; cost: number; slotId: string; type: TowerType }
   | { kind: "level"; cost: number; towerId: string }
-  | { kind: "specUpgrade"; cost: number; towerId: string };
+  | { kind: "specUpgrade"; cost: number; towerId: string }
+  | { kind: "masteryUpgrade"; cost: number; towerId: string };
 
 /**
- * Visual Overhaul spec section 21: choosing a specialization path is now a
- * Gems purchase, not a Gold one (see GameEngine.chooseTowerSpecialization) —
- * this greedy bot only ever spends Gold, so it can no longer unlock a path
- * on its own (a real Gold-only player wouldn't be able to either). It still
- * exercises specUpgrade (still Gold, still requires a chosen path) whenever
- * a save already ships one pre-chosen — see the "with a pre-chosen
- * specialization" variant below.
- *
- * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): Tower Mastery moved OFF
- * Gold entirely and onto Gems (see gemSinks.ts) — it is deliberately NOT a
- * candidate here anymore, since a Gold balance can never actually afford it
- * regardless of how the cost number compares. Its own Gems-funded spending
- * is exercised separately by spendGemsOnMastery below, driven by whatever
- * Gems the bot actually earns from boss/mini-boss kills, never by Gold.
+ * Visual Overhaul spec section 21: choosing a specialization path is a Gems
+ * purchase (see GameEngine.chooseTowerSpecialization) and, symmetrically
+ * (INFINITE BALANCE OVERHAUL), unlocking Mastery (0 -> 1) is ALSO a Gems
+ * purchase — this greedy bot only ever spends Gold, so it can no longer
+ * unlock either track on its own (a real Gold-only player wouldn't be able
+ * to either). Both Gems-funded unlock decisions are exercised separately by
+ * spendGemsOnMastery/spendGemsOnMasteryAndSpecialization below, driven by
+ * whatever Gems the bot actually earns from boss/mini-boss kills. This
+ * Gold-only loop DOES exercise specUpgrade and masteryUpgrade (both Gold,
+ * both require the track already unlocked) whenever a save already ships
+ * one pre-unlocked, or once a Gems-spender has unlocked one mid-run.
  */
 function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: ReadonlySet<string>, typeIndex: number): Action | null {
   const candidates: Action[] = [];
@@ -62,6 +63,10 @@ function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: Reado
       const cost = getSpecializationUpgradeCostFor(tower);
       if (cost !== null) candidates.push({ kind: "specUpgrade", cost, towerId: tower.id });
     }
+
+    if (canUpgradeMastery(tower)) {
+      candidates.push({ kind: "masteryUpgrade", cost: getMasteryUpgradeCostFor(tower), towerId: tower.id });
+    }
   }
 
   if (candidates.length === 0) return null;
@@ -70,40 +75,34 @@ function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: Reado
 }
 
 /**
- * CORREÇÃO DE REQUISITOS — Mastery's own Gems-funded greedy spend, entirely
+ * INFINITE BALANCE OVERHAUL — Mastery's own Gems-funded greedy spend, entirely
  * separate from the Gold loop above: converts whatever Gem Shards have
- * accumulated (boss/mini-boss kills), then buys the single cheapest
- * available Mastery upgrade across every placed tower while Gems allow it.
- * Mirrors the real player flow (Shards -> Gems -> Mastery) instead of
- * assuming Gems appear from nowhere.
+ * accumulated (boss/mini-boss kills), then unlocks the single cheapest
+ * not-yet-unlocked Mastery track across every placed tower while Gems allow
+ * it (a flat MASTERY_UNLOCK_GEM_COST per tower type — every subsequent level
+ * is Gold, exercised by the main Gold loop's masteryUpgrade candidate
+ * instead). Mirrors the real player flow (Shards -> Gems -> unlock).
  */
 function spendGemsOnMastery(engine: GameEngine, towers: readonly TowerInstance[]): void {
   while (engine.convertGemShards()) {
     /* keep converting until below the fixed rate */
   }
   for (let guard = 0; guard < 50; guard++) {
-    if (towers.length === 0) return;
-    let cheapest: TowerInstance | null = null;
-    let cheapestCost = Infinity;
-    for (const tower of towers) {
-      const cost = getMasteryUpgradeCostFor(tower);
-      if (cost < cheapestCost) {
-        cheapestCost = cost;
-        cheapest = tower;
-      }
-    }
-    if (!cheapest || !engine.canAffordGems(cheapestCost)) return;
-    engine.selectTower(cheapest.id);
-    if (!engine.upgradeSelectedTowerMastery()) return;
+    const unlockable = towers.find((t) => {
+      engine.selectTower(t.id);
+      return canUnlockMastery(t) && engine.canUnlockSelectedTowerMastery();
+    });
+    if (!unlockable || !engine.canAffordGems(MASTERY_UNLOCK_GEM_COST)) return;
+    engine.selectTower(unlockable.id);
+    if (!engine.unlockSelectedTowerMastery()) return;
   }
 }
 
 /**
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — spends Gems on choosing a
- * fresh specialization path (preferring diversifying a build's identity)
- * before falling back to Mastery, so a simulation using this variant
- * actually EXERCISES the new uncapped-Specialization Gold sink end-to-end,
- * not just its Gold-only upgrade loop.
+ * INFINITE BALANCE OVERHAUL — spends Gems on choosing a fresh specialization
+ * path (preferring diversifying a build's identity) before falling back to
+ * unlocking Mastery, so a simulation using this variant actually EXERCISES
+ * both uncapped Gold sinks' Gems-funded unlock step end-to-end.
  */
 function spendGemsOnMasteryAndSpecialization(engine: GameEngine, towers: readonly TowerInstance[]): void {
   while (engine.convertGemShards()) {
@@ -122,18 +121,13 @@ function spendGemsOnMasteryAndSpecialization(engine: GameEngine, towers: readonl
       if (engine.chooseTowerSpecialization(options[0]!.id)) continue;
     }
 
-    let cheapest: TowerInstance | null = null;
-    let cheapestCost = Infinity;
-    for (const tower of towers) {
-      const cost = getMasteryUpgradeCostFor(tower);
-      if (cost < cheapestCost) {
-        cheapestCost = cost;
-        cheapest = tower;
-      }
-    }
-    if (!cheapest || !engine.canAffordGems(cheapestCost)) return;
-    engine.selectTower(cheapest.id);
-    if (!engine.upgradeSelectedTowerMastery()) return;
+    const unlockable = towers.find((t) => {
+      engine.selectTower(t.id);
+      return canUnlockMastery(t) && engine.canUnlockSelectedTowerMastery();
+    });
+    if (!unlockable || !engine.canAffordGems(MASTERY_UNLOCK_GEM_COST)) return;
+    engine.selectTower(unlockable.id);
+    if (!engine.unlockSelectedTowerMastery()) return;
   }
 }
 
@@ -188,9 +182,12 @@ function runGreedyBot(
       } else if (action.kind === "level") {
         engine.selectTower(action.towerId);
         engine.upgradeSelectedTower();
-      } else {
+      } else if (action.kind === "specUpgrade") {
         engine.selectTower(action.towerId);
         engine.upgradeSelectedTowerSpecialization();
+      } else {
+        engine.selectTower(action.towerId);
+        engine.upgradeSelectedTowerMastery();
       }
     }
 
@@ -257,23 +254,20 @@ describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
     // — long enough to comfortably pass the ~27-30h full-level-30 point for
     // every one of the 12 slots, on the ACTUAL engine, not a projection.
     //
-    // NOTE on why this test no longer also asserts avgMasteryLevel > 0 here:
-    // an earlier version of this test tried to prove Gems-funded Mastery
-    // reachable by having this SAME greedy bot also convert Gem Shards and
-    // spend them on Mastery. Real engine simulation caught a genuine,
-    // PRE-EXISTING (not introduced by this correction) property of the boss
-    // fight itself: this bot's build gets permanently stuck in BOSS_BATTLE
-    // against one specific main boss around wave ~270-300 for the rest of
-    // the 48h run (bossesDefeatedTotal stays 0 from that point on — verified
-    // via engine.getLocalEconomyTotals()), so its Gem Shard income (which
-    // only comes from boss/mini-boss kills) permanently flatlines while Gold
-    // (from ordinary enemy kills, which keep happening even mid-standoff)
-    // keeps flowing and towers keep leveling from it. That is a boss-combat-
-    // balance question, not a Season/Mastery/Gems-economy one — chasing it
-    // here would silently widen this correction's scope. Gems-funded
-    // Mastery's own reachability is proven directly, deterministically, and
-    // without depending on this bot's incidental combat luck by
-    // GameEngineProgression2.test.ts's "Tower Mastery funded by Gems" suite.
+    // NOTE on why this test still doesn't assert avgMasteryLevel > 0 here:
+    // an EARLIER version of this test found this same bot permanently stuck
+    // in BOSS_BATTLE against one specific main boss around wave ~270-300,
+    // flatlining its Gem Shard income for the rest of a 48h run — traced at
+    // the time to the endgame's OLD exponential-per-lap boss-HP formula
+    // (since fixed, see config/phaseConfig.ts's getEndgameBossHpMultiplierBonus
+    // doc comment; the "HONEST FINDING" test below this one, using a
+    // sibling bot, now confirms Gems-funded unlocks ARE reachable post-fix).
+    // Left unasserted here regardless, since this specific bot's Gold-only
+    // spend pattern was never the right tool to prove a Gems-funded sink
+    // reachable in the first place — Mastery's own reachability is proven
+    // directly, deterministically, and without depending on any bot's
+    // incidental combat luck by GameEngineProgression2.test.ts's "Tower
+    // Mastery" suite.
     const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
     const result = runGreedyBot(FORTY_EIGHT_HOURS_MS);
 
@@ -287,11 +281,32 @@ describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
     expect(result.gold).toBeGreaterThan(0);
   }, 120_000);
 
-  it("HONEST FINDING: this exact bot (seed=1) never earns enough Gems to unlock even its FIRST specialization path in 48h, even when actively trying to (spendGemsOnMasteryAndSpecialization) — same root cause as the pre-existing Mastery finding above (its Gem Shard income flatlines once it hits the wave ~270-300 boss stall; see engine/BossManager.ts / GameEngine's boss-escape doc comment). This is a REAL, boss-combat-balance consequence, not a bug in the Specialization sink itself — the sink's own mechanics (uncapped level, capped effect, no overflow) are proven directly and deterministically, without depending on this bot's incidental combat luck, by specializations.test.ts and GameEngineProgression2.test.ts's 'Specialization is a genuinely uncapped Gold sink' suite.", () => {
+  /**
+   * INFINITE BALANCE OVERHAUL — HONEST FINDING, UPDATED. The original
+   * version of this test (seed=1, same bot) found avgSpecializationLevel
+   * stuck at exactly 0 for the whole 48h run: Gem Shard income (boss/mini-
+   * boss kills only) flatlined once the bot got permanently stuck against
+   * the single hardest endgame boss around wave ~270-300, because the OLD
+   * endgame boss-HP formula compounded exponentially (1.08^laps) while
+   * player power was effectively capped (Specialization stopped at level 5,
+   * Mastery granted 0 combat power) — a structural wall, not bad luck.
+   *
+   * Both of those root causes are now fixed: Specialization/Mastery are
+   * genuinely uncapped with real (if modest) growth, AND the endgame boss-HP
+   * bonus was rewritten from exponential-per-lap to a bounded power-law
+   * that stays below player power's own growth rate (see
+   * config/phaseConfig.ts's getEndgameBossHpMultiplierBonus doc comment for
+   * the real simulation data that caught the exponential version). Bosses
+   * stay killable indefinitely now, so Gem Shard income never flatlines —
+   * re-running this EXACT bot/seed confirms the chicken-and-egg problem no
+   * longer reproduces: it reaches a real, growing Specialization level
+   * (not just once, but sustained upgrades) well within 48h.
+   */
+  it("HONEST FINDING (RE-VERIFIED): this exact bot (seed=1) DOES earn enough Gems to unlock and then keep upgrading a specialization path in 48h, now that bosses stay killable indefinitely (spendGemsOnMasteryAndSpecialization)", () => {
     const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
     const result = runGreedyBot(FORTY_EIGHT_HOURS_MS, spendGemsOnMasteryAndSpecialization);
 
-    expect(result.avgSpecializationLevel).toBe(0);
+    expect(result.avgSpecializationLevel).toBeGreaterThan(0);
     expect(Number.isFinite(result.gold)).toBe(true);
   }, 120_000);
 });

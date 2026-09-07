@@ -181,23 +181,37 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(reloaded.getRenderSnapshot().towers[0]!.equippedSkinId).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
   });
 
-  describe("Tower Mastery funded by Gems (CORREÇÃO DE REQUISITOS — was Gold before)", () => {
-    it("upgrading Mastery spends Gems, never Gold, and persists permanently across a reload", () => {
+  describe("Tower Mastery — one-time Gems unlock, then Gold forever (INFINITE BALANCE OVERHAUL)", () => {
+    it("unlocking Mastery spends Gems, never Gold, and persists permanently across a reload", () => {
       const engine = startWithOneMaxedTower();
       const goldBefore = engine.getHudSnapshot().gold;
       const gemsBefore = engine.getHudSnapshot().gems;
 
-      expect(engine.upgradeSelectedTowerMastery()).toBe(true);
+      expect(engine.canUnlockSelectedTowerMastery()).toBe(true);
+      expect(engine.unlockSelectedTowerMastery()).toBe(true);
       expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
       expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore); // Gems spent
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
+      expect(engine.canUnlockSelectedTowerMastery()).toBe(false); // one-time only
 
       const reloaded = new GameEngine();
       reloaded.startRun();
       expect(reloaded.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
     });
 
-    it("fails without enough Gems even when Gold is abundant", () => {
+    it("every level AFTER the unlock spends Gold, never Gems", () => {
+      const engine = startWithOneMaxedTower();
+      expect(engine.unlockSelectedTowerMastery()).toBe(true);
+      const gemsAfterUnlock = engine.getHudSnapshot().gems;
+      const goldBefore = engine.getHudSnapshot().gold;
+
+      expect(engine.upgradeSelectedTowerMastery()).toBe(true);
+      expect(engine.getHudSnapshot().gems).toBe(gemsAfterUnlock); // Gems untouched
+      expect(engine.getHudSnapshot().gold).toBeLessThan(goldBefore); // Gold spent
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(2);
+    });
+
+    it("unlock fails without enough Gems even when Gold is abundant", () => {
       updateSave({
         gold: 999_999,
         gems: 0,
@@ -206,15 +220,21 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       const engine = new GameEngine();
       engine.startRun();
       engine.selectTower(engine.getRenderSnapshot().towers[0]!.id);
+      expect(engine.unlockSelectedTowerMastery()).toBe(false);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
+    });
+
+    it("upgrade fails before the track is unlocked, even with abundant Gold", () => {
+      const engine = startWithOneMaxedTower();
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
       expect(engine.upgradeSelectedTowerMastery()).toBe(false);
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
     });
 
-    // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery grants ZERO
-    // combat power now; this suite proves its actual replacement function
-    // (Specialization Respec Tokens) is wired correctly end-to-end through
-    // GameEngine, deterministically — not dependent on any bot's incidental
-    // combat luck.
+    // Mastery grants real but modest combat bonuses now (see
+    // entities/Tower.test.ts's own dedicated coverage) — this suite proves
+    // its original replacement function (Specialization Respec Tokens) is
+    // still wired correctly end-to-end through GameEngine, deterministically.
     it("earning a Respec Token via Mastery lets the player reset a chosen specialization, and it's spent (not re-grantable) after a reload", () => {
       const engine = startWithOneMaxedTower();
       const tower = engine.getRenderSnapshot().towers[0]!;
@@ -226,8 +246,9 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(engine.canRespecSelectedTowerSpecialization()).toBe(false);
       expect(engine.respecSelectedTowerSpecialization()).toBe(false);
 
-      // 5 Mastery levels = exactly 1 Respec Token.
-      for (let i = 0; i < 5; i++) engine.upgradeSelectedTowerMastery();
+      // 1 Gems unlock (0 -> 1) + 4 Gold upgrades (1 -> 5) = exactly 1 Respec Token.
+      engine.unlockSelectedTowerMastery();
+      for (let i = 0; i < 4; i++) engine.upgradeSelectedTowerMastery();
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(5);
       expect(engine.getAvailableRespecTokensForSelectedTower()).toBe(1);
       expect(engine.canRespecSelectedTowerSpecialization()).toBe(true);
@@ -253,10 +274,10 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     });
   });
 
-  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the Gold-sink fix: the
-  // level track is genuinely uncapped end-to-end through GameEngine, while
-  // the combat effect it grants stays exactly at its original level-5 cap.
-  describe("Specialization is a genuinely uncapped Gold sink, with a soft-capped combat effect (CORREÇÃO DE REQUISITOS SEASON COMPETITIVA)", () => {
+  // INFINITE BALANCE OVERHAUL — the level track AND the combat effect it
+  // grants are BOTH genuinely uncapped end-to-end through GameEngine now
+  // (diminishing returns, never a disguised flat cap).
+  describe("Specialization is a genuinely uncapped Gold sink, with a diminishing-returns (never capped) combat effect (INFINITE BALANCE OVERHAUL)", () => {
     it("upgradeSelectedTowerSpecialization keeps working, and keeps costing real Gold, FAR past the old level-5 cap", () => {
       const engine = startWithOneMaxedTower();
       engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER");
@@ -276,10 +297,10 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(Number.isFinite(getSpecializationUpgradeCostFor(tower))).toBe(true);
     });
 
-    it("the specialization's combat-relevant stats (read through the exact same pipeline CombatSystem uses) stop growing once its level passes the effect cap, even though Gold keeps being spent", () => {
+    it("the specialization's combat-relevant stats (read through the exact same pipeline CombatSystem uses) KEEP growing past the old level-5 cap, even though the growth per level shrinks", () => {
       const engine = startWithOneMaxedTower();
       engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER");
-      for (let i = 0; i < 4; i++) engine.upgradeSelectedTowerSpecialization(); // level 1 -> 5 (the cap)
+      for (let i = 0; i < 4; i++) engine.upgradeSelectedTowerSpecialization(); // level 1 -> 5 (the OLD cap)
 
       const readEffect = () => {
         const tower = engine.getRenderSnapshot().towers[0]!;
@@ -287,10 +308,13 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
         return applySpecializationToSpecial(base, tower.specializationId, tower.specializationLevel);
       };
 
-      const effectAtCap = readEffect();
+      const effectAtOldCap = readEffect();
       for (let i = 0; i < 20; i++) engine.upgradeSelectedTowerSpecialization(); // level 5 -> 25
+      const effectAtLevel25 = readEffect();
 
-      expect(readEffect()).toEqual(effectAtCap);
+      expect(effectAtLevel25).not.toEqual(effectAtOldCap);
+      if (effectAtLevel25.type !== "IRONWOOD" || effectAtOldCap.type !== "IRONWOOD") throw new Error("unreachable");
+      expect(effectAtLevel25.critMultiplier).toBeGreaterThan(effectAtOldCap.critMultiplier);
       expect(engine.getRenderSnapshot().towers[0]!.specializationLevel).toBe(25);
     });
   });

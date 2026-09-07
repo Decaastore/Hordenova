@@ -24,16 +24,18 @@ describe("gemSinks (Master Implementation Pass spec section 7/8/46)", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the NEVER-P2W CONTRACT
-  // used to carry one deliberate exception (tower_mastery, because Mastery
-  // used to grant a real damage/attack-speed/range multiplier). Mastery no
-  // longer grants any combat stat (see config/towerMastery.ts), so the
-  // exception category was removed entirely — every sink must now be an
-  // ordinary CONVENIENCE or COSMETIC_PRESTIGE purchase, with no exceptions.
-  it("tower_mastery is an ordinary COSMETIC_PRESTIGE sink — the old COMBAT_POWER_MASTERY_EXCEPTION category no longer exists", () => {
+  // INFINITE BALANCE OVERHAUL — tower_mastery here is the one-time Gems
+  // unlock only (CONVENIENCE, uncapped:false — same shape as
+  // specialization_unlock). Every level after that is a Gold sink (see
+  // goldSinks.ts's "mastery" entry) whose combat effect DOES grow, with
+  // diminishing returns, funded entirely by Gold — never Gems. The
+  // NEVER-P2W CONTRACT holds because Gems only ever buy the one-time
+  // access, never a recurring power purchase.
+  it("tower_mastery's Gems cost is the one-time CONVENIENCE unlock, not a recurring power purchase", () => {
     const mastery = GEM_SINKS.find((s) => s.id === "tower_mastery");
     expect(mastery).toBeDefined();
-    expect(mastery!.category).toBe("COSMETIC_PRESTIGE");
+    expect(mastery!.category).toBe("CONVENIENCE");
+    expect(mastery!.uncapped).toBe(false);
   });
 
   it("every registered Gem sink is CONVENIENCE or COSMETIC_PRESTIGE — no combat-power exception exists anymore", () => {

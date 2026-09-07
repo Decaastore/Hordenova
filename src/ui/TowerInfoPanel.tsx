@@ -2,13 +2,20 @@ import type { CSSProperties, ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import {
   canChooseSpecialization,
+  canUnlockMastery,
+  canUpgradeMastery,
   canUpgradeSpecialization,
   getMasteryUpgradeCostFor,
   getSpecializationUpgradeCostFor,
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
-import { getMasteryCosmeticTier, getNextMasteryCosmeticTier, MASTERY_RESPEC_TOKEN_INTERVAL } from "@/config/towerMastery";
+import {
+  getMasteryCosmeticTier,
+  getNextMasteryCosmeticTier,
+  MASTERY_RESPEC_TOKEN_INTERVAL,
+  MASTERY_UNLOCK_GEM_COST,
+} from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
@@ -19,7 +26,6 @@ import {
 } from "@/config/towerStats";
 import {
   getSpecializationsForTower,
-  SPECIALIZATION_EFFECT_LEVEL_CAP,
   SPECIALIZATION_UNLOCK_GEM_COST,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
@@ -43,7 +49,9 @@ interface TowerInfoPanelProps {
   onPurchaseSkin: (skinId: string) => void;
   /** Whether `skinId` is already permanently owned — reused so this component never needs its own copy of the ownership set. */
   isSkinOwned: (skinId: string) => boolean;
-  /** Master Implementation Pass spec sections 3-6 — Tower Mastery, now a PERMANENT, Gems-funded uncapped sink past MAX_TOWER_LEVEL (CORREÇÃO DE REQUISITOS). */
+  /** INFINITE BALANCE OVERHAUL — one-time Gems unlock (0 -> 1), mirroring onChooseSpecialization. */
+  onUnlockMastery: () => void;
+  /** INFINITE BALANCE OVERHAUL — Gold-funded, uncapped upgrade (1 -> 2 -> ... forever), mirroring onUpgradeSpecialization. */
   onUpgradeMastery: () => void;
   /** CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — how many Specialization Respec Tokens this tower's type currently has available (earned by masteryLevel, minus spent). */
   respecTokensAvailable: number;
@@ -72,6 +80,7 @@ export function TowerInfoPanel({
   onEquipSkin,
   onPurchaseSkin,
   isSkinOwned,
+  onUnlockMastery,
   onUpgradeMastery,
   respecTokensAvailable,
   canRespecSpecialization,
@@ -167,7 +176,15 @@ export function TowerInfoPanel({
         </button>
       )}
 
-      <MasterySection tower={tower} gems={gems} theme={theme} t={t} onUpgrade={onUpgradeMastery} />
+      <MasterySection
+        tower={tower}
+        gold={gold}
+        gems={gems}
+        theme={theme}
+        t={t}
+        onUnlock={onUnlockMastery}
+        onUpgrade={onUpgradeMastery}
+      />
 
       <SpecializationSection
         tower={tower}
@@ -202,40 +219,66 @@ export function TowerInfoPanel({
  * spending out, exactly like Specialization already allows once its own
  * level gate passes.
  *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery no longer buys ANY
- * combat stat. It represents permanent prestige/experience instead: every
- * MASTERY_RESPEC_TOKEN_INTERVAL levels grants a Specialization Respec Token
- * (shown here as "progress to next token"), and reaching a cosmetic tier
- * unlocks a purely visual ring/aura/rune effect around the tower (see
- * config/towerMastery.ts — MASTERY_COSMETIC_TIERS is calculated directly
- * from masteryLevel and is never read by CombatSystem). No "+X% Damage" /
- * "+X% Attack Speed" / "+X% Range" text belongs here anymore.
+ * INFINITE BALANCE OVERHAUL — mirrors SpecializationSection's two-step
+ * shape exactly: a one-time Gems UNLOCK (0 -> 1) followed by an uncapped
+ * Gold UPGRADE track (1 -> 2 -> ... forever). Mastery grants real, small,
+ * bounded-weighted combat bonuses again (see config/towerMastery.ts's
+ * getMasteryBonuses — range/gold-efficiency/siege-resistance lead, damage is
+ * deliberately the smallest), on top of the unchanged Respec Token and
+ * cosmetic-tier rewards.
  */
 function MasterySection({
   tower,
+  gold,
   gems,
   theme,
   t,
+  onUnlock,
   onUpgrade,
 }: {
   tower: TowerInstance;
+  gold: number;
   gems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
+  onUnlock: () => void;
   onUpgrade: () => void;
 }) {
-  const cost = getMasteryUpgradeCostFor(tower);
-  const affordable = gems >= cost;
   const currentTier = getMasteryCosmeticTier(tower.masteryLevel);
   const nextTier = getNextMasteryCosmeticTier(tower.masteryLevel);
   const levelsToNextToken = MASTERY_RESPEC_TOKEN_INTERVAL - (tower.masteryLevel % MASTERY_RESPEC_TOKEN_INTERVAL);
+
+  if (canUnlockMastery(tower)) {
+    const affordable = gems >= MASTERY_UNLOCK_GEM_COST;
+    return (
+      <>
+        <div style={dividerStyle} />
+        <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
+        <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>{t("towerInfo.masteryPrestigeNote")}</div>
+        <button
+          onClick={onUnlock}
+          disabled={!affordable}
+          style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {t("towerInfo.masteryUnlock")}
+            <span style={{ opacity: 0.6 }}>·</span>
+            {t("towerInfo.cost")} <GemIcon size={11} color={PALETTE.gem} /> {MASTERY_UNLOCK_GEM_COST}
+          </span>
+        </button>
+      </>
+    );
+  }
+
+  const cost = getMasteryUpgradeCostFor(tower);
+  const affordable = gold >= cost;
+  const canUpgrade = canUpgradeMastery(tower);
 
   return (
     <>
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{t("towerInfo.masteryLevel", { level: tower.masteryLevel })}</div>
-      <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>{t("towerInfo.masteryPrestigeNote")}</div>
       <div style={{ fontSize: 10, color: theme.accent, marginTop: 2 }}>
         {t("towerInfo.masteryNextToken", { levels: levelsToNextToken })}
       </div>
@@ -252,17 +295,19 @@ function MasterySection({
           })}
         </div>
       )}
-      <button
-        onClick={onUpgrade}
-        disabled={!affordable}
-        style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
-      >
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          {t("towerInfo.masteryUpgrade")}
-          <span style={{ opacity: 0.6 }}>·</span>
-          {t("towerInfo.cost")} <GemIcon size={11} color={PALETTE.gem} /> {cost}
-        </span>
-      </button>
+      {canUpgrade && (
+        <button
+          onClick={onUpgrade}
+          disabled={!affordable}
+          style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+        >
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {t("towerInfo.masteryUpgrade")}
+            <span style={{ opacity: 0.6 }}>·</span>
+            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
+          </span>
+        </button>
+      )}
     </>
   );
 }
@@ -357,11 +402,6 @@ function SpecializationSection({
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 2 }}>
         {t("towerInfo.specializationLevel", { level: tower.specializationLevel })}
       </div>
-      {tower.specializationLevel >= SPECIALIZATION_EFFECT_LEVEL_CAP && (
-        <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>
-          {t("towerInfo.specializationEffectCapped", { level: SPECIALIZATION_EFFECT_LEVEL_CAP })}
-        </div>
-      )}
       {canUpgrade && (
         <button
           onClick={onUpgrade}

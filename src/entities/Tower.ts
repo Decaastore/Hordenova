@@ -13,7 +13,7 @@ import {
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
-import { getAvailableRespecTokens, getMasteryUpgradeCost } from "@/config/towerMastery";
+import { getAvailableRespecTokens, getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import type { Vector2 } from "@/utils/geometry";
 
@@ -147,15 +147,18 @@ export interface SiegeDamageResult {
 }
 
 /**
- * Resolves one Boss Siege Attack hit against `tower` — shield absorbs
- * first, armor reduces what's left, remainder comes off HP. Reaching 0 HP
- * disables the tower (reuses the exact same disabledRemainingMs mechanic a
- * DISABLER enemy already uses) for `disableDurationMs` rather than
- * destroying it — a tower is never permanently lost to this.
+ * Resolves one Boss Siege Attack hit against `tower` — Mastery's
+ * siegeResistance (a bounded fraction, see config/towerMastery.ts) shrinks
+ * the raw hit first, then shield absorbs, then armor reduces what's left,
+ * remainder comes off HP. Reaching 0 HP disables the tower (reuses the
+ * exact same disabledRemainingMs mechanic a DISABLER enemy already uses)
+ * for `disableDurationMs` rather than destroying it — a tower is never
+ * permanently lost to this.
  */
 export function applySiegeDamage(tower: TowerInstance, rawDamage: number, disableDurationMs: number): SiegeDamageResult {
   const def = getTowerSurvivalDefinition(tower.type);
-  let remaining = rawDamage;
+  const siegeResistance = tower.masteryLevel > 0 ? getMasteryBonuses(tower.masteryLevel).siegeResistance : 0;
+  let remaining = rawDamage * (1 - siegeResistance);
 
   if (tower.shieldHp > 0) {
     const absorbed = Math.min(tower.shieldHp, remaining);
@@ -178,30 +181,60 @@ export function applySiegeDamage(tower: TowerInstance, rawDamage: number, disabl
  * resolveSpecialAttack, and every chain/crit/frozen-bonus damage
  * calculation).
  *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — masteryLevel is deliberately
- * NEVER read here anymore. An earlier version of this function applied a
- * uniform Mastery bonus multiplier on top of `levelStats`, which is exactly
- * the "Gems -> Mastery -> +X% DPS" pattern the Season's competitive design
- * forbids (Gems must never buy permanent combat power — see
- * config/towerMastery.ts's doc comment for the full rationale and what
- * Mastery grants instead). `getTowerStats` now returns the level-based
- * stats completely unmodified regardless of masteryLevel — see this file's
- * own permanent regression test ("masteryLevel never changes combat
- * stats") that locks this in.
+ * INFINITE BALANCE OVERHAUL — masteryLevel IS read here again, but not the
+ * way the old (now-removed) uniform "+X% DPS" version did it. Mastery's
+ * combat effect is now small, deliberately damage-weighted last of its five
+ * dimensions (see config/towerMastery.ts's getMasteryBonuses doc comment —
+ * range is the largest per-point effect, damage the smallest), diminishing-
+ * returns shaped (masteryEffectScale), and funded entirely by Gold after a
+ * one-time Gems unlock — never a recurring Gems purchase. That is why this
+ * no longer violates the NEVER-P2W contract: Gems buy access to the track,
+ * Gold buys every point of power in it, exactly like Specialization.
  */
 export function getTowerStats(tower: TowerInstance): TowerLevelStats {
-  return getTowerLevelStats(tower.type, tower.level);
+  const levelStats = getTowerLevelStats(tower.type, tower.level);
+  if (tower.masteryLevel <= 0) return levelStats;
+
+  const bonuses = getMasteryBonuses(tower.masteryLevel);
+  return {
+    ...levelStats,
+    damage: round2(levelStats.damage * bonuses.damageMultiplier),
+    attackSpeed: round2(levelStats.attackSpeed * bonuses.attackSpeedMultiplier),
+    range: round2(levelStats.range * bonuses.rangeMultiplier),
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 // ---------------------------------------------------------------------------
 // Master Implementation Pass spec sections 3-6 — Tower Mastery.
 // ---------------------------------------------------------------------------
 
-/** Always purchasable — no max level (spec: "SEM CAP REAL"). */
-export function canUpgradeMastery(): boolean {
+/**
+ * INFINITE BALANCE OVERHAUL — Mastery now mirrors Specialization's two-step
+ * shape exactly: a one-time Gems UNLOCK (0 -> 1) followed by an uncapped
+ * Gold UPGRADE track (1 -> 2 -> ... forever). These two gates replace the
+ * old, single always-true `canUpgradeMastery()`.
+ */
+export function canUnlockMastery(tower: TowerInstance): boolean {
+  return tower.masteryLevel <= 0;
+}
+
+/** Mutates `tower` in place: pays the one-time unlock, setting masteryLevel to 1. Caller owns the MASTERY_UNLOCK_GEM_COST Gems deduction. */
+export function unlockMastery(tower: TowerInstance): boolean {
+  if (!canUnlockMastery(tower)) return false;
+  tower.masteryLevel = 1;
   return true;
 }
 
+/** No max level (spec: "SEM CAP REAL") — always purchasable once unlocked. */
+export function canUpgradeMastery(tower: TowerInstance): boolean {
+  return tower.masteryLevel >= 1;
+}
+
+/** GOLD cost for the selected tower's NEXT mastery level. Only meaningful once unlocked (masteryLevel >= 1) — the 0 -> 1 step uses the flat MASTERY_UNLOCK_GEM_COST instead. */
 export function getMasteryUpgradeCostFor(tower: TowerInstance): number {
   return getMasteryUpgradeCost(tower.type, tower.masteryLevel);
 }
@@ -243,7 +276,21 @@ export function canUpgradeTower(tower: TowerInstance): boolean {
 }
 
 export function getTowerUpgradeCost(tower: TowerInstance): number | null {
-  return getUpgradeCost(tower.type, tower.level);
+  const raw = getUpgradeCost(tower.type, tower.level);
+  return raw === null ? null : applyMasteryGoldDiscount(tower, raw);
+}
+
+/**
+ * Mastery's goldCostReduction (see config/towerMastery.ts's getMasteryBonuses
+ * doc comment: "every Gold price a tower of this type charges — level,
+ * specialization") shaves a bounded fraction off both of those prices, never
+ * off Mastery's own price (that would be self-referential). Rounds up so a
+ * heavily-discounted price never floors to 0 and becomes a free upgrade.
+ */
+function applyMasteryGoldDiscount(tower: TowerInstance, rawCost: number): number {
+  if (tower.masteryLevel <= 0) return rawCost;
+  const discount = getMasteryBonuses(tower.masteryLevel).goldCostReduction;
+  return Math.max(1, Math.ceil(rawCost * (1 - discount)));
 }
 
 /** Mutates `tower` in place, incrementing its level (caller owns gold deduction). */
@@ -301,11 +348,10 @@ export function chooseSpecialization(tower: TowerInstance, id: SpecializationId)
 }
 
 /**
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization level is now
- * genuinely uncapped (Gold must always have somewhere to go); only the
- * combat EFFECT stops growing past SPECIALIZATION_EFFECT_LEVEL_CAP (see
- * config/specializations.ts). So "can upgrade" is simply "has a path
- * chosen" — there is no longer a level at which this returns false.
+ * INFINITE BALANCE OVERHAUL — both the level AND the combat effect are
+ * genuinely uncapped now (see config/specializations.ts's specializationEffectScale
+ * — diminishing returns, never flat). So "can upgrade" is simply "has a path
+ * chosen" — there is no level at which this returns false.
  */
 export function canUpgradeSpecialization(tower: TowerInstance): boolean {
   return tower.specializationId !== null;
@@ -313,7 +359,7 @@ export function canUpgradeSpecialization(tower: TowerInstance): boolean {
 
 export function getSpecializationUpgradeCostFor(tower: TowerInstance): number | null {
   if (!tower.specializationId) return null;
-  return getSpecializationUpgradeCost(tower.type, tower.specializationLevel);
+  return applyMasteryGoldDiscount(tower, getSpecializationUpgradeCost(tower.type, tower.specializationLevel));
 }
 
 /** Mutates `tower` in place, incrementing its specialization level (caller owns gold deduction). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getScaledEnemyStats, ENEMY_TYPES } from "./enemyStats";
+import { getScaledEnemyStats, ENEMY_TYPES, hpMultiplierForWaveIndex } from "./enemyStats";
 
 /**
  * Master Implementation Pass spec section 47/52 — numerical safety at
@@ -21,7 +21,7 @@ describe("enemyStats — numerical safety at extreme wave numbers", () => {
     }
   });
 
-  it("HP is monotonically non-decreasing as the wave number climbs (difficulty never regresses), even past the compounding cap", () => {
+  it("HP is monotonically non-decreasing as the wave number climbs (difficulty never regresses), at any wave a save could reach", () => {
     let previousHp = 0;
     for (const wave of EXTREME_CHECKPOINTS) {
       const hp = getScaledEnemyStats("BRUTE", wave).hp;
@@ -30,25 +30,38 @@ describe("enemyStats — numerical safety at extreme wave numbers", () => {
     }
   });
 
-  it("HP keeps growing well past the compounding cap (linear term alone must still raise difficulty at extreme scale)", () => {
+  it("HP keeps growing at extreme scale (the late-game power-law term never flattens into a plateau)", () => {
     const at1M = getScaledEnemyStats("BRUTE", 1_000_000).hp;
     const at3M = getScaledEnemyStats("BRUTE", 3_000_000).hp;
     expect(at3M).toBeGreaterThan(at1M);
   });
 
-  it("matches the pre-safety-cap formula EXACTLY for every realistic wave a save could actually reach (regression proof — this fix changes only extreme-scale safety, never real gameplay balance)", () => {
-    // Reproduces the OLD unbounded formula directly for comparison — waveIndex
-    // here never approaches the 20,000 cap, so both formulas must agree
-    // bit-for-bit at the waves anyone has ever actually played to
-    // (the documented balance "wall" sits around wave 450-460).
-    const HP_GROWTH_PER_WAVE = 0.06;
-    const HP_COMPOUND_PER_WAVE = 0.006;
-    for (const wave of [1, 2, 10, 30, 100, 160, 250, 460, 1000, 5000, 19999]) {
+  /**
+   * INFINITE BALANCE OVERHAUL — the OLD formula this test used to lock in
+   * (linear-growth x exponential-compound, hard-capped at a wave-index
+   * ceiling of 20,000 purely to avoid Infinity) is gone: it had no way to
+   * decelerate except by literally freezing the curve, which is exactly
+   * what the user's spec forbade ("nunca congelar a curva"). Replaced by
+   * `hpMultiplierForWaveIndex` — an early-surge x late-power-law curve that
+   * needs no hard ceiling at all (see enemyStats.ts's own doc comment for
+   * the full derivation). This test now locks THAT formula in exactly,
+   * against getScaledEnemyStats's real output, so a future change can't
+   * silently drift the two apart.
+   */
+  it("getScaledEnemyStats.hp matches hpMultiplierForWaveIndex EXACTLY, at both realistic and extreme wave numbers (regression proof)", () => {
+    for (const wave of [1, 2, 10, 30, 100, 160, 250, 460, 1000, 5000, 19999, 100_000, 10_000_000]) {
       const waveIndex = wave - 1;
-      const oldMultiplier = (1 + waveIndex * HP_GROWTH_PER_WAVE) * Math.pow(1 + HP_COMPOUND_PER_WAVE, waveIndex);
-      const expectedHp = Math.round(40 * oldMultiplier); // CRAWLER baseHp = 40
+      const expectedHp = Math.round(40 * hpMultiplierForWaveIndex(waveIndex)); // CRAWLER baseHp = 40
       expect(getScaledEnemyStats("CRAWLER", wave).hp).toBe(expectedHp);
     }
+  });
+
+  it("hpMultiplierForWaveIndex has no hard-coded ceiling wave — it is a single continuous formula, never a frozen/clamped plateau, at any index a save could ever reach", () => {
+    const veryLate = hpMultiplierForWaveIndex(50_000_000);
+    const evenLater = hpMultiplierForWaveIndex(100_000_000);
+    expect(Number.isFinite(veryLate)).toBe(true);
+    expect(Number.isFinite(evenLater)).toBe(true);
+    expect(evenLater).toBeGreaterThan(veryLate); // still climbing — never plateaus
   });
 });
 

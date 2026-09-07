@@ -105,6 +105,31 @@ describe("phaseConfig", () => {
     expect(Number.isFinite(getEndgameBossHpMultiplierBonus(absurdWave))).toBe(true);
   });
 
+  /**
+   * INFINITE BALANCE OVERHAUL — mandatory permanent regression test. Real
+   * GameEngine simulation (a build whose Specialization/Mastery levels grow
+   * with wave, run through the actual CombatSystem/BossManager/map
+   * geometry) caught the ORIGINAL exponential-per-lap version of this bonus
+   * out-racing player power: the damage-budget/boss-HP ratio for a steadily
+   * reinvesting build collapsed from ~84x at wave 2000 to ~3x at wave
+   * 10,000. This test locks in the fix at the formula level (a bounded
+   * power-law, same shape as enemyStats.ts's own late-game term) so a future
+   * change back to unbounded exponential compounding fails loudly here
+   * instead of silently reintroducing a multi-thousand-wave wall.
+   */
+  it("getEndgameBossHpMultiplierBonus grows sub-polynomially in wave (power-law, not exponential) — never re-creates the compounding wall", () => {
+    const last = PHASES[PHASES.length - 1]!;
+    const endgameStart = last.endWave + 1;
+    const lapWaves = PHASES.length * 20;
+
+    // A genuinely exponential curve would roughly double every fixed
+    // interval of laps; this power-law curve must grow far slower than
+    // that even across a 1000x jump in lap count.
+    const bonusAt10Laps = getEndgameBossHpMultiplierBonus(endgameStart + 10 * lapWaves);
+    const bonusAt10000Laps = getEndgameBossHpMultiplierBonus(endgameStart + 10_000 * lapWaves);
+    expect(bonusAt10000Laps / bonusAt10Laps).toBeLessThan(10); // 1000x more laps, <10x more HP bonus
+  });
+
   it("milestone bonuses only apply to their exact configured wave", () => {
     expect(getMilestoneBonus(30)).toBeGreaterThan(0);
     expect(getMilestoneBonus(31)).toBe(0);

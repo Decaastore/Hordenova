@@ -23,18 +23,19 @@
  * specialization early in a Season had nothing left to spend Gold on for
  * the rest of that Season.
  *
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — FIXED, not papered over: no
- * new Gold sink was invented. `specialization` (config/specializations.ts)
- * had its level cap removed — Gold can always buy another specialization
- * level, forever — while its COMBAT EFFECT stays capped at exactly the same
- * point it always was (see SPECIALIZATION_EFFECT_LEVEL_CAP), so this is not
- * `Gold -> infinite power`, only `Gold -> infinite (but harmless) sink`.
+ * INFINITE BALANCE OVERHAUL — both `specialization` and `mastery`
+ * (config/specializations.ts / config/towerMastery.ts) now have neither a
+ * level cap nor an effect cap: Gold can always buy another level, forever,
+ * and every level still buys a real (diminishing-returns) amount of power —
+ * see specializationEffectScale/masteryEffectScale in those files. This is
+ * `Gold -> infinite, ever-slower-growing power`, never a flat "harmless"
+ * sink and never an unbounded one either.
  * Tower Level (`tower_level`) is deliberately left alone — MAX_TOWER_LEVEL=30
  * and its visual/unlock ladder are untouched by this correction.
  * `hasUncappedGoldSink()` below now correctly returns true again.
  */
 
-export type GoldSinkCategory = "TOWER_LEVEL" | "SPECIALIZATION";
+export type GoldSinkCategory = "TOWER_LEVEL" | "SPECIALIZATION" | "MASTERY";
 
 export interface GoldSinkDefinition {
   id: string;
@@ -48,6 +49,9 @@ export interface GoldSinkDefinition {
 export const GOLD_SINKS: readonly GoldSinkDefinition[] = [
   { id: "tower_level", category: "TOWER_LEVEL", i18nKey: "TOWER_LEVEL", uncapped: false },
   { id: "specialization", category: "SPECIALIZATION", i18nKey: "SPECIALIZATION", uncapped: true },
+  // INFINITE BALANCE OVERHAUL — Mastery leveling (not its one-time Gems
+  // unlock, see gemSinks.ts) moved to Gold, uncapped, mirroring Specialization.
+  { id: "mastery", category: "MASTERY", i18nKey: "MASTERY", uncapped: true },
 ];
 
 /** Spec section 45's Gold Economy Invariant, made checkable: true as long as at least one UNCAPPED sink exists — Gold can never structurally run out of somewhere to go, regardless of account age/level/wealth. */

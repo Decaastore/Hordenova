@@ -148,13 +148,31 @@ export const PHASES: readonly PhaseDefinition[] = [
  *
  * ESCALATION IS PRESERVED (spec: "não apenas Boss1->Boss2->...->loop sem
  * progressão"): getEndgameBossHpMultiplierBonus below still makes every
- * FULL 6-boss lap measurably harder than the last, via the same
- * compound-cap-plus-linear-tail overflow-safety pattern already used by
- * enemyStats.ts/towerMastery.ts/specializations.ts/prestige.ts — genuinely
- * uncapped, never Infinity/NaN, but growing slowly enough (+8%/lap) that it
- * can never again concentrate into the single-fight wall this fix exists to
- * remove. `getPhaseForWave` itself stays total (never crashes/falls
- * through) exactly as before.
+ * FULL 6-boss lap measurably harder than the last. `getPhaseForWave` itself
+ * stays total (never crashes/falls through) exactly as before.
+ *
+ * INFINITE BALANCE OVERHAUL — real GameEngine simulation (a build whose
+ * Specialization/Mastery levels grow with wave, run through the actual
+ * CombatSystem/BossManager/map geometry) caught a SECOND, independent wall
+ * this correction had to fix: the ORIGINAL per-lap bonus below compounded
+ * exponentially (1.08^laps, capped only at 500 laps = wave ~60,130) while
+ * player power — even with both Specialization and Mastery now genuinely
+ * uncapped — only grows at a sub-linear, diminishing-returns rate (roughly
+ * wave^0.95 combined, see specializationEffectScale/masteryEffectScale).
+ * Exponential ALWAYS eventually beats sub-linear, so that compounding
+ * design guaranteed a recreated wall — measured concretely: the damage-
+ * budget/boss-HP ratio for a steadily-reinvesting build fell from ~84x at
+ * wave 2000 to ~26x at wave 5000 to ~3x at wave 10,000, and would have
+ * crossed below 1 (unkillable) well before wave 20,000. Replaced with the
+ * same bounded power-law technique already used by enemyStats.ts's own late-
+ * game term (`(1 + laps/SCALE) ^ EXPONENT`, EXPONENT < 1): still genuinely
+ * uncapped and measurably harder every lap, but its growth rate in laps
+ * (and laps grow linearly in wave) stays safely below player power's own
+ * asymptotic exponent, so the "further you invest, the further you can go"
+ * property holds indefinitely instead of degrading past some far-future
+ * wave. Re-simulated after the fix: the same ratio climbs from ~37x (wave
+ * 30) to >80x (wave 2000-10,000) and keeps climbing at wave 100,000+
+ * instead of collapsing.
  */
 const ENDGAME_CYCLE_LENGTH = 20;
 /** Same relative rhythm every hand-authored 20-wave phase (Volcanic Wastes through Abyss) already uses — not a new pattern. */
@@ -194,10 +212,16 @@ export function getEndgameCycleLapCount(waveNumber: number): number {
   return Math.floor(blockIndex / PHASES.length);
 }
 
-const ENDGAME_HP_GROWTH_PER_LAP = 0.08;
-/** Numerical safety (same technique as enemyStats.ts/towerMastery.ts): compounding stops accelerating beyond this many laps, but keeps climbing forever via the linear tail below — never Infinity/NaN at any lap count a save could ever reach. */
-const ENDGAME_HP_LAP_COMPOUND_CAP = 500;
-const ENDGAME_HP_LAP_LINEAR_TAIL_GROWTH = 0.05;
+/**
+ * Bounded power-law (same shape as enemyStats.ts's LATE(i) term): grows
+ * forever, never flat, but at a strictly decelerating rate — deliberately
+ * below player power's own combined Specialization+Mastery growth exponent
+ * (~0.95) so this can never again out-race player power the way the old
+ * exponential-per-lap formula did (see this file's top doc comment for the
+ * real simulation data that caught it).
+ */
+const ENDGAME_HP_LAP_SCALE = 8;
+const ENDGAME_HP_LAP_EXPONENT = 0.15;
 
 /**
  * Multiplier (>= 1) applied on top of a boss's normal `hpMultiplierVsBrute`
@@ -205,16 +229,13 @@ const ENDGAME_HP_LAP_LINEAR_TAIL_GROWTH = 0.05;
  * hand-authored phase and the entire first lap of the rotation. This is
  * what keeps the endgame "measurably harder over time" per spec, without
  * ever re-concentrating into a single always-hardest fight (see this file's
- * top doc comment).
+ * top doc comment) AND without ever out-growing player power (see the same
+ * doc comment's INFINITE BALANCE OVERHAUL section).
  */
 export function getEndgameBossHpMultiplierBonus(waveNumber: number): number {
   const laps = getEndgameCycleLapCount(waveNumber);
   if (laps <= 0) return 1;
-  const cappedLaps = Math.min(laps, ENDGAME_HP_LAP_COMPOUND_CAP);
-  const compound = Math.pow(1 + ENDGAME_HP_GROWTH_PER_LAP, cappedLaps);
-  const tailLaps = Math.max(0, laps - ENDGAME_HP_LAP_COMPOUND_CAP);
-  const linearTail = 1 + tailLaps * ENDGAME_HP_LAP_LINEAR_TAIL_GROWTH;
-  return compound * linearTail;
+  return Math.pow(1 + laps / ENDGAME_HP_LAP_SCALE, ENDGAME_HP_LAP_EXPONENT);
 }
 
 export function isMainBossWave(waveNumber: number): boolean {

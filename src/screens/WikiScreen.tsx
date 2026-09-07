@@ -285,12 +285,11 @@ function ItemsSection() {
 }
 
 /**
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Mastery no longer buys any
- * combat stat, so this section no longer shows "+X% Damage/Attack Speed/
- * Range" (that text described a mechanic that has been removed — see
- * config/towerMastery.ts). It now truthfully documents what Mastery
- * actually is: a permanent, Gems-funded prestige track that grants
- * Specialization Respec Tokens and purely-cosmetic visual tiers.
+ * INFINITE BALANCE OVERHAUL — Mastery is unlocked once with Gems, then every
+ * level after that costs Gold (see config/towerMastery.ts). It grants real
+ * but modest combat bonuses (range/gold-efficiency/siege-resistance lead,
+ * damage is the smallest) plus the unchanged Specialization Respec Tokens
+ * and cosmetic visual tiers below.
  */
 function ProgressionSection() {
   const { t } = useLanguage();
@@ -308,7 +307,7 @@ function ProgressionSection() {
                 label={t("wiki.masteryCosmeticTier")}
                 value={tier ? t(`towerInfo.masteryCosmetic.${tier.nameKey}` as TranslationKey) : t("wiki.masteryCosmeticNone")}
               />
-              <StatRow label={`${t("wiki.upgradeCostBase")} (${t("hud.gems")})`} value={getMasteryUpgradeCost("IRONWOOD", level)} />
+              <StatRow label={`${t("wiki.upgradeCostBase")} (${t("hud.gold")})`} value={getMasteryUpgradeCost("IRONWOOD", level)} />
             </Card>
           );
         })}
