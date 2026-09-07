@@ -49,7 +49,9 @@ export const CC_DR_DECAY_MS = 5000;
 export function getCcResistanceTier(isBoss: boolean, isMainBoss: boolean, isElite: boolean): CcResistanceTier {
   if (isBoss) return isMainBoss ? "BOSS" : "MINI_BOSS";
   if (isElite) return "ELITE";
-  return "NORMAL";
+  // U2 (v1.0 infinite-progression freeze): a plain enemy now reuses ELITE's
+  // resistance tier exactly — no separate NORMAL_WEAK tier.
+  return "ELITE";
 }
 
 /** The effective duration multiplier for a CC landing on a target currently at `stacks` (0-indexed) prior stacks. NORMAL tier is always 1 regardless of stacks (it never accumulates any). */

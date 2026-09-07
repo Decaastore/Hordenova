@@ -99,10 +99,11 @@ export interface EnemyInstance {
   elite?: boolean;
   /**
    * AUDITORIA E CORREÇÃO GERAL spec sections 24-25 — CC diminishing-returns
-   * bookkeeping (see config/ccResistance.ts). 0 for every NORMAL-tier enemy
-   * for its entire life (never incremented — normal enemies always take
-   * full CC, unaffected by any of this). `ccResistanceDecayRemainingMs`
-   * only ticks down while `ccResistanceStacks > 0`; see advanceEnemy.
+   * bookkeeping (see config/ccResistance.ts). U2 (v1.0 infinite-progression
+   * freeze): every enemy, including plain ones, now resolves to at least
+   * the ELITE tier, so this accumulates for all of them the same way.
+   * `ccResistanceDecayRemainingMs` only ticks down while
+   * `ccResistanceStacks > 0`; see advanceEnemy.
    */
   ccResistanceStacks: number;
   ccResistanceDecayRemainingMs: number;
@@ -257,10 +258,12 @@ export function applySlow(enemy: EnemyInstance, percent: number, durationMs: num
   const clampedPercent = Math.min(Math.max(percent, 0), 1);
 
   // AUDITORIA E CORREÇÃO GERAL spec sections 24-25 — tiered CC resistance +
-  // diminishing returns (config/ccResistance.ts). NORMAL-tier enemies are
-  // completely unaffected (multiplier always 1, never accumulates a stack)
-  // — this is what guarantees a Boss/Mini-Boss/Elite can never be kept
-  // permanently frozen no matter how often a same-or-stronger reapplication
+  // diminishing returns (config/ccResistance.ts). U2 (v1.0 infinite-
+  // progression freeze): a plain enemy now resolves to the ELITE tier
+  // exactly, same as an elite-tagged one — there is no zero-resistance tier
+  // left in practice. This is what guarantees a Boss/Mini-Boss/Elite/plain
+  // enemy alike can never be kept permanently frozen no matter how often a
+  // same-or-stronger reapplication
   // would otherwise refresh the timer to full: eventually the stack caps
   // and the effective duration is forced to 0 (a genuine, temporary immunity).
   const tier = getCcResistanceTier(enemy.boss !== undefined, enemy.boss?.isMainBoss === true, enemy.elite === true);

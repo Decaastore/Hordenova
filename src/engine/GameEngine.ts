@@ -1082,7 +1082,7 @@ export class GameEngine {
       if (reachedEnd) reachedBaseIds.add(enemy.id);
     }
 
-    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt);
+    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave);
     this.projectiles.push(...newProjectiles);
     recordDamageEvents(this.battleStats, damageEvents);
 

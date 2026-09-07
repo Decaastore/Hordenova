@@ -19,12 +19,15 @@ import { CC_DR_DECAY_MS } from "@/config/ccResistance";
 describe("Freeze / Slow status effect (Frostborn)", () => {
   it("freezes on application (percent 1 = 0 effective speed) and unfreezes exactly when the duration elapses", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
+    // U2 (v1.0 infinite-progression freeze): a plain enemy now resolves to
+    // the ELITE CC-resistance tier, so its first hit (stack 0) is already
+    // scaled by ELITE's 0.7 baseline multiplier: 1000 * 0.7 = 700ms.
     applySlow(enemy, 1, 1000);
 
     expect(enemy.slow).not.toBeNull();
     expect(getEffectiveSpeed(enemy)).toBe(0);
 
-    advanceEnemy(enemy, 999);
+    advanceEnemy(enemy, 699);
     expect(enemy.slow).not.toBeNull(); // still frozen, 1ms left
     expect(getEffectiveSpeed(enemy)).toBe(0);
 
@@ -35,18 +38,20 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
 
   it("stays frozen for the full correct duration, not a tick early or a tick late", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
+    // U2: effective duration = 500 * ELITE(0.7) * DR[stack 0]=1 = 350ms.
     applySlow(enemy, 1, 500);
 
-    for (let elapsed = 0; elapsed < 480; elapsed += 20) {
+    for (let elapsed = 0; elapsed < 330; elapsed += 20) {
       advanceEnemy(enemy, 20);
       expect(enemy.slow, `should still be frozen at ${elapsed + 20}ms`).not.toBeNull();
     }
-    advanceEnemy(enemy, 20); // crosses 500ms
+    advanceEnemy(enemy, 20); // 350ms total — crosses the effective duration
     expect(enemy.slow).toBeNull();
   });
 
   it("REGRESSION: a weaker slow landing on an already-frozen target never re-extends the freeze (the permanent-freeze bug)", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
+    // U2: first hit (stack 0) is scaled by ELITE's baseline: 900 * 0.7 = 630ms.
     applySlow(enemy, 1, 900); // Deep Freeze-style full freeze
 
     // Simulate a Frostborn tower that keeps re-hitting the target it just
@@ -55,15 +60,17 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
     // longer than what remains of the freeze. Before the fix this
     // continuously refreshed remainingMs via Math.max(remaining, 2000)
     // and the freeze never expired. Every weaker hit here lands strictly
-    // BEFORE the freeze's own natural expiry (300ms, 600ms — never 900ms)
-    // so this isolates "does a weaker hit extend an active freeze" from
-    // "a fresh hit landing after the freeze already expired is legitimate".
-    advanceEnemy(enemy, 300); // 600ms of the freeze remain
-    applySlow(enemy, 0.35, 2000); // weaker than the active freeze — must be a no-op
+    // BEFORE the freeze's own natural expiry so this isolates "does a
+    // weaker hit extend an active freeze" from "a fresh hit landing after
+    // the freeze already expired is legitimate" — the exact bounds below
+    // stay loose (<=) precisely so they hold regardless of the CC-resistance
+    // tier scaling the effective duration down.
+    advanceEnemy(enemy, 300); // 330ms of the freeze remain (630 - 300)
+    applySlow(enemy, 0.35, 2000); // weaker than the active freeze — must be a no-op (still consumes a resistance stack)
     expect(enemy.slow!.percent).toBe(1); // still frozen, not downgraded
     expect(enemy.slow!.remainingMs).toBeLessThanOrEqual(600); // not extended past what naturally remained
 
-    advanceEnemy(enemy, 300); // 300ms of the freeze remain
+    advanceEnemy(enemy, 300); // 30ms of the freeze remain
     applySlow(enemy, 0.35, 2000); // weaker again — still a no-op
     expect(enemy.slow!.percent).toBe(1);
     expect(enemy.slow!.remainingMs).toBeLessThanOrEqual(300);
@@ -77,13 +84,17 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
 
   it("a same-or-stronger reapplication during an active freeze correctly renews/replaces the duration", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
+    // U2: first hit (stack 0) — effective = 500 * ELITE(0.7) * DR[0]=1 = 350ms.
     applySlow(enemy, 1, 500);
-    advanceEnemy(enemy, 400); // 100ms remaining
+    advanceEnemy(enemy, 300); // 50ms remaining
 
-    applySlow(enemy, 1, 500); // a fresh freeze proc — should reset to a full 500ms
-    advanceEnemy(enemy, 400);
-    expect(enemy.slow).not.toBeNull(); // would have expired under the OLD 100ms remainder, but was renewed
-    advanceEnemy(enemy, 100);
+    // Second hit bumps the resistance stack to 1, so the renewed effective
+    // duration is 500 * 0.7 * DR[1]=0.5 = 175ms — still a fresh renewal to
+    // 175ms, not merely an extension of the old 50ms remainder.
+    applySlow(enemy, 1, 500);
+    advanceEnemy(enemy, 150);
+    expect(enemy.slow).not.toBeNull(); // would have expired under the OLD 50ms remainder, but was renewed to 175ms
+    advanceEnemy(enemy, 25);
     expect(enemy.slow).toBeNull();
   });
 
@@ -176,8 +187,10 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
  * indefinitely in practice. These tests prove the fix: CC resistance +
  * diminishing returns (config/ccResistance.ts) guarantee a Boss/Mini-Boss/
  * Elite ALWAYS resumes moving, no matter how many same-or-stronger freezes
- * land back-to-back — while a plain (NORMAL-tier) enemy is completely
- * unaffected, preserving every test above unchanged.
+ * land back-to-back. U2 (v1.0 infinite-progression freeze) extended this
+ * same ELITE-tier resistance to plain enemies too — see the dedicated test
+ * below for that behavior; every freeze-mechanics test above was updated to
+ * account for it.
  */
 describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec sections 23-28)", () => {
   const ELITE_MODIFIER = { hpMultiplier: 1.5, speedMultiplier: 1, damageMultiplier: 1.5, rewardMultiplier: 2, regenPercentPerSecond: 0 };
@@ -204,11 +217,11 @@ describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec
     expect(everMovedAgain).toBe(true);
   });
 
-  it("a NORMAL-tier enemy (no boss/elite tag) is completely unaffected by CC resistance — every existing freeze test above stays valid", () => {
+  it("U2 (v1.0 infinite-progression freeze): a plain enemy (no boss/elite tag) now reuses ELITE's CC resistance exactly — no separate NORMAL_WEAK tier", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
     applySlow(enemy, 1, 1000);
-    expect(enemy.slow!.remainingMs).toBe(1000); // full duration, no reduction
-    expect(enemy.ccResistanceStacks).toBe(0); // never tracked for NORMAL tier
+    expect(enemy.slow!.remainingMs).toBe(1000 * 0.7); // ELITE's baseline (stack 0) multiplier, same as a real elite would get
+    expect(enemy.ccResistanceStacks).toBe(1); // now tracked exactly like ELITE
   });
 
   it("an ELITE enemy's first freeze is already reduced by its tier's baseline resistance", () => {

@@ -3,13 +3,15 @@ import { CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "
 
 describe("ccResistance (AUDITORIA E CORREÇÃO GERAL spec sections 24-25)", () => {
   it("getCcResistanceTier maps isBoss/isMainBoss/isElite to the correct tier", () => {
-    expect(getCcResistanceTier(false, false, false)).toBe("NORMAL");
+    // U2 (v1.0 infinite-progression freeze): a plain enemy now reuses
+    // ELITE's tier exactly — there is no separate NORMAL_WEAK tier.
+    expect(getCcResistanceTier(false, false, false)).toBe("ELITE");
     expect(getCcResistanceTier(false, false, true)).toBe("ELITE");
     expect(getCcResistanceTier(true, false, false)).toBe("MINI_BOSS");
     expect(getCcResistanceTier(true, true, false)).toBe("BOSS");
   });
 
-  it("NORMAL tier always returns a 1.0 multiplier, at any stack count — spec section 23's 'Normal -> CC normal'", () => {
+  it("the NORMAL tier value still returns a 1.0 multiplier at any stack count, though no real enemy resolves to it anymore post-U2", () => {
     for (const stacks of [0, 1, 2, 3, 10]) {
       expect(getCcDurationMultiplier("NORMAL", stacks)).toBe(1);
     }

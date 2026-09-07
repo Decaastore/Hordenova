@@ -20,6 +20,7 @@ import { createProjectile, type ProjectileInstance } from "@/entities/Projectile
 import { getTowerSpecialAtLevel, type TowerSpecial, type TowerType } from "@/config/towerStats";
 import { applySpecializationToSpecial } from "@/config/specializations";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
+import { windowedBossDamageBump } from "@/config/bossPowerBudget";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
 import { distance, type Vector2 } from "@/utils/geometry";
 
@@ -127,6 +128,11 @@ export function tickCombat(
   towers: readonly TowerInstance[],
   enemies: readonly EnemyInstance[],
   dtMs: number,
+  // U1 (v1.0 infinite-progression freeze): the current wave, used ONLY to
+  // look up the windowed Main-Boss damage bump below. Defaults to a value
+  // outside the [300,800] window so every existing/omitted call site keeps
+  // its exact prior behavior (bump === 1, unconditionally).
+  waveNumber = 0,
 ): CombatTickResult {
   const projectiles: ProjectileInstance[] = [];
   const damageEvents: DamageEvent[] = [];
@@ -138,7 +144,11 @@ export function tickCombat(
     armorPenetration = 0,
   ): DamageEvent => {
     const targetDamageReduction = enemy.damageReduction;
-    const actual = applyDamageToEnemy(enemy, rawDamage, armorPenetration);
+    // U1: a direct multiplier on the player's effective damage against the
+    // Main Boss only — never applied to Boss HP, never to a mini-boss or
+    // any normal enemy. See config/bossPowerBudget.ts.
+    const effectiveDamage = enemy.boss?.isMainBoss === true ? rawDamage * windowedBossDamageBump(waveNumber) : rawDamage;
+    const actual = applyDamageToEnemy(enemy, effectiveDamage, armorPenetration);
     const event: DamageEvent = {
       towerId: tower.id,
       towerType: tower.type,
