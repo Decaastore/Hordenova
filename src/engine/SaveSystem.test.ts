@@ -253,6 +253,58 @@ describe("SaveSystem", () => {
       expect(tampered.masteryUnlocked).toEqual({}); // false is not ownership, and the bogus key is dropped
       expect(tampered.unlockedSpecializationIds).toEqual({ IRONWOOD: ["IRONWOOD_EXECUTIONER"] });
     });
+
+    it("BALANCEAMENTO DEFINITIVO (save v16 -> v17): a pre-Repositioning/pre-Item-Slots save (missing lastFreeRepositionDayIndex and every towerLoadout entry's equippedItemInstanceIds entirely) self-heals both to their fresh-account defaults — free reposition available, all slots empty — without losing any pre-existing progress", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          version: 16,
+          bestWave: 300,
+          gold: 5000,
+          gems: 900,
+          towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 20, specializationId: null, specializationLevel: 0, equippedSkinId: null, masteryLevel: 0 }],
+        }),
+      );
+      const loaded = loadSave();
+      expect(loaded.version).toBe(SAVE_DATA_VERSION);
+      // Pre-existing progress is fully preserved.
+      expect(loaded.bestWave).toBe(300);
+      expect(loaded.gold).toBe(5000);
+      expect(loaded.gems).toBe(900);
+      expect(loaded.towerLoadout[0]?.level).toBe(20);
+      // Brand-new fields self-heal to a fresh-account default.
+      expect(loaded.lastFreeRepositionDayIndex).toBeNull();
+      expect(loaded.towerLoadout[0]?.equippedItemInstanceIds).toEqual([null, null, null]);
+    });
+
+    it("Item Slots self-heal a save corrupted to equip a real inventory item's instanceId on two different towers — the first tower in loadout order keeps it, the second drops back to empty, and an instanceId that isn't actually owned drops to empty on any tower", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SAVE_DATA,
+          version: SAVE_DATA_VERSION,
+          inventory: [
+            {
+              instanceId: "item-real-1",
+              itemDefinitionId: "mosswood_charm",
+              ownerId: "player-1",
+              acquiredAt: 0,
+              source: { type: "BOSS_DROP", refId: "hollow-warden" },
+              tradable: true,
+              pendingTrade: false,
+              history: [],
+            },
+          ],
+          towerLoadout: [
+            { slotId: "slot-1", type: "IRONWOOD", level: 1, equippedItemInstanceIds: ["item-real-1", "item-does-not-exist", null] },
+            { slotId: "slot-2", type: "INFERNO", level: 1, equippedItemInstanceIds: ["item-real-1", null, null] },
+          ],
+        }),
+      );
+      const loaded = loadSave();
+      expect(loaded.towerLoadout[0]?.equippedItemInstanceIds).toEqual(["item-real-1", null, null]);
+      expect(loaded.towerLoadout[1]?.equippedItemInstanceIds).toEqual([null, null, null]);
+    });
   });
 
   describe("Ascension storage namespace (Master Implementation spec section 2)", () => {

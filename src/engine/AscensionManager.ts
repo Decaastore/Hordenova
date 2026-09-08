@@ -229,6 +229,15 @@ export function syncSeasonIfNeeded(): void {
   // separate PERMANENT equippedTowerSkinByType map, not from this loadout
   // entry, so leaving this entry's own equivalent field blank changes
   // nothing about what the player actually sees.
+  //
+  // BALANCEAMENTO DEFINITIVO spec section 7/12 — Tower Equipment Slots.
+  // This file's own header already classifies "items/inventory" as
+  // PERMANENT, never touched by a Season boundary — equippedItemInstanceIds
+  // is carried forward UNCHANGED for exactly that reason (equipping grants
+  // no combat power in this pass, so there is no seasonal-balance reason to
+  // strip it, and the equipped items themselves remain permanently owned in
+  // SaveData.inventory regardless). Losing this on every reset would have
+  // been a silent, contract-inconsistent regression.
   const resetLoadout: TowerLoadoutEntry[] = main.towerLoadout.map((entry) => ({
     slotId: entry.slotId,
     type: entry.type,
@@ -237,6 +246,7 @@ export function syncSeasonIfNeeded(): void {
     specializationLevel: 0,
     equippedSkinId: null,
     masteryLevel: 0,
+    equippedItemInstanceIds: entry.equippedItemInstanceIds,
   }));
 
   updateSave({

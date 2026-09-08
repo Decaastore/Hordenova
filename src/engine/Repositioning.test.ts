@@ -4,7 +4,8 @@ import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { REPOSITION_GEM_COST } from "@/config/repositioning";
 import { DAY_DURATION_MS } from "./DailyClock";
-import { SEASON_EPOCH_MS } from "./SeasonClock";
+import { SEASON_EPOCH_MS, SEASON_DURATION_MS, seasonClock, LocalSeasonClock } from "./SeasonClock";
+import { syncSeasonIfNeeded } from "./AscensionManager";
 
 /**
  * BALANCEAMENTO DEFINITIVO spec section 6/13 — real-GameEngine tests for
@@ -168,5 +169,35 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
     expect(engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[0]!.id)).toBe(false);
     expect(engine.getHudSnapshot().repositionFreeAvailable).toBe(true);
     expect(engine.getHudSnapshot().gems).toBe(gemsBefore);
+  });
+
+  /**
+   * BALANCEAMENTO DEFINITIVO spec section 13 — a Season boundary is a
+   * completely different clock than the daily reposition allowance (30
+   * days vs 24h, and AscensionManager.syncSeasonIfNeeded's own reset only
+   * ever touches tower level/specialization/Gold/currentWave — never
+   * lastFreeRepositionDayIndex). This pins that independence explicitly:
+   * crossing a Season boundary must never grant (or take away) a free
+   * reposition outside of its own real daily clock.
+   */
+  it("a Season boundary does not interact with the daily reposition allowance at all — it is governed only by its own daily clock", () => {
+    vi.setSystemTime(DAY0);
+    const engine = setupTwoTowers();
+    engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[2]!.id);
+    expect(engine.getHudSnapshot().repositionFreeAvailable).toBe(false);
+
+    // Cross a real Season boundary (30 days) while staying on the SAME calendar day otherwise —
+    // a fresh GameEngine reload (not the live in-memory instance) is what proves the SAVED value
+    // survived the reset untouched.
+    vi.spyOn(seasonClock, "getCurrentSeasonWindow").mockImplementation(
+      () => new LocalSeasonClock(() => DAY0 + SEASON_DURATION_MS).getCurrentSeasonWindow(),
+    );
+    syncSeasonIfNeeded();
+    vi.restoreAllMocks();
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+    // Still the same real day as the free use — must still read as spent (the season boundary alone changes nothing here).
+    expect(reloaded.getHudSnapshot().repositionFreeAvailable).toBe(false);
   });
 });

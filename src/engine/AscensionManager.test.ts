@@ -197,6 +197,43 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(loadSave().inventory).toEqual(inventory);
   });
 
+  /**
+   * BALANCEAMENTO DEFINITIVO spec section 7/12 — regression test for a real
+   * bug found during the persistence audit: the season reset rebuilds each
+   * TowerLoadoutEntry from scratch and had forgotten to carry forward the
+   * new equippedItemInstanceIds field, silently unequipping every tower's
+   * items at every Season boundary even though this file's own header
+   * classifies items/inventory as PERMANENT. Items grant no combat power in
+   * this pass, so there is no seasonal-balance reason to strip them either.
+   */
+  it("equipped items survive a Season boundary — Item Slots are equipment/build state, not seasonal combat progression", () => {
+    mockSeasonNumber(2);
+    const item = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
+    updateSave({
+      ascensionLastSyncedSeason: 1,
+      seasonBestWave: 40,
+      inventory: [item],
+      towerLoadout: [
+        {
+          slotId: "slot-1",
+          type: "IRONWOOD",
+          level: 12,
+          specializationId: "IRONWOOD_EXECUTIONER",
+          specializationLevel: 3,
+          equippedItemInstanceIds: [item.instanceId, null, null],
+        },
+      ],
+    });
+
+    syncSeasonIfNeeded();
+
+    const reloaded = loadSave();
+    expect(reloaded.towerLoadout[0]!.equippedItemInstanceIds).toEqual([item.instanceId, null, null]);
+    // Level/specialization DID reset, exactly as before — only the equip state survived.
+    expect(reloaded.towerLoadout[0]!.level).toBe(1);
+    expect(reloaded.towerLoadout[0]!.specializationId).toBeNull();
+  });
+
   it("[Test 10/11] Best Wave history (the account's all-time bestWave) continues across a Season boundary", () => {
     mockSeasonNumber(2);
     updateSave({ ascensionLastSyncedSeason: 1, seasonBestWave: 40, bestWave: 123 });
