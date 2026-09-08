@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "draft:novidades": "node scripts/draftNovidades.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",

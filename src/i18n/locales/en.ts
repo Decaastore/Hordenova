@@ -656,6 +656,13 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v6: {
+        specializationSwitchVisible: "Fixed \"Switch Specialization\" not appearing in a tower's info panel once you owned 2 or more specialization paths for that tower type — the action itself always worked, it just wasn't showing up.",
+        executionerBossDamageCap: "Rebalanced the Ironwood Executioner path's boss-damage bonus so it stops compounding without limit at very high specialization levels — keeps late-game boss fights meaningful for a heavily invested Executioner build.",
+        castleDamageScaling: "Castle damage from an enemy reaching your base is now a percentage of the Castle's own max HP (10% Normal / 25% Mini-Boss / 50% Boss) that grows smoothly with wave progression, instead of a fixed number that never changed — early waves are gentler, late waves carry real weight.",
+        towerRepositioning: "You can now move an already-built tower to a different building spot on the map — 1 free move per day, 200 Gems for additional moves the same day. Moving onto another tower's spot swaps the two.",
+        equipmentSlots: "Towers now have 3 Equipment Slots where you can equip items you already own. This is the foundation for future rare Boss-dropped gear — equipping doesn't change combat power yet.",
+      },
       v5: {
         homeRedesign: "Home now has a real top navigation bar (Play/Season/Ranking/Wiki/News) and a portal section below the hero with live Season, Ranking, Wiki and News teasers — no longer a single empty-feeling screen.",
         rankingScreen: "Added a dedicated Ranking screen showing your own Season Score and Prestige — honestly marked as unavailable without a server, never a fabricated leaderboard.",

@@ -4,19 +4,31 @@
  * real, shipped change in this codebase (cross-referenced against this
  * repo's own commit history) — no invented feature, date, or number.
  *
- * `dateIso` is deliberately `null` on every version except the very latest
- * one: this repo's commit history was authored inside a single sandboxed
- * development session, so every earlier commit carries the SAME calendar
- * timestamp regardless of how much real design/implementation time it
- * actually represents — showing that timestamp on each version would
- * itself be a fabricated-looking, misleading history. Versions are
- * ordered newest-first instead; only the version shipping today (this
- * Home/Wiki/Novidades pass) has a real, honest date.
+ * `dateIso` is `null` on an early version whose real ship date isn't known
+ * (this repo's earliest commit history was authored inside a single
+ * sandboxed development session, so those commits don't carry a
+ * meaningful individual calendar date) — versions are ordered newest-first
+ * regardless, so a missing date never affects ordering. From v5 onward
+ * every version's `dateIso` is the real date it shipped.
  *
  * To add a new version when real work ships: add ONE new entry at the top
- * of PATCH_NOTES with a fresh `id`, today's `dateIso`, and its real items
- * (each `i18nKey` needs a matching `novidades.entries.<id>.<i18nKey>` in
- * both locale files) — nothing else needs to change.
+ * of PATCH_NOTES with a fresh `id`, the real ship date as `dateIso`, and
+ * its real items (each `i18nKey` needs a matching
+ * `novidades.entries.<id>.<i18nKey>` in both locale files) — nothing else
+ * needs to change.
+ *
+ * BALANCEAMENTO DEFINITIVO spec section 11 (automation) — this repo IS the
+ * whole app (game + site: NovidadesScreen.tsx reads this file directly,
+ * no separate site repo), and has no CI/CD pipeline to hook an automatic
+ * publish step into. Fully automatic publication (a raw commit turned
+ * straight into a player-facing entry, no review) isn't safe — deciding
+ * whether a change is player-relevant and writing honest, non-technical
+ * copy for it is a judgment call this file's own rules above already
+ * require, not a mechanical transform. The safe middle ground that exists
+ * instead: `npm run draft:novidades` (scripts/draftNovidades.mjs) lists
+ * every commit since this file was last touched as a plain review
+ * checklist — never auto-writes here, never auto-publishes. A human (or an
+ * AI session) reads that list and adds the entry by hand, same as always.
  */
 
 export type PatchNoteType = "NEW" | "CHANGE" | "FIX" | "BALANCE" | "REMOVAL";
@@ -49,6 +61,17 @@ export interface PatchNoteVersion {
 
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteVersion[] = [
+  {
+    id: "v6",
+    dateIso: "2026-09-08",
+    items: [
+      { type: "FIX", category: "TOWERS", i18nKey: "specializationSwitchVisible" },
+      { type: "BALANCE", category: "TOWERS", i18nKey: "executionerBossDamageCap" },
+      { type: "CHANGE", category: "CASTLE", i18nKey: "castleDamageScaling" },
+      { type: "NEW", category: "SYSTEMS", i18nKey: "towerRepositioning" },
+      { type: "NEW", category: "ITEMS", i18nKey: "equipmentSlots" },
+    ],
+  },
   {
     id: "v5",
     dateIso: "2026-09-05",

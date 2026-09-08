@@ -657,6 +657,13 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v6: {
+        specializationSwitchVisible: "Corrigido \"Trocar Especialização\" não aparecendo no painel de informações da torre quando você já possuía 2 ou mais caminhos de especialização para aquele tipo de torre — a ação em si sempre funcionou, apenas não estava sendo exibida.",
+        executionerBossDamageCap: "Rebalanceado o bônus de dano contra chefes do caminho Executioner do Ironwood para parar de crescer sem limite em níveis de especialização muito altos — mantém as lutas contra chefes relevantes no fim de jogo para uma build Executioner bem investida.",
+        castleDamageScaling: "O dano ao Castelo quando um inimigo alcança sua base agora é uma porcentagem do HP máximo do próprio Castelo (10% Normal / 25% Mini-Boss / 50% Boss) que cresce suavemente com a progressão de waves, em vez de um número fixo que nunca mudava — waves iniciais são mais tranquilas, waves avançadas carregam peso real.",
+        towerRepositioning: "Agora você pode mover uma torre já construída para outro espaço de construção no mapa — 1 movimento grátis por dia, 200 Gems para movimentos adicionais no mesmo dia. Mover para o espaço de outra torre troca as duas de lugar.",
+        equipmentSlots: "Torres agora têm 3 Slots de Equipamento onde você pode equipar itens que já possui. Esta é a base para futuros equipamentos raros dropados por chefes — equipar ainda não altera o poder de combate.",
+      },
       v5: {
         homeRedesign: "A Home agora tem uma navegação superior real (Jogar/Season/Ranking/Wiki/Novidades) e uma seção de portal abaixo do hero com resumos ao vivo de Season, Ranking, Wiki e Novidades — não é mais uma tela única com sensação de vazia.",
         rankingScreen: "Adicionada uma tela de Ranking dedicada mostrando seu próprio Season Score e Prestígio — marcada honestamente como indisponível sem servidor, nunca um ranking fabricado.",
