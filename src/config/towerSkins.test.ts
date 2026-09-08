@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getSkinsForTower, getTowerSkinDefinition, TOWER_SKINS } from "./towerSkins";
+import { getSkinsForTower, getTowerSkinDefinition, TOWER_SKIN_TIER_PRICES, TOWER_SKINS } from "./towerSkins";
 import { TOWER_TYPES, getTowerLevelStats, getTowerSpecialAtLevel } from "./towerStats";
 import { canEquipSkin, canPurchaseSkin, createTowerInstance, equipSkin, getTowerStats } from "@/entities/Tower";
 
@@ -88,5 +88,19 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
       const keys = Object.keys(skin.paletteOverride);
       for (const key of keys) expect(["primary", "secondary", "accent", "glow"]).toContain(key);
     }
+  });
+
+  describe("commercial tiers (HORDENOVA Season/Progression v1.0)", () => {
+    it("the three approved price points exist exactly: 120 / 350 / 800 Gems", () => {
+      expect(TOWER_SKIN_TIER_PRICES.ENTRY).toBe(120);
+      expect(TOWER_SKIN_TIER_PRICES.INTERMEDIATE).toBe(350);
+      expect(TOWER_SKIN_TIER_PRICES.PREMIUM).toBe(800);
+    });
+
+    it("every skin's gemCost matches exactly its own tier's price", () => {
+      for (const skin of TOWER_SKINS) {
+        expect(skin.gemCost).toBe(TOWER_SKIN_TIER_PRICES[skin.tier]);
+      }
+    });
   });
 });

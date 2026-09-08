@@ -5,7 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { TOWER_DEFINITIONS, TOWER_TYPES, TOWER_SPECIALS, getTowerLevelStats, getTowerSpecialAtLevel, MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/config/specializations";
-import { getMasteryCosmeticTier, getMasteryRespecTokensEarned, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
+import { getMasteryCosmeticTier, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS, ENEMY_TYPES } from "@/config/enemyStats";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { CASTLE_TIERS } from "@/config/castleConfig";
@@ -285,11 +285,11 @@ function ItemsSection() {
 }
 
 /**
- * INFINITE BALANCE OVERHAUL — Mastery is unlocked once with Gems, then every
- * level after that costs Gold (see config/towerMastery.ts). It grants real
+ * HORDENOVA Season/Progression v1.0 — Mastery ownership is unlocked once,
+ * permanently, with Gems (see config/towerMastery.ts); the numeric Mastery
+ * LEVEL is Season-scoped and funded with Gold each Season. It grants real
  * but modest combat bonuses (range/gold-efficiency/siege-resistance lead,
- * damage is the smallest) plus the unchanged Specialization Respec Tokens
- * and cosmetic visual tiers below.
+ * damage is the smallest) plus the cosmetic visual tiers below.
  */
 function ProgressionSection() {
   const { t } = useLanguage();
@@ -302,7 +302,6 @@ function ProgressionSection() {
           const tier = getMasteryCosmeticTier(level);
           return (
             <Card key={level} title={t("wiki.level") + " " + level}>
-              <StatRow label={t("wiki.masteryRespecTokens")} value={getMasteryRespecTokensEarned(level)} />
               <StatRow
                 label={t("wiki.masteryCosmeticTier")}
                 value={tier ? t(`towerInfo.masteryCosmetic.${tier.nameKey}` as TranslationKey) : t("wiki.masteryCosmeticNone")}

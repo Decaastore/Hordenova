@@ -1,17 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  getAvailableRespecTokens,
   getMasteryBonuses,
   getMasteryCosmeticTier,
-  getMasteryRespecTokensEarned,
   getMasteryUpgradeCost,
   getNextMasteryCosmeticTier,
   masteryEffectScale,
   MASTERY_COSMETIC_TIERS,
-  MASTERY_RESPEC_TOKEN_INTERVAL,
+  MASTERY_EFFECT_EXPONENT,
   MASTERY_UNLOCK_GEM_COST,
 } from "./towerMastery";
-import { TOWER_TYPES } from "./towerStats";
+import { TOWER_DEFINITIONS, TOWER_TYPES } from "./towerStats";
 import { SPECIALIZATION_UNLOCK_GEM_COST } from "./specializations";
 
 describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE BALANCE OVERHAUL — Gems-once, Gold-forever)", () => {
@@ -29,6 +27,34 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE B
   it("the one-time unlock cost is comparable in scale to Specialization's own one-time unlock (both premium Gems purchases), not a trivial spend nor a wall", () => {
     expect(MASTERY_UNLOCK_GEM_COST).toBeGreaterThan(SPECIALIZATION_UNLOCK_GEM_COST * 0.3);
     expect(MASTERY_UNLOCK_GEM_COST).toBeLessThan(SPECIALIZATION_UNLOCK_GEM_COST * 5);
+  });
+
+  it("HORDENOVA Season/Progression v1.0 contract: the one-time Mastery ownership unlock costs exactly 400 Gems", () => {
+    expect(MASTERY_UNLOCK_GEM_COST).toBe(400);
+  });
+
+  it("HORDENOVA Season/Progression v1.0 contract: MASTERY_EFFECT_EXPONENT stays frozen at 0.45", () => {
+    expect(MASTERY_EFFECT_EXPONENT).toBe(0.45);
+  });
+
+  it("HORDENOVA Season/Progression v1.0 contract: the Season Gold cost curve uses multiplier 55 / growth 1.07 / compound cap 40", () => {
+    const MASTERY_BASE_COST_MULTIPLIER = 55;
+    const MASTERY_COST_GROWTH_FACTOR = 1.07;
+    const MASTERY_COST_COMPOUND_LEVEL_CAP = 40;
+    const linearTailGrowth = Math.log(MASTERY_COST_GROWTH_FACTOR);
+    for (const type of TOWER_TYPES) {
+      const def = TOWER_DEFINITIONS[type];
+      for (const currentLevel of [0, 1, 10, 39, 40, 41, 100]) {
+        const targetLevel = Math.max(1, currentLevel + 1);
+        const base = def.upgradeCostBase * MASTERY_BASE_COST_MULTIPLIER;
+        const cappedLevel = Math.min(targetLevel, MASTERY_COST_COMPOUND_LEVEL_CAP);
+        const compound = Math.pow(MASTERY_COST_GROWTH_FACTOR, cappedLevel - 1);
+        const tailLevels = Math.max(0, targetLevel - MASTERY_COST_COMPOUND_LEVEL_CAP);
+        const linearTail = 1 + tailLevels * linearTailGrowth;
+        const expected = Math.round(base * compound * linearTail) + targetLevel;
+        expect(getMasteryUpgradeCost(type, currentLevel)).toBe(expected);
+      }
+    }
   });
 
   it("never returns Infinity/NaN, even at mastery levels far beyond anything reachable in real play (spec section 47 numerical safety)", () => {
@@ -86,33 +112,6 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE B
       for (const value of Object.values(bonuses)) expect(Number.isFinite(value)).toBe(true);
       previous = bonuses;
     }
-  });
-
-  // Respec Tokens and cosmetic tiers are unchanged from the original design
-  // (see this file's exports) — exercised below.
-
-  it("Respec Tokens: 0 below the first interval, then exactly 1 every MASTERY_RESPEC_TOKEN_INTERVAL levels", () => {
-    expect(getMasteryRespecTokensEarned(0)).toBe(0);
-    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL - 1)).toBe(0);
-    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL)).toBe(1);
-    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL * 2)).toBe(2);
-    expect(getMasteryRespecTokensEarned(MASTERY_RESPEC_TOKEN_INTERVAL * 3)).toBe(3);
-  });
-
-  it("Respec Tokens: is a PURE function of masteryLevel — calling it repeatedly (simulating a reload/restart) never changes the result, so it can never double-grant", () => {
-    const level = MASTERY_RESPEC_TOKEN_INTERVAL * 4;
-    const first = getMasteryRespecTokensEarned(level);
-    const second = getMasteryRespecTokensEarned(level);
-    const third = getMasteryRespecTokensEarned(level);
-    expect(first).toBe(second);
-    expect(second).toBe(third);
-  });
-
-  it("getAvailableRespecTokens subtracts what's already been spent, and never goes negative", () => {
-    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 0)).toBe(3);
-    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 2)).toBe(1);
-    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 3)).toBe(0);
-    expect(getAvailableRespecTokens(MASTERY_RESPEC_TOKEN_INTERVAL * 3, 999)).toBe(0);
   });
 
   it("cosmetic tiers unlock in order as masteryLevel rises, and are never affected by combat state (pure function of level)", () => {

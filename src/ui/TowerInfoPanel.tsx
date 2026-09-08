@@ -2,7 +2,6 @@ import type { CSSProperties, ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import {
   canChooseSpecialization,
-  canUnlockMastery,
   canUpgradeMastery,
   canUpgradeSpecialization,
   getMasteryUpgradeCostFor,
@@ -10,12 +9,7 @@ import {
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
-import {
-  getMasteryCosmeticTier,
-  getNextMasteryCosmeticTier,
-  MASTERY_RESPEC_TOKEN_INTERVAL,
-  MASTERY_UNLOCK_GEM_COST,
-} from "@/config/towerMastery";
+import { getMasteryCosmeticTier, getNextMasteryCosmeticTier, MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
@@ -26,6 +20,7 @@ import {
 } from "@/config/towerStats";
 import {
   getSpecializationsForTower,
+  SPECIALIZATION_CHANGE_GEM_COST,
   SPECIALIZATION_UNLOCK_GEM_COST,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
@@ -49,15 +44,14 @@ interface TowerInfoPanelProps {
   onPurchaseSkin: (skinId: string) => void;
   /** Whether `skinId` is already permanently owned — reused so this component never needs its own copy of the ownership set. */
   isSkinOwned: (skinId: string) => boolean;
-  /** INFINITE BALANCE OVERHAUL — one-time Gems unlock (0 -> 1), mirroring onChooseSpecialization. */
+  /** HORDENOVA Season/Progression v1.0 — one-time, PERMANENT Gems unlock, mirroring onChooseSpecialization. Never touches the current (Season-scoped) Mastery level. */
   onUnlockMastery: () => void;
-  /** INFINITE BALANCE OVERHAUL — Gold-funded, uncapped upgrade (1 -> 2 -> ... forever), mirroring onUpgradeSpecialization. */
+  /** Gold-funded, uncapped upgrade (0 -> 1 -> 2 -> ... forever, resetting to 0 every Season), mirroring onUpgradeSpecialization. */
   onUpgradeMastery: () => void;
-  /** CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — how many Specialization Respec Tokens this tower's type currently has available (earned by masteryLevel, minus spent). */
-  respecTokensAvailable: number;
-  /** Whether the currently-chosen specialization path can be respec'd right now (a path is chosen AND a token is available). */
-  canRespecSpecialization: boolean;
-  onRespecSpecialization: () => void;
+  /** Every SpecializationId this account has ever purchased for the selected tower's TYPE — permanent, never reset. A path in this list is free to (re-)choose or switch to. */
+  unlockedSpecializationIdsForType: readonly SpecializationId[];
+  /** "Trocar Especialização" — 200 Gems, switches to a DIFFERENT path already in `unlockedSpecializationIdsForType`. */
+  onSwitchSpecialization: (id: SpecializationId) => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -82,9 +76,8 @@ export function TowerInfoPanel({
   isSkinOwned,
   onUnlockMastery,
   onUpgradeMastery,
-  respecTokensAvailable,
-  canRespecSpecialization,
-  onRespecSpecialization,
+  unlockedSpecializationIdsForType,
+  onSwitchSpecialization,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -194,9 +187,8 @@ export function TowerInfoPanel({
         t={t}
         onChoose={onChooseSpecialization}
         onUpgrade={onUpgradeSpecialization}
-        respecTokensAvailable={respecTokensAvailable}
-        canRespec={canRespecSpecialization}
-        onRespec={onRespecSpecialization}
+        unlockedSpecializationIdsForType={unlockedSpecializationIdsForType}
+        onSwitch={onSwitchSpecialization}
       />
 
       <SkinSection
@@ -219,13 +211,16 @@ export function TowerInfoPanel({
  * spending out, exactly like Specialization already allows once its own
  * level gate passes.
  *
- * INFINITE BALANCE OVERHAUL — mirrors SpecializationSection's two-step
- * shape exactly: a one-time Gems UNLOCK (0 -> 1) followed by an uncapped
- * Gold UPGRADE track (1 -> 2 -> ... forever). Mastery grants real, small,
- * bounded-weighted combat bonuses again (see config/towerMastery.ts's
- * getMasteryBonuses — range/gold-efficiency/siege-resistance lead, damage is
- * deliberately the smallest), on top of the unchanged Respec Token and
- * cosmetic-tier rewards.
+ * HORDENOVA Season/Progression v1.0 — Ownership (`tower.masteryUnlocked`,
+ * permanent, a one-time Gems purchase) and progression (`tower.
+ * masteryLevel`, Season-scoped, Gold-funded, resets to 0 every Season) are
+ * fully separate. Unlocking grants ownership FOREVER without touching the
+ * level at all — the Gold-upgrade track below then works starting from
+ * whatever the level currently is, 0 at the start of every Season, owned or
+ * not. Mastery grants real, small, bounded-weighted combat bonuses (see
+ * config/towerMastery.ts's getMasteryBonuses — range/gold-efficiency/
+ * siege-resistance lead, damage is deliberately the smallest), on top of
+ * the cosmetic-tier rewards below.
  */
 function MasterySection({
   tower,
@@ -246,9 +241,8 @@ function MasterySection({
 }) {
   const currentTier = getMasteryCosmeticTier(tower.masteryLevel);
   const nextTier = getNextMasteryCosmeticTier(tower.masteryLevel);
-  const levelsToNextToken = MASTERY_RESPEC_TOKEN_INTERVAL - (tower.masteryLevel % MASTERY_RESPEC_TOKEN_INTERVAL);
 
-  if (canUnlockMastery(tower)) {
+  if (!tower.masteryUnlocked) {
     const affordable = gems >= MASTERY_UNLOCK_GEM_COST;
     return (
       <>
@@ -279,9 +273,6 @@ function MasterySection({
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{t("towerInfo.masteryLevel", { level: tower.masteryLevel })}</div>
-      <div style={{ fontSize: 10, color: theme.accent, marginTop: 2 }}>
-        {t("towerInfo.masteryNextToken", { levels: levelsToNextToken })}
-      </div>
       {currentTier && (
         <div style={{ fontSize: 10, color: theme.accent, marginTop: 1 }}>
           {t("towerInfo.masteryCosmeticActive", { name: t(`towerInfo.masteryCosmetic.${currentTier.nameKey}` as TranslationKey) })}
@@ -313,14 +304,17 @@ function MasterySection({
 }
 
 /**
- * Progression 2.0 / Visual Overhaul spec section 21: the CHOICE of a path
- * (this section's top half) is a one-time Gems purchase — a strategic
- * decision the player unlocks with premium currency, never with Gold and
- * never buying a stat directly (the path still has to be leveled up with
- * Gold afterward, same as before). Everything past the choice — the
- * specialization's own 1->5 levels (bottom half) — is unchanged: an
- * independent Gold sink from the tower's own level, well past
- * MAX_TOWER_LEVEL.
+ * HORDENOVA Season/Progression v1.0 — the CHOICE of a path (this section's
+ * top half) is free the moment this account already OWNS that path
+ * (`unlockedSpecializationIdsForType`, permanent — most commonly true at
+ * the start of a new Season, when `specializationId` just reset to null but
+ * ownership didn't); choosing a path never owned before still costs
+ * SPECIALIZATION_UNLOCK_GEM_COST Gems and grants permanent ownership from
+ * then on. Everything past the choice — the specialization's own levels
+ * (bottom half) — is unchanged: an independent Gold sink from the tower's
+ * own level, well past MAX_TOWER_LEVEL. "Trocar Especialização" (200 Gems)
+ * switches between two paths already owned, replacing the old Respec Token
+ * system entirely.
  */
 function SpecializationSection({
   tower,
@@ -330,9 +324,8 @@ function SpecializationSection({
   t,
   onChoose,
   onUpgrade,
-  respecTokensAvailable,
-  canRespec,
-  onRespec,
+  unlockedSpecializationIdsForType,
+  onSwitch,
 }: {
   tower: TowerInstance;
   gold: number;
@@ -341,9 +334,8 @@ function SpecializationSection({
   t: Translate;
   onChoose: (id: SpecializationId) => void;
   onUpgrade: () => void;
-  respecTokensAvailable: number;
-  canRespec: boolean;
-  onRespec: () => void;
+  unlockedSpecializationIdsForType: readonly SpecializationId[];
+  onSwitch: (id: SpecializationId) => void;
 }) {
   if (!tower.specializationId) {
     if (!canChooseSpecialization(tower)) {
@@ -360,28 +352,37 @@ function SpecializationSection({
     }
 
     const options = getSpecializationsForTower(tower.type);
-    const affordable = gems >= SPECIALIZATION_UNLOCK_GEM_COST;
     return (
       <>
         <div style={dividerStyle} />
         <div style={sectionLabelStyle}>{t("towerInfo.specializationSection")}</div>
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-          {options.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => onChoose(option.id)}
-              disabled={!affordable}
-              style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
-            >
-              <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
-              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
-                {t(`specializations.${option.id}.description`)}
-              </div>
-              <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                {t("towerInfo.specializationChoose")} · <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_UNLOCK_GEM_COST}
-              </div>
-            </button>
-          ))}
+          {options.map((option) => {
+            const owned = unlockedSpecializationIdsForType.includes(option.id);
+            const affordable = owned || gems >= SPECIALIZATION_UNLOCK_GEM_COST;
+            return (
+              <button
+                key={option.id}
+                onClick={() => onChoose(option.id)}
+                disabled={!affordable}
+                style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
+              >
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
+                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
+                  {t(`specializations.${option.id}.description`)}
+                </div>
+                <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  {owned ? (
+                    t("towerInfo.specializationReactivate")
+                  ) : (
+                    <>
+                      {t("towerInfo.specializationChoose")} · <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_UNLOCK_GEM_COST}
+                    </>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </>
     );
@@ -390,6 +391,8 @@ function SpecializationSection({
   const specCost = getSpecializationUpgradeCostFor(tower);
   const specAffordable = specCost !== null && gold >= specCost;
   const canUpgrade = canUpgradeSpecialization(tower);
+  const switchTargets = unlockedSpecializationIdsForType.filter((id) => id !== tower.specializationId);
+  const switchAffordable = gems >= SPECIALIZATION_CHANGE_GEM_COST;
 
   return (
     <>
@@ -416,15 +419,20 @@ function SpecializationSection({
         </button>
       )}
 
-      {respecTokensAvailable > 0 && (
+      {switchTargets.map((id) => (
         <button
-          onClick={onRespec}
-          disabled={!canRespec}
-          style={{ ...respecButtonStyle, borderColor: theme.accent, opacity: canRespec ? 1 : 0.5 }}
+          key={id}
+          onClick={() => onSwitch(id)}
+          disabled={!switchAffordable}
+          style={{ ...switchButtonStyle, borderColor: theme.accent, opacity: switchAffordable ? 1 : 0.5 }}
         >
-          {t("towerInfo.specializationRespec", { tokens: respecTokensAvailable })}
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
+            <span style={{ opacity: 0.6 }}>·</span>
+            <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
+          </span>
         </button>
-      )}
+      ))}
     </>
   );
 }
@@ -664,7 +672,7 @@ const upgradeButtonStyle: CSSProperties = {
   letterSpacing: 0.5,
 };
 
-const respecButtonStyle: CSSProperties = {
+const switchButtonStyle: CSSProperties = {
   marginTop: 6,
   padding: "7px 10px",
   borderRadius: 7,

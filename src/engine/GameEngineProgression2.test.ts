@@ -182,7 +182,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
   });
 
   describe("Tower Mastery — one-time Gems unlock, then Gold forever (INFINITE BALANCE OVERHAUL)", () => {
-    it("unlocking Mastery spends Gems, never Gold, and persists permanently across a reload", () => {
+    it("unlocking Mastery spends Gems, never Gold, grants ownership only (never a free level), and ownership persists permanently across a reload", () => {
       const engine = startWithOneMaxedTower();
       const goldBefore = engine.getHudSnapshot().gold;
       const gemsBefore = engine.getHudSnapshot().gems;
@@ -191,12 +191,13 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(engine.unlockSelectedTowerMastery()).toBe(true);
       expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
       expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore); // Gems spent
-      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0); // ownership grants no free level
       expect(engine.canUnlockSelectedTowerMastery()).toBe(false); // one-time only
 
       const reloaded = new GameEngine();
       reloaded.startRun();
-      expect(reloaded.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
+      expect(reloaded.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
     });
 
     it("every level AFTER the unlock spends Gold, never Gems", () => {
@@ -208,7 +209,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(engine.upgradeSelectedTowerMastery()).toBe(true);
       expect(engine.getHudSnapshot().gems).toBe(gemsAfterUnlock); // Gems untouched
       expect(engine.getHudSnapshot().gold).toBeLessThan(goldBefore); // Gold spent
-      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(2);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
     });
 
     it("unlock fails without enough Gems even when Gold is abundant", () => {
@@ -233,44 +234,119 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
 
     // Mastery grants real but modest combat bonuses now (see
     // entities/Tower.test.ts's own dedicated coverage) — this suite proves
-    // its original replacement function (Specialization Respec Tokens) is
-    // still wired correctly end-to-end through GameEngine, deterministically.
-    it("earning a Respec Token via Mastery lets the player reset a chosen specialization, and it's spent (not re-grantable) after a reload", () => {
+    // Mastery ownership (400 Gems, permanent, never re-charged) is wired
+    // correctly end-to-end through GameEngine, deterministically.
+    it("unlockSelectedTowerMastery charges the 400 Gems ownership cost exactly once, ever, and a reload never re-charges it", () => {
       const engine = startWithOneMaxedTower();
       const tower = engine.getRenderSnapshot().towers[0]!;
-      engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER");
-      engine.upgradeSelectedTowerSpecialization();
-      engine.upgradeSelectedTowerSpecialization();
+      const gemsBefore = engine.getHudSnapshot().gems;
 
-      expect(engine.getAvailableRespecTokensForSelectedTower()).toBe(0);
-      expect(engine.canRespecSelectedTowerSpecialization()).toBe(false);
-      expect(engine.respecSelectedTowerSpecialization()).toBe(false);
+      expect(engine.canUnlockSelectedTowerMastery()).toBe(true);
+      expect(engine.unlockSelectedTowerMastery()).toBe(true);
+      expect(engine.getHudSnapshot().gems).toBe(gemsBefore - 400);
+      expect(engine.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
+      // Ownership is granted for free — the level is untouched.
+      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
 
-      // 1 Gems unlock (0 -> 1) + 4 Gold upgrades (1 -> 5) = exactly 1 Respec Token.
-      engine.unlockSelectedTowerMastery();
-      for (let i = 0; i < 4; i++) engine.upgradeSelectedTowerMastery();
-      expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(5);
-      expect(engine.getAvailableRespecTokensForSelectedTower()).toBe(1);
-      expect(engine.canRespecSelectedTowerSpecialization()).toBe(true);
+      // Already owned — never re-charged, on this engine or a fresh reload.
+      expect(engine.canUnlockSelectedTowerMastery()).toBe(false);
+      expect(engine.unlockSelectedTowerMastery()).toBe(false);
+      expect(engine.getHudSnapshot().gems).toBe(gemsBefore - 400);
 
-      const levelBeforeRespec = engine.getRenderSnapshot().towers[0]!.level;
-      expect(engine.respecSelectedTowerSpecialization()).toBe(true);
-      const afterRespec = engine.getRenderSnapshot().towers[0]!;
-      expect(afterRespec.specializationId).toBeNull();
-      expect(afterRespec.specializationLevel).toBe(0);
-      // Permanent progression is completely untouched by a respec.
-      expect(afterRespec.masteryLevel).toBe(5);
-      expect(afterRespec.level).toBe(levelBeforeRespec);
-
-      // The token is now spent — cannot respec again without another 5
-      // Mastery levels, and a reload doesn't re-grant it (idempotent).
-      expect(engine.getAvailableRespecTokensForSelectedTower()).toBe(0);
-      engine.chooseTowerSpecialization("IRONWOOD_BREAKER");
       const reloaded = new GameEngine();
       reloaded.startRun();
       reloaded.selectTower(tower.id);
-      expect(reloaded.getAvailableRespecTokensForSelectedTower()).toBe(0);
-      expect(reloaded.canRespecSelectedTowerSpecialization()).toBe(false);
+      expect(reloaded.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
+      expect(reloaded.canUnlockSelectedTowerMastery()).toBe(false);
+      expect(reloaded.unlockSelectedTowerMastery()).toBe(false);
+      expect(reloaded.getHudSnapshot().gems).toBe(gemsBefore - 400);
+    });
+  });
+
+  describe("\"Trocar Especialização\" — HORDENOVA Season/Progression v1.0 ownership/switch model", () => {
+    it("choosing a never-before-owned path costs 500 Gems and records permanent ownership", () => {
+      const engine = startWithOneMaxedTower();
+      const gemsBefore = engine.getHudSnapshot().gems;
+      expect(engine.isSpecializationUnlocked("IRONWOOD", "IRONWOOD_EXECUTIONER")).toBe(false);
+
+      expect(engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(true);
+      expect(engine.getHudSnapshot().gems).toBe(gemsBefore - 500);
+      expect(engine.isSpecializationUnlocked("IRONWOOD", "IRONWOOD_EXECUTIONER")).toBe(true);
+      expect(engine.getRenderSnapshot().towers[0]!.specializationId).toBe("IRONWOOD_EXECUTIONER");
+    });
+
+    it("re-choosing an already-owned path (e.g. after a Season reset cleared the active pick) is free — ownership is never re-charged", () => {
+      const engine = startWithOneMaxedTower();
+      expect(engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(true);
+      const gemsAfterFirstChoice = engine.getHudSnapshot().gems;
+
+      // Simulate a Season reset clearing the active pick — ownership
+      // (unlockedSpecializationIds, permanent) persists in the save
+      // regardless; only the loadout's active specializationId/Level reset.
+      updateSave({
+        towerLoadout: [
+          {
+            slotId: TOWER_SLOTS[0]!.id,
+            type: "IRONWOOD",
+            level: SPECIALIZATION_UNLOCK_TOWER_LEVEL,
+            specializationId: null,
+            specializationLevel: 0,
+            equippedSkinId: null,
+          },
+        ],
+      });
+      const reloaded = new GameEngine();
+      reloaded.startRun();
+      reloaded.selectTower(reloaded.getRenderSnapshot().towers[0]!.id);
+
+      expect(reloaded.isSpecializationUnlocked("IRONWOOD", "IRONWOOD_EXECUTIONER")).toBe(true);
+      expect(reloaded.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(true);
+      expect(reloaded.getHudSnapshot().gems).toBe(gemsAfterFirstChoice);
+      expect(reloaded.getRenderSnapshot().towers[0]!.specializationId).toBe("IRONWOOD_EXECUTIONER");
+    });
+
+    it("switching between two already-owned paths costs a flat 200 Gems, regardless of level", () => {
+      // Both paths are pre-seeded as already owned (e.g. picked in different
+      // past Seasons) — chooseTowerSpecialization only ever accepts a NEW
+      // pick from an unchosen (null) state, so acquiring a 2nd owned path
+      // for the same active tower within one Season goes through this
+      // pre-seeded-ownership route, not two consecutive "choose" calls.
+      updateSave({
+        currentWave: 1,
+        gold: 999_999,
+        gems: 999_999,
+        towerLoadout: [
+          {
+            slotId: TOWER_SLOTS[0]!.id,
+            type: "IRONWOOD",
+            level: SPECIALIZATION_UNLOCK_TOWER_LEVEL,
+            specializationId: null,
+            specializationLevel: 0,
+            equippedSkinId: null,
+          },
+        ],
+        unlockedSpecializationIds: { IRONWOOD: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"] },
+      });
+      const engine = new GameEngine();
+      engine.startRun();
+      engine.selectTower(engine.getRenderSnapshot().towers[0]!.id);
+
+      expect(engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER")).toBe(true); // free, already owned
+      const gemsBeforeSwitch = engine.getHudSnapshot().gems;
+
+      expect(engine.canSwitchSelectedTowerSpecialization("IRONWOOD_BREAKER")).toBe(true);
+      expect(engine.switchTowerSpecialization("IRONWOOD_BREAKER")).toBe(true);
+      expect(engine.getHudSnapshot().gems).toBe(gemsBeforeSwitch - 200);
+      expect(engine.getRenderSnapshot().towers[0]!.specializationId).toBe("IRONWOOD_BREAKER");
+      expect(engine.getRenderSnapshot().towers[0]!.specializationLevel).toBe(1);
+    });
+
+    it("cannot switch to a path never owned — that must go through chooseTowerSpecialization's 500 Gems purchase instead", () => {
+      const engine = startWithOneMaxedTower();
+      engine.chooseTowerSpecialization("IRONWOOD_EXECUTIONER");
+      expect(engine.canSwitchSelectedTowerSpecialization("IRONWOOD_VANGUARD")).toBe(false);
+      expect(engine.switchTowerSpecialization("IRONWOOD_VANGUARD")).toBe(false);
+      expect(engine.getRenderSnapshot().towers[0]!.specializationId).toBe("IRONWOOD_EXECUTIONER");
     });
   });
 
@@ -350,11 +426,49 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getGemShardBalance()).toBeGreaterThan(0);
   });
 
+  it("HORDENOVA Season/Progression v1.0 contract: a Main Boss kill grants exactly 60 Gem Shards, a Mini-Boss kill exactly 24, at Prestige level 0", () => {
+    // bestWave preset well past both test waves so that the wave advancing
+    // past the kill never ALSO crosses a fresh wave-milestone bonus (a
+    // separate Gem Shard source, see GameEngine.advanceBestWave) in the same
+    // tick as the boss kill — isolating the boss-kill grant on its own.
+    updateSave({ currentWave: 30, bestWave: 999, gold: 999_999, towerLoadout: [] }); // wave 30 = Ancient Forest's main boss wave
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getPrestigeLevel()).toBe(0);
+
+    let iterations = 0;
+    while (engine.getHudSnapshot().bossHp === null && iterations < 2000) {
+      engine.update(50);
+      iterations++;
+    }
+    const mainBoss = engine.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss);
+    expect(mainBoss).toBeDefined();
+    const shardsBeforeKill = engine.getGemShardBalance();
+    mainBoss!.hp = 0;
+    engine.update(50);
+    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(60);
+
+    updateSave({ currentWave: 21, bestWave: 999, gold: 999_999, towerLoadout: [] }); // a mini-boss wave, no main boss
+    const engine2 = new GameEngine();
+    engine2.startRun();
+    let miniBoss = null;
+    for (let i = 0; i < 300 && !miniBoss; i++) {
+      engine2.update(100);
+      miniBoss = engine2.getRenderSnapshot().enemies.find((e) => e.boss && !e.boss.isMainBoss) ?? null;
+    }
+    expect(miniBoss).toBeTruthy();
+    const shardsBeforeMiniKill = engine2.getGemShardBalance();
+    miniBoss!.hp = 0;
+    engine2.update(50);
+    expect(engine2.getGemShardBalance() - shardsBeforeMiniKill).toBe(24);
+  });
+
   it("gem shard conversion only fires at the fixed rate and never leaves a partial remainder unconverted-but-lost", () => {
     const engine = new GameEngine();
     engine.startRun();
     // No public "addGemShards" — drive it via the documented static rate constant instead of hand-editing private state.
     const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
+    expect(rate).toBe(10); // HORDENOVA Season/Progression v1.0 contract: 10 shards = 1 Gem
     expect(engine.convertGemShards()).toBe(false); // 0 shards, can't convert
 
     // Simulate having shards by reloading a save that already has some.
@@ -431,22 +545,33 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getOverflowInventory()).toEqual([]);
   });
 
-  describe("Profile Prestige (Master Implementation Pass spec section 7-8)", () => {
-    it("starts at level 0 and spends Gems (never Gold) on upgrade", () => {
-      updateSave({ gems: 100, gold: 500 });
+  describe("Profile Prestige (HORDENOVA Season/Progression v1.0 — requires bestWave >= 100, permanent, Gems-funded)", () => {
+    it("starts at level 0 and spends Gems (never Gold) on upgrade, once bestWave requirement is met", () => {
+      updateSave({ gems: 1000, gold: 500, bestWave: 100 });
       const engine = new GameEngine();
       engine.startRun();
       expect(engine.getPrestigeLevel()).toBe(0);
 
       const goldBefore = engine.getHudSnapshot().gold;
+      const gemsBefore = engine.getHudSnapshot().gems;
+      expect(engine.canUpgradePrestige()).toBe(true);
       expect(engine.upgradePrestige()).toBe(true);
       expect(engine.getPrestigeLevel()).toBe(1);
       expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
-      expect(engine.getGemBalance()).toBeLessThan(100); // Gems spent
+      expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore); // Gems spent
+    });
+
+    it("blocked below the bestWave 100 requirement, even with abundant Gems", () => {
+      updateSave({ gems: 1_000_000, bestWave: 99 });
+      const engine = new GameEngine();
+      engine.startRun();
+      expect(engine.canUpgradePrestige()).toBe(false);
+      expect(engine.upgradePrestige()).toBe(false);
+      expect(engine.getPrestigeLevel()).toBe(0);
     });
 
     it("fails without enough Gems, and nothing is applied on the failed attempt", () => {
-      updateSave({ gems: 0 });
+      updateSave({ gems: 0, bestWave: 100 });
       const engine = new GameEngine();
       engine.startRun();
       expect(engine.upgradePrestige()).toBe(false);
@@ -454,7 +579,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     });
 
     it("is genuinely uncapped — many consecutive purchases keep succeeding given enough Gems", () => {
-      updateSave({ gems: 1_000_000 });
+      updateSave({ gems: 1_000_000, bestWave: 100 });
       const engine = new GameEngine();
       engine.startRun();
       for (let i = 0; i < 50; i++) expect(engine.upgradePrestige()).toBe(true);
@@ -462,7 +587,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     });
 
     it("persists across a reload", () => {
-      updateSave({ gems: 1_000_000 });
+      updateSave({ gems: 1_000_000, bestWave: 100 });
       const first = new GameEngine();
       first.startRun();
       first.upgradePrestige();
@@ -471,6 +596,25 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       const reloaded = new GameEngine();
       reloaded.startRun();
       expect(reloaded.getPrestigeLevel()).toBe(2);
+    });
+
+    it("at level 40 (the functional cap), Gem Shard income from a Main Boss kill is boosted by exactly +20% (60 -> 72)", () => {
+      updateSave({ currentWave: 30, gold: 999_999, gems: 0, prestigeLevel: 40, bestWave: 100, towerLoadout: [] });
+      const engine = new GameEngine();
+      engine.startRun();
+      expect(engine.getCurrentPrestigeBonuses().gemShardMultiplier).toBeCloseTo(1.2, 5);
+
+      let iterations = 0;
+      while (engine.getHudSnapshot().bossHp === null && iterations < 2000) {
+        engine.update(50);
+        iterations++;
+      }
+      const mainBoss = engine.getRenderSnapshot().enemies.find((e) => e.boss?.isMainBoss);
+      expect(mainBoss).toBeDefined();
+      const shardsBeforeKill = engine.getGemShardBalance();
+      mainBoss!.hp = 0;
+      engine.update(50);
+      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(72);
     });
   });
 });

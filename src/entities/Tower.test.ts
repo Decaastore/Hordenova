@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   applySiegeDamage,
-  canRespecSpecialization,
+  canSwitchSpecialization,
   chooseSpecialization,
   createTowerInstance,
   getTowerStats,
   resetTowerSurvival,
-  respecSpecialization,
+  switchSpecialization,
   tickTowerSurvivalRegen,
 } from "./Tower";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
@@ -144,44 +144,45 @@ describe("Tower — Mastery grants a small, real, growing combat bonus (INFINITE
   });
 });
 
-describe("Tower — Specialization Respec Token (CORREÇÃO DE REQUISITOS)", () => {
-  it("cannot respec a tower with no specialization chosen, even with tokens available", () => {
+describe("Tower — \"Trocar Especialização\" (HORDENOVA Season/Progression v1.0)", () => {
+  it("cannot switch a tower with no specialization chosen", () => {
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, null, 0, null, 5);
-    expect(canRespecSpecialization(tower, 0)).toBe(false);
+    expect(canSwitchSpecialization(tower)).toBe(false);
   });
 
-  it("cannot respec without an available token", () => {
+  it("can switch as soon as a specialization is chosen — no Mastery level or token requirement of any kind", () => {
     const specId = getSpecializationsForTower("IRONWOOD")[0]!.id;
-    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, specId, 1, null, 4);
-    // masteryLevel 4 earns 0 tokens (interval is 5) — nothing available.
-    expect(canRespecSpecialization(tower, 0)).toBe(false);
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 10, specId, 1, null, 0);
+    expect(canSwitchSpecialization(tower)).toBe(true);
   });
 
-  it("respecSpecialization resets specializationId/Level to unchosen, and touches nothing else", () => {
-    const specId = getSpecializationsForTower("IRONWOOD")[0]!.id;
-    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 12, specId, 3, null, 5);
-    expect(canRespecSpecialization(tower, 0)).toBe(true);
+  it("switchSpecialization sets the new path at level 1, and touches nothing else", () => {
+    const options = getSpecializationsForTower("IRONWOOD");
+    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 12, options[0]!.id, 3, null, 5);
+    expect(canSwitchSpecialization(tower)).toBe(true);
 
     const levelBefore = tower.level;
     const masteryBefore = tower.masteryLevel;
     const hpBefore = tower.hp;
 
-    respecSpecialization(tower);
+    switchSpecialization(tower, options[1]!.id);
 
-    expect(tower.specializationId).toBeNull();
-    expect(tower.specializationLevel).toBe(0);
+    expect(tower.specializationId).toBe(options[1]!.id);
+    expect(tower.specializationLevel).toBe(1);
     // Permanent/unrelated progression is completely untouched.
     expect(tower.level).toBe(levelBefore);
     expect(tower.masteryLevel).toBe(masteryBefore);
     expect(tower.hp).toBe(hpBefore);
   });
 
-  it("chooseSpecialization still works normally after a respec — the player can pick a different path", () => {
+  it("chooseSpecialization still refuses to act once a path is already chosen — reaching a further path goes through switchSpecialization, not choose", () => {
     const options = getSpecializationsForTower("IRONWOOD");
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 12, options[0]!.id, 2, null, 5);
-    respecSpecialization(tower);
-    expect(chooseSpecialization(tower, options[1]!.id)).toBe(true);
-    expect(tower.specializationId).toBe(options[1]!.id);
+    expect(chooseSpecialization(tower, options[1]!.id)).toBe(false);
+    expect(tower.specializationId).toBe(options[0]!.id);
+
+    switchSpecialization(tower, options[2]!.id);
+    expect(tower.specializationId).toBe(options[2]!.id);
     expect(tower.specializationLevel).toBe(1);
   });
 });

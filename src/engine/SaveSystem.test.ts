@@ -185,6 +185,73 @@ describe("SaveSystem", () => {
       expect(tamperedLoad.ownedTowerSkinIds).toEqual(["real-string"]);
       expect(tamperedLoad.equippedTowerSkinByType).toEqual({});
     });
+
+    it("HORDENOVA Season/Progression v1.0 migration (save v15 -> v16): an existing player's Mastery/Specialization ownership is derived from their old permanent progress, never lost, and never re-charged", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          version: 15,
+          bestWave: 200,
+          gold: 5000,
+          gems: 42,
+          // Old (pre-v16) world: towerMasteryLevels was PERMANENT — any type
+          // above 0 had already paid its one-time unlock.
+          towerMasteryLevels: { IRONWOOD: 7, INFERNO: 0 },
+          // Old (pre-v16) world: a placed tower's specializationId was the
+          // only record of ever having owned that path.
+          towerLoadout: [
+            { slotId: "slot-1", type: "IRONWOOD", level: 25, specializationId: "IRONWOOD_EXECUTIONER", specializationLevel: 4 },
+            { slotId: "slot-2", type: "FROSTBORN", level: 10, specializationId: null, specializationLevel: 0 },
+          ],
+          towerRespecTokensSpent: { IRONWOOD: 1 }, // the removed field — must not resurrect or break anything
+        }),
+      );
+
+      const loaded = loadSave();
+      expect(loaded.version).toBe(SAVE_DATA_VERSION);
+      // IRONWOOD had a real (>0) Mastery level -> ownership is granted.
+      expect(loaded.masteryUnlocked.IRONWOOD).toBe(true);
+      // INFERNO was at level 0 -> never actually unlocked, ownership is NOT fabricated.
+      expect(loaded.masteryUnlocked.INFERNO).toBeUndefined();
+      // The numeric level itself is left exactly as it was by this migration
+      // (only a real Season boundary resets it going forward).
+      expect(loaded.towerMasteryLevels.IRONWOOD).toBe(7);
+      // IRONWOOD's chosen path becomes permanently owned.
+      expect(loaded.unlockedSpecializationIds.IRONWOOD).toEqual(["IRONWOOD_EXECUTIONER"]);
+      // FROSTBORN never had a path chosen -> nothing fabricated for it.
+      expect(loaded.unlockedSpecializationIds.FROSTBORN).toBeUndefined();
+      // Every other pre-existing balance/progress value survives untouched —
+      // this migration only ever ADDS fields, never a destructive reset.
+      expect(loaded.bestWave).toBe(200);
+      expect(loaded.gold).toBe(5000);
+      expect(loaded.gems).toBe(42);
+      // The removed Respec Token field is gone, not resurrected.
+      expect((loaded as unknown as { towerRespecTokensSpent?: unknown }).towerRespecTokensSpent).toBeUndefined();
+    });
+
+    it("a v16+ save round-trips masteryUnlocked/unlockedSpecializationIds exactly, and self-heals tampered values instead of throwing", () => {
+      writeSave({
+        ...DEFAULT_SAVE_DATA,
+        masteryUnlocked: { IRONWOOD: true },
+        unlockedSpecializationIds: { IRONWOOD: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"] },
+      });
+      const loaded = loadSave();
+      expect(loaded.masteryUnlocked).toEqual({ IRONWOOD: true });
+      expect(loaded.unlockedSpecializationIds).toEqual({ IRONWOOD: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"] });
+
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SAVE_DATA,
+          version: SAVE_DATA_VERSION,
+          masteryUnlocked: { IRONWOOD: false, NOT_A_TOWER: true },
+          unlockedSpecializationIds: { IRONWOOD: ["NOT_A_REAL_ID", "IRONWOOD_EXECUTIONER"], NOT_A_TOWER: ["x"] },
+        }),
+      );
+      const tampered = loadSave();
+      expect(tampered.masteryUnlocked).toEqual({}); // false is not ownership, and the bogus key is dropped
+      expect(tampered.unlockedSpecializationIds).toEqual({ IRONWOOD: ["IRONWOOD_EXECUTIONER"] });
+    });
   });
 
   describe("Ascension storage namespace (Master Implementation spec section 2)", () => {

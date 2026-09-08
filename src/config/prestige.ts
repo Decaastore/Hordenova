@@ -1,51 +1,48 @@
 /**
- * Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the
- * recurring, scalable, purely-cosmetic Gem sink the spec explicitly asks
- * for alongside the existing ones (specialization unlock, see
- * config/specializations.ts's SPECIALIZATION_UNLOCK_GEM_COST; inventory
- * capacity expansion stays the architecturally-reserved-but-not-yet-a-real-
- * sink field it already was — see SaveSystem.ts's own comment on
- * inventoryCapacity). Genuinely uncapped ("a progressão pode continuar
- * indefinitely" — spec's own words for this exact feature), account-wide
- * (not per-tower), and NEVER touches damage/HP/attack-speed/drop-rate/
- * progression — see config/gemSinks.ts's registry doc comment for the
- * full "never P2W" contract this and every other Gem sink must honor.
+ * HORDENOVA Season/Progression v1.0 — PROFILE PRESTIGE. Permanent,
+ * account-wide (never per-tower, never reset by a Season boundary), funded
+ * entirely by Gems. Requires the account's all-time `bestWave` to have ever
+ * reached PRESTIGE_MIN_BEST_WAVE — a monotonic record that, once crossed,
+ * can never un-cross, so this is a one-time permanent gate, not a recurring
+ * check.
  *
- * A tier is purely a display label/color band over the same underlying
- * `prestigeLevel` integer — nothing here ever branches gameplay on it.
+ * Grants small, PERMANENTLY BOUNDED economy bonuses (Gold income, Gem Shard
+ * income) that fully saturate at PRESTIGE_FUNCTIONAL_CAP_LEVEL — well within
+ * a realistic number of Prestige levels, deliberately NOT the kind of
+ * open-ended diminishing-returns curve Mastery/Specialization use. Past that
+ * level, Prestige keeps costing Gems and keeps climbing forever (see
+ * getPrestigeUpgradeCost), but delivers zero further economic effect —
+ * every level past the cap is pure status/ranking/cosmetic tier, never a
+ * second infinite economic-power track competing with Mastery/Specialization.
+ *
+ * NEVER: damage, HP, attack speed, or any other direct combat multiplier —
+ * see config/gemSinks.ts's registry doc comment for the full "never P2W"
+ * contract every Gem sink must honor.
  */
 
-const PRESTIGE_BASE_COST_GEMS = 3;
-const PRESTIGE_GROWTH_FACTOR = 1.15;
-/**
- * Same overflow-safety technique as enemyStats.ts / towerMastery.ts —
- * compounding growth stops accelerating past this level, cost keeps
- * climbing forever via the linear tail below. Capped much lower than
- * towerMastery.ts's equivalent (2000) because this curve's growth FACTOR
- * is itself larger (1.15 vs 1.05) — compound alone at level 1000 is
- * already ~10^60, leaving well over 200 orders of magnitude of headroom
- * below Number.MAX_VALUE for the linear tail to keep multiplying safely.
- */
-const PRESTIGE_COST_COMPOUND_LEVEL_CAP = 1000;
-const PRESTIGE_COST_LINEAR_TAIL_GROWTH = 2;
+/** All-time bestWave (never reset by a Season boundary) required before Prestige level 0 -> 1 becomes purchasable at all. Trivial to reach — it exists to make "atingir um requisito" a real, if easy, step, not a Gems-only gate. */
+export const PRESTIGE_MIN_BEST_WAVE = 100;
+
+export function canUnlockPrestige(bestWave: number): boolean {
+  return bestWave >= PRESTIGE_MIN_BEST_WAVE;
+}
+
+const PRESTIGE_BASE_COST_GEMS = 150;
+const PRESTIGE_GROWTH_FACTOR = 1.1;
 
 /**
- * Gem cost to go from `currentLevel` to `currentLevel + 1`. No max level.
- * The `+ targetLevel` floor guarantees strict integer monotonicity even at
- * the very start of the curve, where `Math.round` on a still-small
- * multiplicative value would otherwise round two consecutive levels down
- * to the identical integer (e.g. level 0 and level 1 both rounding to 5
- * Gems) — a real "next level is free" bug this floor rules out entirely,
- * while being utterly negligible next to the multiplicative term at any
- * level where it actually matters.
+ * Gem cost to go from `currentLevel` to `currentLevel + 1`. No max level —
+ * exact formula approved for HORDENOVA Season/Progression v1.0, no
+ * compounding-cap/linear-tail safety net (unlike Mastery/Specialization's
+ * cost curves): 1.10^n only approaches double-precision overflow around
+ * n≈7,440, a Prestige level so far beyond any realistic Gems budget (level
+ * 50 alone already costs ~193,000 Gems) that the safety net every other
+ * uncapped cost curve in this codebase needs would never actually matter
+ * here — adding one would be complexity with no real effect.
  */
 export function getPrestigeUpgradeCost(currentLevel: number): number {
   const targetLevel = currentLevel + 1;
-  const cappedLevel = Math.min(targetLevel, PRESTIGE_COST_COMPOUND_LEVEL_CAP);
-  const compound = Math.pow(PRESTIGE_GROWTH_FACTOR, cappedLevel);
-  const tailLevels = Math.max(0, targetLevel - PRESTIGE_COST_COMPOUND_LEVEL_CAP);
-  const linearTail = 1 + tailLevels * PRESTIGE_COST_LINEAR_TAIL_GROWTH;
-  return Math.max(1, Math.round(PRESTIGE_BASE_COST_GEMS * compound * linearTail) + targetLevel);
+  return Math.round(PRESTIGE_BASE_COST_GEMS * Math.pow(PRESTIGE_GROWTH_FACTOR, targetLevel)) + targetLevel;
 }
 
 /** Every 10 levels is a new cosmetic tier — i18n key: prestige.tiers.<name> */
@@ -76,10 +73,45 @@ const PRESTIGE_TIER_COLORS = [
   "#ffffff", // TRANSCENDENT - white
 ] as const;
 
-/** Cosmetic-only tier for a given prestige level — cycles the name list (with an incrementing Roman-numeral-style suffix past the first cycle) so this never runs out of a label at extreme levels, same "genuinely uncapped, never breaks" discipline as every other formula in this pass. */
+/** Cosmetic-only tier for a given prestige level — cycles the name list (with an incrementing Roman-numeral-style suffix past the first cycle) so this never runs out of a label at extreme levels, same "genuinely uncapped, never breaks" discipline as every other formula in this pass. This is what gives Prestige levels PAST the functional cap (see below) their ongoing status value. */
 export function getPrestigeTier(level: number): PrestigeTier {
   const tier = Math.floor(level / PRESTIGE_TIER_INTERVAL);
   const cycle = Math.floor(tier / PRESTIGE_TIER_NAMES.length);
   const nameIndex = tier % PRESTIGE_TIER_NAMES.length;
   return { tier, nameKey: PRESTIGE_TIER_NAMES[nameIndex]!, cycle, color: PRESTIGE_TIER_COLORS[nameIndex]! };
+}
+
+// ---------------------------------------------------------------------------
+// Prestige economy bonuses — small, permanently bounded, no combat power.
+// ---------------------------------------------------------------------------
+
+const PRESTIGE_GOLD_BONUS_PER_LEVEL = 0.005; // +0.5%/level
+const PRESTIGE_GOLD_BONUS_CAP = 0.15; // saturates at level 30
+const PRESTIGE_GEM_SHARD_BONUS_PER_LEVEL = 0.005; // +0.5%/level
+const PRESTIGE_GEM_SHARD_BONUS_CAP = 0.2; // saturates at level 40
+
+/** The level at which BOTH bonuses below are fully saturated — every level past this one costs Gems (see getPrestigeUpgradeCost) but grants no further economic effect, existing purely as status/ranking (see getPrestigeTier). */
+export const PRESTIGE_FUNCTIONAL_CAP_LEVEL = PRESTIGE_GEM_SHARD_BONUS_CAP / PRESTIGE_GEM_SHARD_BONUS_PER_LEVEL;
+
+export interface PrestigeBonuses {
+  /** Multiplier on Gold earned per kill. 1 = no bonus. Caps at 1.15 (level 30). */
+  goldMultiplier: number;
+  /** Multiplier on Gem Shards earned per boss/mini-boss kill. 1 = no bonus. Caps at 1.20 (level 40). */
+  gemShardMultiplier: number;
+}
+
+/**
+ * Pure function of `prestigeLevel` — a simple linear ramp to a hard cap,
+ * deliberately NOT the diminishing-returns family Mastery/Specialization
+ * use, because those need to keep paying out forever (matching Gold's own
+ * unbounded growth) while Prestige explicitly must NOT: it caps in a
+ * reasonable, small number of levels (30/40) so it can never become a second
+ * infinite economic-power track running alongside them.
+ */
+export function getPrestigeBonuses(prestigeLevel: number): PrestigeBonuses {
+  const level = Math.max(0, prestigeLevel);
+  return {
+    goldMultiplier: 1 + Math.min(PRESTIGE_GOLD_BONUS_CAP, level * PRESTIGE_GOLD_BONUS_PER_LEVEL),
+    gemShardMultiplier: 1 + Math.min(PRESTIGE_GEM_SHARD_BONUS_CAP, level * PRESTIGE_GEM_SHARD_BONUS_PER_LEVEL),
+  };
 }

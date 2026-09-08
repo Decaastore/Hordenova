@@ -133,57 +133,55 @@ export interface SaveData {
   pendingRouletteSpinWaves: number[];
 
   /**
-   * HORDENOVA — PRÓXIMA GRANDE FASE spec, "DECISÃO DEFINITIVA SOBRE
-   * PROGRESSÃO": the account's single permanent save NEVER resets for a
-   * Season boundary — towers/gold/gems/Tower Mastery/Prestige/items/
-   * collection/skins/unlocks all keep going forever, exactly like
-   * `bestWave` above always has. Season is purely a competitive window
-   * layered on top: `seasonBestWave` is a SEPARATE high-water mark of the
-   * SAME `currentWave` progress, tracked identically to `bestWave` (see
-   * GameEngine.advanceBestWave/recordRunResult, which update both), except
-   * it resets to 0 only when a season boundary is crossed (see
-   * AscensionManager.syncSeasonIfNeeded) — never on a retry, never for any
-   * other reason. `bestWave` (the account's all-time record) and
-   * `seasonBestWave` (this season's record) can and will diverge the
+   * Season high-water mark of `currentWave` — tracked identically to
+   * `bestWave` (see GameEngine.advanceBestWave/recordRunResult, which
+   * update both), except it resets to 0 only when a season boundary is
+   * crossed (see AscensionManager.syncSeasonIfNeeded) — never on a retry,
+   * never for any other reason. `bestWave` (the account's all-time record)
+   * and `seasonBestWave` (this season's record) can and will diverge the
    * moment a season rolls over, by design.
    */
   seasonBestWave: number;
 
   // -----------------------------------------------------------------------
-  // HORDENOVA — PRÓXIMA GRANDE FASE spec, "CORREÇÃO DE REQUISITOS": a
-  // player's build (tower LEVEL, specialization progress, Gold) is
-  // SEASONAL — it resets to a fresh start at every Season boundary (see
-  // AscensionManager.syncSeasonIfNeeded), exactly like `towerLoadout`/
-  // `gold`/`currentWave` above. Tower Mastery and Tower Skin OWNERSHIP are
-  // the opposite: permanent, account-wide, and untouched by that reset —
-  // moved out of TowerLoadoutEntry (which IS wiped each season) into their
-  // own top-level fields here. Mastery is funded by GEMS, never Gold — and
-  // (CORREÇÃO DE REQUISITOS, SEASON COMPETITIVA) it grants ZERO combat
-  // power, so this is no longer an exception to the Gem economy's
-  // never-buys-power rule at all: see config/towerMastery.ts's doc comment
-  // for what it actually grants (Respec Tokens + cosmetic tiers).
+  // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
+  // ownership." A player's build (Tower Level, Mastery Level, Specialization
+  // Level, Gold) is SEASONAL — it resets to a fresh start at every Season
+  // boundary (see AscensionManager.syncSeasonIfNeeded), exactly like
+  // `towerLoadout`/`gold`/`currentWave` above. OWNERSHIP of Mastery and
+  // Specialization tracks, and Tower Skins, is the opposite: permanent,
+  // account-wide, and untouched by that reset.
+  //
+  // `towerMasteryLevels` (per-tower-TYPE, SEASON-scoped, resets to {} at
+  // every Season boundary) is now purely the numeric progression half;
+  // `masteryUnlocked` below is the permanent ownership half — the two are
+  // never conflated. A tower type's level always starts at 0 on a new
+  // Season regardless of whether it's ever been unlocked; ownership only
+  // gates whether Gold can raise that level at all (see
+  // config/towerMastery.ts's canUpgradeMastery).
   // -----------------------------------------------------------------------
-  /** Permanent per-tower-TYPE Mastery level (0 = never invested) — survives every Season reset. Applied to a freshly-placed tower of that type via GameEngine.instantiateTowerFromLoadout/placeTower. */
+  /** SEASON-scoped per-tower-TYPE Mastery level — resets to {} at every Season boundary. Applied to a freshly-placed tower of that type via GameEngine.instantiateTowerFromLoadout/placeTower. */
   towerMasteryLevels: Partial<Record<TowerType, number>>;
+  /** PERMANENT per-tower-TYPE Mastery ownership (the one-time 400 Gems ever-purchase) — never reset by a Season boundary, never charged again once true for a given type. */
+  masteryUnlocked: Partial<Record<TowerType, boolean>>;
   /** Permanent record of every Tower Skin id this account has ever unlocked (by reaching its unlockLevel on some tower, in any Season) — mirrors unlockedCastleSkinIds. Never removed once granted, regardless of the tower's current (seasonal) level. */
   ownedTowerSkinIds: string[];
   /** Permanent per-tower-TYPE equipped-skin preference, auto-reapplied whenever a tower of that type is placed in a future Season — so an owned skin doesn't visually vanish just because the season reset the tower itself. Absent/undefined = default look. */
   equippedTowerSkinByType: Partial<Record<TowerType, string>>;
 
   /**
-   * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
-   * Tokens spent so far, per tower TYPE. Mirrors towerMasteryLevels'
-   * exact shape/persistence philosophy: permanent, account-wide-by-type,
-   * survives every Season reset (specialization CHOICE is Season-scoped —
-   * lives in towerLoadout — but how many respecs have been spent is not).
-   * How many tokens are currently AVAILABLE is never stored — it's always
-   * derived as getAvailableRespecTokens(masteryLevel, spent) — so this
-   * field can only ever go up, never silently regrant a token on reload.
+   * PERMANENT per-tower-TYPE record of every Specialization path this
+   * account has ever purchased (the one-time 500 Gems unlock) — never reset
+   * by a Season boundary, never charged again for a path already in this
+   * list. The tower instance's own `specializationId`/`specializationLevel`
+   * (in `towerLoadout`) remain SEASON-scoped — this is only the permanent
+   * ownership record that lets a new Season's `chooseTowerSpecialization`
+   * re-activate an already-owned path for free instead of charging again.
    */
-  towerRespecTokensSpent: Partial<Record<TowerType, number>>;
+  unlockedSpecializationIds: Partial<Record<TowerType, SpecializationId[]>>;
 }
 
-export const SAVE_DATA_VERSION = 15;
+export const SAVE_DATA_VERSION = 16;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -225,9 +223,10 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   pendingRouletteSpinWaves: [],
   seasonBestWave: 0,
   towerMasteryLevels: {},
+  masteryUnlocked: {},
   ownedTowerSkinIds: [],
   equippedTowerSkinByType: {},
-  towerRespecTokensSpent: {},
+  unlockedSpecializationIds: {},
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -410,14 +409,66 @@ function parseTowerMasteryLevels(raw: unknown): Partial<Record<TowerType, number
   return result;
 }
 
-/** Self-healing parse for `towerRespecTokensSpent` — same shape/validation as parseTowerMasteryLevels (a per-TowerType non-negative-integer count). */
-function parseTowerRespecTokensSpent(raw: unknown): Partial<Record<TowerType, number>> {
+/** Self-healing parse for `masteryUnlocked` (save v16+) — drops any key that isn't a real TowerType or any value that isn't literally `true` (a key present-but-false, or any other truthy junk, is treated as not-owned rather than trusted). */
+function parseMasteryUnlocked(raw: unknown): Partial<Record<TowerType, boolean>> {
   if (!raw || typeof raw !== "object") return {};
-  const result: Partial<Record<TowerType, number>> = {};
+  const result: Partial<Record<TowerType, boolean>> = {};
   for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (VALID_TOWER_TYPES.has(key as TowerType) && typeof value === "number" && value >= 0) {
-      result[key as TowerType] = value;
+    if (VALID_TOWER_TYPES.has(key as TowerType) && value === true) result[key as TowerType] = true;
+  }
+  return result;
+}
+
+/**
+ * MIGRATION (save v15 -> v16): a pre-v16 save never had a separate
+ * `masteryUnlocked` field — Mastery ownership and level were the same
+ * number (`towerMasteryLevels[type] > 0` meant both "ever unlocked" AND
+ * "currently at this level", and that field was PERMANENT). Splitting them
+ * must not cost an existing player their ownership: any type already at a
+ * level > 0 already paid the one-time Gems unlock, so it becomes
+ * permanently owned here. The numeric level itself is deliberately left
+ * untouched by this migration (not zeroed) — it will obey the new
+ * Season-scoped reset model starting at the next real Season boundary
+ * (see AscensionManager.syncSeasonIfNeeded), not retroactively.
+ */
+function deriveMasteryUnlockedFromLegacyLevels(levels: Partial<Record<TowerType, number>>): Partial<Record<TowerType, boolean>> {
+  const result: Partial<Record<TowerType, boolean>> = {};
+  for (const [type, level] of Object.entries(levels)) {
+    if (VALID_TOWER_TYPES.has(type as TowerType) && typeof level === "number" && level > 0) {
+      result[type as TowerType] = true;
     }
+  }
+  return result;
+}
+
+/** Self-healing parse for `unlockedSpecializationIds` (save v16+) — drops any key that isn't a real TowerType, or any array entry that isn't a real SpecializationId belonging to that tower type. */
+function parseUnlockedSpecializationIds(raw: unknown): Partial<Record<TowerType, SpecializationId[]>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Partial<Record<TowerType, SpecializationId[]>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!VALID_TOWER_TYPES.has(key as TowerType) || !Array.isArray(value)) continue;
+    const validIds = new Set<SpecializationId>(SPECIALIZATIONS_BY_TOWER[key as TowerType].map((s) => s.id));
+    const ids = value.filter((id): id is SpecializationId => typeof id === "string" && validIds.has(id as SpecializationId));
+    if (ids.length > 0) result[key as TowerType] = ids;
+  }
+  return result;
+}
+
+/**
+ * MIGRATION (save v15 -> v16): a pre-v16 save never tracked Specialization
+ * ownership separately from the tower instance's own (Season-scoped)
+ * `specializationId` — every path a placed tower currently has chosen was
+ * already paid for once, so it becomes permanently owned here rather than
+ * requiring the player to pay again the next time `specializationId` resets
+ * to null at a Season boundary.
+ */
+function deriveUnlockedSpecializationIdsFromLegacyLoadout(loadout: readonly TowerLoadoutEntry[]): Partial<Record<TowerType, SpecializationId[]>> {
+  const result: Partial<Record<TowerType, SpecializationId[]>> = {};
+  for (const entry of loadout) {
+    if (!entry.specializationId) continue;
+    const owned = result[entry.type] ?? [];
+    if (!owned.includes(entry.specializationId)) owned.push(entry.specializationId);
+    result[entry.type] = owned;
   }
   return result;
 }
@@ -447,6 +498,14 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
     }
 
     const parsed = JSON.parse(raw) as Partial<SaveData>;
+    // HORDENOVA Season/Progression v1.0 (save v15 -> v16) — a save written
+    // before this migration never had masteryUnlocked/unlockedSpecializationIds
+    // at all, so its existing (permanent, pre-split) progress must be
+    // carried forward as ownership rather than silently discarded — see
+    // deriveMasteryUnlockedFromLegacyLevels/deriveUnlockedSpecializationIdsFromLegacyLoadout.
+    const legacySave = !(typeof parsed.version === "number" && parsed.version >= 16);
+    const parsedTowerLoadout = parseTowerLoadout(parsed.towerLoadout);
+    const parsedTowerMasteryLevels = parseTowerMasteryLevels(parsed.towerMasteryLevels);
     const result: SaveData = {
       version: SAVE_DATA_VERSION,
       bestWave: typeof parsed.bestWave === "number" ? parsed.bestWave : 0,
@@ -454,7 +513,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       lastPlayedAt: typeof parsed.lastPlayedAt === "number" ? parsed.lastPlayedAt : null,
       currentWave: typeof parsed.currentWave === "number" ? parsed.currentWave : 0,
       gold: typeof parsed.gold === "number" ? parsed.gold : RUN_START.startingGold,
-      towerLoadout: parseTowerLoadout(parsed.towerLoadout),
+      towerLoadout: parsedTowerLoadout,
       inventory: parseInventory(parsed.inventory),
       cosmetics: Array.isArray(parsed.cosmetics) ? parsed.cosmetics : [],
       xp: typeof parsed.xp === "number" ? parsed.xp : 0,
@@ -517,18 +576,25 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // all-time bestWave; 0 is the only correct default (nothing was
       // "achieved this season" before this field existed to record it).
       seasonBestWave: typeof parsed.seasonBestWave === "number" && parsed.seasonBestWave >= 0 ? parsed.seasonBestWave : 0,
-      // CORREÇÃO DE REQUISITOS — Tower Mastery, owned skins, and equipped
-      // skins are permanent account-wide state (unlike tower level/loadout,
-      // which are Season-scoped and live only in towerLoadout). A
-      // pre-existing save never tracked these separately, so empty is the
-      // only correct default.
-      towerMasteryLevels: parseTowerMasteryLevels(parsed.towerMasteryLevels),
+      // Owned skins and equipped skins are permanent account-wide state
+      // (unlike tower level/loadout, which are Season-scoped and live only
+      // in towerLoadout). A pre-existing save never tracked these
+      // separately, so empty is the only correct default.
+      towerMasteryLevels: parsedTowerMasteryLevels,
       ownedTowerSkinIds: parseOwnedTowerSkinIds(parsed.ownedTowerSkinIds),
       equippedTowerSkinByType: parseEquippedTowerSkinByType(parsed.equippedTowerSkinByType),
-      // CORREÇÃO DE REQUISITOS (save v14 -> v15) — a pre-existing save never
-      // tracked respec tokens spent at all; 0 spent per type is the only
-      // correct default (nothing was ever spent before this field existed).
-      towerRespecTokensSpent: parseTowerRespecTokensSpent(parsed.towerRespecTokensSpent),
+      // HORDENOVA Season/Progression v1.0 (save v15 -> v16) — Mastery/
+      // Specialization OWNERSHIP is a brand-new permanent field, split out
+      // of what used to be a single conflated number/loadout entry. See
+      // deriveMasteryUnlockedFromLegacyLevels/deriveUnlockedSpecializationIdsFromLegacyLoadout's
+      // own doc comments for exactly why a pre-v16 save's existing progress
+      // is carried forward as ownership rather than lost.
+      masteryUnlocked: legacySave
+        ? deriveMasteryUnlockedFromLegacyLevels(parsedTowerMasteryLevels)
+        : parseMasteryUnlocked(parsed.masteryUnlocked),
+      unlockedSpecializationIds: legacySave
+        ? deriveUnlockedSpecializationIdsFromLegacyLoadout(parsedTowerLoadout)
+        : parseUnlockedSpecializationIds(parsed.unlockedSpecializationIds),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

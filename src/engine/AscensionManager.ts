@@ -21,25 +21,28 @@ import type { TowerLoadoutEntry } from "@/entities/Tower";
  * here was judged not worth the churn/regression risk for a purely internal
  * name; this comment is the map from old name to new meaning.
  *
- * THE CORE RULE THIS FILE ENFORCES (as refined by the player's own
- * "CORREÇÃO DE REQUISITOS" follow-up, which explicitly supersedes this
- * comment's earlier "never resets towers/gold" wording): Season is a
+ * THE CORE RULE THIS FILE ENFORCES — HORDENOVA Season/Progression v1.0's own
+ * restatement: "Season resets progression, not ownership." Season is a
  * competitive WINDOW layered on top of the one permanent save. Two
  * completely separate buckets exist:
  *
- *   PERMANENT (never touched by a Season boundary): gems, Tower Mastery
- *   (SaveData.towerMasteryLevels — funded by Gems, see gemSinks.ts),
- *   owned/equipped Tower Skins (ownedTowerSkinIds/equippedTowerSkinByType —
- *   also Gems-only), Profile Prestige, items/inventory, collection,
- *   ascensionHistory/records, bestWave (the account's all-time record).
+ *   PERMANENT (never touched by a Season boundary): gems, Mastery ownership
+ *   (SaveData.masteryUnlocked — the one-time 400 Gems purchase per tower
+ *   TYPE), Specialization ownership (SaveData.unlockedSpecializationIds —
+ *   the one-time 500 Gems purchase per path), owned/equipped Tower Skins
+ *   (ownedTowerSkinIds/equippedTowerSkinByType — also Gems-only), Profile
+ *   Prestige, items/inventory, collection, ascensionHistory/records,
+ *   bestWave (the account's all-time record).
  *
  *   SEASONAL (reset to a fresh state at every Season boundary, by
- *   syncSeasonIfNeeded below): tower LEVEL, specialization choice/level,
- *   Gold, currentWave, and seasonBestWave itself. A tower placed and leveled
- *   to 35 in Season 1 stays PLACED (its type is never "un-unlocked" — there
- *   was never a type-lock to begin with, every type is buildable from wave 1
- *   the same way it always has been) but drops back to level 1 in Season 2;
- *   the Gold spent leveling it belonged to Season 1 only.
+ *   syncSeasonIfNeeded below): tower LEVEL, Mastery LEVEL
+ *   (SaveData.towerMasteryLevels — ownership above is untouched, only the
+ *   numeric progression resets), specialization choice/level, Gold,
+ *   currentWave, and seasonBestWave itself. A tower placed and leveled to 35
+ *   in Season 1 stays PLACED (its type is never "un-unlocked" — there was
+ *   never a type-lock to begin with, every type is buildable from wave 1 the
+ *   same way it always has been) but drops back to level 1 in Season 2; the
+ *   Gold spent leveling it belonged to Season 1 only.
  *
  * `seasonBestWave` is tracked LIVE, the same way `bestWave` always has been
  * (see GameEngine.advanceBestWave/SaveSystem.recordRunResult, which update
@@ -216,15 +219,16 @@ export function syncSeasonIfNeeded(): void {
     finalizeSeason(s, 0);
   }
 
-  // CORREÇÃO DE REQUISITOS — tower level/specialization and Season Gold are
-  // SEASONAL, not permanent: each placed tower keeps its TYPE and SLOT
-  // (never "un-placed" — there's no unlock to lose) but returns to a fresh
+  // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
+  // ownership": tower level/specialization/Season Gold are SEASONAL, not
+  // permanent: each placed tower keeps its TYPE and SLOT (never
+  // "un-placed" — there's no unlock to lose) but returns to a fresh
   // level-1, no-specialization state, exactly like a tower a player just
-  // built. Mastery level and equipped skin are deliberately NOT touched
-  // here — instantiateTowerFromLoadout (GameEngine.ts) sources those from
-  // the separate PERMANENT towerMasteryLevels/equippedTowerSkinByType maps,
-  // not from this loadout entry, so leaving this entry's own equivalent
-  // fields blank changes nothing about what the player actually sees.
+  // built. Equipped skin is deliberately NOT touched here —
+  // instantiateTowerFromLoadout (GameEngine.ts) sources it from the
+  // separate PERMANENT equippedTowerSkinByType map, not from this loadout
+  // entry, so leaving this entry's own equivalent field blank changes
+  // nothing about what the player actually sees.
   const resetLoadout: TowerLoadoutEntry[] = main.towerLoadout.map((entry) => ({
     slotId: entry.slotId,
     type: entry.type,
@@ -241,5 +245,12 @@ export function syncSeasonIfNeeded(): void {
     currentWave: 0,
     gold: RUN_START.startingGold,
     towerLoadout: resetLoadout,
+    // Mastery LEVEL is SEASON-scoped (unlike its permanent ownership half,
+    // SaveData.masteryUnlocked, which this reset never touches) — resets
+    // to {} exactly like the loadout's own level/specialization fields
+    // above. This is the one field this reset used to leave untouched
+    // (when Mastery ownership and level were still the same conflated
+    // number) and no longer does.
+    towerMasteryLevels: {},
   });
 }

@@ -118,18 +118,43 @@ export function specializationEffectScale(level: number): number {
 }
 
 /**
- * Visual Overhaul spec section 21/22: specialization is a strategic
- * decision Gems can unlock, not a stat Gems can buy. The CHOICE of a path
- * (null -> level 1) now costs this flat Gem amount instead of Gold —
- * every LEVEL of that path after the choice (1->2, ..., 4->5) stays on
- * Gold via getSpecializationUpgradeCost below, unchanged. A flat cost
- * (not scaled by tower level/type) keeps this one clear "premium
- * decision" price rather than inventing a second gold-shaped curve in
- * Gems; tuned against the existing Gem-Shard drop rates (main boss 5,
- * mini-boss 2, milestone wave ~1-3, 10 shards/Gem) so a single
- * specialization unlock is a genuine mid-game goal, not an instant spend.
+ * HORDENOVA Season/Progression v1.0 — Ownership vs. Level split.
+ *
+ * Specialization is now explicitly two SEPARATE things, never conflated:
+ *
+ *   OWNERSHIP (`unlockedSpecializationIds`, SaveData/GameEngine, permanent,
+ *   keyed by TOWER TYPE -> array of owned SpecializationId) — a one-time
+ *   SPECIALIZATION_UNLOCK_GEM_COST Gems purchase per path. NEVER resets at
+ *   a Season boundary and is NEVER charged again for a path already owned —
+ *   picking an already-owned path again in a future Season (the tower's own
+ *   `specializationId` is Season-scoped and resets to null) is free.
+ *
+ *   PROGRESSION (`specializationLevel`, on the tower instance itself,
+ *   Season-scoped) — resets to 0 at the start of every Season along with
+ *   the active choice, raised entirely with Gold via
+ *   getSpecializationUpgradeCost below.
+ *
+ * The CHOICE of a path a tower doesn't yet own costs SPECIALIZATION_UNLOCK_
+ * GEM_COST Gems (a strategic decision Gems can unlock, never a stat Gems can
+ * buy); every LEVEL of that path after the choice stays on Gold, unchanged.
+ * Tuned against real Gem Shard income (see config/prestige.ts and
+ * GameEngine's boss/mini-boss shard grants) so a single specialization
+ * unlock is a genuine goal, not an instant spend.
  */
-export const SPECIALIZATION_UNLOCK_GEM_COST = 8;
+export const SPECIALIZATION_UNLOCK_GEM_COST = 500;
+
+/**
+ * "Trocar Especialização" — HORDENOVA Season/Progression v1.0. A flat,
+ * unconditional Gems purchase that switches a tower's ACTIVE specialization
+ * from one it already owns to a DIFFERENT path it already owns (see
+ * GameEngine.switchTowerSpecialization). Replaces the old Specialization
+ * Respec Token system entirely — there is no free/earned respec anymore,
+ * only this flat Gems purchase. Switching to a path NOT yet owned still
+ * costs the full SPECIALIZATION_UNLOCK_GEM_COST above, not this discounted
+ * rate — this price is specifically the "flexibility fee" for moving
+ * between paths already paid for once.
+ */
+export const SPECIALIZATION_CHANGE_GEM_COST = 200;
 
 export interface SpecializationDefinition {
   id: SpecializationId;
@@ -181,8 +206,8 @@ export function isSpecializationForTower(id: SpecializationId, type: TowerType):
   return getSpecializationDefinition(id).towerType === type;
 }
 
-/** Original tuned rate for the first levels — UNCHANGED, so the hand-tuned early Specialization prices stay exactly what they always were. */
-const SPECIALIZATION_LINEAR_COST_MULTIPLIER = 7;
+/** HORDENOVA Season/Progression v1.0 — retuned 7->40, validated by a real GameEngine Season simulation across F2P/payer profiles (specializationLevel now resets to 0 every Season, so the old permanent-account-lifetime tuning no longer fits). */
+const SPECIALIZATION_LINEAR_COST_MULTIPLIER = 40;
 /**
  * INFINITE BALANCE OVERHAUL — Gold cost curve.
  *
@@ -200,13 +225,19 @@ const SPECIALIZATION_LINEAR_COST_MULTIPLIER = 7;
  * ~linearly with wave number, which is precisely the input the sqrt-shaped
  * effect curve above needs to keep player power ahead of enemy HP forever.
  * A convex (quadratic-or-worse) tail here would break that inequality and
- * quietly re-introduce a wall thousands of waves later.
+ * quietly re-introduce a wall thousands of waves later. This asymptotic
+ * property is NOT part of the frozen Infinite Progression spec (only
+ * SPECIALIZATION_EFFECT_EXPONENT above is) — retuning the constants below
+ * for the new Season cadence does not reopen any frozen contract.
  *
  * SPECIALIZATION_COST_LINEAR_TAIL_GROWTH is set to ln(GROWTH_FACTOR) so the
- * curve's slope is continuous at the ceiling — no price cliff at level 40.
+ * curve's slope is continuous at the ceiling — no price cliff at the cap.
+ *
+ * HORDENOVA Season/Progression v1.0 — growth factor retuned 1.06->1.07,
+ * compound cap retuned 50->40, matching the approved Season simulation.
  */
-const SPECIALIZATION_COST_GROWTH_FACTOR = 1.06;
-const SPECIALIZATION_COST_COMPOUND_LEVEL_CAP = 50;
+const SPECIALIZATION_COST_GROWTH_FACTOR = 1.07;
+const SPECIALIZATION_COST_COMPOUND_LEVEL_CAP = 40;
 const SPECIALIZATION_COST_LINEAR_TAIL_GROWTH = Math.log(SPECIALIZATION_COST_GROWTH_FACTOR);
 
 /**

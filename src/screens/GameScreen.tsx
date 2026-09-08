@@ -131,9 +131,8 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             isSkinOwned={(skinId) => engine.isTowerSkinOwned(skinId)}
             onUnlockMastery={() => engine.unlockSelectedTowerMastery()}
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
-            respecTokensAvailable={engine.getAvailableRespecTokensForSelectedTower()}
-            canRespecSpecialization={engine.canRespecSelectedTowerSpecialization()}
-            onRespecSpecialization={() => engine.respecSelectedTowerSpecialization()}
+            unlockedSpecializationIdsForType={engine.getUnlockedSpecializationIdsForType(selectedTower.type)}
+            onSwitchSpecialization={(id) => engine.switchTowerSpecialization(id)}
           />
         )}
 

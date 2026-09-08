@@ -105,23 +105,29 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.towerLoadout[0]!.level).toBe(1);
   });
 
-  it("[Test 3/11 & 4/11] Tower Mastery levels are PERMANENT — untouched by a Season boundary — and were funded by Gems, never Gold", () => {
+  it("[Test 3/11 & 4/11] Tower Mastery OWNERSHIP is PERMANENT — untouched by a Season boundary — while its numeric LEVEL is Season-scoped and resets to 0", () => {
     mockSeasonNumber(2);
     updateSave({
       ascensionLastSyncedSeason: 1,
       seasonBestWave: 40,
       gold: 12345,
+      masteryUnlocked: { IRONWOOD: true },
       towerMasteryLevels: { IRONWOOD: 7 },
     });
 
     syncSeasonIfNeeded();
 
     const main = loadSave();
-    expect(main.towerMasteryLevels.IRONWOOD).toBe(7);
-    // Gold itself is Season-scoped and resets — Mastery's own permanence is
-    // independent of whatever Gold balance existed; GameEngine's own
-    // upgradeSelectedTowerMastery test (GameEngineProgression2.test.ts)
-    // covers the "Gems, not Gold, are debited" half of this requirement.
+    // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
+    // ownership": the one-time 400 Gems unlock (funded by Gems, never Gold —
+    // see GameEngineProgression2.test.ts's own dedicated coverage) is never
+    // re-charged and survives every Season boundary...
+    expect(main.masteryUnlocked.IRONWOOD).toBe(true);
+    // ...but the numeric level it gates access to is Season-scoped, exactly
+    // like tower level and specialization level — it resets to a clean
+    // slate at the start of every Season, regardless of ownership.
+    expect(main.towerMasteryLevels.IRONWOOD).toBeUndefined();
+    // Gold itself is also Season-scoped and resets independently of both.
     expect(main.gold).toBe(RUN_START.startingGold);
   });
 
@@ -141,19 +147,35 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.equippedTowerSkinByType.IRONWOOD).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
   });
 
-  it("[Test 7/11] tower specialization progress does NOT cross a Season boundary", () => {
+  it("Profile Prestige (bought with Gems, permanent) is completely untouched by a Season boundary", () => {
+    mockSeasonNumber(2);
+    updateSave({ ascensionLastSyncedSeason: 1, seasonBestWave: 40, prestigeLevel: 12 });
+
+    syncSeasonIfNeeded();
+
+    expect(loadSave().prestigeLevel).toBe(12);
+  });
+
+  it("[Test 7/11] tower specialization progress does NOT cross a Season boundary, but the account's ownership of the path (paid for in Gems) does", () => {
     mockSeasonNumber(2);
     updateSave({
       ascensionLastSyncedSeason: 1,
       seasonBestWave: 40,
       towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 30, specializationId: "IRONWOOD_EXECUTIONER", specializationLevel: 5 }],
+      unlockedSpecializationIds: { IRONWOOD: ["IRONWOOD_EXECUTIONER"] },
     });
 
     syncSeasonIfNeeded();
 
-    const entry = loadSave().towerLoadout[0]!;
+    const main = loadSave();
+    const entry = main.towerLoadout[0]!;
     expect(entry.specializationId ?? null).toBeNull();
     expect(entry.specializationLevel ?? 0).toBe(0);
+    // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
+    // ownership": the 500 Gems already spent on this path is never
+    // re-charged; re-choosing it next Season is free (see
+    // GameEngineProgression2.test.ts's own dedicated coverage).
+    expect(main.unlockedSpecializationIds.IRONWOOD).toEqual(["IRONWOOD_EXECUTIONER"]);
   });
 
   it("[Test 8/11] Season Gold does NOT cross a Season boundary — resets to the starting amount", () => {

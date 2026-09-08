@@ -21,7 +21,7 @@ import {
   type RouletteRewardType,
 } from "@/config/roulette";
 import { CASTLE_SKINS } from "@/config/castleSkins";
-import { getPrestigeUpgradeCost } from "@/config/prestige";
+import { canUnlockPrestige, getPrestigeBonuses, getPrestigeUpgradeCost, type PrestigeBonuses } from "@/config/prestige";
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
@@ -39,21 +39,19 @@ import {
   upgradeSpecialization as upgradeSpecializationEntity,
   equipSkin as equipSkinEntity,
   canPurchaseSkin as canPurchaseSkinEntity,
-  canUnlockMastery,
-  unlockMastery as unlockMasteryEntity,
   canUpgradeMastery,
   getMasteryUpgradeCostFor,
   upgradeMastery as upgradeMasteryEntity,
-  canRespecSpecialization,
-  respecSpecialization as respecSpecializationEntity,
+  canSwitchSpecialization,
+  switchSpecialization as switchSpecializationEntity,
   applySiegeDamage,
   resetTowerSurvival,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import { getAvailableRespecTokens, MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
+import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
-import { SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
+import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import {
   advanceEnemy,
   createEliteEnemyInstance,
@@ -313,28 +311,21 @@ export class GameEngine {
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
 
-  // CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE) — Tower Mastery and Tower
-  // Skin ownership are PERMANENT, account-wide, keyed by TOWER TYPE (every
-  // placed tower of a type shares its type's Mastery level and equipped
-  // skin) — unlike `towers[].level`/`specializationLevel`, which live in the
-  // Season-scoped towerLoadout and reset to 0 at every Season boundary (see
-  // AscensionManager.syncSeasonIfNeeded). See SaveData's doc comment for the
-  // full PERMANENT vs SEASONAL split this mirrors.
+  // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
+  // ownership." towerMasteryLevels is now SEASON-scoped (resets to {} at
+  // every Season boundary, see AscensionManager.syncSeasonIfNeeded);
+  // masteryUnlocked/unlockedSpecializationIds/Tower Skin ownership are the
+  // permanent, account-wide, never-reset halves, keyed by TOWER TYPE (every
+  // placed tower of a type shares its type's Mastery level/ownership and
+  // equipped skin). See SaveData's doc comment for the full split.
   private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
+  /** Permanent per-TYPE Mastery ownership (the one-time 400 Gems purchase) — never reset by a Season boundary. */
+  private masteryUnlocked: Partial<Record<TowerType, boolean>> = {};
   private ownedTowerSkinIds = new Set<string>();
   private equippedTowerSkinByType: Partial<Record<TowerType, string>> = {};
 
-  /**
-   * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
-   * Tokens spent so far, PER TOWER TYPE — the exact same permanent,
-   * account-wide-by-type persistence shape as towerMasteryLevels above
-   * (spec's own suggestion: "mesma filosofia de persistência já usada para
-   * Mastery"). How many tokens are AVAILABLE is never stored directly —
-   * it's always recomputed as getAvailableRespecTokens(masteryLevel,
-   * spent), so a reload/restart can never re-grant a token that was
-   * already spent (idempotent by construction, not by a guard flag).
-   */
-  private towerRespecTokensSpent: Partial<Record<TowerType, number>> = {};
+  /** Permanent per-TYPE record of every Specialization path ever purchased (the one-time 500 Gems unlock) — never reset by a Season boundary, never re-charged for a path already in this list. See config/specializations.ts's SPECIALIZATION_UNLOCK_GEM_COST/SPECIALIZATION_CHANGE_GEM_COST. */
+  private unlockedSpecializationIds: Partial<Record<TowerType, SpecializationId[]>> = {};
 
   // Master Implementation spec sections 46-48, and AUDITORIA E CORREÇÃO
   // GERAL spec sections 1-13 — the every-10-wave Roulette.
@@ -419,9 +410,16 @@ export class GameEngine {
     // reads these maps to give each tower its permanent-by-type Mastery
     // level and equipped skin.
     this.towerMasteryLevels = { ...save.towerMasteryLevels };
+    this.masteryUnlocked = { ...save.masteryUnlocked };
     this.ownedTowerSkinIds = new Set(save.ownedTowerSkinIds);
     this.equippedTowerSkinByType = { ...save.equippedTowerSkinByType };
-    this.towerRespecTokensSpent = { ...save.towerRespecTokensSpent };
+    // Deep-copy each per-type array — a shallow spread would leave every
+    // type's array as the SAME reference as the loaded save's, so pushing a
+    // newly-unlocked id in chooseTowerSpecialization would mutate the save
+    // object this engine is supposed to be an independent working copy of.
+    this.unlockedSpecializationIds = Object.fromEntries(
+      Object.entries(save.unlockedSpecializationIds).map(([type, ids]) => [type, [...(ids ?? [])]]),
+    ) as Partial<Record<TowerType, SpecializationId[]>>;
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.playerId = save.playerId;
@@ -584,6 +582,7 @@ export class GameEngine {
       entry.specializationLevel,
       this.equippedTowerSkinByType[entry.type] ?? null,
       this.towerMasteryLevels[entry.type] ?? 0,
+      this.masteryUnlocked[entry.type] === true,
     );
   }
 
@@ -608,6 +607,7 @@ export class GameEngine {
         0,
         this.equippedTowerSkinByType[type] ?? null,
         this.towerMasteryLevels[type] ?? 0,
+        this.masteryUnlocked[type] === true,
       ),
     );
     this.persist();
@@ -638,42 +638,41 @@ export class GameEngine {
   }
 
   /**
-   * Master Implementation Pass spec sections 3-6 — TOWER MASTERY: the
-   * uncapped sink past MAX_TOWER_LEVEL. Deliberately available at ANY tower
-   * level (not gated behind level 30) — a player free to invest earlier if
+   * HORDENOVA Season/Progression v1.0 — TOWER MASTERY: the uncapped sink
+   * past MAX_TOWER_LEVEL. Deliberately available at ANY tower level (not
+   * gated behind a specific level) — a player free to invest earlier if
    * they'd rather spread spending out, exactly like Specialization already
    * works once its own level gate is passed.
    *
-   * INFINITE BALANCE OVERHAUL — Mastery now mirrors Specialization's shape
-   * exactly: a one-time MASTERY_UNLOCK_GEM_COST Gems purchase (0 -> 1,
-   * handled by unlockSelectedTowerMastery below) opens the track, then this
-   * method is Gold-only forever (1 -> 2 -> ... no max level). It also grants
-   * real, small, bounded-weighted combat effects again — see
-   * config/towerMastery.ts's getMasteryBonuses doc comment for why this is
-   * still not "Gems buy power": Gems only ever buy the one-time access. The
-   * level lives in `this.towerMasteryLevels` (keyed by TYPE, not by tower
-   * instance), applied to every placed tower of that type immediately so
-   * two Ironwood towers never silently disagree on their own Mastery level.
+   * Ownership (`this.masteryUnlocked`, permanent per TYPE) and progression
+   * (`this.towerMasteryLevels`, SEASON-scoped per TYPE) are fully separate:
+   * a one-time MASTERY_UNLOCK_GEM_COST Gems purchase (handled by
+   * unlockSelectedTowerMastery below) grants ownership FOREVER — it does
+   * NOT touch the level at all, including on the very first purchase. Every
+   * level, in every Season including the first, is bought with Gold via
+   * upgradeSelectedTowerMastery, which requires ownership but reads from
+   * whatever the CURRENT (Season-scoped) level happens to be — 0 at the
+   * start of every Season, owned or not. It also grants real, small,
+   * bounded-weighted combat effects — see config/towerMastery.ts's
+   * getMasteryBonuses doc comment for why this is still not "Gems buy
+   * power": Gems only ever buy the one-time access, forever, never a level.
    */
   canUnlockSelectedTowerMastery(): boolean {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    return !!tower && canUnlockMastery(tower);
+    return !!tower && this.masteryUnlocked[tower.type] !== true;
   }
 
-  /** Pays the one-time MASTERY_UNLOCK_GEM_COST Gems to set the selected tower's TYPE mastery level to 1. */
+  /** Pays the one-time, permanent MASTERY_UNLOCK_GEM_COST Gems to grant the selected tower's TYPE Mastery ownership forever. Never re-charged for this type again, in any future Season. Does NOT touch the current (Season-scoped) Mastery level. */
   unlockSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower || !canUnlockMastery(tower)) return false;
+    if (!tower || this.masteryUnlocked[tower.type] === true) return false;
     if (!this.canAffordGems(MASTERY_UNLOCK_GEM_COST)) return false;
 
-    const unlocked = unlockMasteryEntity(tower);
-    if (!unlocked) return false;
-
     this.spendGems(MASTERY_UNLOCK_GEM_COST, `tower_mastery:${tower.type}`);
-    this.towerMasteryLevels[tower.type] = tower.masteryLevel;
+    this.masteryUnlocked[tower.type] = true;
     for (const other of this.towers) {
-      if (other.type === tower.type && other.id !== tower.id) other.masteryLevel = tower.masteryLevel;
+      if (other.type === tower.type) other.masteryUnlocked = true;
     }
     this.emitAudio({ type: "level_unlock" });
     this.persist();
@@ -681,7 +680,7 @@ export class GameEngine {
     return true;
   }
 
-  /** GOLD-funded, uncapped upgrade of the selected tower's TYPE mastery level (1 -> 2 -> ... forever). Use unlockSelectedTowerMastery for the initial 0 -> 1 Gems unlock instead. */
+  /** GOLD-funded, uncapped upgrade of the selected tower's TYPE mastery level (0 -> 1 -> 2 -> ... forever, resetting to 0 every Season) — requires Mastery ownership (see unlockSelectedTowerMastery), never re-checks or re-charges it. */
   upgradeSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
@@ -702,48 +701,16 @@ export class GameEngine {
     return true;
   }
 
-  /** How many Specialization Respec Tokens the selected tower's TYPE currently has available (earned by masteryLevel, minus spent) — 0 if nothing selected. */
-  getAvailableRespecTokensForSelectedTower(): number {
-    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower) return 0;
-    return getAvailableRespecTokens(tower.masteryLevel, this.towerRespecTokensSpent[tower.type] ?? 0);
-  }
-
-  canRespecSelectedTowerSpecialization(): boolean {
-    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower) return false;
-    return canRespecSpecialization(tower, this.towerRespecTokensSpent[tower.type] ?? 0);
-  }
-
-  /**
-   * Spends 1 Specialization Respec Token to reset the SELECTED tower's
-   * specialization path back to unchosen (specializationId -> null,
-   * specializationLevel -> 0) — everything else (level, masteryLevel,
-   * unlock status, HP, equipped skin) is untouched. The token pool itself
-   * is per TYPE (mirrors towerMasteryLevels), so spending here reduces
-   * what every tower of this type has available, exactly like Mastery
-   * itself is shared account-wide-by-type.
-   */
-  respecSelectedTowerSpecialization(): boolean {
-    if (!this.canModifyLoadout()) return false;
-    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower) return false;
-    const spent = this.towerRespecTokensSpent[tower.type] ?? 0;
-    if (!canRespecSpecialization(tower, spent)) return false;
-
-    respecSpecializationEntity(tower);
-    this.towerRespecTokensSpent[tower.type] = spent + 1;
-    this.emitAudio({ type: "tower_upgrade" });
-    this.persist();
-    this.notify();
-    return true;
-  }
-
   // -------------------------------------------------------------------
   // Progression 2.0 — Specialization / Upgrade Slot (spec section 5/6).
   // The fix for "reaches phase 46 in 20 minutes": a genuine, player-chosen
   // gold sink that keeps mattering well past MAX_TOWER_LEVEL. See
   // config/specializations.ts for the full design rationale.
+  //
+  // HORDENOVA Season/Progression v1.0 — ownership (`this.
+  // unlockedSpecializationIds`, permanent per TYPE) and progression
+  // (`specializationId`/`specializationLevel`, on the tower instance,
+  // SEASON-scoped) are fully separate, exactly mirroring Mastery above.
   // -------------------------------------------------------------------
 
   canChooseSpecializationForSelectedTower(): boolean {
@@ -751,27 +718,70 @@ export class GameEngine {
     return !!tower && canChooseSpecialization(tower);
   }
 
+  /** Every SpecializationId this account has ever purchased for `type` — permanent, never reset. Used by the UI to show an already-owned path as a free re-activation instead of another SPECIALIZATION_UNLOCK_GEM_COST charge. */
+  getUnlockedSpecializationIdsForType(type: TowerType): readonly SpecializationId[] {
+    return this.unlockedSpecializationIds[type] ?? [];
+  }
+
+  isSpecializationUnlocked(type: TowerType, id: SpecializationId): boolean {
+    return this.getUnlockedSpecializationIdsForType(type).includes(id);
+  }
+
   /**
-   * Visual Overhaul spec section 21: the CHOICE of a specialization path
-   * (null -> level 1) is a premium, Gems-gated strategic decision, not
-   * another gold sink — Gems can unlock a build direction, never buy
-   * damage/level/HP/victory directly, and this is the one place that
-   * unlock lives. Every level AFTER the choice (1->2, ..., 4->5, via
-   * upgradeSelectedTowerSpecialization below) still costs Gold, unchanged.
-   * Permanent once chosen — no re-spec in this pass, matching the spec's
-   * "escolha real".
+   * The CHOICE of a specialization path (null -> an active pick, for THIS
+   * Season) is free the moment the account already owns that exact path
+   * (see isSpecializationUnlocked) — re-activating something already paid
+   * for never charges Gems again. Choosing a path this account has NEVER
+   * owned costs SPECIALIZATION_UNLOCK_GEM_COST Gems, once, and grants
+   * PERMANENT ownership of it from that point on. Every level after the
+   * choice (via upgradeSelectedTowerSpecialization below) always costs Gold.
    */
   chooseTowerSpecialization(specializationId: SpecializationId): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !canChooseSpecialization(tower)) return false;
-    if (!this.canAffordGems(SPECIALIZATION_UNLOCK_GEM_COST)) return false;
+
+    const alreadyOwned = this.isSpecializationUnlocked(tower.type, specializationId);
+    if (!alreadyOwned && !this.canAffordGems(SPECIALIZATION_UNLOCK_GEM_COST)) return false;
 
     const applied = chooseSpecializationEntity(tower, specializationId);
     if (!applied) return false;
 
-    this.spendGems(SPECIALIZATION_UNLOCK_GEM_COST, `specialization:${specializationId}`);
+    if (!alreadyOwned) {
+      this.spendGems(SPECIALIZATION_UNLOCK_GEM_COST, `specialization:${specializationId}`);
+      const owned = this.unlockedSpecializationIds[tower.type] ?? [];
+      this.unlockedSpecializationIds[tower.type] = [...owned, specializationId];
+    }
     this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /**
+   * "Trocar Especialização" — a flat, unconditional SPECIALIZATION_CHANGE_
+   * GEM_COST Gems purchase that switches the selected tower's ACTIVE
+   * specialization to a DIFFERENT path this account already owns. Replaces
+   * the old Specialization Respec Token system entirely: there is no free
+   * or earned respec anymore, only this flat Gems purchase, and it only
+   * ever moves between paths already paid for once — picking a brand-new
+   * path still goes through chooseTowerSpecialization (500 Gems) instead.
+   */
+  canSwitchSelectedTowerSpecialization(newId: SpecializationId): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canSwitchSpecialization(tower) || newId === tower.specializationId) return false;
+    return this.isSpecializationUnlocked(tower.type, newId);
+  }
+
+  switchTowerSpecialization(newId: SpecializationId): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !this.canSwitchSelectedTowerSpecialization(newId)) return false;
+    if (!this.canAffordGems(SPECIALIZATION_CHANGE_GEM_COST)) return false;
+
+    this.spendGems(SPECIALIZATION_CHANGE_GEM_COST, `specialization_change:${newId}`);
+    switchSpecializationEntity(tower, newId);
+    this.emitAudio({ type: "tower_upgrade" });
     this.persist();
     this.notify();
     return true;
@@ -931,17 +941,29 @@ export class GameEngine {
   }
 
   // -------------------------------------------------------------------
-  // Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE. The
-  // recurring, uncapped Gem sink: purely cosmetic (a display tier/color,
-  // see config/prestige.ts), never a combat-power lever, exactly like
-  // every other Gem spend this class exposes.
+  // HORDENOVA Season/Progression v1.0 — PROFILE PRESTIGE. Permanent,
+  // account-wide, uncapped Gem sink, gated behind PRESTIGE_MIN_BEST_WAVE.
+  // Grants small, permanently-bounded Gold/Gem Shard bonuses (see
+  // config/prestige.ts's getPrestigeBonuses) — never a combat-power lever,
+  // and never touches damage/HP/attack speed.
   // -------------------------------------------------------------------
 
   getPrestigeLevel(): number {
     return this.prestigeLevel;
   }
 
+  /** Whether this account's all-time bestWave has ever reached PRESTIGE_MIN_BEST_WAVE — a permanent, monotonic gate (see config/prestige.ts). */
+  canUpgradePrestige(): boolean {
+    return canUnlockPrestige(this.bestWave);
+  }
+
+  /** Current Gold/Gem Shard income multipliers from Prestige — see config/prestige.ts's getPrestigeBonuses doc comment for why these are permanently bounded rather than another infinite economic track. */
+  getCurrentPrestigeBonuses(): PrestigeBonuses {
+    return getPrestigeBonuses(this.prestigeLevel);
+  }
+
   upgradePrestige(): boolean {
+    if (!canUnlockPrestige(this.bestWave)) return false;
     const cost = getPrestigeUpgradeCost(this.prestigeLevel);
     if (!this.spendGems(cost, "profile_prestige")) return false;
     this.prestigeLevel += 1;
@@ -1117,7 +1139,12 @@ export class GameEngine {
         continue; // removed, no gold — it breached the base
       }
       if (isEnemyDead(enemy)) {
-        this.gold += enemy.goldReward;
+        // HORDENOVA Season/Progression v1.0 — Prestige's small, permanently
+        // bounded Gold bonus (see config/prestige.ts's getPrestigeBonuses)
+        // applies here, at the one real per-kill Gold grant. Never touches
+        // enemy.goldReward itself (the frozen wave-scaling formula), only
+        // the amount the player actually receives.
+        this.gold += Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier);
         this.enemiesDefeated += 1;
         recordKill(this.battleStats, enemy);
         const tier = this.classifyEnemyTier(enemy);
@@ -1371,8 +1398,15 @@ export class GameEngine {
     // kill grants a small amount regardless of whether it also has a
     // dropTableId — this is the ONE gem-adjacent reward already wired to a
     // real, non-arbitrary event (a boss actually dying), independent of
-    // the item-drop system below.
-    this.addGemShards(boss.isMainBoss ? 5 : 2, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
+    // the item-drop system below. HORDENOVA Season/Progression v1.0: base
+    // rates raised 5/2 -> 60/24 (validated by real-GameEngine multi-Season
+    // simulation to give a dedicated F2P player real access to Mastery/
+    // Specialization within roughly a Season), and Prestige's small,
+    // permanently bounded Gem Shard bonus (config/prestige.ts's
+    // getPrestigeBonuses) applies on top.
+    const baseShards = boss.isMainBoss ? 60 : 24;
+    const shards = Math.round(baseShards * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
+    this.addGemShards(shards, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
 
     const def = getBossDefinitionById(boss.bossId);
     if (!def || !def.dropTableId) return;
@@ -1515,9 +1549,10 @@ export class GameEngine {
         pendingRouletteSpinWaves: this.pendingRouletteSpinWaves,
         seasonBestWave: this.seasonBestWave,
         towerMasteryLevels: this.towerMasteryLevels,
+        masteryUnlocked: this.masteryUnlocked,
         ownedTowerSkinIds: [...this.ownedTowerSkinIds],
         equippedTowerSkinByType: this.equippedTowerSkinByType,
-        towerRespecTokensSpent: this.towerRespecTokensSpent,
+        unlockedSpecializationIds: this.unlockedSpecializationIds,
       },
       this.storageKey,
     );

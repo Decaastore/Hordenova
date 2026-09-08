@@ -13,7 +13,7 @@ import {
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
-import { getAvailableRespecTokens, getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
+import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import type { Vector2 } from "@/utils/geometry";
 
@@ -44,8 +44,10 @@ export interface TowerInstance {
   specializationLevel: number;
   /** Progression 2.0 — cosmetic-only equipped skin id, or null for the default look. Never read by combat code. */
   equippedSkinId: string | null;
-  /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. 0 = never invested. See config/towerMastery.ts for the bonus/cost formulas. */
+  /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. HORDENOVA Season/Progression v1.0: this is now purely the SEASON-scoped level (resets to 0 every Season) — see `masteryUnlocked` below for the permanent ownership half. See config/towerMastery.ts for the bonus/cost formulas. */
   masteryLevel: number;
+  /** HORDENOVA Season/Progression v1.0 — permanent, account-wide-by-type Mastery OWNERSHIP (the one-time 400 Gems purchase), denormalized onto each tower instance exactly like `masteryLevel` is, kept in sync by GameEngine whenever it changes. Gates whether `masteryLevel` can be raised with Gold at all — see `canUpgradeMastery`. Never reset by a Season boundary. */
+  masteryUnlocked: boolean;
 
   // -------------------------------------------------------------------
   // Master Implementation Pass spec section 12-13 — TOWER SURVIVAL /
@@ -90,6 +92,7 @@ export function createTowerInstance(
   specializationLevel = 0,
   equippedSkinId: string | null = null,
   masteryLevel = 0,
+  masteryUnlocked = false,
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -110,6 +113,7 @@ export function createTowerInstance(
     specializationLevel,
     equippedSkinId,
     masteryLevel,
+    masteryUnlocked,
     ...survivalStatsForFreshTower(type),
   };
 }
@@ -213,25 +217,20 @@ function round2(value: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * INFINITE BALANCE OVERHAUL — Mastery now mirrors Specialization's two-step
- * shape exactly: a one-time Gems UNLOCK (0 -> 1) followed by an uncapped
- * Gold UPGRADE track (1 -> 2 -> ... forever). These two gates replace the
- * old, single always-true `canUpgradeMastery()`.
+ * HORDENOVA Season/Progression v1.0 — Mastery ownership (`masteryUnlocked`,
+ * permanent) is now fully separate from Mastery progression (`masteryLevel`,
+ * Season-scoped). The one-time Gems unlock is a pure GameEngine/account-
+ * level concern (it flips `masteryUnlocked` for a TOWER TYPE, permanently —
+ * see GameEngine.unlockSelectedTowerMastery) and no longer mutates
+ * `masteryLevel` at all: unlocking grants ACCESS to the Gold-upgrade track
+ * below, not a free first level. `canUnlockMastery`/`unlockMastery` (which
+ * used to live here, gated on `masteryLevel <= 0`) are gone — there is no
+ * tower-instance-local notion of "unlocked" left to check or mutate.
  */
-export function canUnlockMastery(tower: TowerInstance): boolean {
-  return tower.masteryLevel <= 0;
-}
 
-/** Mutates `tower` in place: pays the one-time unlock, setting masteryLevel to 1. Caller owns the MASTERY_UNLOCK_GEM_COST Gems deduction. */
-export function unlockMastery(tower: TowerInstance): boolean {
-  if (!canUnlockMastery(tower)) return false;
-  tower.masteryLevel = 1;
-  return true;
-}
-
-/** No max level (spec: "SEM CAP REAL") — always purchasable once unlocked. */
+/** No max level (spec: "SEM CAP REAL") — purchasable once the tower TYPE's Mastery ownership has ever been purchased, regardless of the current (Season-scoped) masteryLevel value — including a freshly Season-reset 0. */
 export function canUpgradeMastery(tower: TowerInstance): boolean {
-  return tower.masteryLevel >= 1;
+  return tower.masteryUnlocked === true;
 }
 
 /** GOLD cost for the selected tower's NEXT mastery level. Only meaningful once unlocked (masteryLevel >= 1) — the 0 -> 1 step uses the flat MASTERY_UNLOCK_GEM_COST instead. */
@@ -245,30 +244,32 @@ export function upgradeMastery(tower: TowerInstance): void {
 }
 
 /**
- * CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — Specialization Respec
- * Token: the smallest structure needed to let Mastery grant a genuine,
- * non-power reward. `respecTokensSpent` is owned by the caller (GameEngine,
- * keyed per TowerType — see towerRespecTokensSpent — mirroring exactly how
- * masteryLevel itself is already account-wide-by-type, not per placed
- * instance) and passed in here rather than stored on TowerInstance, since
- * the token pool is shared by every tower of a type just like Mastery is.
+ * "Trocar Especialização" — HORDENOVA Season/Progression v1.0. Replaces the
+ * old Specialization Respec Token system entirely (removed): switching is
+ * now a flat, unconditional 200 Gems purchase (see config/specializations.ts's
+ * SPECIALIZATION_CHANGE_GEM_COST), never something earned by leveling
+ * Mastery. Requires a specialization already chosen — GameEngine is
+ * responsible for checking the NEW path is one this account already owns
+ * (see unlockedSpecializationIds) and for the Gems deduction before calling
+ * `switchSpecialization` below.
  */
-export function canRespecSpecialization(tower: TowerInstance, respecTokensSpent: number): boolean {
-  return tower.specializationId !== null && getAvailableRespecTokens(tower.masteryLevel, respecTokensSpent) > 0;
+export function canSwitchSpecialization(tower: TowerInstance): boolean {
+  return tower.specializationId !== null;
 }
 
 /**
- * Mutates `tower` in place: clears the chosen specialization path back to
- * "not chosen" so the player may pick a different one. Deliberately touches
- * ONLY specializationId/specializationLevel — level, masteryLevel, HP,
- * equipped skin, and every other permanent field are left completely
- * untouched (spec: "não apagar Mastery, status de desbloqueio, histórico,
- * itens"). Caller owns checking canRespecSpecialization and incrementing
- * its own respecTokensSpent counter.
+ * Mutates `tower` in place: switches the active specialization to `newId`,
+ * starting its level fresh at 1 for this tower instance (the ABANDONED
+ * path's level progress on this instance is not preserved — the same
+ * limitation the old Respec Token system already had). Touches ONLY
+ * specializationId/specializationLevel — level, masteryLevel, HP, equipped
+ * skin, and every other field are left completely untouched. Caller owns
+ * checking canSwitchSpecialization, verifying `newId` is already owned, and
+ * the Gems deduction.
  */
-export function respecSpecialization(tower: TowerInstance): void {
-  tower.specializationId = null;
-  tower.specializationLevel = 0;
+export function switchSpecialization(tower: TowerInstance, newId: SpecializationId): void {
+  tower.specializationId = newId;
+  tower.specializationLevel = 1;
 }
 
 export function canUpgradeTower(tower: TowerInstance): boolean {

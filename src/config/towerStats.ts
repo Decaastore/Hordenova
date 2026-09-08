@@ -14,13 +14,22 @@ export const TOWER_TYPES: readonly TowerType[] = [
 ];
 
 /**
- * 30 levels, not 5 — Core Gameplay + Progression spec section 3: upgrades
- * must stay perceptible across a long build-and-strategize loop, not cap out
- * after a handful of clicks. Growth is formula-based (see
+ * HORDENOVA Season/Progression v1.0 — 60 levels, not 30. Tower Level is now
+ * SEASON-SCOPED (resets to 1 at every Season boundary, see
+ * AscensionManager.syncSeasonIfNeeded), so the old 30-level cap — tuned for
+ * an account that leveled ONCE and never reset — no longer fits: a real
+ * Season-length simulation (real GameEngine, greedy-spend bot, F2P/payer
+ * profiles at 15h/60h of play) found F2P casual and F2P ativo BOTH fully
+ * maxing every tower at level 30 well within a single Season, leaving Gold
+ * with nothing left to buy for most of it. Raising the cap to 60 — paired
+ * with the steeper `lateGameFactor` below — keeps Level a real, non-trivial
+ * decision across an entire 30-day Season for every simulated profile
+ * (casual reaches roughly a third of the way, a dedicated F2P player nearly
+ * maxes it, matching the intended pacing). Growth stays formula-based (see
  * `levelGrowthMultiplier`) so it scales cleanly to any MAX_TOWER_LEVEL
  * instead of needing a hand-authored table entry per level.
  */
-export const MAX_TOWER_LEVEL = 30;
+export const MAX_TOWER_LEVEL = 60;
 
 /**
  * Levels at which a tower gets a step-change on top of its normal per-level
@@ -324,15 +333,22 @@ export function getMilestoneUnlockForLevel(type: TowerType, level: number): Towe
  *
  * Fix: a convex `lateGameFactor` that stays ~1x for early levels (so a
  * fresh build still feels responsive) and grows the cost of LATE levels
- * (20-30) steeply, stretching the spending phase to better overlap with
- * when the HP wall actually starts to matter, without touching the HP/gold
- * scaling formulas in enemyStats.ts or inventing a second currency.
+ * steeply, stretching the spending phase to better overlap with when the HP
+ * wall actually starts to matter, without touching the HP/gold scaling
+ * formulas in enemyStats.ts or inventing a second currency.
+ *
+ * HORDENOVA Season/Progression v1.0 — with MAX_TOWER_LEVEL raised to 60 (see
+ * that constant's own doc comment) and Tower Level now resetting every
+ * Season, the steepness constant below was retuned from 0.35 to 1.0 and
+ * validated by the same real-GameEngine Season simulation: it keeps Level a
+ * meaningful, non-trivial sink across an entire 30-day Season for every
+ * simulated profile instead of maxing out in the first few hours.
  */
 export function getUpgradeCost(type: TowerType, currentLevel: number): number | null {
   if (currentLevel >= MAX_TOWER_LEVEL) return null;
   const def = TOWER_DEFINITIONS[type];
   const targetLevel = currentLevel + 1;
-  const lateGameFactor = 1 + currentLevel * 0.35;
+  const lateGameFactor = 1 + currentLevel * 1.0;
   return Math.round(def.upgradeCostBase * targetLevel * 0.75 * lateGameFactor);
 }
 

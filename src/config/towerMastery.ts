@@ -2,74 +2,56 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
 
 /**
  * TOWER MASTERY — the account-wide, per-TOWER-TYPE progression track that
- * exists past MAX_TOWER_LEVEL (30). Level 30 stays the last VISUAL evolution
- * and the last of the level-driven special unlocks (multiShot/giantSlayer/
+ * exists past MAX_TOWER_LEVEL. Level 30 stays the last VISUAL evolution and
+ * the last of the level-driven special unlocks (multiShot/giantSlayer/
  * wildfire/deepFreeze/arcaneSurge/etc, all in towerStats.ts, all untouched)
  * — Mastery is a SEPARATE, uncapped track layered on top, exactly mirroring
- * how config/specializations.ts layers an independent optional track next to
- * level.
+ * how config/specializations.ts layers an independent optional track next
+ * to level.
  *
  * ============================================================================
- * INFINITE BALANCE OVERHAUL — what changed and why.
+ * HORDENOVA Season/Progression v1.0 — Ownership vs. Level split.
  * ============================================================================
  *
- * BEFORE: Mastery cost Gems at EVERY level, forever, and granted ZERO combat
- * effect (Respec Tokens + a cosmetic tier only). That combination is what
- * produced the documented chicken-and-egg: the only Gem Shard sources were
- * boss/mini-boss kills, the wall stopped exactly those kills, and the one
- * thing Gems could be spent on did nothing to break the wall. A permanently
- * powerless track also meant player power was structurally bounded, which is
- * half of why the wall was unavoidable at all.
+ * Mastery is now explicitly two SEPARATE things, never conflated:
  *
- * NOW, mirroring Specialization's own shape exactly (one premium unlock, then
- * a pure Gold track):
- *   1. UNLOCK — one flat, one-time MASTERY_UNLOCK_GEM_COST Gems payment per
- *      TOWER TYPE (not per placed tower — Mastery has always been account-
- *      wide-by-type, see GameEngine.towerMasteryLevels; that scope is
- *      deliberately unchanged). Paying it sets masteryLevel to 1.
- *   2. EVERY LEVEL AFTER — Gold, forever, via getMasteryUpgradeCost. No max
- *      level, no cap of any kind.
- *   3. REAL BUT DELIBERATELY NON-DPS-LED EFFECT — see getMasteryBonuses.
+ *   OWNERSHIP (`masteryUnlocked`, SaveData/GameEngine, permanent, keyed by
+ *   TOWER TYPE) — a one-time MASTERY_UNLOCK_GEM_COST Gems purchase that
+ *   NEVER resets at a Season boundary and is NEVER charged again once paid.
+ *
+ *   PROGRESSION (`masteryLevel`, SEASON-scoped) — starts at 0 at the
+ *   beginning of every Season, regardless of ownership, and is raised
+ *   entirely with Gold via getMasteryUpgradeCost below. Owning the track
+ *   only gates WHETHER a tower type can spend Gold on it at all — it does
+ *   NOT pre-fill any levels for free at a new Season's start.
+ *
+ * This mirrors Specialization's own ownership/level split
+ * (config/specializations.ts's `unlockedSpecializationIds` vs.
+ * `specializationLevel`) exactly, and is why `getMasteryUpgradeCost` below
+ * is called starting from currentMasteryLevel=0 every single Season, not
+ * just the first time a type is ever unlocked.
  *
  * IS THIS "GEMS BUY POWER"? No, in exactly the same sense Specialization
  * isn't: Gems buy ACCESS to a track (a one-time unlock a free player reaches
- * from ordinary milestone/boss Gem Shard income — see
- * config/phaseConfig.ts's endgame milestone shards), and Gold — the purely
- * earned, Season-scoped currency — buys every point of power in it. A
- * larger Gem stockpile buys the unlock earlier, never higher.
+ * from ordinary Gem Shard income), and Gold — the purely earned,
+ * Season-scoped currency — buys every point of power in it, every single
+ * Season. A larger Gem stockpile buys the unlock earlier, never higher.
  *
- * The Respec Token and cosmetic-tier rewards below are UNCHANGED; Mastery
- * still grants them on the same intervals it always did.
+ * The Specialization Respec Token system that used to live in this file has
+ * been removed entirely — switching specializations is now the flat,
+ * unconditional "Trocar Especialização" purchase (200 Gems, see
+ * config/specializations.ts's SPECIALIZATION_CHANGE_GEM_COST), not something
+ * earned by leveling Mastery.
  */
 
 /**
- * One-time Gems price to unlock the Mastery track for a tower TYPE. Flat (not
- * scaled by type/level) for the same reason SPECIALIZATION_UNLOCK_GEM_COST is
- * flat: it is one clear premium decision, not a second Gold-shaped curve
- * denominated in Gems. Tuned against real Gem Shard income (boss 5 / mini-boss
- * 2 / milestone, 10 shards = 1 Gem) so a F2P player unlocks their first
- * Mastery track inside the first content phases, not after the wall.
+ * One-time Gems price to unlock the Mastery track for a tower TYPE,
+ * permanently — never charged again for that type, on this account, in any
+ * future Season. Flat (not scaled by type/level) for the same reason
+ * SPECIALIZATION_UNLOCK_GEM_COST is flat: it is one clear premium decision,
+ * not a second Gold-shaped curve denominated in Gems.
  */
-export const MASTERY_UNLOCK_GEM_COST = 6;
-
-/** Every N mastery levels grants exactly 1 Specialization Respec Token (5 -> 1, 10 -> 2, 15 -> 3, ...). */
-export const MASTERY_RESPEC_TOKEN_INTERVAL = 5;
-
-/**
- * Pure function of `masteryLevel` — NEVER a stored/incremented counter, so
- * it can never double-grant on a reload/restart. The engine tracks only how
- * many of these have been SPENT (SaveData.towerRespecTokensSpent, same
- * per-TowerType persistence shape as towerMasteryLevels) and subtracts that
- * from this to get what's currently available (getAvailableRespecTokens).
- */
-export function getMasteryRespecTokensEarned(masteryLevel: number): number {
-  return Math.floor(Math.max(0, masteryLevel) / MASTERY_RESPEC_TOKEN_INTERVAL);
-}
-
-/** Tokens earned so far minus tokens already spent — never negative. */
-export function getAvailableRespecTokens(masteryLevel: number, tokensSpent: number): number {
-  return Math.max(0, getMasteryRespecTokensEarned(masteryLevel) - Math.max(0, tokensSpent));
-}
+export const MASTERY_UNLOCK_GEM_COST = 400;
 
 export interface MasteryCosmeticTier {
   /** Stable id — used as a rendering key, never shown raw to the player. */
@@ -83,7 +65,9 @@ export interface MasteryCosmeticTier {
 /**
  * Cosmetic tiers unlocked purely by masteryLevel — ring/aura/runes reward
  * bands. Deliberately never read by CombatSystem; only EntityRenderer/
- * TowerInfoPanel ever call these.
+ * TowerInfoPanel ever call these. Since masteryLevel is Season-scoped, these
+ * tiers are a per-Season display (recomputed fresh from level 0 each time),
+ * not a permanent unlock.
  */
 export const MASTERY_COSMETIC_TIERS: readonly MasteryCosmeticTier[] = [
   { id: "ember_ring", nameKey: "emberRing", level: 5 },
@@ -112,10 +96,10 @@ export function getNextMasteryCosmeticTier(masteryLevel: number): MasteryCosmeti
 // ---------------------------------------------------------------------------
 
 /**
- * Same construction as config/specializations.ts's specializationEffectScale
- * (deliberately: one diminishing-returns technique in this codebase, not
- * two), with its own exponent so the two tracks FEEL different rather than
- * being the same curve twice.
+ * FROZEN — part of the v1.0 Infinite Progression Mathematical Specification.
+ * DO NOT alter this exponent or the shape of masteryEffectScale; only the
+ * ownership/level split and the Gold cost curve below are in scope for the
+ * Season/Prestige update.
  *
  *   scale(L) = (L0 / s) * ((1 + L / L0) ^ s - 1)
  *
@@ -192,38 +176,35 @@ export function getMasteryBonuses(masteryLevel: number): MasteryBonuses {
 }
 
 // ---------------------------------------------------------------------------
-// Mastery cost — Gold, forever.
+// Mastery cost — Gold, forever, reset to level 0 every Season.
 // ---------------------------------------------------------------------------
 
 /**
- * Same structure as config/prestige.ts's getPrestigeUpgradeCost and
- * config/specializations.ts's getSpecializationUpgradeCost: compounding growth
- * capped at a level-index ceiling, then a purely linear tail. The ceiling is
- * what makes the curve overflow-proof (a raw Math.pow over an unbounded level
- * eventually reaches Infinity, which would turn "expensive" into "impossible"
- * — see prestige.ts's own comment); the linear tail is what keeps the curve
- * ASYMPTOTICALLY LINEAR in the level, which is the property the whole no-wall
- * proof rests on (cumulative Gold grows ~wave^2, so a linear per-level price
- * means the affordable level grows ~linearly with wave, which is exactly the
- * input masteryEffectScale needs).
- *
- * The tail slope is ln(GROWTH_FACTOR) so the curve's slope is continuous at
- * the ceiling — no price cliff.
+ * HORDENOVA Season/Progression v1.0 — retuned constants (multiplier 16->55,
+ * growth factor 1.06->1.07, compound cap 50->40), validated by a real
+ * GameEngine Season simulation across F2P/payer profiles. Same structure as
+ * before: compounding growth capped at a level-index ceiling, then a purely
+ * linear tail — the ceiling keeps the curve overflow-proof, the linear tail
+ * keeps it asymptotically linear in the level (this part of the curve is
+ * NOT part of the frozen Infinite Progression spec — only
+ * MASTERY_EFFECT_EXPONENT above is — so retuning it for the new Season
+ * cadence does not reopen any frozen contract).
  *
  * Mastery is per TOWER TYPE while Specialization is per placed tower, so the
  * same Gold buys 12 Specialization tracks but only 4 Mastery tracks — the
  * base multiplier below is set higher than Specialization's accordingly, so
  * neither track trivially dominates the other as a Gold destination.
  */
-const MASTERY_BASE_COST_MULTIPLIER = 16;
-const MASTERY_COST_GROWTH_FACTOR = 1.06;
-const MASTERY_COST_COMPOUND_LEVEL_CAP = 50;
+const MASTERY_BASE_COST_MULTIPLIER = 55;
+const MASTERY_COST_GROWTH_FACTOR = 1.07;
+const MASTERY_COST_COMPOUND_LEVEL_CAP = 40;
 const MASTERY_COST_LINEAR_TAIL_GROWTH = Math.log(MASTERY_COST_GROWTH_FACTOR);
 
 /**
  * GOLD cost to go from `currentMasteryLevel` to `currentMasteryLevel + 1`.
- * Only meaningful once the track is unlocked (level >= 1); level 0 -> 1 is
- * the one-time MASTERY_UNLOCK_GEM_COST Gems purchase instead. No max level —
+ * Called starting from 0 at the beginning of every Season, for any tower
+ * type whose Mastery ownership has ever been purchased — ownership only
+ * gates ACCESS to this curve, it never pre-pays any of it. No max level —
  * always returns a real, finite, strictly increasing number.
  */
 export function getMasteryUpgradeCost(type: TowerType, currentMasteryLevel: number): number {
