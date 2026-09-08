@@ -528,7 +528,23 @@ export const en = {
   prestige: {
     title: "PROFILE PRESTIGE",
     level: "Prestige Lv.{level}",
+    levelPlain: "Level {level}",
     upgrade: "UPGRADE PRESTIGE",
+    cost: "{cost} Gems",
+    currentBenefitsTitle: "Current Benefits",
+    nextLevelTitle: "Next Level",
+    progressionTitle: "Progression",
+    benefitGold: "+{percent}% Gold",
+    benefitGemShards: "+{percent}% Gem Shards",
+    noAdditionalBonus: "No additional economic bonus",
+    insufficientGems: "{amount} more Gems needed",
+    permanentHint: "Prestige is permanent — it never resets with a Season, and every level you buy is kept forever.",
+    capNote: "Past level {cap}, Prestige keeps climbing forever as pure status/ranking progression — no further economic bonus is granted.",
+    locked: {
+      title: "Prestige Locked",
+      requirement: "Reach wave {required} to unlock it — your current record is wave {bestWave}.",
+      explainer: "Prestige is a permanent, account-wide progression bought with Gems: each level is a one-time purchase that never resets with a Season, and grants a small, permanently bounded bonus to Gold and Gem Shard income.",
+    },
     tiers: {
       INITIATE: "Initiate",
       ADEPT: "Adept",
@@ -656,6 +672,9 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v9: {
+        prestigeProfileDetail: "The Inventory's Stats tab now shows Prestige in full detail: current benefits, the next level's cost and gain, and a complete progression list — all computed live from the real system, with no new bonuses or price changes.",
+      },
       v8: {
         gemShardRateCorrection: "Adjusted how many Gem Shards a Boss or Mini-Boss kill grants to a healthier long-term rate for an infinite game — the conversion stays 10 Shards = 1 Gem.",
       },

@@ -25,6 +25,8 @@ interface InventoryPanelProps {
   /** Master Implementation Pass spec section 7-8 — Profile Prestige, the recurring cosmetic Gem sink. */
   gems: number;
   prestigeLevel: number;
+  /** The account's all-time record wave — gates whether Prestige is unlocked at all (see config/prestige.ts's canUnlockPrestige). */
+  bestWave: number;
   onUpgradePrestige: () => void;
 }
 
@@ -55,6 +57,7 @@ export function InventoryPanel({
   onConvertGemShards,
   gems,
   prestigeLevel,
+  bestWave,
   onUpgradePrestige,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
@@ -161,6 +164,7 @@ export function InventoryPanel({
             }}
             gems={gems}
             prestigeLevel={prestigeLevel}
+            bestWave={bestWave}
             onUpgradePrestige={onUpgradePrestige}
           />
         )}

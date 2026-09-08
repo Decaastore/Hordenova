@@ -236,6 +236,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onConvertGemShards={() => engine.convertGemShards()}
             gems={hud.gems}
             prestigeLevel={engine.getPrestigeLevel()}
+            bestWave={hud.bestWave}
             onUpgradePrestige={() => engine.upgradePrestige()}
           />
         )}

@@ -529,7 +529,23 @@ export const ptBR: TranslationSchema = {
   prestige: {
     title: "PRESTÍGIO DE PERFIL",
     level: "Prestígio Nív.{level}",
+    levelPlain: "Nível {level}",
     upgrade: "MELHORAR PRESTÍGIO",
+    cost: "{cost} Gemas",
+    currentBenefitsTitle: "Benefícios Atuais",
+    nextLevelTitle: "Próximo Nível",
+    progressionTitle: "Progressão",
+    benefitGold: "+{percent}% Gold",
+    benefitGemShards: "+{percent}% Gem Shards",
+    noAdditionalBonus: "Sem bônus econômico adicional",
+    insufficientGems: "Faltam {amount} Gemas",
+    permanentHint: "Prestígio é permanente — nunca reseta com a Season, e cada nível comprado fica para sempre.",
+    capNote: "A partir do nível {cap}, o Prestígio continua subindo para sempre como progressão de status/ranking — sem novos bônus econômicos.",
+    locked: {
+      title: "Prestígio Bloqueado",
+      requirement: "Alcance a wave {required} para desbloquear — seu recorde atual é a wave {bestWave}.",
+      explainer: "Prestígio é uma progressão permanente da conta, comprada com Gemas: cada nível é uma compra única que nunca reseta com a Season, e concede um pequeno bônus permanente e limitado à renda de Gold e Gem Shards.",
+    },
     tiers: {
       INITIATE: "Iniciado",
       ADEPT: "Adepto",
@@ -657,6 +673,9 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v9: {
+        prestigeProfileDetail: "A aba de Estatísticas do Inventário agora mostra o Prestígio em detalhe: benefícios atuais, custo e ganho do próximo nível, e uma lista completa de progressão — tudo calculado ao vivo pelo sistema real, sem novos bônus ou mudança de preço.",
+      },
       v8: {
         gemShardRateCorrection: "Ajustada a quantidade de Fragmentos de Gema (Gem Shards) concedida ao derrotar Bosses e Mini-Bosses para uma taxa mais saudável no longo prazo de um jogo infinito — a conversão continua sendo 10 Fragmentos = 1 Gem.",
       },
