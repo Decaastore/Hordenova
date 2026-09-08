@@ -62,6 +62,11 @@ export interface PatchNoteVersion {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteVersion[] = [
   {
+    id: "v8",
+    dateIso: "2026-09-08",
+    items: [{ type: "BALANCE", category: "SYSTEMS", i18nKey: "gemShardRateCorrection" }],
+  },
+  {
     id: "v7",
     dateIso: "2026-09-08",
     items: [{ type: "BALANCE", category: "TOWERS", i18nKey: "executionerBudgetRetune" }],

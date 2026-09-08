@@ -426,7 +426,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getGemShardBalance()).toBeGreaterThan(0);
   });
 
-  it("HORDENOVA Season/Progression v1.0 contract: a Main Boss kill grants exactly 60 Gem Shards, a Mini-Boss kill exactly 24, at Prestige level 0", () => {
+  it("HORDENOVA balance correction: a Main Boss kill grants exactly 1 Gem Shard, a Mini-Boss kill exactly 1, at Prestige level 0", () => {
     // bestWave preset well past both test waves so that the wave advancing
     // past the kill never ALSO crosses a fresh wave-milestone bonus (a
     // separate Gem Shard source, see GameEngine.advanceBestWave) in the same
@@ -446,7 +446,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     const shardsBeforeKill = engine.getGemShardBalance();
     mainBoss!.hp = 0;
     engine.update(50);
-    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(60);
+    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(1);
 
     updateSave({ currentWave: 21, bestWave: 999, gold: 999_999, towerLoadout: [] }); // a mini-boss wave, no main boss
     const engine2 = new GameEngine();
@@ -460,7 +460,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     const shardsBeforeMiniKill = engine2.getGemShardBalance();
     miniBoss!.hp = 0;
     engine2.update(50);
-    expect(engine2.getGemShardBalance() - shardsBeforeMiniKill).toBe(24);
+    expect(engine2.getGemShardBalance() - shardsBeforeMiniKill).toBe(1);
   });
 
   it("gem shard conversion only fires at the fixed rate and never leaves a partial remainder unconverted-but-lost", () => {
@@ -598,7 +598,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(reloaded.getPrestigeLevel()).toBe(2);
     });
 
-    it("at level 40 (the functional cap), Gem Shard income from a Main Boss kill is boosted by exactly +20% (60 -> 72)", () => {
+    it("at level 40 (the functional cap), the +20% Gem Shard multiplier still applies to the base rate — with a base of 1, Math.round keeps it at 1 (rounding, not a lost bonus: the multiplier is still wired, see prestige.test.ts for its own +20% contract)", () => {
       updateSave({ currentWave: 30, gold: 999_999, gems: 0, prestigeLevel: 40, bestWave: 100, towerLoadout: [] });
       const engine = new GameEngine();
       engine.startRun();
@@ -614,7 +614,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       const shardsBeforeKill = engine.getGemShardBalance();
       mainBoss!.hp = 0;
       engine.update(50);
-      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(72);
+      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(1);
     });
   });
 });

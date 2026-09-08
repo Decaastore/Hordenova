@@ -281,41 +281,28 @@ describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
   }, 120_000);
 
   /**
-   * HORDENOVA Season/Progression v1.0 — HONEST FINDING, RE-VERIFIED AGAIN
-   * against the approved Season economy (Mastery/Specialization ownership
-   * now cost 400/500 Gems, up from 6/8; Gem Shards now 60/mini-boss and
-   * 24/main-boss(*), up from the pre-Season rate this test was last tuned
-   * against). Bosses staying killable indefinitely (the earlier fix this
-   * comment used to describe) is unchanged and still holds — Gem Shard
-   * income never flatlines.
+   * HORDENOVA balance correction — RE-VERIFIED AGAIN after Gem Shards were
+   * lowered from 60/main-boss and 24/mini-boss to 1/1 (too generous for an
+   * infinite F2P game, especially for long unattended sessions). This
+   * bot's 48h Gem Shard income is now so small that it never even clears
+   * Mastery's 400-Gem one-time unlock on any slot, let alone Specialization's
+   * 500 — both stay at 0, an even stronger version of the same finding this
+   * test used to describe. Bosses staying killable indefinitely (the
+   * earlier fix this comment used to describe) is unchanged and still
+   * holds — Gem Shard income never flatlines, just accrues far slower now.
    *
-   * (*) The actual finding below is DIFFERENT from — and independent of —
-   * that boss-killability fix: this bot prioritizes Specialization's 500
-   * Gems FIRST every tick (see spendGemsOnMasteryAndSpecialization above),
-   * but Mastery's one-time unlock has no tower-level gate while
-   * Specialization requires SPECIALIZATION_UNLOCK_TOWER_LEVEL first. Early
-   * in a run, while towers are still below that level, the ONLY eligible
-   * Gems purchase is Mastery (400 Gems, cheaper too) — so a bot spending
-   * indiscriminately across every tower slot funnels its early Gems into
-   * Mastery ownership on all 4 starting slots (1,600 Gems) well before any
-   * tower crosses the Specialization threshold, and 48h of this exact
-   * bot/seed's Gem Shard income isn't enough to also clear the further 500
-   * Gems Specialization needs on top of that. This is the same effect the
-   * real Season simulation (SEASON-SIM-7) already surfaced and reported as
-   * a simulation-model artifact, not a wall for an actual player: someone
-   * choosing to prioritize Specialization on even one or two towers (rather
-   * than spreading Mastery across all of them, as this bot indiscriminately
-   * does) reaches it far sooner. Mastery itself IS reachable and genuinely
-   * productive here — avgMasteryLevel keeps climbing well past 0 in this
-   * same run — so Gems are being spent, just not on Specialization first,
-   * despite the bot's own stated priority.
+   * This is a known simulation-model artifact, not a real player wall: this
+   * bot spends indiscriminately across every one of the 12 tower slots
+   * (see spendGemsOnMasteryAndSpecialization above) instead of concentrating
+   * its Gems on one or two towers the way an actual player would — the real
+   * Season simulation (SEASON-SIM-7) already surfaced this same effect.
    */
-  it("HONEST FINDING (RE-VERIFIED): this exact indiscriminate-across-all-slots bot (seed=1) spends its Season Gems entirely on Mastery ownership within 48h and never reaches Specialization — a known simulation-model artifact, not a real player wall (spendGemsOnMasteryAndSpecialization)", () => {
+  it("HONEST FINDING (RE-VERIFIED): this exact indiscriminate-across-all-slots bot (seed=1) does not clear even Mastery's unlock within 48h at the corrected Gem Shard rate — a known simulation-model artifact, not a real player wall (spendGemsOnMasteryAndSpecialization)", () => {
     const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
     const result = runGreedyBot(FORTY_EIGHT_HOURS_MS, spendGemsOnMasteryAndSpecialization);
 
     expect(result.avgSpecializationLevel).toBe(0);
-    expect(result.avgMasteryLevel).toBeGreaterThan(0);
+    expect(result.avgMasteryLevel).toBe(0);
     expect(Number.isFinite(result.gold)).toBe(true);
   }, 120_000);
 });

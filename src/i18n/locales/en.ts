@@ -656,6 +656,9 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v8: {
+        gemShardRateCorrection: "Adjusted how many Gem Shards a Boss or Mini-Boss kill grants to a healthier long-term rate for an infinite game — the conversion stays 10 Shards = 1 Gem.",
+      },
       v7: {
         executionerBudgetRetune: "Another fine-tuning pass on the Ironwood Executioner path: its edge against bosses is now more in line with the other Ironwood paths (Breaker/Vanguard), keeping its boss-specialist identity without trivializing boss fights.",
       },

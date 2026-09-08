@@ -657,6 +657,9 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v8: {
+        gemShardRateCorrection: "Ajustada a quantidade de Fragmentos de Gema (Gem Shards) concedida ao derrotar Bosses e Mini-Bosses para uma taxa mais saudável no longo prazo de um jogo infinito — a conversão continua sendo 10 Fragmentos = 1 Gem.",
+      },
       v7: {
         executionerBudgetRetune: "Novo ajuste fino no caminho Executioner do Ironwood: sua vantagem contra chefes agora fica mais alinhada com os outros caminhos do Ironwood (Breaker/Vanguard), mantendo a identidade de especialista em chefes sem tornar as lutas triviais.",
       },

@@ -1541,13 +1541,13 @@ export class GameEngine {
     // kill grants a small amount regardless of whether it also has a
     // dropTableId — this is the ONE gem-adjacent reward already wired to a
     // real, non-arbitrary event (a boss actually dying), independent of
-    // the item-drop system below. HORDENOVA Season/Progression v1.0: base
-    // rates raised 5/2 -> 60/24 (validated by real-GameEngine multi-Season
-    // simulation to give a dedicated F2P player real access to Mastery/
-    // Specialization within roughly a Season), and Prestige's small,
-    // permanently bounded Gem Shard bonus (config/prestige.ts's
-    // getPrestigeBonuses) applies on top.
-    const baseShards = boss.isMainBoss ? 60 : 24;
+    // the item-drop system below. HORDENOVA balance correction: base rates
+    // lowered 60/24 -> 1/1 — the previous rates were too generous for an
+    // infinite F2P game, especially for players who leave a run active for
+    // many hours. Prestige's small, permanently bounded Gem Shard bonus
+    // (config/prestige.ts's getPrestigeBonuses) still applies on top, per
+    // its own unchanged formula.
+    const baseShards = boss.isMainBoss ? 1 : 1;
     const shards = Math.round(baseShards * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
     this.addGemShards(shards, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
 
