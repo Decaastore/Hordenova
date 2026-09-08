@@ -153,6 +153,11 @@ export const ptBR: TranslationSchema = {
     skinSection: "SKIN",
     skinDefault: "Padrão",
     skinLockedUntil: "Desbloqueia no Nív.{level}",
+    reposition: {
+      title: "REPOSICIONAR",
+      action: "REPOSICIONAR TORRE",
+      free: "GRÁTIS HOJE",
+    },
   },
   specializations: {
     IRONWOOD_EXECUTIONER: { name: "Executor", description: "Cada ponto investido aprimora ainda mais os críticos e o dano em chefes." },
@@ -543,6 +548,17 @@ export const ptBR: TranslationSchema = {
     PROFILE_PRESTIGE: { name: "Prestígio de Perfil", description: "Um nível de prestígio sem limite, puramente cosmético. Nunca afeta o poder de combate." },
     TOWER_MASTERY: { name: "Maestria da Torre", description: "Um desbloqueio único e permanente por tipo de torre. Seu nível numérico reinicia a cada Season e concede pequenos bônus de combate além de tiers visuais puramente cosméticos. Nunca dano, velocidade de ataque ou alcance." },
     TOWER_SKIN: { name: "Skin de Torre", description: "Reskins puramente cosméticos para a aparência de uma torre. Nunca afeta os atributos de combate." },
+  },
+  reposition: {
+    pickingTitle: "REPOSICIONANDO",
+    pickingHint: "Clique em outro slot no mapa para mover ou trocar esta torre. Slot vazio: ela se move. Slot ocupado: elas trocam de lugar.",
+    cancel: "CANCELAR",
+    confirmTitle: "Confirmar Reposicionamento",
+    confirmBody: "Reposicionar esta torre por {cost} Gems?",
+    confirm: "CONFIRMAR",
+    insufficientTitle: "Gems Insuficientes",
+    insufficientBody: "Reposicionar custa {cost} Gems. O reposicionamento grátis de hoje já foi usado.",
+    close: "FECHAR",
   },
   castleTiers: {
     INTACT: "Intacto",

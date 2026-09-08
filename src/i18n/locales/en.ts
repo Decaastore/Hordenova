@@ -152,6 +152,11 @@ export const en = {
     skinSection: "SKIN",
     skinDefault: "Default",
     skinLockedUntil: "Unlocks Lv.{level}",
+    reposition: {
+      title: "REPOSITION",
+      action: "REPOSITION TOWER",
+      free: "FREE TODAY",
+    },
   },
   specializations: {
     IRONWOOD_EXECUTIONER: { name: "Executioner", description: "Every point invested sharpens critical strikes and boss damage further." },
@@ -542,6 +547,17 @@ export const en = {
     PROFILE_PRESTIGE: { name: "Profile Prestige", description: "An uncapped, purely cosmetic prestige tier and color band. Never affects combat power." },
     TOWER_MASTERY: { name: "Tower Mastery", description: "A one-time, permanent unlock per tower type. Its numeric level resets every Season and grants small combat bonuses plus purely cosmetic visual tiers. Never damage, attack speed, or range." },
     TOWER_SKIN: { name: "Tower Skin", description: "Purely cosmetic reskins for a tower's appearance. Never affects combat stats." },
+  },
+  reposition: {
+    pickingTitle: "REPOSITIONING",
+    pickingHint: "Click another slot on the map to move or swap this tower. Empty slot: it moves. Occupied slot: they swap.",
+    cancel: "CANCEL",
+    confirmTitle: "Confirm Repositioning",
+    confirmBody: "Reposition this tower for {cost} Gems?",
+    confirm: "CONFIRM",
+    insufficientTitle: "Not Enough Gems",
+    insufficientBody: "Repositioning costs {cost} Gems. Today's free reposition is already used.",
+    close: "CLOSE",
   },
   castleTiers: {
     INTACT: "Intact",

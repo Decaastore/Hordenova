@@ -179,9 +179,22 @@ export interface SaveData {
    * re-activate an already-owned path for free instead of charging again.
    */
   unlockedSpecializationIds: Partial<Record<TowerType, SpecializationId[]>>;
+
+  /**
+   * BALANCEAMENTO DEFINITIVO spec section 6/13 — Tower Repositioning. The
+   * day index (engine/DailyClock.ts's getCurrentDayIndex, a pure function
+   * of wall-clock time) this account last used its FREE reposition — null
+   * if never used. Comparing this against the CURRENT day index (never
+   * storing a boolean "used today" flag directly) is what makes the daily
+   * reset survive reload/close-reopen for free, exactly like every other
+   * time-gated system in this save (Season boundaries, Roulette milestones).
+   * Paid repositions (200 Gems, see config/repositioning.ts) never touch
+   * this field at all — only the one free use per day does.
+   */
+  lastFreeRepositionDayIndex: number | null;
 }
 
-export const SAVE_DATA_VERSION = 16;
+export const SAVE_DATA_VERSION = 17;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -227,6 +240,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ownedTowerSkinIds: [],
   equippedTowerSkinByType: {},
   unlockedSpecializationIds: {},
+  lastFreeRepositionDayIndex: null,
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -595,6 +609,14 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       unlockedSpecializationIds: legacySave
         ? deriveUnlockedSpecializationIdsFromLegacyLoadout(parsedTowerLoadout)
         : parseUnlockedSpecializationIds(parsed.unlockedSpecializationIds),
+      // BALANCEAMENTO DEFINITIVO (save v16 -> v17) — brand new field, same
+      // "sensible fresh-account default for a pre-existing save" pattern as
+      // every other additive migration in this function. null is exactly
+      // correct here: a save that never had Tower Repositioning has
+      // genuinely never used its free reposition, so the very next attempt
+      // must be free — never treated as already-spent.
+      lastFreeRepositionDayIndex:
+        typeof parsed.lastFreeRepositionDayIndex === "number" ? parsed.lastFreeRepositionDayIndex : null,
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

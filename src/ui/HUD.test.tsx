@@ -36,6 +36,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     pendingItemReward: null,
     pendingRouletteResult: null,
     pendingRouletteSpinWave: null,
+    repositionFreeAvailable: true,
     ...overrides,
   };
 }

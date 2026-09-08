@@ -54,6 +54,8 @@ function renderPanel(props: {
           onUpgradeMastery={() => {}}
           unlockedSpecializationIdsForType={(props.unlockedSpecializationIdsForType ?? ["IRONWOOD_EXECUTIONER"]) as never}
           onSwitchSpecialization={(props.onSwitchSpecialization ?? (() => {})) as never}
+          repositionFreeAvailable={true}
+          onStartReposition={() => {}}
         />
       </LanguageProvider>,
     );

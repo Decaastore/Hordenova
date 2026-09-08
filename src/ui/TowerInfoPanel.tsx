@@ -26,6 +26,7 @@ import {
   type SpecializationId,
 } from "@/config/specializations";
 import { getSkinsForTower } from "@/config/towerSkins";
+import { REPOSITION_GEM_COST } from "@/config/repositioning";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -52,6 +53,10 @@ interface TowerInfoPanelProps {
   unlockedSpecializationIdsForType: readonly SpecializationId[];
   /** "Trocar Especialização" — 200 Gems, switches to a DIFFERENT path already in `unlockedSpecializationIdsForType`. */
   onSwitchSpecialization: (id: SpecializationId) => void;
+  /** BALANCEAMENTO DEFINITIVO spec section 6 — whether the account's one free Tower Repositioning for today is still unused. */
+  repositionFreeAvailable: boolean;
+  /** Enters "pick a destination on the map" mode for this tower — see screens/GameScreen.tsx and ui/RepositioningOverlay.tsx for the map-click + confirmation flow. */
+  onStartReposition: () => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -78,6 +83,8 @@ export function TowerInfoPanel({
   onUpgradeMastery,
   unlockedSpecializationIdsForType,
   onSwitchSpecialization,
+  repositionFreeAvailable,
+  onStartReposition,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -201,7 +208,50 @@ export function TowerInfoPanel({
         onPurchase={onPurchaseSkin}
         isSkinOwned={isSkinOwned}
       />
+
+      <RepositionSection theme={theme} t={t} freeAvailable={repositionFreeAvailable} onStart={onStartReposition} />
     </div>
+  );
+}
+
+/**
+ * BALANCEAMENTO DEFINITIVO spec section 6/8 — "Tower > Equipamento >
+ * Reposicionar" reads as its own small section, matching the existing
+ * Mastery/Specialization/Skin sections' shape. The destination itself is
+ * picked on the MAP (not inside this panel — a slot is a map position, not
+ * a list), so this only ever starts the flow; screens/GameScreen.tsx +
+ * ui/RepositioningOverlay.tsx own the click-a-slot + confirm/insufficient-
+ * Gems steps that follow.
+ */
+function RepositionSection({
+  theme,
+  t,
+  freeAvailable,
+  onStart,
+}: {
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  freeAvailable: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.reposition.title")}</div>
+      <button onClick={onStart} style={{ ...upgradeButtonStyle, borderColor: theme.primary, marginTop: 6 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+          {t("towerInfo.reposition.action")}
+          <span style={{ opacity: 0.6 }}>·</span>
+          {freeAvailable ? (
+            t("towerInfo.reposition.free")
+          ) : (
+            <>
+              <GemIcon size={10} color={PALETTE.gem} /> {REPOSITION_GEM_COST}
+            </>
+          )}
+        </span>
+      </button>
+    </>
   );
 }
 

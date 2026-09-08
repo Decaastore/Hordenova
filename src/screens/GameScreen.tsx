@@ -17,6 +17,7 @@ import { RouletteBanner } from "@/ui/RouletteBanner";
 import { RoulettePendingPrompt } from "@/ui/RoulettePendingPrompt";
 import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
 import { EndgameWallBanner } from "@/ui/EndgameWallBanner";
+import { RepositioningOverlay } from "@/ui/RepositioningOverlay";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 
@@ -34,6 +35,19 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // re-armed whenever a fresh PROGRESSION_STOPPED report comes in.
   const [reportDismissed, setReportDismissed] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+
+  // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
+  // small state machine: "picking" a destination on the map, then either
+  // executing immediately (free) or "confirm"/"blocked" for a paid move.
+  // Lives here (not inside GameEngine) because it's pure UI flow — the
+  // engine's own repositionTower() call is only ever made from "confirm"'s
+  // onConfirm or directly from a free destination click.
+  type RepositionUiState =
+    | { phase: "idle" }
+    | { phase: "picking"; fromSlotId: string }
+    | { phase: "confirm"; fromSlotId: string; toSlotId: string; cost: number }
+    | { phase: "blocked"; cost: number };
+  const [repositionUi, setRepositionUi] = useState<RepositionUiState>({ phase: "idle" });
 
   useEffect(() => {
     // Master Implementation spec section 9 — every entry point into the
@@ -58,7 +72,24 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     }
   }, [engine]);
 
+  /** Executes (free) or opens the Gems confirmation/blocked prompt for a chosen destination slot — shared by both the empty-slot and swap-with-occupied-slot paths below. */
+  const resolveRepositionDestination = (fromSlotId: string, toSlotId: string) => {
+    const cost = engine.getRepositionCost();
+    if (cost === 0) {
+      engine.repositionTower(fromSlotId, toSlotId);
+      setRepositionUi({ phase: "idle" });
+    } else if (hud.gems < cost) {
+      setRepositionUi({ phase: "blocked", cost });
+    } else {
+      setRepositionUi({ phase: "confirm", fromSlotId, toSlotId, cost });
+    }
+  };
+
   const handleSlotClick = (slotId: string) => {
+    if (repositionUi.phase === "picking") {
+      resolveRepositionDestination(repositionUi.fromSlotId, slotId);
+      return;
+    }
     if (pendingTowerType) {
       const placed = engine.placeTower(slotId, pendingTowerType);
       if (placed) setPendingTowerType(null);
@@ -66,12 +97,30 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   };
 
   const handleTowerClick = (towerId: string) => {
+    if (repositionUi.phase === "picking") {
+      const tower = engine.getRenderSnapshot().towers.find((t) => t.id === towerId);
+      if (!tower) return;
+      if (tower.slotId === repositionUi.fromSlotId) {
+        // Clicking the same tower being repositioned cancels the flow.
+        setRepositionUi({ phase: "idle" });
+        return;
+      }
+      resolveRepositionDestination(repositionUi.fromSlotId, tower.slotId);
+      return;
+    }
     engine.selectTower(towerId);
   };
 
   const handleBackgroundClick = () => {
     engine.selectTower(null);
     setPendingTowerType(null);
+    if (repositionUi.phase === "picking") setRepositionUi({ phase: "idle" });
+  };
+
+  const handleStartReposition = (slotId: string) => {
+    engine.selectTower(null);
+    setPendingTowerType(null);
+    setRepositionUi({ phase: "picking", fromSlotId: slotId });
   };
 
   const selectedTower = hud.selectedTowerId
@@ -133,7 +182,27 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
             unlockedSpecializationIdsForType={engine.getUnlockedSpecializationIdsForType(selectedTower.type)}
             onSwitchSpecialization={(id) => engine.switchTowerSpecialization(id)}
+            repositionFreeAvailable={hud.repositionFreeAvailable}
+            onStartReposition={() => handleStartReposition(selectedTower.slotId)}
           />
+        )}
+
+        {repositionUi.phase === "picking" && (
+          <RepositioningOverlay mode="picking" onCancel={() => setRepositionUi({ phase: "idle" })} />
+        )}
+        {repositionUi.phase === "confirm" && (
+          <RepositioningOverlay
+            mode="confirm"
+            cost={repositionUi.cost}
+            onConfirm={() => {
+              engine.repositionTower(repositionUi.fromSlotId, repositionUi.toSlotId);
+              setRepositionUi({ phase: "idle" });
+            }}
+            onCancel={() => setRepositionUi({ phase: "idle" })}
+          />
+        )}
+        {repositionUi.phase === "blocked" && (
+          <RepositioningOverlay mode="blocked" cost={repositionUi.cost} onClose={() => setRepositionUi({ phase: "idle" })} />
         )}
 
         {hud.phase === "PROGRESSION_STOPPED" && !reportDismissed && (

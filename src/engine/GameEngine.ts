@@ -53,6 +53,8 @@ import {
 import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
+import { REPOSITION_GEM_COST } from "@/config/repositioning";
+import { getCurrentDayIndex } from "./DailyClock";
 import {
   advanceEnemy,
   createEliteEnemyInstance,
@@ -145,6 +147,8 @@ export interface HudSnapshot {
    * it (even across F5) until the player actually spins.
    */
   pendingRouletteSpinWave: number | null;
+  /** BALANCEAMENTO DEFINITIVO spec section 6 — whether the account's one free Tower Repositioning for TODAY (see engine/DailyClock.ts) is still available. false means the next reposition costs REPOSITION_GEM_COST Gems (config/repositioning.ts). */
+  repositionFreeAvailable: boolean;
 }
 
 /**
@@ -221,7 +225,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.pendingItemReward?.instanceId === b.pendingItemReward?.instanceId &&
     a.pendingRouletteResult?.wave === b.pendingRouletteResult?.wave &&
     a.pendingRouletteResult?.rewardType === b.pendingRouletteResult?.rewardType &&
-    a.pendingRouletteSpinWave === b.pendingRouletteSpinWave
+    a.pendingRouletteSpinWave === b.pendingRouletteSpinWave &&
+    a.repositionFreeAvailable === b.repositionFreeAvailable
   );
 }
 
@@ -351,6 +356,9 @@ export class GameEngine {
   /** Master Implementation Pass spec section 7-8 — PROFILE PRESTIGE: the recurring, uncapped, purely-cosmetic Gem sink (config/prestige.ts). */
   private prestigeLevel = 0;
 
+  /** BALANCEAMENTO DEFINITIVO spec section 6/13 — see SaveData.lastFreeRepositionDayIndex's own doc comment. */
+  private lastFreeRepositionDayIndex: number | null = null;
+
   /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
   private audioEvents: GameAudioEvent[] = [];
   private waveCompleteAudioFiredForWave: number | null = null;
@@ -435,6 +443,7 @@ export class GameEngine {
     this.unlockedCastleSkinIds = save.unlockedCastleSkinIds;
     this.prestigeLevel = save.prestigeLevel;
     this.pendingRouletteSpinWaves = [...save.pendingRouletteSpinWaves];
+    this.lastFreeRepositionDayIndex = save.lastFreeRepositionDayIndex;
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -610,6 +619,74 @@ export class GameEngine {
         this.masteryUnlocked[type] === true,
       ),
     );
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // BALANCEAMENTO DEFINITIVO spec section 6/13 — Tower Repositioning. See
+  // config/repositioning.ts's own doc comment for the "1 change = 1 pick-
+  // tower-then-pick-destination-slot action" definition (a swap with an
+  // occupied slot still counts as one), and engine/DailyClock.ts for why
+  // the daily boundary is a day-INDEX comparison rather than a stored flag.
+  // ---------------------------------------------------------------------
+
+  /** Whether the account's one free reposition for the CURRENT day is still unused. */
+  isFreeRepositionAvailable(): boolean {
+    return this.lastFreeRepositionDayIndex !== getCurrentDayIndex();
+  }
+
+  /** 0 when the free daily reposition is still available, REPOSITION_GEM_COST otherwise. UI must show this and get confirmation before ever calling repositionTower with a non-zero cost. */
+  getRepositionCost(): number {
+    return this.isFreeRepositionAvailable() ? 0 : REPOSITION_GEM_COST;
+  }
+
+  /**
+   * Moves the tower currently at `fromSlotId` to `toSlotId` — one of the
+   * map's fixed TOWER_SLOTS positions, never an arbitrary coordinate (the
+   * structural min-spacing rule from FIX-5 is preserved unchanged: every
+   * legal destination is already a pre-vetted slot). If `toSlotId` already
+   * holds a different tower, the two SWAP positions atomically as part of
+   * this SAME call — still exactly one reposition for cost/allowance
+   * purposes. Touches ONLY slotId/position on the affected tower(s): level,
+   * Mastery, Specialization, ownership, HP and every other field are
+   * completely untouched, on both towers.
+   *
+   * Spends REPOSITION_GEM_COST Gems when the day's free use is already
+   * spent — the caller (UI) is responsible for showing a confirmation
+   * before calling this whenever getRepositionCost() > 0, exactly like
+   * every other Gems purchase in this engine (switchTowerSpecialization,
+   * purchaseTowerSkin, ...): this method performs the action unconditionally
+   * once called, it never itself prompts.
+   */
+  repositionTower(fromSlotId: string, toSlotId: string): boolean {
+    if (!this.canModifyLoadout()) return false;
+    if (fromSlotId === toSlotId) return false;
+
+    const fromTower = this.towers.find((t) => t.slotId === fromSlotId);
+    const toSlot = TOWER_SLOTS.find((s) => s.id === toSlotId);
+    if (!fromTower || !toSlot) return false;
+
+    const isFree = this.isFreeRepositionAvailable();
+    if (!isFree && !this.canAffordGems(REPOSITION_GEM_COST)) return false;
+
+    const toTower = this.towers.find((t) => t.slotId === toSlotId);
+    const fromSlot = TOWER_SLOTS.find((s) => s.id === fromSlotId)!;
+
+    fromTower.slotId = toSlotId;
+    fromTower.position = toSlot.position;
+    if (toTower) {
+      toTower.slotId = fromSlotId;
+      toTower.position = fromSlot.position;
+    }
+
+    if (isFree) {
+      this.lastFreeRepositionDayIndex = getCurrentDayIndex();
+    } else {
+      this.spendGems(REPOSITION_GEM_COST, "tower_reposition");
+    }
+
     this.persist();
     this.notify();
     return true;
@@ -1560,6 +1637,7 @@ export class GameEngine {
         ownedTowerSkinIds: [...this.ownedTowerSkinIds],
         equippedTowerSkinByType: this.equippedTowerSkinByType,
         unlockedSpecializationIds: this.unlockedSpecializationIds,
+        lastFreeRepositionDayIndex: this.lastFreeRepositionDayIndex,
       },
       this.storageKey,
     );
@@ -1600,6 +1678,7 @@ export class GameEngine {
         : null,
       pendingRouletteResult: this.pendingRouletteResults[0] ?? null,
       pendingRouletteSpinWave: this.pendingRouletteSpinWaves[0] ?? null,
+      repositionFreeAvailable: this.isFreeRepositionAvailable(),
     };
 
     const prev = this.cachedHud;
