@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import {
   canChooseSpecialization,
@@ -180,6 +180,7 @@ export function TowerInfoPanel({
       />
 
       <SpecializationSection
+        key={tower.id}
         tower={tower}
         gold={gold}
         gems={gems}
@@ -337,6 +338,12 @@ function SpecializationSection({
   unlockedSpecializationIdsForType: readonly SpecializationId[];
   onSwitch: (id: SpecializationId) => void;
 }) {
+  // Confirm-before-spend step for "Trocar Especialização" — declared here,
+  // before any early return, per the Rules of Hooks. Reset whenever a
+  // DIFFERENT tower is selected (see this component's `key={tower.id}` at
+  // its call site); a completed switch clears it explicitly instead.
+  const [confirmingSwitchId, setConfirmingSwitchId] = useState<SpecializationId | null>(null);
+
   if (!tower.specializationId) {
     if (!canChooseSpecialization(tower)) {
       if (tower.level >= SPECIALIZATION_UNLOCK_TOWER_LEVEL) return null; // already chosen elsewhere / shouldn't happen
@@ -419,20 +426,66 @@ function SpecializationSection({
         </button>
       )}
 
-      {switchTargets.map((id) => (
-        <button
-          key={id}
-          onClick={() => onSwitch(id)}
-          disabled={!switchAffordable}
-          style={{ ...switchButtonStyle, borderColor: theme.accent, opacity: switchAffordable ? 1 : 0.5 }}
-        >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            {t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
-            <span style={{ opacity: 0.6 }}>·</span>
-            <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
-          </span>
-        </button>
-      ))}
+      {/* "Trocar Especialização" — HORDENOVA. Only rendered when this account
+          owns at least one OTHER path for this tower's type (switchTargets
+          non-empty); a tower with just one specialization ever unlocked
+          correctly shows nothing here — there is nothing useful to switch
+          to. Clicking a target arms a confirmation step (below) instead of
+          spending Gems immediately. */}
+      {switchTargets.length > 0 && (
+        <>
+          <div style={{ ...sectionLabelStyle, marginTop: 8 }}>{t("towerInfo.specializationSwitchSection")}</div>
+          {confirmingSwitchId ? (
+            <div style={switchConfirmBoxStyle}>
+              <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
+                {t("towerInfo.specializationSwitchConfirm", { name: t(`specializations.${confirmingSwitchId}.name`) })}
+              </div>
+              {!switchAffordable && (
+                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginBottom: 6, fontStyle: "italic" }}>
+                  {t("towerInfo.specializationInsufficientGems", { cost: SPECIALIZATION_CHANGE_GEM_COST })}
+                </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  onClick={() => {
+                    onSwitch(confirmingSwitchId);
+                    setConfirmingSwitchId(null);
+                  }}
+                  disabled={!switchAffordable}
+                  style={{ ...upgradeButtonStyle, width: "100%", marginTop: 0, borderColor: theme.primary, opacity: switchAffordable ? 1 : 0.5 }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                    {t("towerInfo.specializationSwitchConfirmYes")}
+                    <span style={{ opacity: 0.6 }}>·</span>
+                    <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setConfirmingSwitchId(null)}
+                  style={{ ...switchButtonStyle, width: "100%", marginTop: 0, textAlign: "center" }}
+                >
+                  {t("towerInfo.specializationSwitchConfirmNo")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            switchTargets.map((id) => (
+              <button
+                key={id}
+                onClick={() => setConfirmingSwitchId(id)}
+                disabled={!switchAffordable}
+                style={{ ...switchButtonStyle, borderColor: theme.accent, opacity: switchAffordable ? 1 : 0.5 }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  {t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
+                  <span style={{ opacity: 0.6 }}>·</span>
+                  <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
+                </span>
+              </button>
+            ))
+          )}
+        </>
+      )}
     </>
   );
 }
@@ -682,6 +735,15 @@ const switchButtonStyle: CSSProperties = {
   fontWeight: 600,
   fontSize: 10.5,
   letterSpacing: 0.4,
+};
+
+const switchConfirmBoxStyle: CSSProperties = {
+  marginTop: 6,
+  padding: "8px 10px",
+  borderRadius: 7,
+  border: "1px solid",
+  borderColor: PALETTE.uiPanelBorder,
+  background: "rgba(255,255,255,0.03)",
 };
 
 const unlockBannerStyle: CSSProperties = {
