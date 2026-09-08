@@ -80,6 +80,53 @@ describe("Specialization / Upgrade Slot (Progression 2.0 spec section 5/6)", () 
     expect(specialized.bossDamageMultiplier).toBeGreaterThan(base.bossDamageMultiplier);
   });
 
+  /**
+   * BALANCEAMENTO DEFINITIVO audit finding — real-GameEngine simulation at
+   * wave 1595 found a 12x IRONWOOD_EXECUTIONER build's boss-kill margin at
+   * ~1508x (vs. ~54x for BREAKER and ~22x for VANGUARD at the identical
+   * level/specLevel/masteryLevel investment) — trivializing every boss fight
+   * far beyond the "fácil demais" (>30x) contract line. Root cause: this was
+   * the ONLY specialization path in the file combining TWO of its own
+   * fields (critMultiplier AND bossDamageMultiplier) that both scale
+   * continuously and UNBOUNDED with the same diminishing-returns `lvl` —
+   * multiplying together on every hit against a boss/mini-boss, so the
+   * path's boss-specific power grew roughly QUADRATICALLY in `lvl` instead
+   * of linearly like every other path's own single unbounded field. Every
+   * other path in this file caps at most one field (a probability/fraction)
+   * and leaves exactly ONE companion field genuinely unbounded — this test
+   * pins EXECUTIONER to that same one-bounded/one-unbounded shape: critMultiplier
+   * stays the sole unbounded field (matching e.g. BREAKER's own shape),
+   * bossDamageMultiplier's specialization-driven bonus now saturates. This
+   * does NOT touch specializationEffectScale/SPECIALIZATION_EFFECT_EXPONENT
+   * (frozen) — only how this one path's own two fields consume `lvl`.
+   */
+  it("BALANCE FIX: IRONWOOD_EXECUTIONER's bossDamageMultiplier saturates at very high specialization levels — critMultiplier stays the sole unbounded companion field", () => {
+    const base = getTowerSpecialAtLevel("IRONWOOD", 60);
+    if (base.type !== "IRONWOOD") throw new Error("unreachable");
+
+    const at = (level: number) => {
+      const r = applySpecializationToSpecial(base, "IRONWOOD_EXECUTIONER", level);
+      if (r.type !== "IRONWOOD") throw new Error("unreachable");
+      return r;
+    };
+
+    const low = at(20);
+    const mid = at(800); // ~ the specLevel a maximally-reinvesting build reaches by wave ~1595
+    const extreme = at(100_000);
+
+    // critMultiplier: the deliberately unbounded companion field — keeps
+    // growing forever, exactly like every other path's own unbounded field.
+    expect(mid.critMultiplier).toBeGreaterThan(low.critMultiplier);
+    expect(extreme.critMultiplier).toBeGreaterThan(mid.critMultiplier);
+
+    // bossDamageMultiplier: now saturates (mirrors how BREAKER's own
+    // armor-penetration field is capped) instead of compounding with
+    // critMultiplier forever — level 800 and level 100,000 land at the
+    // exact same saturated value.
+    expect(mid.bossDamageMultiplier).toBeLessThanOrEqual(3.6);
+    expect(extreme.bossDamageMultiplier).toBe(mid.bossDamageMultiplier);
+  });
+
   it("STORMCALLER_ARCANE_SURGE adds flat magic damage that keeps growing with specialization level, with no cap", () => {
     const base = getTowerSpecialAtLevel("STORMCALLER", 10);
     const lvl1 = applySpecializationToSpecial(base, "STORMCALLER_ARCANE_SURGE", 1) as { bonusFlatDamage?: number };

@@ -44,7 +44,6 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
     hp,
     maxHp: hp,
     baseSpeed: def.speed,
-    damageToBase: def.damageToBase,
     goldReward: def.goldReward,
     damageReduction: def.resistance,
     regenPerSecond: hp * def.regenPercentPerSecond,

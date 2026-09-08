@@ -159,6 +159,33 @@ describe("Boss killability across the full wave range (real GameEngine, coverage
     }
   }, 60_000);
 
+  /**
+   * BALANCEAMENTO DEFINITIVO audit — the complementary UPPER-bound guard
+   * this suite never had: real-GameEngine simulation at wave 1595 (the
+   * exact wave a live account reported clearing "trivially") found a
+   * round-robin 12/12 reinvesting build's boss margin at ~564x before the
+   * fix (config/specializations.ts's IRONWOOD_EXECUTIONER combining two of
+   * its own unbounded fields — see that file's own regression test) — an
+   * order of magnitude past the "fácil demais" (>30x) contract line. The
+   * fix (bossDamageMultiplier saturation) brings this SAME build down to
+   * ~32x — right at the "confortável" (20-30x) contract boundary instead
+   * of an order of magnitude past "fácil demais" (>30x). This
+   * guard catches any FUTURE reintroduction of runaway multiplicative
+   * stacking without re-litigating the exact number balance passes may
+   * still retune deliberately — the ceiling here is set well above the
+   * currently-measured value specifically so it never fires on routine
+   * tuning, only on a real regression back toward the old order of magnitude.
+   */
+  it("BALANCE CEILING: a reinvesting round-robin 12/12 build's boss margin at wave 1595 stays well below the old ~564x blowup — guards against re-introducing runaway multiplicative stacking", () => {
+    const def = MAIN_BOSSES["hollow-warden"]!;
+    const wave = 1595;
+    const build = makeBuild(growingBuild(wave));
+    const budget = measureDamageBudget(build, def, wave);
+    const bossHp = realBossHp(def, wave);
+    const ratio = budget / bossHp;
+    expect(ratio).toBeLessThan(60);
+  }, 60_000);
+
   it("EVERY main boss is killable (real damage budget exceeds its HP) by a moderate, non-optimized round-robin build at wave 130", () => {
     const build = makeBuild(roundRobinBuild(30, 5, 0));
     for (const [id, def] of Object.entries(MAIN_BOSSES)) {

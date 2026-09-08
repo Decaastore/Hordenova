@@ -15,8 +15,8 @@ describe("BattleDiagnostics", () => {
   it("recommends Frostborn (Slow/CC) when Runners are the enemies leaking through", () => {
     const stats = createBattleStats();
     const runner = createEnemyInstance("RUNNER", 5);
-    recordBaseHit(stats, runner);
-    recordBaseHit(stats, runner);
+    recordBaseHit(stats, runner, 10);
+    recordBaseHit(stats, runner, 10);
 
     const finalized = finalizeBattleStats(stats, 5);
     const towers = [createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 })];
@@ -57,7 +57,7 @@ describe("BattleDiagnostics", () => {
   it("computes a real, non-random percent damage gain from actual tower level stats", () => {
     const stats = createBattleStats();
     const runner = createEnemyInstance("RUNNER", 5);
-    recordBaseHit(stats, runner);
+    recordBaseHit(stats, runner, 10);
     const finalized = finalizeBattleStats(stats, 5);
 
     const tower = createTowerInstance("slot-1", "FROSTBORN", { x: 0, y: 0 }, 5);
@@ -73,7 +73,7 @@ describe("BattleDiagnostics", () => {
   it("recommends building the tower type when none is owned yet", () => {
     const stats = createBattleStats();
     const runner = createEnemyInstance("RUNNER", 5);
-    recordBaseHit(stats, runner);
+    recordBaseHit(stats, runner, 10);
     const finalized = finalizeBattleStats(stats, 5);
 
     const report = generateFailureReport(finalized, []);

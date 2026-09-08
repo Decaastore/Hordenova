@@ -49,8 +49,6 @@ export interface EnemyDefinition {
   baseHp: number;
   /** World units per second. */
   baseSpeed: number;
-  /** Damage dealt to the base if this enemy reaches the end of the path. */
-  baseDamageToBase: number;
   /** Gold granted to the player when killed. */
   goldReward: number;
   /** Flat fraction of incoming damage ignored (0..1). 0 for most enemies. */
@@ -73,7 +71,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Basic enemy, balanced stats.",
     baseHp: 40,
     baseSpeed: 60,
-    baseDamageToBase: 5,
     goldReward: 5,
     damageReduction: 0,
     regenPercentPerSecond: 0,
@@ -84,7 +81,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Very fast, low HP. Pressures slow-firing towers.",
     baseHp: 20,
     baseSpeed: 130,
-    baseDamageToBase: 3,
     goldReward: 4,
     damageReduction: 0,
     regenPercentPerSecond: 0,
@@ -95,7 +91,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "High HP, slow. Tests sustained DPS.",
     baseHp: 220,
     baseSpeed: 32,
-    baseDamageToBase: 15,
     goldReward: 12,
     damageReduction: 0,
     regenPercentPerSecond: 0,
@@ -106,7 +101,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Reduces incoming damage. Forces tower-composition decisions.",
     baseHp: 70,
     baseSpeed: 48,
-    baseDamageToBase: 8,
     goldReward: 8,
     damageReduction: 0.35,
     regenPercentPerSecond: 0,
@@ -117,7 +111,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Tiny, cheap, arrives in numbers. Individually harmless; in bulk, overwhelming.",
     baseHp: 12,
     baseSpeed: 70,
-    baseDamageToBase: 2,
     goldReward: 2,
     damageReduction: 0,
     regenPercentPerSecond: 0,
@@ -128,7 +121,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Steadily heals while alive. Chip damage barely dents it — needs a real burst.",
     baseHp: 90,
     baseSpeed: 42,
-    baseDamageToBase: 9,
     goldReward: 10,
     damageReduction: 0,
     regenPercentPerSecond: 0.025,
@@ -139,7 +131,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Heavy armor greatly reduces physical damage. Weak to Magic/Armor Penetration.",
     baseHp: 160,
     baseSpeed: 30,
-    baseDamageToBase: 12,
     goldReward: 14,
     damageReduction: 0.55,
     regenPercentPerSecond: 0,
@@ -150,7 +141,6 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     role: "Periodically jams the nearest tower, silencing it for a moment. The build itself is the target.",
     baseHp: 55,
     baseSpeed: 50,
-    baseDamageToBase: 6,
     goldReward: 9,
     damageReduction: 0,
     regenPercentPerSecond: 0,
@@ -267,7 +257,6 @@ function bandScaling(waveNumber: number, startWave: number, perWave: number, cap
 export interface ScaledEnemyStats {
   hp: number;
   speed: number;
-  damageToBase: number;
   goldReward: number;
   damageReduction: number;
   regenPerSecond: number;
@@ -287,7 +276,6 @@ export function getScaledEnemyStats(type: EnemyType, waveNumber: number): Scaled
   return {
     hp,
     speed: def.baseSpeed * speedMultiplier,
-    damageToBase: def.baseDamageToBase,
     goldReward: Math.round(def.goldReward * goldMultiplier),
     damageReduction,
     regenPerSecond: hp * def.regenPercentPerSecond,

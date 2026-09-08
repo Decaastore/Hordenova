@@ -8,6 +8,7 @@ import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/c
 import { getMasteryCosmeticTier, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS, ENEMY_TYPES } from "@/config/enemyStats";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
+import { CASTLE_DAMAGE_BASE_PERCENT } from "@/config/castleDamage";
 import { CASTLE_TIERS } from "@/config/castleConfig";
 import { CASTLE_SKINS } from "@/config/castleSkins";
 import { ITEM_DEFINITIONS, ITEM_TYPES } from "@/config/itemDefinitions";
@@ -183,7 +184,7 @@ function BestiarySection() {
               <p style={descStyle}>{t(`enemies.${type}.description` as TranslationKey)}</p>
               <StatRow label={t("wiki.hp")} value={def.baseHp} />
               <StatRow label={t("wiki.speed")} value={def.baseSpeed} />
-              <StatRow label={t("wiki.damageToBase")} value={def.baseDamageToBase} />
+              <StatRow label={t("wiki.damageToBase")} value={`${Math.round(CASTLE_DAMAGE_BASE_PERCENT.NORMAL * 100)}% (x wave)`} />
               <StatRow label={t("wiki.goldReward")} value={def.goldReward} />
               {def.damageReduction > 0 && <StatRow label={t("wiki.damageReduction")} value={`${Math.round(def.damageReduction * 100)}%`} />}
               {def.regenPercentPerSecond > 0 && <StatRow label={t("wiki.regenPerSecond")} value={`${(def.regenPercentPerSecond * 100).toFixed(1)}%`} />}
@@ -218,7 +219,10 @@ function BossCard({ boss }: { boss: (typeof MAIN_BOSSES)[string] }) {
   return (
     <Card title={t(`bosses.${boss.i18nKey}.name` as TranslationKey)}>
       <StatRow label={t("wiki.hpVsBrute")} value={`×${boss.hpMultiplierVsBrute}`} />
-      <StatRow label={t("wiki.damageToBase")} value={boss.damageToBase} />
+      <StatRow
+        label={t("wiki.damageToBase")}
+        value={`${Math.round(CASTLE_DAMAGE_BASE_PERCENT[boss.isMainBoss ? "BOSS" : "MINI_BOSS"] * 100)}% (x wave)`}
+      />
       <StatRow label={t("wiki.speed")} value={boss.speed} />
       <StatRow label={t("wiki.goldReward")} value={boss.goldReward} />
       <StatRow label={t("wiki.ability")} value={boss.ability} />

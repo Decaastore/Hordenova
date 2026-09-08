@@ -83,7 +83,6 @@ export interface EnemyInstance {
   hp: number;
   maxHp: number;
   baseSpeed: number;
-  damageToBase: number;
   goldReward: number;
   damageReduction: number;
   /** Fraction of maxHp healed per second while alive. 0 for most enemies (REGENERATOR archetype, some mini-bosses). */
@@ -95,7 +94,7 @@ export interface EnemyInstance {
   burn: BurnEffect | null;
   boss?: BossState;
   disablerState?: DisablerState;
-  /** Elite modifier applied at spawn — see BossManager-style creation in GameEngine.maybeSpawnElite. Purely a marker for rendering/rewards; its stat bumps are already baked into hp/damageToBase/goldReward. */
+  /** Elite modifier applied at spawn — see BossManager-style creation in GameEngine.maybeSpawnElite. Purely a marker for rendering/rewards; its stat bumps are already baked into hp/goldReward. Castle damage is unaffected — Elite is a Normal-category enemy for CastleDamageCategory purposes (config/castleDamage.ts), the spec's 3-tier Normal/Mini-Boss/Boss split has no separate Elite tier. */
   elite?: boolean;
   /**
    * AUDITORIA E CORREÇÃO GERAL spec sections 24-25 — CC diminishing-returns
@@ -130,7 +129,6 @@ export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyI
     hp: stats.hp,
     maxHp: stats.hp,
     baseSpeed: stats.speed,
-    damageToBase: stats.damageToBase,
     goldReward: stats.goldReward,
     damageReduction: stats.damageReduction,
     regenPerSecond: stats.regenPerSecond,
@@ -308,7 +306,6 @@ export function applyBurn(enemy: EnemyInstance, damagePerSecond: number, duratio
 export interface EliteModifier {
   hpMultiplier: number;
   speedMultiplier: number;
-  damageMultiplier: number;
   rewardMultiplier: number;
   regenPercentPerSecond: number;
 }
@@ -318,7 +315,6 @@ export function createEliteEnemyInstance(type: EnemyType, waveNumber: number, mo
   enemy.hp = Math.round(enemy.hp * modifier.hpMultiplier);
   enemy.maxHp = enemy.hp;
   enemy.baseSpeed *= modifier.speedMultiplier;
-  enemy.damageToBase = Math.round(enemy.damageToBase * modifier.damageMultiplier);
   enemy.goldReward = Math.round(enemy.goldReward * modifier.rewardMultiplier);
   enemy.regenPerSecond = enemy.maxHp * modifier.regenPercentPerSecond;
   enemy.elite = true;

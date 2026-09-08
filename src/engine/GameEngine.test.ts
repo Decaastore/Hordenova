@@ -238,14 +238,22 @@ describe("GameEngine — Active Idle progression", () => {
    * must NEVER freeze the run (proven above), but a real STREAK of escapes
    * with zero kills in between is a genuinely different situation the
    * player deserves to be told about explicitly, instead of it looking
-   * identical to one unlucky fight. A huge castleHpBonus keeps this
-   * deterministic reproduction alive across several boss escapes (an empty
-   * build, so every boss walks straight through) without ever tripping
-   * PROGRESSION_STOPPED, which would otherwise end the run before the
-   * streak could accumulate.
+   * identical to one unlucky fight.
+   *
+   * BALANCEAMENTO DEFINITIVO spec section 5 note: this test used to rely on
+   * a huge flat `castleHpBonus` to keep the castle alive across several boss
+   * escapes. That trick no longer works — Castle Damage (config/castleDamage.ts)
+   * is now a PERCENTAGE of the castle's own current max HP, so it is
+   * deliberately scale-invariant: a bigger max HP absorbs proportionally
+   * bigger hits, never more real hits. This test isn't about castle-damage
+   * amounts at all, only about the escape-streak/EndgameWallReport bookkeeping,
+   * so it now refills baseHp to full after every tick instead — the same
+   * "make the castle unkillable for this specific test's purpose" intent,
+   * expressed in a way that doesn't fight the real (and intentionally
+   * unbounded) damage formula.
    */
   it("3 consecutive boss escapes with zero kills surface an explicit EndgameWallReport — a single escape does not, and the run never freezes", () => {
-    updateSave({ currentWave: 30, gold: 0, castleHpBonus: 1_000_000_000, towerLoadout: [] });
+    updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.setSpeed(4);
@@ -257,6 +265,11 @@ describe("GameEngine — Active Idle progression", () => {
 
     while (escapesSeen < 3 && iterations < maxIterations) {
       engine.update(500);
+      // Refill the castle to full after every tick — see the doc comment
+      // above for why this test decouples itself from the real (now
+      // percentage-of-max-HP) Castle Damage formula entirely.
+      const internals = engine as unknown as { baseHp: number; maxBaseHp: number };
+      internals.baseHp = internals.maxBaseHp;
       iterations++;
       const phase = engine.getHudSnapshot().phase;
       // A BOSS_BATTLE -> RUNNING transition with no VICTORY in between (this

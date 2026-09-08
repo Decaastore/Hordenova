@@ -55,8 +55,8 @@ export function recordKill(stats: BattleStats, enemy: EnemyInstance): void {
   delete stats.lastHitTowerType[enemy.id];
 }
 
-export function recordBaseHit(stats: BattleStats, enemy: EnemyInstance): void {
-  stats.totalBaseDamageTaken += enemy.damageToBase;
+export function recordBaseHit(stats: BattleStats, enemy: EnemyInstance, damageAmount: number): void {
+  stats.totalBaseDamageTaken += damageAmount;
   stats.enemiesReachedBaseByType[enemy.type] = (stats.enemiesReachedBaseByType[enemy.type] ?? 0) + 1;
 }
 

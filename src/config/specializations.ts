@@ -287,7 +287,7 @@ export function applySpecializationToSpecial(
       return {
         ...b,
         critMultiplier: round2(b.critMultiplier + lvl * 0.15),
-        bossDamageMultiplier: round2((b.bossDamageMultiplier || 1) + lvl * 0.1),
+        bossDamageMultiplier: round2((b.bossDamageMultiplier || 1) + Math.min(2.0, lvl * 0.1)),
       };
     }
     case "IRONWOOD_BREAKER": {

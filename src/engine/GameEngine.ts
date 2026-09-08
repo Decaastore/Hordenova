@@ -12,6 +12,7 @@ import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
+import { computeCastleDamage, type CastleDamageCategory } from "@/config/castleDamage";
 import {
   castleHpForReward,
   rollRoulette,
@@ -93,7 +94,6 @@ import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 const ELITE_MODIFIER: EliteModifier = {
   hpMultiplier: 1.4,
   speedMultiplier: 1.2,
-  damageMultiplier: 1.25,
   rewardMultiplier: 1.6,
   regenPercentPerSecond: 0.015,
 };
@@ -1134,8 +1134,15 @@ export class GameEngine {
     let bossDefeatedThisTick = false;
     for (const enemy of this.enemies) {
       if (reachedBaseIds.has(enemy.id)) {
-        this.baseHp = Math.max(0, this.baseHp - enemy.damageToBase);
-        recordBaseHit(this.battleStats, enemy);
+        // BALANCEAMENTO DEFINITIVO spec section 5 — category-based Castle
+        // Damage (config/castleDamage.ts), computed fresh at the exact
+        // moment of crossing from the CURRENT wave and CURRENT max Castle
+        // HP (never a flat per-archetype constant, never cached on the
+        // enemy, never applied more than this one time per enemy).
+        const category: CastleDamageCategory = enemy.boss?.isMainBoss ? "BOSS" : enemy.boss ? "MINI_BOSS" : "NORMAL";
+        const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp);
+        this.baseHp = Math.max(0, this.baseHp - castleDamage);
+        recordBaseHit(this.battleStats, enemy, castleDamage);
         continue; // removed, no gold — it breached the base
       }
       if (isEnemyDead(enemy)) {

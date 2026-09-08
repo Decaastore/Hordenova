@@ -23,7 +23,6 @@ export interface BossDefinition {
   isMainBoss: boolean;
   /** Multiplier applied to a same-wave Brute's scaled HP — the boss's HP baseline. */
   hpMultiplierVsBrute: number;
-  damageToBase: number;
   speed: number;
   goldReward: number;
   ability: BossAbilityId;
@@ -39,7 +38,6 @@ export interface BossDefinition {
 function boss(overrides: Partial<BossDefinition> & Pick<BossDefinition, "id" | "i18nKey" | "isMainBoss">): BossDefinition {
   return {
     hpMultiplierVsBrute: 4,
-    damageToBase: 20,
     speed: 34,
     goldReward: 60,
     ability: "NONE",
@@ -68,7 +66,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "HOLLOW_WARDEN",
     isMainBoss: true,
     hpMultiplierVsBrute: 18,
-    damageToBase: 40,
     speed: 26,
     goldReward: 220,
     ability: "SUMMON",
@@ -81,7 +78,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "MOLTEN_COLOSSUS",
     isMainBoss: true,
     hpMultiplierVsBrute: 19,
-    damageToBase: 45,
     speed: 24,
     goldReward: 320,
     ability: "SUMMON",
@@ -93,7 +89,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "GLACIAL_SOVEREIGN",
     isMainBoss: true,
     hpMultiplierVsBrute: 20,
-    damageToBase: 42,
     speed: 27,
     goldReward: 420,
     ability: "SHIELD",
@@ -104,7 +99,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "SAND_DEVOURER",
     isMainBoss: true,
     hpMultiplierVsBrute: 21,
-    damageToBase: 48,
     speed: 30,
     goldReward: 520,
     ability: "DISABLE",
@@ -115,7 +109,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "GRAVE_TYRANT",
     isMainBoss: true,
     hpMultiplierVsBrute: 22,
-    damageToBase: 50,
     speed: 28,
     goldReward: 650,
     ability: "BERSERKER",
@@ -126,7 +119,6 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "ABYSSAL_MAW",
     isMainBoss: true,
     hpMultiplierVsBrute: 24,
-    damageToBase: 55,
     speed: 30,
     goldReward: 800,
     ability: "SUMMON",
@@ -152,7 +144,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "ASHFEN_WARLORD",
     isMainBoss: false,
     hpMultiplierVsBrute: 4,
-    damageToBase: 20,
     speed: 34,
     goldReward: 60,
     ability: "SHIELD",
@@ -164,7 +155,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "BRIAR_SUMMONER",
     isMainBoss: false,
     hpMultiplierVsBrute: 3.5,
-    damageToBase: 16,
     speed: 36,
     goldReward: 65,
     ability: "SUMMON",
@@ -176,7 +166,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "MOSSBACK_REGENERATOR",
     isMainBoss: false,
     hpMultiplierVsBrute: 5,
-    damageToBase: 18,
     speed: 30,
     goldReward: 70,
     ability: "REGEN",
@@ -188,7 +177,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "GLOOM_JAMMER",
     isMainBoss: false,
     hpMultiplierVsBrute: 3.5,
-    damageToBase: 16,
     speed: 38,
     goldReward: 65,
     ability: "DISABLE",
@@ -200,7 +188,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "STONEBOUND_SENTINEL",
     isMainBoss: false,
     hpMultiplierVsBrute: 6,
-    damageToBase: 24,
     speed: 22,
     goldReward: 75,
     ability: "NONE",
@@ -211,7 +198,6 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     i18nKey: "FEROCIOUS_BERSERKER",
     isMainBoss: false,
     hpMultiplierVsBrute: 4,
-    damageToBase: 22,
     speed: 40,
     goldReward: 70,
     ability: "BERSERKER",

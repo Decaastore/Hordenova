@@ -193,7 +193,7 @@ describe("Freeze / Slow status effect (Frostborn)", () => {
  * account for it.
  */
 describe("CC resistance + diminishing returns (AUDITORIA E CORREÇÃO GERAL spec sections 23-28)", () => {
-  const ELITE_MODIFIER = { hpMultiplier: 1.5, speedMultiplier: 1, damageMultiplier: 1.5, rewardMultiplier: 2, regenPercentPerSecond: 0 };
+  const ELITE_MODIFIER = { hpMultiplier: 1.5, speedMultiplier: 1, rewardMultiplier: 2, regenPercentPerSecond: 0 };
 
   it("THE BUG, reproduced and fixed: a Boss hit with a constant 100% freeze chance every 100ms is NEVER stuck forever — it eventually resumes moving", () => {
     const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
