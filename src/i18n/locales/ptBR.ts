@@ -657,6 +657,9 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v7: {
+        executionerBudgetRetune: "Novo ajuste fino no caminho Executioner do Ironwood: sua vantagem contra chefes agora fica mais alinhada com os outros caminhos do Ironwood (Breaker/Vanguard), mantendo a identidade de especialista em chefes sem tornar as lutas triviais.",
+      },
       v6: {
         specializationSwitchVisible: "Corrigido \"Trocar Especialização\" não aparecendo no painel de informações da torre quando você já possuía 2 ou mais caminhos de especialização para aquele tipo de torre — a ação em si sempre funcionou, apenas não estava sendo exibida.",
         executionerBossDamageCap: "Rebalanceado o bônus de dano contra chefes do caminho Executioner do Ironwood para parar de crescer sem limite em níveis de especialização muito altos — mantém as lutas contra chefes relevantes no fim de jogo para uma build Executioner bem investida.",

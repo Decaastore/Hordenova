@@ -656,6 +656,9 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v7: {
+        executionerBudgetRetune: "Another fine-tuning pass on the Ironwood Executioner path: its edge against bosses is now more in line with the other Ironwood paths (Breaker/Vanguard), keeping its boss-specialist identity without trivializing boss fights.",
+      },
       v6: {
         specializationSwitchVisible: "Fixed \"Switch Specialization\" not appearing in a tower's info panel once you owned 2 or more specialization paths for that tower type — the action itself always worked, it just wasn't showing up.",
         executionerBossDamageCap: "Rebalanced the Ironwood Executioner path's boss-damage bonus so it stops compounding without limit at very high specialization levels — keeps late-game boss fights meaningful for a heavily invested Executioner build.",
