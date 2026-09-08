@@ -157,6 +157,14 @@ export const en = {
       action: "REPOSITION TOWER",
       free: "FREE TODAY",
     },
+    equipment: {
+      title: "EQUIPMENT",
+      slot: "SLOT {index}",
+      empty: "Empty",
+      equip: "EQUIP",
+      remove: "REMOVE",
+      noItems: "No compatible items available to equip here.",
+    },
   },
   specializations: {
     IRONWOOD_EXECUTIONER: { name: "Executioner", description: "Every point invested sharpens critical strikes and boss damage further." },

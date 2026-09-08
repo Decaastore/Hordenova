@@ -26,7 +26,7 @@ import { canUnlockPrestige, getPrestigeBonuses, getPrestigeUpgradeCost, type Pre
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
-import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
+import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY, findItem } from "./InventoryManager";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { checkLocalFirst, type LocalFirstDiscoveries } from "./WorldFirst";
 import {
@@ -47,9 +47,13 @@ import {
   switchSpecialization as switchSpecializationEntity,
   applySiegeDamage,
   resetTowerSurvival,
+  canEquipItem,
+  equipItem as equipItemEntity,
+  unequipItem as unequipItemEntity,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
+import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
@@ -592,6 +596,7 @@ export class GameEngine {
       this.equippedTowerSkinByType[entry.type] ?? null,
       this.towerMasteryLevels[entry.type] ?? 0,
       this.masteryUnlocked[entry.type] === true,
+      entry.equippedItemInstanceIds,
     );
   }
 
@@ -875,6 +880,60 @@ export class GameEngine {
     this.gold -= cost;
     upgradeSpecializationEntity(tower);
     this.emitAudio({ type: "tower_upgrade" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // BALANCEAMENTO DEFINITIVO spec section 7 — Tower Equipment Slots.
+  // Architecture only: equipping never grants combat power in this pass
+  // (see config/towerItemSlots.ts's own doc comment). GameEngine is the
+  // only place that can see EVERY tower's equipped items at once, so the
+  // "not already equipped on a DIFFERENT tower" duplication guard lives
+  // here rather than in entities/Tower.ts.
+  // -------------------------------------------------------------------
+
+  /** The selected tower's equipment slots as real ItemInstance objects (null for an empty slot), for UI rendering. */
+  getSelectedTowerItemSlots(): (ItemInstance | null)[] {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return Array(TOWER_ITEM_SLOT_COUNT).fill(null);
+    return tower.equippedItemInstanceIds.map((id) => (id ? findItem(this.inventory, id) : null));
+  }
+
+  /** Whether `instanceId` (an item this account owns) can be equipped into the selected tower's `slotIndex` right now. */
+  canEquipItemOnSelectedTower(instanceId: string, slotIndex: number): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    const item = findItem(this.inventory, instanceId);
+    if (!item) return false;
+    const equippedElsewhere = this.towers.some(
+      (t) => t.id !== tower.id && t.equippedItemInstanceIds.includes(instanceId),
+    );
+    return canEquipItem(tower, slotIndex, item, equippedElsewhere);
+  }
+
+  /** Equips `instanceId` into the selected tower's `slotIndex`. Auto-unequips it from wherever else it currently sits on THIS same tower (an item can occupy only one slot at a time), and refuses if it's already equipped on a different tower or mid-trade. */
+  equipItemOnSelectedTower(instanceId: string, slotIndex: number): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    if (!this.canEquipItemOnSelectedTower(instanceId, slotIndex)) return false;
+
+    const currentSlot = tower.equippedItemInstanceIds.indexOf(instanceId);
+    if (currentSlot !== -1) unequipItemEntity(tower, currentSlot);
+    equipItemEntity(tower, slotIndex, instanceId);
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Empties the selected tower's `slotIndex` — a no-op if it was already empty. */
+  unequipItemFromSelectedTower(slotIndex: number): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    unequipItemEntity(tower, slotIndex);
     this.persist();
     this.notify();
     return true;
@@ -1616,6 +1675,7 @@ export class GameEngine {
           specializationLevel: t.specializationLevel,
           equippedSkinId: t.equippedSkinId,
           masteryLevel: t.masteryLevel,
+          equippedItemInstanceIds: t.equippedItemInstanceIds,
         })),
         discoveredEnemyTypes: [...this.discoveredEnemyTypes],
         inventory: this.inventory,

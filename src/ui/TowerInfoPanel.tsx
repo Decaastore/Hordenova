@@ -27,6 +27,10 @@ import {
 } from "@/config/specializations";
 import { getSkinsForTower } from "@/config/towerSkins";
 import { REPOSITION_GEM_COST } from "@/config/repositioning";
+import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
+import { getItemDefinition } from "@/config/itemDefinitions";
+import { getRarityDefinition } from "@/config/rarity";
+import type { ItemInstance } from "@/entities/Item";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -57,6 +61,13 @@ interface TowerInfoPanelProps {
   repositionFreeAvailable: boolean;
   /** Enters "pick a destination on the map" mode for this tower — see screens/GameScreen.tsx and ui/RepositioningOverlay.tsx for the map-click + confirmation flow. */
   onStartReposition: () => void;
+  /** BALANCEAMENTO DEFINITIVO spec section 7/8 — the selected tower's equipment slots, one entry per slot (null = empty). */
+  itemSlots: readonly (ItemInstance | null)[];
+  /** Every item this account owns, for the equip picker — includes items already equipped elsewhere (filtered out via canEquipToSlot instead, so the reason an item is unavailable can be shown rather than just hidden). */
+  inventory: readonly ItemInstance[];
+  canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
+  onEquipItem: (instanceId: string, slotIndex: number) => void;
+  onUnequipItem: (slotIndex: number) => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -85,6 +96,11 @@ export function TowerInfoPanel({
   onSwitchSpecialization,
   repositionFreeAvailable,
   onStartReposition,
+  itemSlots,
+  inventory,
+  canEquipToSlot,
+  onEquipItem,
+  onUnequipItem,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -209,7 +225,139 @@ export function TowerInfoPanel({
         isSkinOwned={isSkinOwned}
       />
 
+      <EquipmentSection
+        theme={theme}
+        t={t}
+        itemSlots={itemSlots}
+        inventory={inventory}
+        canEquipToSlot={canEquipToSlot}
+        onEquip={onEquipItem}
+        onUnequip={onUnequipItem}
+      />
+
       <RepositionSection theme={theme} t={t} freeAvailable={repositionFreeAvailable} onStart={onStartReposition} />
+    </div>
+  );
+}
+
+/**
+ * BALANCEAMENTO DEFINITIVO spec section 7/8 — "Torre > Equipamento >
+ * [Slot 1] [Slot 2] [Slot 3]". Each slot shows empty/equipped clearly, with
+ * its own equip/remove action; equipping opens an inline picker of the
+ * account's compatible, not-equipped-elsewhere items rather than a
+ * separate modal, keeping the panel from growing another overlay layer.
+ * No final art — plain rarity-colored tiles, matching ui/InventoryPanel.tsx's
+ * own existing tile treatment so it doesn't look like a bolted-on system.
+ */
+function EquipmentSection({
+  theme,
+  t,
+  itemSlots,
+  inventory,
+  canEquipToSlot,
+  onEquip,
+  onUnequip,
+}: {
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  itemSlots: readonly (ItemInstance | null)[];
+  inventory: readonly ItemInstance[];
+  canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
+  onEquip: (instanceId: string, slotIndex: number) => void;
+  onUnequip: (slotIndex: number) => void;
+}) {
+  const [pickingSlot, setPickingSlot] = useState<number | null>(null);
+
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.equipment.title")}</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+        {Array.from({ length: TOWER_ITEM_SLOT_COUNT }, (_, slotIndex) => {
+          const equipped = itemSlots[slotIndex] ?? null;
+          const equippedDef = equipped ? getItemDefinition(equipped.itemDefinitionId) : null;
+
+          return (
+            <div key={slotIndex}>
+              <div style={equipmentSlotRowStyle}>
+                <span style={equipmentSlotLabelStyle}>{t("towerInfo.equipment.slot", { index: slotIndex + 1 })}</span>
+                {equipped && equippedDef ? (
+                  <>
+                    <span style={{ ...equipmentItemNameStyle, color: getRarityDefinition(equippedDef.rarity).color }}>
+                      {t(`items.${equippedDef.i18nKey}.name` as TranslationKey)}
+                    </span>
+                    <button onClick={() => onUnequip(slotIndex)} style={equipmentActionButtonStyle}>
+                      {t("towerInfo.equipment.remove")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span style={equipmentEmptyLabelStyle}>{t("towerInfo.equipment.empty")}</span>
+                    <button
+                      onClick={() => setPickingSlot(pickingSlot === slotIndex ? null : slotIndex)}
+                      style={{ ...equipmentActionButtonStyle, borderColor: theme.primary }}
+                    >
+                      {t("towerInfo.equipment.equip")}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {pickingSlot === slotIndex && (
+                <EquipmentPicker
+                  t={t}
+                  inventory={inventory}
+                  slotIndex={slotIndex}
+                  canEquipToSlot={canEquipToSlot}
+                  onPick={(instanceId) => {
+                    onEquip(instanceId, slotIndex);
+                    setPickingSlot(null);
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+function EquipmentPicker({
+  t,
+  inventory,
+  slotIndex,
+  canEquipToSlot,
+  onPick,
+}: {
+  t: Translate;
+  inventory: readonly ItemInstance[];
+  slotIndex: number;
+  canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
+  onPick: (instanceId: string) => void;
+}) {
+  const eligible = inventory.filter((item) => canEquipToSlot(item.instanceId, slotIndex));
+
+  if (eligible.length === 0) {
+    return <div style={equipmentPickerEmptyStyle}>{t("towerInfo.equipment.noItems")}</div>;
+  }
+
+  return (
+    <div style={equipmentPickerStyle}>
+      {eligible.map((item) => {
+        const def = getItemDefinition(item.itemDefinitionId);
+        if (!def) return null;
+        const rarityDef = getRarityDefinition(def.rarity);
+        return (
+          <button
+            key={item.instanceId}
+            onClick={() => onPick(item.instanceId)}
+            style={{ ...equipmentPickerItemStyle, borderColor: rarityDef.color }}
+          >
+            {t(`items.${def.i18nKey}.name` as TranslationKey)}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -823,4 +971,76 @@ const skinChipStyle: CSSProperties = {
   fontSize: 10.5,
   fontWeight: 600,
   cursor: "pointer",
+};
+
+const equipmentSlotRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "5px 8px",
+  borderRadius: 7,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(255,255,255,0.02)",
+};
+
+const equipmentSlotLabelStyle: CSSProperties = {
+  fontSize: 9,
+  color: PALETTE.uiTextDim,
+  fontWeight: 700,
+  flexShrink: 0,
+};
+
+const equipmentEmptyLabelStyle: CSSProperties = {
+  fontSize: 11,
+  color: PALETTE.uiTextDim,
+  fontStyle: "italic",
+  flex: 1,
+};
+
+const equipmentItemNameStyle: CSSProperties = {
+  fontSize: 11,
+  fontWeight: 700,
+  flex: 1,
+};
+
+const equipmentActionButtonStyle: CSSProperties = {
+  padding: "3px 8px",
+  borderRadius: 6,
+  border: "1px solid",
+  borderColor: PALETTE.uiPanelBorder,
+  background: "transparent",
+  color: PALETTE.uiText,
+  fontSize: 9.5,
+  fontWeight: 700,
+  cursor: "pointer",
+  flexShrink: 0,
+};
+
+const equipmentPickerStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 5,
+  marginTop: 4,
+  padding: "6px 8px",
+  borderRadius: 7,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(0,0,0,0.15)",
+};
+
+const equipmentPickerItemStyle: CSSProperties = {
+  padding: "4px 8px",
+  borderRadius: 6,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.04)",
+  color: PALETTE.uiText,
+  fontSize: 10,
+  cursor: "pointer",
+};
+
+const equipmentPickerEmptyStyle: CSSProperties = {
+  marginTop: 4,
+  padding: "6px 8px",
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+  fontStyle: "italic",
 };

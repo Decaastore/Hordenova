@@ -158,6 +158,14 @@ export const ptBR: TranslationSchema = {
       action: "REPOSICIONAR TORRE",
       free: "GRÁTIS HOJE",
     },
+    equipment: {
+      title: "EQUIPAMENTO",
+      slot: "SLOT {index}",
+      empty: "Vazio",
+      equip: "EQUIPAR",
+      remove: "REMOVER",
+      noItems: "Nenhum item compatível disponível para equipar aqui.",
+    },
   },
   specializations: {
     IRONWOOD_EXECUTIONER: { name: "Executor", description: "Cada ponto investido aprimora ainda mais os críticos e o dano em chefes." },

@@ -10,6 +10,7 @@ import { TowerInfoPanel } from "./TowerInfoPanel";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import { createTowerInstance, type TowerInstance } from "@/entities/Tower";
 import { SPECIALIZATION_CHANGE_GEM_COST } from "@/config/specializations";
+import { createItemInstance, type ItemInstance } from "@/entities/Item";
 
 function makeTower(overrides: Partial<TowerInstance> = {}): TowerInstance {
   const tower = createTowerInstance(
@@ -32,6 +33,11 @@ function renderPanel(props: {
   gems?: number;
   unlockedSpecializationIdsForType?: readonly string[];
   onSwitchSpecialization?: (id: string) => void;
+  itemSlots?: readonly (ItemInstance | null)[];
+  inventory?: readonly ItemInstance[];
+  canEquipToSlot?: (instanceId: string, slotIndex: number) => boolean;
+  onEquipItem?: (instanceId: string, slotIndex: number) => void;
+  onUnequipItem?: (slotIndex: number) => void;
 }): { container: HTMLDivElement; root: Root } {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -56,6 +62,11 @@ function renderPanel(props: {
           onSwitchSpecialization={(props.onSwitchSpecialization ?? (() => {})) as never}
           repositionFreeAvailable={true}
           onStartReposition={() => {}}
+          itemSlots={props.itemSlots ?? [null, null, null]}
+          inventory={props.inventory ?? []}
+          canEquipToSlot={props.canEquipToSlot ?? (() => false)}
+          onEquipItem={props.onEquipItem ?? (() => {})}
+          onUnequipItem={props.onUnequipItem ?? (() => {})}
         />
       </LanguageProvider>,
     );
@@ -175,5 +186,78 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
     act(() => switchButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onSwitch).not.toHaveBeenCalled();
     expect(findButtonByText(container, "CONFIRM")).toBeNull(); // never reached the confirm step
+  });
+});
+
+/**
+ * BALANCEAMENTO DEFINITIVO spec section 7/8 — "Tower > Equipment > [Slot 1]
+ * [Slot 2] [Slot 3]" component-level rendering contract.
+ */
+describe("TowerInfoPanel — Equipment slots (BALANCEAMENTO DEFINITIVO spec section 7/8)", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  function makeItem(itemDefinitionId: string): ItemInstance {
+    return createItemInstance(itemDefinitionId, "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
+  }
+
+  it("shows all 3 slots as empty when nothing is equipped", () => {
+    ({ container, root } = renderPanel({ tower: makeTower() }));
+    expect(container.textContent).toContain("EQUIPMENT");
+    const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
+    expect(equipButtons).toHaveLength(3);
+  });
+
+  it("shows the item's name and a REMOVE action for a filled slot", () => {
+    const item = makeItem("mosswood_charm");
+    ({ container, root } = renderPanel({ tower: makeTower(), itemSlots: [item, null, null] }));
+    expect(container.textContent).toContain("Mosswood Charm");
+    expect(findButtonByText(container, "REMOVE")).not.toBeNull();
+  });
+
+  it("clicking EQUIP on an empty slot opens a picker of eligible inventory items, and picking one calls onEquipItem with the right slot index", () => {
+    const item = makeItem("ancient_core");
+    const onEquip = vi.fn();
+    ({
+      container,
+      root,
+    } = renderPanel({
+      tower: makeTower(),
+      inventory: [item],
+      canEquipToSlot: () => true,
+      onEquipItem: onEquip,
+    }));
+
+    const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
+    act(() => equipButtons[1]!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(container.textContent).toContain("Ancient Core");
+
+    const itemButton = findButtonByText(container, "Ancient Core")!;
+    act(() => itemButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onEquip).toHaveBeenCalledWith(item.instanceId, 1);
+  });
+
+  it("clicking REMOVE on a filled slot calls onUnequipItem with the right slot index", () => {
+    const item = makeItem("hollow_sigil");
+    const onUnequip = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      itemSlots: [null, item, null],
+      onUnequipItem: onUnequip,
+    }));
+    act(() => findButtonByText(container, "REMOVE")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onUnequip).toHaveBeenCalledWith(1);
+  });
+
+  it("the picker shows a clear message instead of an empty list when no inventory item is eligible", () => {
+    ({ container, root } = renderPanel({ tower: makeTower(), inventory: [], canEquipToSlot: () => false }));
+    const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
+    act(() => equipButtons[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(container.textContent).toContain("No compatible items");
   });
 });

@@ -3,6 +3,7 @@ import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
 import { SPECIALIZATIONS_BY_TOWER, type SpecializationId } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 import type { ItemInstance } from "@/entities/Item";
@@ -253,9 +254,21 @@ function isStorageAvailable(): boolean {
   }
 }
 
-function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
+/**
+ * `validItemInstanceIds` (BALANCEAMENTO DEFINITIVO spec section 7/12) is
+ * the set of instanceIds this save's own `inventory` actually owns — an
+ * `equippedItemInstanceIds` entry pointing anywhere else (a corrupted save,
+ * an item that was traded away while equipped, or a save written before
+ * Item Slots existed) self-heals back to an empty slot rather than being
+ * trusted. Duplicates across the WHOLE loadout (the same instanceId
+ * claimed by two towers, or twice on the same tower) are resolved
+ * first-claim-wins, in loadout order — spec section 14's "item equipado em
+ * duas torres simultaneamente" must never survive a reload.
+ */
+function parseTowerLoadout(raw: unknown, validItemInstanceIds: ReadonlySet<string>): TowerLoadoutEntry[] {
   if (!Array.isArray(raw)) return [];
   const validTypes = new Set<TowerType>(TOWER_TYPES);
+  const claimedItemInstanceIds = new Set<string>();
   const entries: TowerLoadoutEntry[] = [];
   for (const item of raw) {
     if (
@@ -275,6 +288,19 @@ function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
           ? (entry.specializationId as SpecializationId)
           : null;
       const skinDef = typeof entry.equippedSkinId === "string" ? getTowerSkinDefinition(entry.equippedSkinId) : null;
+      const rawItemSlots = Array.isArray(entry.equippedItemInstanceIds) ? entry.equippedItemInstanceIds : [];
+      const equippedItemInstanceIds: (string | null)[] = Array.from({ length: TOWER_ITEM_SLOT_COUNT }, (_, i) => {
+        const candidate = rawItemSlots[i];
+        if (
+          typeof candidate === "string" &&
+          validItemInstanceIds.has(candidate) &&
+          !claimedItemInstanceIds.has(candidate)
+        ) {
+          claimedItemInstanceIds.add(candidate);
+          return candidate;
+        }
+        return null;
+      });
       entries.push({
         slotId: entry.slotId as string,
         type: entry.type,
@@ -283,6 +309,7 @@ function parseTowerLoadout(raw: unknown): TowerLoadoutEntry[] {
         specializationLevel: specializationId && typeof entry.specializationLevel === "number" ? entry.specializationLevel : 0,
         equippedSkinId: skinDef && skinDef.towerType === entry.type ? skinDef.id : null,
         masteryLevel: typeof entry.masteryLevel === "number" && entry.masteryLevel >= 0 ? entry.masteryLevel : 0,
+        equippedItemInstanceIds,
       });
     }
   }
@@ -518,7 +545,11 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
     // carried forward as ownership rather than silently discarded — see
     // deriveMasteryUnlockedFromLegacyLevels/deriveUnlockedSpecializationIdsFromLegacyLoadout.
     const legacySave = !(typeof parsed.version === "number" && parsed.version >= 16);
-    const parsedTowerLoadout = parseTowerLoadout(parsed.towerLoadout);
+    // Item Slots (spec section 7/12) need to validate equippedItemInstanceIds
+    // against real ownership, so inventory is parsed BEFORE the loadout.
+    const parsedInventory = parseInventory(parsed.inventory);
+    const validItemInstanceIds = new Set(parsedInventory.map((i) => i.instanceId));
+    const parsedTowerLoadout = parseTowerLoadout(parsed.towerLoadout, validItemInstanceIds);
     const parsedTowerMasteryLevels = parseTowerMasteryLevels(parsed.towerMasteryLevels);
     const result: SaveData = {
       version: SAVE_DATA_VERSION,
@@ -528,7 +559,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       currentWave: typeof parsed.currentWave === "number" ? parsed.currentWave : 0,
       gold: typeof parsed.gold === "number" ? parsed.gold : RUN_START.startingGold,
       towerLoadout: parsedTowerLoadout,
-      inventory: parseInventory(parsed.inventory),
+      inventory: parsedInventory,
       cosmetics: Array.isArray(parsed.cosmetics) ? parsed.cosmetics : [],
       xp: typeof parsed.xp === "number" ? parsed.xp : 0,
       materials: Array.isArray(parsed.materials) ? parsed.materials : [],

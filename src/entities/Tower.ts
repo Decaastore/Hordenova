@@ -15,6 +15,9 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
 import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
+import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
+import { getItemDefinition } from "@/config/itemDefinitions";
+import type { ItemInstance } from "./Item";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -62,6 +65,15 @@ export interface TowerInstance {
   maxHp: number;
   /** 0 for a tower type with no shield identity (see config/towerSurvival.ts) — always <= its type's maxShield. */
   shieldHp: number;
+
+  /**
+   * BALANCEAMENTO DEFINITIVO spec section 7 — Tower Equipment Slots.
+   * Fixed-length (TOWER_ITEM_SLOT_COUNT) array; each entry is either an
+   * owned ItemInstance.instanceId (equipped) or null (empty). Permanent —
+   * carried in TowerLoadoutEntry, never reset by a Season boundary or a
+   * retryPhase() (equipping is a build decision, not battle state).
+   */
+  equippedItemInstanceIds: (string | null)[];
 }
 
 /**
@@ -79,6 +91,8 @@ export interface TowerLoadoutEntry {
   equippedSkinId?: string | null;
   /** Optional for the same reason as the specialization fields above — self-heals to 0 on load for a save written before Mastery existed. */
   masteryLevel?: number;
+  /** Optional for the same reason — self-heals to an all-empty (TOWER_ITEM_SLOT_COUNT nulls) array on load for a save written before Item Slots existed. */
+  equippedItemInstanceIds?: (string | null)[];
 }
 
 let nextTowerId = 1;
@@ -93,6 +107,7 @@ export function createTowerInstance(
   equippedSkinId: string | null = null,
   masteryLevel = 0,
   masteryUnlocked = false,
+  equippedItemInstanceIds: (string | null)[] = Array(TOWER_ITEM_SLOT_COUNT).fill(null),
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -114,6 +129,7 @@ export function createTowerInstance(
     equippedSkinId,
     masteryLevel,
     masteryUnlocked,
+    equippedItemInstanceIds,
     ...survivalStatsForFreshTower(type),
   };
 }
@@ -407,4 +423,44 @@ export function equipSkin(tower: TowerInstance, skinId: string | null, ownedSkin
 export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinIds: ReadonlySet<string>): boolean {
   const def = getTowerSkinDefinition(skinId);
   return !!def && def.towerType === tower.type && tower.level >= def.unlockLevel && !ownedSkinIds.has(skinId);
+}
+
+// ---------------------------------------------------------------------------
+// BALANCEAMENTO DEFINITIVO spec section 7 — Tower Equipment Slots (architecture
+// only — see config/towerItemSlots.ts's own doc comment for the full scope
+// note). GameEngine owns cross-tower bookkeeping (an item can't be equipped
+// on two towers at once, and must actually be in the account's inventory);
+// these functions only ever touch the ONE tower passed in, mirroring the
+// equipSkin/canEquipSkin split above.
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether `item` can go into `tower`'s slot `slotIndex` right now. Callers
+ * (GameEngine) are responsible for `alreadyEquippedElsewhere` — whether this
+ * exact ItemInstance is currently equipped on any OTHER tower (this tower's
+ * own other slots don't count; re-equipping into a different slot on the
+ * same tower is just a slot change, not a duplication).
+ */
+export function canEquipItem(
+  _tower: TowerInstance,
+  slotIndex: number,
+  item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade">,
+  alreadyEquippedElsewhere: boolean,
+): boolean {
+  if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return false;
+  if (alreadyEquippedElsewhere) return false;
+  if (item.pendingTrade) return false;
+  const def = getItemDefinition(item.itemDefinitionId);
+  return !!def && def.category !== "COSMETIC";
+}
+
+/** Mutates `tower` in place — caller owns the canEquipItem check beforehand. */
+export function equipItem(tower: TowerInstance, slotIndex: number, instanceId: string): void {
+  tower.equippedItemInstanceIds[slotIndex] = instanceId;
+}
+
+/** Mutates `tower` in place. A no-op if `slotIndex` is out of range or already empty. */
+export function unequipItem(tower: TowerInstance, slotIndex: number): void {
+  if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return;
+  tower.equippedItemInstanceIds[slotIndex] = null;
 }

@@ -184,6 +184,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onSwitchSpecialization={(id) => engine.switchTowerSpecialization(id)}
             repositionFreeAvailable={hud.repositionFreeAvailable}
             onStartReposition={() => handleStartReposition(selectedTower.slotId)}
+            itemSlots={engine.getSelectedTowerItemSlots()}
+            inventory={engine.getInventory()}
+            canEquipToSlot={(instanceId, slotIndex) => engine.canEquipItemOnSelectedTower(instanceId, slotIndex)}
+            onEquipItem={(instanceId, slotIndex) => engine.equipItemOnSelectedTower(instanceId, slotIndex)}
+            onUnequipItem={(slotIndex) => engine.unequipItemFromSelectedTower(slotIndex)}
           />
         )}
 
