@@ -284,10 +284,15 @@ export function applySpecializationToSpecial(
   switch (specializationId) {
     case "IRONWOOD_EXECUTIONER": {
       const b = base as Extract<TowerSpecial, { type: "IRONWOOD" }>;
+      // Balance audit (waves 100-5000, real GameEngine): the crit coefficient
+      // now matches IRONWOOD_BREAKER's own (0.04) so the two paths' margin
+      // ratio stays flat across waves instead of drifting apart forever —
+      // the boss-killer identity comes entirely from the capped companion
+      // field below, not from out-growing the sibling path's own scaling.
       return {
         ...b,
-        critMultiplier: round2(b.critMultiplier + lvl * 0.15),
-        bossDamageMultiplier: round2((b.bossDamageMultiplier || 1) + Math.min(2.0, lvl * 0.1)),
+        critMultiplier: round2(b.critMultiplier + lvl * 0.04),
+        bossDamageMultiplier: round2((b.bossDamageMultiplier || 1) + Math.min(0.75, lvl * 0.1)),
       };
     }
     case "IRONWOOD_BREAKER": {

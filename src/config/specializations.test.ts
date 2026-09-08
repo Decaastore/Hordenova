@@ -127,6 +127,46 @@ describe("Specialization / Upgrade Slot (Progression 2.0 spec section 5/6)", () 
     expect(extreme.bossDamageMultiplier).toBe(mid.bossDamageMultiplier);
   });
 
+  /**
+   * BALANCEAMENTO DEFINITIVO second-pass audit — the one-bounded/one-unbounded
+   * SHAPE fix above (previous test) removed the runaway EXPONENTIAL bug, but
+   * a real-GameEngine sweep across waves 100-5000 (isolated 12/12 builds,
+   * level=30, specLevel=round(wave/2), masteryLevel=round(wave/3)) found the
+   * tuned CONSTANTS still made EXECUTIONER's boss-kill margin ~80-108x —
+   * 3-9x above its own IRONWOOD_BREAKER sibling (same shape, same `lvl`
+   * input, same test bias), with the gap widening every wave tested (never
+   * saturating within the tested range). Root cause: critMultiplier's
+   * coefficient (0.15) was ~3.75x BREAKER's own (0.04) and bossDamageMultiplier's
+   * cap (2.0, i.e. a flat +300% boss multiplier) was far bigger than any
+   * sibling's bounded field — so even though neither field is individually
+   * unbounded-times-unbounded anymore, the combination still consumed far
+   * more of the shared power budget than any other IRONWOOD path.
+   *
+   * Fix (magnitude only, not shape): critMultiplier's coefficient now matches
+   * BREAKER's own (0.04) exactly, so the two paths' marginal crit growth
+   * rate is identical and their margin RATIO stays flat across waves instead
+   * of drifting apart forever (~1.35x, measured stable from wave 100 to
+   * 5000, vs. the old 3.18x->6.27x drift). EXECUTIONER's boss-killer identity
+   * now comes entirely from the capped bossDamageMultiplier field (0.75 cap,
+   * down from 2.0) — a real, permanent, boss-specific edge, but sized to sit
+   * alongside its siblings' own budgets instead of dwarfing them.
+   */
+  it("BALANCE FIX 2: IRONWOOD_EXECUTIONER's crit coefficient now matches BREAKER's own (0.04) — the boss-killer edge comes from the (smaller) capped field, not from out-scaling siblings", () => {
+    const base = getTowerSpecialAtLevel("IRONWOOD", 30);
+    if (base.type !== "IRONWOOD") throw new Error("unreachable");
+    const level = 500;
+    const lvl = specializationEffectScale(level);
+
+    const r = applySpecializationToSpecial(base, "IRONWOOD_EXECUTIONER", level);
+    if (r.type !== "IRONWOOD") throw new Error("unreachable");
+
+    expect(r.critMultiplier).toBeCloseTo(base.critMultiplier + lvl * 0.04, 2);
+    expect(r.bossDamageMultiplier).toBeCloseTo((base.bossDamageMultiplier || 1) + Math.min(0.75, lvl * 0.1), 2);
+    // The bounded companion field is meaningfully smaller than the old 2.0
+    // cap — this is the actual budget fix (the shape was already correct).
+    expect(r.bossDamageMultiplier - (base.bossDamageMultiplier || 1)).toBeLessThanOrEqual(0.75);
+  });
+
   it("STORMCALLER_ARCANE_SURGE adds flat magic damage that keeps growing with specialization level, with no cap", () => {
     const base = getTowerSpecialAtLevel("STORMCALLER", 10);
     const lvl1 = applySpecializationToSpecial(base, "STORMCALLER_ARCANE_SURGE", 1) as { bonusFlatDamage?: number };
