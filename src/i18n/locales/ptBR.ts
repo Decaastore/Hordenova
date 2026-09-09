@@ -674,6 +674,9 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v11: {
+        miniBossEnrageForAll: "Corrigido: apenas Mini-Bosses do tipo Berserker conseguiam entrar em Enfurecido. Agora TODOS os Mini-Bosses entram em Enfurecido abaixo de 30% de HP, igual aos Bosses — e por isso todos também recebem corretamente o Escudo do Enfurecido (20% de redução de dano).",
+      },
       v10: {
         enrageShield: "Bosses e Mini-Bosses agora recebem um Escudo defensivo enquanto estão Enfurecidos: Bosses recebem 30% menos dano e Mini-Bosses 20% menos dano nesse estado, com um efeito visual claro (anel ao redor do inimigo + borda da barra de vida) que desaparece assim que o Enfurecido termina.",
       },

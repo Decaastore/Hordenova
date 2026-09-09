@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { advanceEnemy, applyDamageToEnemy, applySlow, createEnemyInstance, createEliteEnemyInstance, getEffectiveSpeed, isEnemyDead, REGEN_SUPPRESSION_MS } from "./Enemy";
-import { createBossInstance } from "@/engine/BossManager";
+import { createBossInstance, tickBossAbilities } from "@/engine/BossManager";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { CC_DR_DECAY_MS } from "@/config/ccResistance";
 
@@ -488,5 +488,52 @@ describe("Enrage Shield damage reduction (SHIELD DURANTE O MODO ENFURECIDO)", ()
     const dealt = applyDamageToEnemy(boss, 100);
     expect(dealt).toBe(70); // NOT 100 * (1-0.3) * (1-0.3) = 49 — a single application only
     expect(dealt).not.toBeCloseTo(100 * (1 - 0.3) * (1 - 0.3), 9);
+  });
+
+  it("5b. leaving the Enraged state makes the Mini-Boss shield disappear immediately too — not just the Boss", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = true;
+    expect(applyDamageToEnemy(boss, 100)).toBe(80); // shielded (20%)
+
+    boss.boss!.enraged = false; // Enraged ends
+    expect(applyDamageToEnemy(boss, 100)).toBe(100); // shield gone immediately
+  });
+
+  it("6b. a normal (non-boss) enemy structurally can never enter Enraged — it has no `.boss` state to hold that flag at all, even at critically low HP", () => {
+    const grunt = createEnemyInstance("RUNNER", 30);
+    grunt.hp = grunt.maxHp * 0.01; // as low as it gets, short of dead
+    tickBossAbilities(grunt, 999_999, 30, []); // a no-op for anything without `.boss` (see the `if (!state) return []` guard)
+    expect(grunt.boss).toBeUndefined();
+  });
+
+  /**
+   * End-to-end integration (real transition, not just the flag manipulated
+   * directly): drives the actual engine function — BossManager.tickBossAbilities
+   * — that flips `enraged` on, for BOTH a Boss and a Mini-Boss whose own
+   * ability is NOT "BERSERKER" (proving the trigger is generic to every
+   * category, per the "Mini-Boss também tem Enfurecido" requirement), then
+   * confirms the Shield activates as a direct, real consequence.
+   */
+  it("1+2+3+4 combined, end-to-end: the REAL Enraged transition (tickBossAbilities) activates the Shield for both a Boss and a non-Berserker Mini-Boss", () => {
+    // nowMs=0 is deliberately BEFORE nextAbilityAtMs (createBossInstance's
+    // own "charge up before firing" gate — see its doc comment), so the
+    // enrage check (which runs unconditionally, ahead of that gate) fires
+    // without also triggering the boss's own ability this same tick — e.g.
+    // ashfen-warlord's SHIELD ability would otherwise overwrite
+    // damageReduction and make this test measure the wrong thing.
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.hp = boss.maxHp * 0.1; // below ENRAGE_HP_THRESHOLD
+    tickBossAbilities(boss, 0, 30, []);
+    expect(boss.boss!.enraged).toBe(true); // 1. Boss enters Enraged for real
+    expect(applyDamageToEnemy(boss, 100)).toBe(70); // 3. and its Shield is active (30%)
+
+    const mini = createBossInstance(MINI_BOSSES["ashfen-warlord"]!, 30, 0); // SHIELD ability, not BERSERKER
+    mini.damageReduction = 0;
+    mini.hp = mini.maxHp * 0.1;
+    tickBossAbilities(mini, 0, 30, []);
+    expect(mini.boss!.enraged).toBe(true); // 2. Mini-Boss enters Enraged for real, whatever its own ability
+    expect(applyDamageToEnemy(mini, 100)).toBe(80); // 4. and its Shield is active (20%)
   });
 });

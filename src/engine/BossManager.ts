@@ -132,14 +132,16 @@ export function tickBossSiege(boss: EnemyInstance, nowMs: number, dtMs: number, 
  *
  * Enrage (spec section 8/9 — "múltiplas fases" / a fight has to escalate,
  * not just be a bigger HP bar): triggers below ENRAGE_HP_THRESHOLD for
- * EVERY main boss automatically (their built-in phase 2), AND for any
- * mini-boss whose signature ability is explicitly "BERSERKER" — the one
- * mini-boss archetype defined by getting more dangerous as it's hurt.
- * REGEN is intentionally NOT one of the cases below — that archetype
- * (regular enemy or mini-boss) heals passively every tick via
- * `regenPerSecond` on the EnemyInstance itself (entities/Enemy.ts
- * advanceEnemy), the same mechanism for both, so there's nothing to do
- * here on the ability's own interval.
+ * EVERY boss AND every mini-boss alike — `state` only ever exists on a
+ * boss/mini-boss EnemyInstance (see the `if (!state) return []` guard
+ * above; a normal enemy has no `.boss` field at all and can never reach
+ * this code), so every category that CAN enrage already shares this one
+ * real trigger — no per-ability allowlist, no second Rage system. This is
+ * also what SHIELD DURANTE O MODO ENFURECIDO (config/enrageShield.ts)
+ * keys off: entities/Enemy.ts's applyDamageToEnemy reads this exact
+ * `state.enraged` flag, so every Enraged mini-boss — whatever its own
+ * ability — gets its Shield the instant it enrages here, not just the
+ * BERSERKER archetype.
  */
 export function tickBossAbilities(
   boss: EnemyInstance,
@@ -155,8 +157,7 @@ export function tickBossAbilities(
     state.shieldUntilMs = null;
   }
 
-  const enragesOnLowHp = state.isMainBoss || state.ability === "BERSERKER";
-  if (enragesOnLowHp && !state.enraged && boss.maxHp > 0 && boss.hp / boss.maxHp <= ENRAGE_HP_THRESHOLD) {
+  if (!state.enraged && boss.maxHp > 0 && boss.hp / boss.maxHp <= ENRAGE_HP_THRESHOLD) {
     state.enraged = true;
     boss.baseSpeed *= ENRAGE_SPEED_MULTIPLIER;
     state.abilityIntervalMs = Math.round(state.abilityIntervalMs * ENRAGE_ABILITY_INTERVAL_MULTIPLIER);

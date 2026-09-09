@@ -673,6 +673,9 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v11: {
+        miniBossEnrageForAll: "Fixed: only Berserker-type Mini-Bosses could ever become Enraged. Every Mini-Boss now enrages below 30% HP, same as a Boss — and so every Mini-Boss now correctly gains the Enraged Shield too (20% damage reduction).",
+      },
       v10: {
         enrageShield: "Bosses and Mini-Bosses now gain a defensive Shield while Enraged: Bosses take 30% less damage and Mini-Bosses take 20% less damage in that state, with a clear visual (a ring around the enemy plus a shield-tinted HP bar border) that disappears the instant Enraged ends.",
       },

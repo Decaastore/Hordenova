@@ -1488,10 +1488,12 @@ export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstan
 /** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
 export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
   if (!enemy.boss) return;
-  // Enraged (below 30% HP, main boss only — see BossManager) reads through
-  // the aura itself: faster pulse, hotter color — no extra state needed,
-  // this is derived straight from hp/maxHp the renderer already has.
-  const isEnraged = enemy.boss.isMainBoss && enemy.maxHp > 0 && enemy.hp / enemy.maxHp <= 0.3;
+  // Enraged reads through the aura itself: faster pulse, hotter color.
+  // Reads the real `enemy.boss.enraged` flag (see BossManager.tickBossAbilities)
+  // — the same one entities/Enemy.ts's applyDamageToEnemy uses for the
+  // actual Shield math — so a Boss AND a Mini-Boss alike get this the
+  // instant they really enrage, never a locally-recomputed approximation.
+  const isEnraged = enemy.boss.enraged;
   const pulseSpeed = isEnraged ? 160 : 400;
   const pulse = 0.55 + 0.25 * Math.sin(timeMs / pulseSpeed);
   const radius = (enemy.boss.isMainBoss ? 30 : 20) * pulse * (isEnraged ? 1.15 : 1);

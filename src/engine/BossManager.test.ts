@@ -56,26 +56,37 @@ describe("BossManager", () => {
     expect(boss.baseSpeed).toBeGreaterThan(speedBefore);
   });
 
-  it("A mini-boss WITHOUT the Berserker ability does not enrage, even at low HP", () => {
+  /**
+   * SHIELD DURANTE O MODO ENFURECIDO (2nd pass) — every mini-boss category
+   * now shares the exact same real Enraged trigger a main boss and a
+   * Berserker mini-boss already used (ENRAGE_HP_THRESHOLD below, same
+   * `state.enraged` flag, same speed/ability-interval effects) — not just
+   * the BERSERKER archetype. This is what lets entities/Enemy.ts's Enraged
+   * Shield reduction (config/enrageShield.ts) actually apply to any
+   * mini-boss the player fights, not only the rare Berserker one.
+   */
+  it("EVERY mini-boss category enrages below 30% HP, not just the Berserker archetype", () => {
+    for (const id of ["ashfen-warlord", "briar-summoner", "mossback-regenerator", "gloom-jammer", "stonebound-sentinel", "ferocious-berserker"] as const) {
+      const boss = createBossInstance(MINI_BOSSES[id]!, 10, NOW);
+      const speedBefore = boss.baseSpeed;
+      boss.hp = boss.maxHp * 0.1;
+
+      tickBossAbilities(boss, boss.boss!.nextAbilityAtMs, 10, []);
+
+      expect(boss.boss!.enraged).toBe(true);
+      expect(boss.baseSpeed).toBeGreaterThan(speedBefore);
+    }
+  });
+
+  it("a mini-boss well above the Enrage threshold stays NOT enraged — this isn't a permanent/forced state", () => {
     const boss = createBossInstance(MINI_BOSSES["ashfen-warlord"]!, 10, NOW);
     const speedBefore = boss.baseSpeed;
-    boss.hp = boss.maxHp * 0.1;
+    boss.hp = boss.maxHp * 0.8;
 
     tickBossAbilities(boss, boss.boss!.nextAbilityAtMs, 10, []);
 
     expect(boss.boss!.enraged).toBe(false);
     expect(boss.baseSpeed).toBe(speedBefore);
-  });
-
-  it("A Berserker mini-boss DOES enrage at low HP, same as a main boss", () => {
-    const boss = createBossInstance(MINI_BOSSES["ferocious-berserker"]!, 10, NOW);
-    const speedBefore = boss.baseSpeed;
-    boss.hp = boss.maxHp * 0.1;
-
-    tickBossAbilities(boss, boss.boss!.nextAbilityAtMs, 10, []);
-
-    expect(boss.boss!.enraged).toBe(true);
-    expect(boss.baseSpeed).toBeGreaterThan(speedBefore);
   });
 
   describe("Boss Siege Attack (Master Implementation Pass spec section 13)", () => {
