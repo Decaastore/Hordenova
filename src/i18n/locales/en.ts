@@ -476,6 +476,14 @@ export const en = {
     bestPhase: "Best Phase",
     bossesDefeated: "Bosses Defeated",
     viewRanking: "VIEW RANKING",
+    testingReset: {
+      button: "RESET SEASON PROGRESS (TESTING)",
+      confirm:
+        "This resets ALL season progression to zero: Best Wave, current wave, Tower Levels, Mastery Levels, Specialization Levels, and Gold. Mastery/Specialization ownership, Gems, skins, achievements, Prestige and equipment-slot unlocks are NOT affected. This cannot be undone.",
+      confirmYes: "RESET NOW",
+      confirmNo: "Cancel",
+      done: "Season progression reset.",
+    },
   },
   ranking: {
     title: "RANKING",
@@ -708,6 +716,10 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v13: {
+        individualDifficulty: "Normal and Elite enemy HP now factors in a small, bounded read of your own account's real strength (Tower Levels, Mastery, active Specializations) on top of the usual per-wave difficulty curve — a stronger account meets slightly tougher enemies, a newer account meets slightly gentler ones, always within a modest range. It never touches Boss or Mini-Boss HP, never becomes a combat bonus, and never affects rewards.",
+        seasonProgressionTestReset: "Added a manual \"Reset Season Progress\" option on the Season screen for testers: it zeroes Best Wave, current wave, Tower/Mastery/Specialization Levels and Gold back to a fresh start. Gems, permanent unlocks (Mastery/Specialization ownership, equipment slots), skins, achievements and Prestige are never touched, and it always asks for confirmation first.",
+      },
       v12: {
         phaseWaveDisplay: "The HUD now shows your progress as \"PHASE X — WAVE Y\" (waves 1-10 per Phase, restarting every Phase) as the primary readout, with the real global wave kept as secondary info — purely a clearer way to read the same progression, with no change to any difficulty or reward formula.",
         equipmentSlotGemUnlock: "Tower Equipment Slots now have a real unlock cost: Slot 1 stays free, Slot 2 costs 250 Gems and Slot 3 costs 500 Gems — a one-time, permanent purchase per tower type that a Season Reset never undoes.",

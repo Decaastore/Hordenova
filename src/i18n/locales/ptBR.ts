@@ -477,6 +477,14 @@ export const ptBR: TranslationSchema = {
     bestPhase: "Melhor Fase",
     bossesDefeated: "Bosses Derrotados",
     viewRanking: "VER RANKING",
+    testingReset: {
+      button: "RESETAR PROGRESSÃO DA SEASON (TESTE)",
+      confirm:
+        "Isso reseta TODA a progressão da season para zero: Best Wave, wave atual, Níveis de Torre, Níveis de Maestria, Níveis de Especialização e Gold. Ownership de Maestria/Especialização, Gems, skins, conquistas, Prestígio e slots de equipamento desbloqueados NÃO são afetados. Isso não pode ser desfeito.",
+      confirmYes: "RESETAR AGORA",
+      confirmNo: "Cancelar",
+      done: "Progressão da season resetada.",
+    },
   },
   ranking: {
     title: "RANKING",
@@ -709,6 +717,10 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v13: {
+        individualDifficulty: "O HP dos inimigos normais e Elite agora leva em conta uma leitura pequena e limitada da força real da sua própria conta (Níveis de Torre, Maestria, Especializações ativas) além da curva de dificuldade normal por onda — uma conta mais forte encontra inimigos um pouco mais duros, uma conta mais nova encontra inimigos um pouco mais fáceis, sempre dentro de uma faixa moderada. Isso nunca afeta o HP de Boss ou Mini-Boss, nunca vira um bônus de combate e nunca afeta recompensas.",
+        seasonProgressionTestReset: "Adicionada uma opção manual \"Resetar Progressão da Season\" na tela de Season para testadores: ela zera Best Wave, wave atual, Níveis de Torre/Maestria/Especialização e Gold, voltando a um início limpo. Gems, desbloqueios permanentes (ownership de Maestria/Especialização, slots de equipamento), skins, conquistas e Prestígio nunca são afetados, e sempre é pedida confirmação antes.",
+      },
       v12: {
         phaseWaveDisplay: "O HUD agora mostra seu progresso como \"FASE X — ONDA Y\" (ondas 1-10 por Fase, recomeçando a cada Fase) como a informação principal, com a onda global real mantida como informação secundária — apenas uma forma mais clara de ler o mesmo progresso, sem nenhuma mudança em fórmula de dificuldade ou recompensa.",
         equipmentSlotGemUnlock: "Os Slots de Equipamento das torres agora têm um custo real de desbloqueio: o Slot 1 continua gratuito, o Slot 2 custa 250 Gemas e o Slot 3 custa 500 Gemas — uma compra única e permanente por tipo de torre que um Reset de Season nunca desfaz.",

@@ -264,3 +264,54 @@ export function syncSeasonIfNeeded(): void {
     towerMasteryLevels: {},
   });
 }
+
+/**
+ * CLAUDE CODE — IMPLEMENTAÇÃO INTEGRADA spec section 9: "Reset global para
+ * teste" — a manual, tester-triggered reset of ALL seasonal progression back
+ * to zero, for use during testing/QA. This is NOT a season boundary and does
+ * not touch `ascensionLastSyncedSeason`/`ascensionHistory` — it is a second,
+ * independent reset path a tester can fire at will, any time, without
+ * waiting for or faking a real season rollover.
+ *
+ * Shares the exact SEASONAL reset shape syncSeasonIfNeeded already uses
+ * (tower level/specialization/Mastery level back to a fresh state, Gold back
+ * to the run-start amount, currentWave/seasonBestWave to 0) with exactly one
+ * addition: it also zeroes the all-time `bestWave` record, since spec
+ * section 9 explicitly lists "Best Wave" among the fields a testing reset
+ * must clear and requires that "old Best Wave must never reappear after
+ * reload" — something a real season boundary deliberately never does (that
+ * field is permanent there) but this manual testing tool explicitly must.
+ *
+ * PRESERVED — same permanent bucket this file's header already documents,
+ * completely untouched by this function: `playerId`, `gems`/`gemShards`,
+ * `prestigeLevel`, `masteryUnlocked` (ownership), `unlockedSpecializationIds`
+ * (ownership), `unlockedItemSlots`, `ownedTowerSkinIds`/
+ * `equippedTowerSkinByType`, `inventory`/`equippedItemInstanceIds`,
+ * `ownedCosmetics`, `ascensionHistory`/`seasonRewardRecords`/
+ * `ascensionSeasonsWon`/`ascensionTop3`/`ascensionTop5`. Spec section 9's own
+ * words: "Season reset = resetar PROGRESSÃO. Season reset NÃO = apagar
+ * OWNERSHIP." — never call this expecting it to touch any of the above.
+ */
+export function resetSeasonProgressionForTesting(): void {
+  const main = loadSave();
+
+  const resetLoadout: TowerLoadoutEntry[] = main.towerLoadout.map((entry) => ({
+    slotId: entry.slotId,
+    type: entry.type,
+    level: 1,
+    specializationId: null,
+    specializationLevel: 0,
+    equippedSkinId: null,
+    masteryLevel: 0,
+    equippedItemInstanceIds: entry.equippedItemInstanceIds,
+  }));
+
+  updateSave({
+    bestWave: 0,
+    seasonBestWave: 0,
+    currentWave: 0,
+    gold: RUN_START.startingGold,
+    towerLoadout: resetLoadout,
+    towerMasteryLevels: {},
+  });
+}

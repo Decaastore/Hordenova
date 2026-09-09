@@ -30,7 +30,12 @@ describe("NovidadesScreen — BALANCEAMENTO DEFINITIVO spec section 10/15", () =
     const html = render();
     const latest = PATCH_NOTES[0]!.id;
     const previous = PATCH_NOTES[1]!.id;
-    expect(html.indexOf(latest)).toBeLessThan(html.indexOf(previous));
+    // Match the rendered version-id chip itself (`>v13<`), not a bare
+    // substring search — a raw id like "v12" can spuriously match unrelated
+    // markup earlier in the page (e.g. an SVG icon's `d="...v12..."` path
+    // command, where "v12" means "vertical line to y=12", nothing to do
+    // with a patch note version).
+    expect(html.indexOf(`>${latest}<`)).toBeLessThan(html.indexOf(`>${previous}<`));
   });
 
   it("the latest version carries a real ISO date, shown in the page", () => {

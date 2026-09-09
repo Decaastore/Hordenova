@@ -4,6 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
 import { getPrestigeTier, getPrestigeUpgradeCost } from "@/config/prestige";
+import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { TrophyIcon, ShieldIcon } from "@/ui/icons";
@@ -47,7 +48,12 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
 
         <div style={scoreCardStyle}>
           <div style={scoreLabelStyle}>{t("ranking.yourSeasonScore")}</div>
-          <div style={scoreValueStyle}>{status.seasonBestWave}</div>
+          <div style={scoreValueStyle}>
+            {t("hud.phaseWaveValue", {
+              phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)),
+              onda: waveInPhase(Math.max(1, status.seasonBestWave)),
+            })}
+          </div>
           <div style={scoreBasisStyle}>{t("ranking.scoreBasis")}</div>
         </div>
 

@@ -3,9 +3,10 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave } from "@/engine/SaveSystem";
-import { getAscensionStatus, syncSeasonIfNeeded } from "@/engine/AscensionManager";
+import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
+import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { getPrestigeTier, getPrestigeUpgradeCost } from "@/config/prestige";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -30,6 +31,7 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
   const { t } = useLanguage();
   const [panelOpen, setPanelOpen] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
+  const [confirmingTestingReset, setConfirmingTestingReset] = useState(false);
 
   useEffect(() => {
     syncSeasonIfNeeded();
@@ -62,7 +64,10 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
           <StatCard
             icon={<TrophyIcon size={18} color={PALETTE.gold} />}
             label={t("season.seasonScore")}
-            value={String(status.seasonBestWave)}
+            value={t("hud.phaseWaveValue", {
+              phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)),
+              onda: waveInPhase(Math.max(1, status.seasonBestWave)),
+            })}
             hint={!status.hasParticipated ? t("season.notYetParticipating") : undefined}
           />
           <StatCard
@@ -108,6 +113,38 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
         </div>
 
         <p style={honestNoteStyle}>{t("ascension.topFive.honestNote")}</p>
+
+        {/* CLAUDE CODE spec section 9 — manual, tester-triggered reset of
+            all seasonal progression. Confirm-gated exactly like the
+            existing "Trocar Especialização"/item-slot-unlock confirm boxes
+            (TowerInfoPanel.tsx) — no destructive save write without an
+            explicit confirm step. */}
+        <div style={testingResetBlockStyle}>
+          {confirmingTestingReset ? (
+            <div style={testingResetConfirmBoxStyle}>
+              <div style={testingResetConfirmTextStyle}>{t("season.testingReset.confirm")}</div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <button
+                  onClick={() => {
+                    resetSeasonProgressionForTesting();
+                    setConfirmingTestingReset(false);
+                    setRefreshTick((n) => n + 1);
+                  }}
+                  style={testingResetConfirmYesStyle}
+                >
+                  {t("season.testingReset.confirmYes")}
+                </button>
+                <button onClick={() => setConfirmingTestingReset(false)} style={testingResetConfirmNoStyle}>
+                  {t("season.testingReset.confirmNo")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setConfirmingTestingReset(true)} style={testingResetButtonStyle}>
+              {t("season.testingReset.button")}
+            </button>
+          )}
+        </div>
       </div>
 
       {panelOpen && <AscensionPanel onClose={() => setPanelOpen(false)} />}
@@ -378,4 +415,65 @@ const honestNoteStyle: CSSProperties = {
   color: PALETTE.uiTextDim,
   lineHeight: 1.5,
   textAlign: "center",
+};
+
+const testingResetBlockStyle: CSSProperties = {
+  width: "100%",
+  paddingTop: 14,
+  borderTop: `1px solid ${PALETTE.uiPanelBorder}`,
+};
+
+const testingResetButtonStyle: CSSProperties = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.danger}`,
+  background: "transparent",
+  color: PALETTE.danger,
+  fontSize: 9.5,
+  fontWeight: 800,
+  letterSpacing: 0.6,
+  cursor: "pointer",
+};
+
+const testingResetConfirmBoxStyle: CSSProperties = {
+  width: "100%",
+  padding: "10px 12px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.danger}`,
+  background: "rgba(120,20,20,0.15)",
+  boxSizing: "border-box",
+};
+
+const testingResetConfirmTextStyle: CSSProperties = {
+  fontSize: 10,
+  color: PALETTE.uiText,
+  lineHeight: 1.5,
+  marginBottom: 8,
+};
+
+const testingResetConfirmYesStyle: CSSProperties = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.danger}`,
+  background: PALETTE.danger,
+  color: "#fff",
+  fontSize: 10,
+  fontWeight: 800,
+  letterSpacing: 0.6,
+  cursor: "pointer",
+};
+
+const testingResetConfirmNoStyle: CSSProperties = {
+  width: "100%",
+  padding: "8px 12px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "transparent",
+  color: PALETTE.uiTextDim,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: 0.6,
+  cursor: "pointer",
 };

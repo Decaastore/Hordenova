@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
+import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { PATCH_NOTES } from "@/config/patchNotes";
 import { PALETTE } from "@/rendering/theme";
@@ -153,7 +154,10 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
             icon={<TrophyIcon size={22} color={PALETTE.gold} />}
             eyebrow={t("nav.ranking")}
             title={t("ranking.yourSeasonScore")}
-            body={String(status.seasonBestWave)}
+            body={t("hud.phaseWaveValue", {
+              phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)),
+              onda: waveInPhase(Math.max(1, status.seasonBestWave)),
+            })}
             cta={t("ranking.title")}
             onClick={() => onNavigate("RANKING")}
             accent={PALETTE.gold}

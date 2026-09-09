@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAscensionStatus, syncSeasonIfNeeded } from "./AscensionManager";
+import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "./AscensionManager";
 import { loadSave, updateSave } from "./SaveSystem";
 import { LocalSeasonClock, SEASON_DURATION_MS, SEASON_EPOCH_MS, seasonClock } from "./SeasonClock";
 import { getSeasonRewardBundle } from "@/config/ascension";
@@ -364,4 +364,134 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     syncSeasonIfNeeded();
     expect(loadSave().seasonRewardRecords).toHaveLength(expectedBundle.cosmetics.length + 1);
   });
+});
+
+/**
+ * CLAUDE CODE — IMPLEMENTAÇÃO INTEGRADA spec section 9: "Reset global para
+ * teste" — a second, independent, manually-triggered reset path (distinct
+ * from syncSeasonIfNeeded's real season-boundary logic). Must zero
+ * everything spec section 9 lists (Best Wave included — the one field
+ * syncSeasonIfNeeded deliberately never touches) while preserving the exact
+ * same permanent bucket this file's other tests already establish.
+ */
+describe("AscensionManager.resetSeasonProgressionForTesting — manual global reset for testing (spec section 9)", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  it("zeroes Best Wave (all-time), seasonBestWave, currentWave, and Gold", () => {
+    updateSave({ bestWave: 480, seasonBestWave: 55, currentWave: 55, gold: 99999 });
+
+    resetSeasonProgressionForTesting();
+
+    const main = loadSave();
+    expect(main.bestWave).toBe(0);
+    expect(main.seasonBestWave).toBe(0);
+    expect(main.currentWave).toBe(0);
+    expect(main.gold).toBe(RUN_START.startingGold);
+  });
+
+  it("resets every placed tower's Level/Specialization/Mastery-level back to a fresh baseline, but keeps each tower placed in its slot", () => {
+    updateSave({
+      bestWave: 300,
+      towerLoadout: [
+        { slotId: "slot-1", type: "IRONWOOD", level: 60, specializationId: "IRONWOOD_EXECUTIONER", specializationLevel: 20 },
+        { slotId: "slot-2", type: "INFERNO", level: 45 },
+      ],
+      towerMasteryLevels: { IRONWOOD: 30, INFERNO: 18 },
+    });
+
+    resetSeasonProgressionForTesting();
+
+    const main = loadSave();
+    expect(main.towerLoadout).toHaveLength(2);
+    for (const entry of main.towerLoadout) {
+      expect(entry.level).toBe(1);
+      expect(entry.specializationId ?? null).toBeNull();
+      expect(entry.specializationLevel ?? 0).toBe(0);
+    }
+    expect(main.towerLoadout[0]!.slotId).toBe("slot-1");
+    expect(main.towerLoadout[0]!.type).toBe("IRONWOOD");
+    expect(main.towerLoadout[1]!.slotId).toBe("slot-2");
+    expect(main.towerLoadout[1]!.type).toBe("INFERNO");
+    expect(main.towerMasteryLevels).toEqual({});
+  });
+
+  it("PRESERVES every permanent field: Mastery/Specialization ownership, Gems, owned skins, item-slot unlocks, inventory/equipped items, Prestige, and ascension history/records", () => {
+    const item = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
+    updateSave({
+      bestWave: 300,
+      gems: 4321,
+      gemShards: 7,
+      prestigeLevel: 12,
+      masteryUnlocked: { IRONWOOD: true },
+      unlockedSpecializationIds: { IRONWOOD: ["IRONWOOD_EXECUTIONER"] },
+      unlockedItemSlots: { IRONWOOD: [true, true, false] },
+      ownedTowerSkinIds: ["IRONWOOD_WARDEN_OF_THE_ABYSS"],
+      equippedTowerSkinByType: { IRONWOOD: "IRONWOOD_WARDEN_OF_THE_ABYSS" },
+      inventory: [item],
+      ascensionSeasonsWon: 3,
+      ascensionTop3: 5,
+      ascensionTop5: 6,
+      towerLoadout: [
+        {
+          slotId: "slot-1",
+          type: "IRONWOOD",
+          level: 40,
+          specializationId: "IRONWOOD_EXECUTIONER",
+          specializationLevel: 10,
+          equippedItemInstanceIds: [item.instanceId, null, null],
+        },
+      ],
+    });
+    const playerIdBefore = loadSave().playerId;
+
+    resetSeasonProgressionForTesting();
+
+    const main = loadSave();
+    expect(main.playerId).toBe(playerIdBefore);
+    expect(main.gems).toBe(4321);
+    expect(main.gemShards).toBe(7);
+    expect(main.prestigeLevel).toBe(12);
+    expect(main.masteryUnlocked.IRONWOOD).toBe(true);
+    expect(main.unlockedSpecializationIds.IRONWOOD).toEqual(["IRONWOOD_EXECUTIONER"]);
+    expect(main.unlockedItemSlots.IRONWOOD).toEqual([true, true, false]);
+    expect(main.ownedTowerSkinIds).toContain("IRONWOOD_WARDEN_OF_THE_ABYSS");
+    expect(main.equippedTowerSkinByType.IRONWOOD).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
+    expect(main.inventory).toEqual([item]);
+    expect(main.towerLoadout[0]!.equippedItemInstanceIds).toEqual([item.instanceId, null, null]);
+    expect(main.ascensionSeasonsWon).toBe(3);
+    expect(main.ascensionTop3).toBe(5);
+    expect(main.ascensionTop5).toBe(6);
+  });
+
+  it("never touches ascensionHistory/ascensionLastSyncedSeason — this is not a real season boundary, so nothing gets finalized or recorded", () => {
+    mockSeasonNumber(2);
+    updateSave({ ascensionLastSyncedSeason: 1, ascensionHistory: [], bestWave: 200, seasonBestWave: 40 });
+
+    resetSeasonProgressionForTesting();
+
+    const main = loadSave();
+    expect(main.ascensionHistory).toEqual([]);
+    expect(main.ascensionLastSyncedSeason).toBe(1);
+  });
+
+  it("the old Best Wave never reappears after a reload — the reset is written to the real persistent save, not just an in-memory value", () => {
+    updateSave({ bestWave: 777, seasonBestWave: 777 });
+
+    resetSeasonProgressionForTesting();
+
+    // Simulate a reload by loading fresh from the persistent store again.
+    const reloaded = loadSave();
+    expect(reloaded.bestWave).toBe(0);
+    expect(reloaded.seasonBestWave).toBe(0);
+  });
+
+  function mockSeasonNumber(n: number) {
+    const t = SEASON_EPOCH_MS + (n - 1) * SEASON_DURATION_MS + 1000;
+    vi.spyOn(seasonClock, "getCurrentSeasonWindow").mockImplementation(() => new LocalSeasonClock(() => t).getCurrentSeasonWindow());
+    vi.spyOn(seasonClock, "getTimeRemainingMs").mockImplementation(() => new LocalSeasonClock(() => t).getTimeRemainingMs());
+    vi.spyOn(seasonClock, "now").mockReturnValue(t);
+  }
 });

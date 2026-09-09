@@ -120,15 +120,27 @@ export interface EnemyInstance {
 
 let nextEnemyId = 1;
 
-export function createEnemyInstance(type: EnemyType, waveNumber: number): EnemyInstance {
+/**
+ * DIFICULDADE INDIVIDUAL POR JOGADOR — `difficultyMultiplier` is the ONLY
+ * seam this per-player adjustment enters through. It defaults to 1 (byte-
+ * for-byte the old behavior) so every existing call site/test that doesn't
+ * pass it is completely unaffected. GameEngine is the only real caller that
+ * passes a computed value (see engine/CombatPower.ts + config/
+ * difficultyScaling.ts) — it is applied ONLY to HP, never to speed, damage
+ * reduction, or gold reward, and never to a Boss/Mini-Boss (those are
+ * created via GameEngine's own separate BossManager path, which never
+ * calls this function with anything but the default 1).
+ */
+export function createEnemyInstance(type: EnemyType, waveNumber: number, difficultyMultiplier = 1): EnemyInstance {
   const stats = getScaledEnemyStats(type, waveNumber);
   const def = ENEMY_DEFINITIONS[type];
   const start = getPointAtDistance(ENEMY_PATH, 0);
+  const hp = Math.max(1, Math.round(stats.hp * difficultyMultiplier));
   return {
     id: `enemy-${nextEnemyId++}`,
     type,
-    hp: stats.hp,
-    maxHp: stats.hp,
+    hp,
+    maxHp: hp,
     baseSpeed: stats.speed,
     goldReward: stats.goldReward,
     damageReduction: stats.damageReduction,
@@ -326,8 +338,13 @@ export interface EliteModifier {
   regenPercentPerSecond: number;
 }
 
-export function createEliteEnemyInstance(type: EnemyType, waveNumber: number, modifier: EliteModifier): EnemyInstance {
-  const enemy = createEnemyInstance(type, waveNumber);
+export function createEliteEnemyInstance(
+  type: EnemyType,
+  waveNumber: number,
+  modifier: EliteModifier,
+  difficultyMultiplier = 1,
+): EnemyInstance {
+  const enemy = createEnemyInstance(type, waveNumber, difficultyMultiplier);
   enemy.hp = Math.round(enemy.hp * modifier.hpMultiplier);
   enemy.maxHp = enemy.hp;
   enemy.baseSpeed *= modifier.speedMultiplier;
