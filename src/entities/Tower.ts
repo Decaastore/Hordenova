@@ -15,7 +15,7 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
 import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
-import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
+import { DEFAULT_UNLOCKED_ITEM_SLOTS, getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import type { ItemInstance } from "./Item";
 import type { Vector2 } from "@/utils/geometry";
@@ -74,6 +74,18 @@ export interface TowerInstance {
    * retryPhase() (equipping is a build decision, not battle state).
    */
   equippedItemInstanceIds: (string | null)[];
+
+  /**
+   * SISTEMA DE SLOTS DE EQUIPAMENTO — permanent, per-TOWER-TYPE slot
+   * ownership (mirrors `masteryUnlocked`'s pattern exactly, but per-slot
+   * rather than a single boolean). Fixed-length (TOWER_ITEM_SLOT_COUNT);
+   * index 0 is always true (the free slot). Denormalized onto every tower
+   * instance of the same type, kept in sync by GameEngine whenever it
+   * changes. Never reset by a Season boundary. Independent from
+   * `equippedItemInstanceIds` — a slot can be unlocked with nothing equipped
+   * in it, and unequipping/swapping an item never re-locks its slot.
+   */
+  unlockedItemSlots: boolean[];
 }
 
 /**
@@ -108,6 +120,7 @@ export function createTowerInstance(
   masteryLevel = 0,
   masteryUnlocked = false,
   equippedItemInstanceIds: (string | null)[] = Array(TOWER_ITEM_SLOT_COUNT).fill(null),
+  unlockedItemSlots: boolean[] = [...DEFAULT_UNLOCKED_ITEM_SLOTS],
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -130,6 +143,7 @@ export function createTowerInstance(
     masteryLevel,
     masteryUnlocked,
     equippedItemInstanceIds,
+    unlockedItemSlots,
     ...survivalStatsForFreshTower(type),
   };
 }
@@ -442,12 +456,13 @@ export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinI
  * same tower is just a slot change, not a duplication).
  */
 export function canEquipItem(
-  _tower: TowerInstance,
+  tower: TowerInstance,
   slotIndex: number,
   item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade">,
   alreadyEquippedElsewhere: boolean,
 ): boolean {
   if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return false;
+  if (!tower.unlockedItemSlots[slotIndex]) return false;
   if (alreadyEquippedElsewhere) return false;
   if (item.pendingTrade) return false;
   const def = getItemDefinition(item.itemDefinitionId);
@@ -463,4 +478,23 @@ export function equipItem(tower: TowerInstance, slotIndex: number, instanceId: s
 export function unequipItem(tower: TowerInstance, slotIndex: number): void {
   if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return;
   tower.equippedItemInstanceIds[slotIndex] = null;
+}
+
+/**
+ * SISTEMA DE SLOTS DE EQUIPAMENTO — whether `slotIndex` is purchasable right
+ * now: in range, not already unlocked, and not the always-free slot 0
+ * (which is never "purchasable" — it's already unlocked). Gems-sufficiency
+ * is a GameEngine concern (mirrors canUnlockSelectedTowerMastery's split:
+ * this function only knows tower-instance state).
+ */
+export function canUnlockItemSlot(tower: TowerInstance, slotIndex: number): boolean {
+  if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return false;
+  if (getItemSlotUnlockCost(slotIndex) <= 0) return false;
+  return tower.unlockedItemSlots[slotIndex] !== true;
+}
+
+/** Mutates `tower` in place — caller (GameEngine) owns the Gems check/deduction and confirmation step beforehand. Permanent: never call this to "re-lock" a slot. */
+export function unlockItemSlot(tower: TowerInstance, slotIndex: number): void {
+  if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return;
+  tower.unlockedItemSlots[slotIndex] = true;
 }

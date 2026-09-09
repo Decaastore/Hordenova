@@ -4,7 +4,9 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
+import { FUSION_ITEM_COUNT, getFusionSuccessChance } from "@/config/itemFusion";
 import type { ItemInstance } from "@/entities/Item";
+import type { FusionEligibility, FusionOutcome } from "@/engine/ItemFusion";
 import { RarityBadge } from "./RarityBadge";
 import { ItemDetailsModal } from "./ItemDetailsModal";
 import { TradeScreen } from "./TradeScreen";
@@ -28,6 +30,10 @@ interface InventoryPanelProps {
   /** The account's all-time record wave — gates whether Prestige is unlocked at all (see config/prestige.ts's canUnlockPrestige). */
   bestWave: number;
   onUpgradePrestige: () => void;
+  /** SISTEMA DE FUSÃO DE ITENS — read-only pre-check for the UI (enables/disables CONFIRMAR FUSÃO, explains why blocked). Re-validated again, unconditionally, by onAttemptFusion itself — the UI's own read is never trusted for the actual spend. */
+  getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
+  /** Pays out the atomic fusion attempt — consumes the 3 selected items and, on success only, creates 1 superior item. See engine/GameEngine.ts's attemptFusion for the exact 8-step guarantee. */
+  onAttemptFusion: (selectedInstanceIds: string[]) => FusionOutcome;
 }
 
 type Tab = "items" | "trade" | "stats";
@@ -59,10 +65,25 @@ export function InventoryPanel({
   prestigeLevel,
   bestWave,
   onUpgradePrestige,
+  getFusionEligibility,
+  onAttemptFusion,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  // SISTEMA DE FUSÃO DE ITENS — selection is local UI state, not engine
+  // state (nothing is consumed until CONFIRMAR FUSÃO). Auto-drops any
+  // instanceId that stops existing in `inventory` — e.g. after a
+  // successful/failed fusion consumes it, or it gets equipped/traded away
+  // in another tab — so the selection can never silently reference a
+  // now-gone item.
+  const [fusionSelectedIds, setFusionSelectedIds] = useState<string[]>([]);
+  const [fusionConfirming, setFusionConfirming] = useState(false);
+  const [fusionOutcome, setFusionOutcome] = useState<FusionOutcome | null>(null);
+
+  useEffect(() => {
+    setFusionSelectedIds((prev) => prev.filter((id) => inventory.some((item) => item.instanceId === id)));
+  }, [inventory]);
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
@@ -133,10 +154,42 @@ export function InventoryPanel({
             ) : (
               <div style={gridStyle}>
                 {inventory.map((item) => (
-                  <ItemTile key={item.instanceId} item={item} onClick={() => setSelectedInstanceId(item.instanceId)} />
+                  <ItemTile
+                    key={item.instanceId}
+                    item={item}
+                    onClick={() => setSelectedInstanceId(item.instanceId)}
+                    fusionSelected={fusionSelectedIds.includes(item.instanceId)}
+                    onToggleFusionSelect={() => {
+                      setFusionOutcome(null);
+                      setFusionConfirming(false);
+                      setFusionSelectedIds((prev) => {
+                        if (prev.includes(item.instanceId)) return prev.filter((id) => id !== item.instanceId);
+                        if (prev.length >= FUSION_ITEM_COUNT) return prev; // never selects a 4th — the extra is simply ignored
+                        return [...prev, item.instanceId];
+                      });
+                    }}
+                  />
                 ))}
               </div>
             )}
+
+            <FusionSection
+              inventory={inventory}
+              selectedIds={fusionSelectedIds}
+              onDeselect={(instanceId) => setFusionSelectedIds((prev) => prev.filter((id) => id !== instanceId))}
+              getFusionEligibility={getFusionEligibility}
+              confirming={fusionConfirming}
+              onRequestConfirm={() => setFusionConfirming(true)}
+              onCancelConfirm={() => setFusionConfirming(false)}
+              onConfirm={() => {
+                const outcome = onAttemptFusion(fusionSelectedIds);
+                setFusionOutcome(outcome);
+                setFusionConfirming(false);
+                if (outcome.status !== "BLOCKED") setFusionSelectedIds([]);
+              }}
+              outcome={fusionOutcome}
+              onDismissOutcome={() => setFusionOutcome(null)}
+            />
 
             {overflowInventory.length > 0 && (
               <>
@@ -191,20 +244,49 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
   );
 }
 
-function ItemTile({ item, onClick }: { item: ItemInstance; onClick: () => void }) {
+function ItemTile({
+  item,
+  onClick,
+  fusionSelected,
+  onToggleFusionSelect,
+}: {
+  item: ItemInstance;
+  onClick: () => void;
+  /** SISTEMA DE FUSÃO DE ITENS — whether this item is currently one of the (at most 3) selected for a fusion attempt. */
+  fusionSelected: boolean;
+  onToggleFusionSelect: () => void;
+}) {
   const { t } = useLanguage();
   const def = getItemDefinition(item.itemDefinitionId);
   if (!def) return null;
   const rarityDef = getRarityDefinition(def.rarity);
 
   return (
-    <button
-      onClick={onClick}
-      style={{ ...tileStyle, borderColor: rarityDef.color, boxShadow: `0 0 12px ${rarityDef.glow}` }}
+    <div
+      style={{
+        ...tileStyle,
+        position: "relative",
+        borderColor: fusionSelected ? PALETTE.uiAccent : rarityDef.color,
+        boxShadow: fusionSelected ? `0 0 12px ${PALETTE.uiAccent}` : `0 0 12px ${rarityDef.glow}`,
+        padding: 0,
+        cursor: "default",
+      }}
     >
-      <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-      <RarityBadge rarity={def.rarity} />
-    </button>
+      <button onClick={onClick} style={tileContentButtonStyle}>
+        <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+        <RarityBadge rarity={def.rarity} />
+      </button>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggleFusionSelect();
+        }}
+        title={t(fusionSelected ? "inventory.fusion.deselectItem" : "inventory.fusion.selectItem")}
+        style={{ ...fusionCheckboxStyle, borderColor: fusionSelected ? PALETTE.uiAccent : PALETTE.uiPanelBorder }}
+      >
+        {fusionSelected ? "✓" : ""}
+      </button>
+    </div>
   );
 }
 
@@ -221,6 +303,167 @@ function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () =
       <span style={claimLabelStyle}>{t("inventory.claim")}</span>
     </button>
   );
+}
+
+/**
+ * SISTEMA DE FUSÃO DE ITENS — "select exactly 3 items of the SAME rarity ->
+ * attempt exactly 1 item of the NEXT rarity tier." All engine validation
+ * (ownership/rarity/eligibility/max-rarity) is re-read from
+ * getFusionEligibility on every render — this component never invents its
+ * own copy of those rules, so the UI can never disagree with what
+ * onAttemptFusion will actually enforce.
+ */
+function FusionSection({
+  inventory,
+  selectedIds,
+  onDeselect,
+  getFusionEligibility,
+  confirming,
+  onRequestConfirm,
+  onCancelConfirm,
+  onConfirm,
+  outcome,
+  onDismissOutcome,
+}: {
+  inventory: readonly ItemInstance[];
+  selectedIds: readonly string[];
+  onDeselect: (instanceId: string) => void;
+  getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
+  confirming: boolean;
+  onRequestConfirm: () => void;
+  onCancelConfirm: () => void;
+  onConfirm: () => void;
+  outcome: FusionOutcome | null;
+  onDismissOutcome: () => void;
+}) {
+  const { t } = useLanguage();
+  const selectedItems = selectedIds
+    .map((id) => inventory.find((item) => item.instanceId === id))
+    .filter((item): item is ItemInstance => !!item);
+
+  const ready = selectedIds.length === FUSION_ITEM_COUNT;
+  const eligibility = ready ? getFusionEligibility([...selectedIds]) : null;
+  const canConfirm = ready && !!eligibility?.ok;
+
+  return (
+    <>
+      <div style={fusionSectionDividerStyle} />
+      <div style={overflowTitleStyle}>{t("inventory.fusion.title")}</div>
+
+      {outcome && outcome.status !== "BLOCKED" && (
+        <div
+          style={{
+            ...fusionOutcomeBoxStyle,
+            borderColor: outcome.status === "SUCCESS" ? PALETTE.success : PALETTE.danger,
+          }}
+        >
+          <span>
+            {outcome.status === "SUCCESS"
+              ? t("inventory.fusion.successResult", {
+                  item: (() => {
+                    const resultDef = getItemDefinition(outcome.resultItem.itemDefinitionId);
+                    return resultDef ? t(`items.${resultDef.i18nKey}.name` as TranslationKey) : outcome.resultItem.itemDefinitionId;
+                  })(),
+                })
+              : t("inventory.fusion.failureResult")}
+          </span>
+          <button onClick={onDismissOutcome} style={fusionDismissButtonStyle}>
+            ×
+          </button>
+        </div>
+      )}
+
+      <div style={fusionHintStyle}>{t("inventory.fusion.selectHint")}</div>
+      <div style={fusionSelectedRowStyle}>
+        {Array.from({ length: FUSION_ITEM_COUNT }, (_, i) => {
+          const item = selectedItems[i];
+          if (!item) return <div key={i} style={fusionSlotEmptyStyle}>{t("inventory.fusion.emptySlot")}</div>;
+          const def = getItemDefinition(item.itemDefinitionId);
+          if (!def) return null;
+          const rarityDef = getRarityDefinition(def.rarity);
+          return (
+            <button
+              key={item.instanceId}
+              onClick={() => onDeselect(item.instanceId)}
+              style={{ ...fusionSlotFilledStyle, borderColor: rarityDef.color }}
+              title={t("inventory.fusion.deselectItem")}
+            >
+              {t(`items.${def.i18nKey}.name` as TranslationKey)}
+            </button>
+          );
+        })}
+      </div>
+      <div style={fusionCountStyle}>{t("inventory.fusion.selectedCount", { count: selectedIds.length })}</div>
+
+      {ready && eligibility && (
+        <div style={fusionDetailsBoxStyle}>
+          {eligibility.ok ? (
+            <>
+              <div style={convertRowStyle}>
+                <span>{t("inventory.fusion.currentRarity")}</span>
+                <RarityBadge rarity={eligibility.rarity!} />
+              </div>
+              <div style={convertRowStyle}>
+                <span>{t("inventory.fusion.targetRarity")}</span>
+                <RarityBadge rarity={eligibility.nextRarity!} />
+              </div>
+              <div style={convertRowStyle}>
+                <span>{t("inventory.fusion.successChance")}</span>
+                <span>{(getFusionSuccessChance(eligibility.rarity!) * 100).toFixed(2)}%</span>
+              </div>
+              <div style={fusionWarningStyle}>{t("inventory.fusion.warning")}</div>
+            </>
+          ) : (
+            <div style={fusionBlockedStyle}>{t(fusionBlockedReasonKey(eligibility.reason))}</div>
+          )}
+        </div>
+      )}
+
+      {confirming ? (
+        <div style={fusionConfirmBoxStyle}>
+          <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
+            {t("inventory.fusion.confirmPrompt", {
+              rarity: eligibility?.ok ? t(`rarity.${eligibility.rarity}` as TranslationKey) : "",
+              chance: eligibility?.ok ? (getFusionSuccessChance(eligibility.rarity!) * 100).toFixed(2) : "0",
+            })}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            <button onClick={onConfirm} style={fusionConfirmButtonStyle}>
+              {t("inventory.fusion.confirmYes")}
+            </button>
+            <button onClick={onCancelConfirm} style={fusionCancelButtonStyle}>
+              {t("inventory.fusion.confirmNo")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button onClick={onRequestConfirm} disabled={!canConfirm} style={{ ...fusionConfirmButtonStyle, opacity: canConfirm ? 1 : 0.45 }}>
+          {t("inventory.fusion.confirmButton")}
+        </button>
+      )}
+    </>
+  );
+}
+
+function fusionBlockedReasonKey(reason: FusionEligibility["reason"]): TranslationKey {
+  switch (reason) {
+    case "WRONG_COUNT":
+      return "inventory.fusion.blockedWrongCount";
+    case "DUPLICATE_SELECTION":
+      return "inventory.fusion.blockedDuplicate";
+    case "ITEM_NOT_FOUND":
+      return "inventory.fusion.blockedNotFound";
+    case "NOT_OWNED":
+      return "inventory.fusion.blockedNotOwned";
+    case "NOT_ELIGIBLE":
+      return "inventory.fusion.blockedNotEligible";
+    case "MIXED_RARITY":
+      return "inventory.fusion.blockedMixedRarity";
+    case "MAX_RARITY":
+      return "inventory.fusion.blockedMaxRarity";
+    default:
+      return "inventory.fusion.blockedWrongCount";
+  }
 }
 
 const overlayStyle: CSSProperties = {
@@ -376,4 +619,169 @@ const claimLabelStyle: CSSProperties = {
   fontWeight: 700,
   color: PALETTE.uiAccent,
   letterSpacing: 0.4,
+};
+
+const tileContentButtonStyle: CSSProperties = {
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 6,
+  width: "100%",
+  padding: "10px 12px",
+  border: "none",
+  background: "transparent",
+  color: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const fusionCheckboxStyle: CSSProperties = {
+  position: "absolute",
+  top: 5,
+  right: 5,
+  width: 16,
+  height: 16,
+  borderRadius: 4,
+  border: "1.5px solid",
+  background: "rgba(0,0,0,0.35)",
+  color: PALETTE.uiAccent,
+  fontSize: 10,
+  fontWeight: 700,
+  lineHeight: 1,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  cursor: "pointer",
+};
+
+const fusionSectionDividerStyle: CSSProperties = {
+  height: 1,
+  background: PALETTE.uiPanelBorder,
+  margin: "16px 0 10px",
+};
+
+const fusionHintStyle: CSSProperties = {
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+  marginBottom: 8,
+  lineHeight: 1.4,
+};
+
+const fusionSelectedRowStyle: CSSProperties = {
+  display: "flex",
+  gap: 8,
+};
+
+const fusionSlotEmptyStyle: CSSProperties = {
+  flex: 1,
+  padding: "8px 6px",
+  borderRadius: 7,
+  border: `1px dashed ${PALETTE.uiPanelBorder}`,
+  fontSize: 10,
+  color: PALETTE.uiTextDim,
+  fontStyle: "italic",
+  textAlign: "center",
+};
+
+const fusionSlotFilledStyle: CSSProperties = {
+  flex: 1,
+  padding: "8px 6px",
+  borderRadius: 7,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.04)",
+  color: PALETTE.uiText,
+  fontSize: 10,
+  fontWeight: 700,
+  cursor: "pointer",
+  textAlign: "center",
+};
+
+const fusionCountStyle: CSSProperties = {
+  fontSize: 10,
+  color: PALETTE.uiTextDim,
+  marginTop: 6,
+  textAlign: "center",
+};
+
+const fusionDetailsBoxStyle: CSSProperties = {
+  marginTop: 10,
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(0,0,0,0.15)",
+  display: "flex",
+  flexDirection: "column",
+  gap: 3,
+};
+
+const fusionWarningStyle: CSSProperties = {
+  marginTop: 4,
+  fontSize: 10.5,
+  fontWeight: 700,
+  color: PALETTE.danger,
+};
+
+const fusionBlockedStyle: CSSProperties = {
+  fontSize: 10.5,
+  color: PALETTE.danger,
+  fontStyle: "italic",
+};
+
+const fusionConfirmButtonStyle: CSSProperties = {
+  marginTop: 8,
+  padding: "8px 10px",
+  borderRadius: 7,
+  border: `1px solid ${PALETTE.uiAccent}`,
+  background: "rgba(255,210,87,0.14)",
+  color: PALETTE.uiAccentBright,
+  fontWeight: 700,
+  fontSize: 12,
+  letterSpacing: 0.5,
+  width: "100%",
+  cursor: "pointer",
+};
+
+const fusionCancelButtonStyle: CSSProperties = {
+  marginTop: 0,
+  padding: "7px 10px",
+  borderRadius: 7,
+  border: `1px dashed ${PALETTE.uiPanelBorder}`,
+  background: "rgba(255,255,255,0.02)",
+  color: PALETTE.uiText,
+  fontWeight: 600,
+  fontSize: 10.5,
+  letterSpacing: 0.4,
+  width: "100%",
+  cursor: "pointer",
+};
+
+const fusionConfirmBoxStyle: CSSProperties = {
+  marginTop: 10,
+  padding: "8px 10px",
+  borderRadius: 7,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(255,255,255,0.03)",
+};
+
+const fusionOutcomeBoxStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 8,
+  marginBottom: 8,
+  padding: "8px 10px",
+  borderRadius: 7,
+  border: "1px solid",
+  background: "rgba(0,0,0,0.2)",
+  fontSize: 11,
+  color: PALETTE.uiText,
+};
+
+const fusionDismissButtonStyle: CSSProperties = {
+  background: "transparent",
+  border: "none",
+  color: PALETTE.uiTextDim,
+  fontSize: 14,
+  cursor: "pointer",
+  flexShrink: 0,
 };

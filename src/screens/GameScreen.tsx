@@ -189,6 +189,10 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             canEquipToSlot={(instanceId, slotIndex) => engine.canEquipItemOnSelectedTower(instanceId, slotIndex)}
             onEquipItem={(instanceId, slotIndex) => engine.equipItemOnSelectedTower(instanceId, slotIndex)}
             onUnequipItem={(slotIndex) => engine.unequipItemFromSelectedTower(slotIndex)}
+            unlockedSlots={engine.getSelectedTowerUnlockedSlots()}
+            getSlotUnlockCost={(slotIndex) => engine.getItemSlotUnlockGemCost(slotIndex)}
+            canUnlockSlot={(slotIndex) => engine.canUnlockItemSlotOnSelectedTower(slotIndex)}
+            onUnlockSlot={(slotIndex) => engine.unlockItemSlotOnSelectedTower(slotIndex)}
           />
         )}
 
@@ -238,6 +242,8 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             prestigeLevel={engine.getPrestigeLevel()}
             bestWave={hud.bestWave}
             onUpgradePrestige={() => engine.upgradePrestige()}
+            getFusionEligibility={(ids) => engine.getFusionEligibility(ids)}
+            onAttemptFusion={(ids) => engine.attemptFusion(ids)}
           />
         )}
       </div>

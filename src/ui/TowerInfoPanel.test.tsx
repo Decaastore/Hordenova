@@ -38,6 +38,10 @@ function renderPanel(props: {
   canEquipToSlot?: (instanceId: string, slotIndex: number) => boolean;
   onEquipItem?: (instanceId: string, slotIndex: number) => void;
   onUnequipItem?: (slotIndex: number) => void;
+  unlockedSlots?: readonly boolean[];
+  getSlotUnlockCost?: (slotIndex: number) => number | null;
+  canUnlockSlot?: (slotIndex: number) => boolean;
+  onUnlockSlot?: (slotIndex: number) => void;
 }): { container: HTMLDivElement; root: Root } {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -67,6 +71,10 @@ function renderPanel(props: {
           canEquipToSlot={props.canEquipToSlot ?? (() => false)}
           onEquipItem={props.onEquipItem ?? (() => {})}
           onUnequipItem={props.onUnequipItem ?? (() => {})}
+          unlockedSlots={props.unlockedSlots ?? [true, true, true]}
+          getSlotUnlockCost={props.getSlotUnlockCost ?? (() => 250)}
+          canUnlockSlot={props.canUnlockSlot ?? (() => true)}
+          onUnlockSlot={props.onUnlockSlot ?? (() => {})}
         />
       </LanguageProvider>,
     );
@@ -259,5 +267,111 @@ describe("TowerInfoPanel — Equipment slots (BALANCEAMENTO DEFINITIVO spec sect
     const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
     act(() => equipButtons[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(container.textContent).toContain("No compatible items");
+  });
+});
+
+/**
+ * SISTEMA DE SLOTS DE EQUIPAMENTO — the lock/unlock UI itself: Slot 1 always
+ * reads unlocked; Slot 2/3 show their Gems cost and a mandatory confirmation
+ * step before any Gems are spent (onUnlockSlot must never fire from the
+ * initial click).
+ */
+describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIPAMENTO)", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+
+  afterEach(() => {
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  // The panel's Mastery section also renders an "UNLOCK MASTERY" button, so
+  // an .includes() search for "UNLOCK" would match the WRONG button (it
+  // renders earlier in the DOM) — this requires an EXACT match, the same
+  // way the existing EQUIP/REMOVE assertions above already do.
+  function findExactButton(text: string): HTMLButtonElement | null {
+    return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === text) ?? null;
+  }
+
+  it("Slot 1 shows as unlocked and never shows an unlock action", () => {
+    ({ container, root } = renderPanel({ tower: makeTower(), unlockedSlots: [true, false, false] }));
+    expect(container.textContent).toContain("Unlocked");
+    const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
+    // Only slot 1 (unlocked) offers EQUIP — slots 2/3 are locked.
+    expect(equipButtons).toHaveLength(1);
+  });
+
+  it("a locked slot (2/3) shows its Gems cost and an UNLOCK action instead of EQUIP", () => {
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockCost: (i) => [0, 250, 500][i] ?? null,
+    }));
+    expect(container.textContent).toContain("250 Gems");
+    expect(container.textContent).toContain("500 Gems");
+    expect(findExactButton("UNLOCK")).not.toBeNull();
+  });
+
+  it("insufficient Gems disables UNLOCK and shows how many Gems are missing", () => {
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      gems: 100,
+      unlockedSlots: [true, false, false],
+      getSlotUnlockCost: () => 250,
+      canUnlockSlot: () => false,
+    }));
+    expect(container.textContent).toContain("Missing");
+    expect(container.textContent).toContain("150 Gems"); // 250 - 100
+    const unlockButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "UNLOCK");
+    expect(unlockButtons.every((b) => b.disabled)).toBe(true);
+  });
+
+  it("clicking UNLOCK only arms a confirmation step — onUnlockSlot is NOT called from the initial click", () => {
+    const onUnlockSlot = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockCost: () => 250,
+      canUnlockSlot: () => true,
+      onUnlockSlot,
+    }));
+    const unlockButton = findExactButton("UNLOCK")!;
+    act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onUnlockSlot).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("CONFIRM UNLOCK");
+  });
+
+  it("confirming the unlock calls onUnlockSlot exactly once with the right slot index — Gems are spent only from this explicit confirm", () => {
+    const onUnlockSlot = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockCost: () => 250,
+      canUnlockSlot: () => true,
+      onUnlockSlot,
+    }));
+    const unlockButton = findExactButton("UNLOCK")!;
+    act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const confirmButton = findButtonByText(container, "CONFIRM UNLOCK")!;
+    act(() => confirmButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onUnlockSlot).toHaveBeenCalledTimes(1);
+    expect(onUnlockSlot).toHaveBeenCalledWith(1);
+  });
+
+  it("canceling the confirmation calls onUnlockSlot zero times and returns to the locked row", () => {
+    const onUnlockSlot = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockCost: () => 250,
+      canUnlockSlot: () => true,
+      onUnlockSlot,
+    }));
+    const unlockButton = findExactButton("UNLOCK")!;
+    act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const cancelButton = findButtonByText(container, "CANCEL")!;
+    act(() => cancelButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onUnlockSlot).not.toHaveBeenCalled();
+    expect(findExactButton("UNLOCK")).not.toBeNull();
   });
 });

@@ -62,6 +62,15 @@ export interface PatchNoteVersion {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteVersion[] = [
   {
+    id: "v12",
+    dateIso: "2026-09-09",
+    items: [
+      { type: "NEW", category: "INTERFACE", i18nKey: "phaseWaveDisplay" },
+      { type: "CHANGE", category: "ITEMS", i18nKey: "equipmentSlotGemUnlock" },
+      { type: "NEW", category: "ITEMS", i18nKey: "itemFusion" },
+    ],
+  },
+  {
     id: "v11",
     dateIso: "2026-09-09",
     items: [{ type: "FIX", category: "BOSSES", i18nKey: "miniBossEnrageForAll" }],

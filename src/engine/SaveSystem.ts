@@ -182,6 +182,18 @@ export interface SaveData {
   unlockedSpecializationIds: Partial<Record<TowerType, SpecializationId[]>>;
 
   /**
+   * SISTEMA DE SLOTS DE EQUIPAMENTO — PERMANENT per-tower-TYPE record of
+   * which equipment slots (fixed-length TOWER_ITEM_SLOT_COUNT) this account
+   * has ever unlocked with Gems. Mirrors `masteryUnlocked` exactly (an
+   * array instead of a single boolean): never reset by a Season boundary,
+   * never charged again for a slot already true. Index 0 is always true
+   * once a tower of that type has ever been placed (see
+   * DEFAULT_UNLOCKED_ITEM_SLOTS) — this map only needs to record slots 1/2
+   * being purchased, but stores the full per-slot array for simplicity.
+   */
+  unlockedItemSlots: Partial<Record<TowerType, boolean[]>>;
+
+  /**
    * BALANCEAMENTO DEFINITIVO spec section 6/13 — Tower Repositioning. The
    * day index (engine/DailyClock.ts's getCurrentDayIndex, a pure function
    * of wall-clock time) this account last used its FREE reposition — null
@@ -195,7 +207,7 @@ export interface SaveData {
   lastFreeRepositionDayIndex: number | null;
 }
 
-export const SAVE_DATA_VERSION = 17;
+export const SAVE_DATA_VERSION = 18;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -241,6 +253,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ownedTowerSkinIds: [],
   equippedTowerSkinByType: {},
   unlockedSpecializationIds: {},
+  unlockedItemSlots: {},
   lastFreeRepositionDayIndex: null,
 };
 
@@ -460,6 +473,17 @@ function parseMasteryUnlocked(raw: unknown): Partial<Record<TowerType, boolean>>
   return result;
 }
 
+/** Self-healing parse for `unlockedItemSlots` (save v18+) — drops any key that isn't a real TowerType, any value that isn't an array, and coerces each entry to a strict boolean (a non-boolean/non-true entry is treated as not-unlocked). Never trusts a length longer than TOWER_ITEM_SLOT_COUNT. */
+function parseUnlockedItemSlots(raw: unknown): Partial<Record<TowerType, boolean[]>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Partial<Record<TowerType, boolean[]>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!VALID_TOWER_TYPES.has(key as TowerType) || !Array.isArray(value)) continue;
+    result[key as TowerType] = Array.from({ length: TOWER_ITEM_SLOT_COUNT }, (_, i) => value[i] === true);
+  }
+  return result;
+}
+
 /**
  * MIGRATION (save v15 -> v16): a pre-v16 save never had a separate
  * `masteryUnlocked` field — Mastery ownership and level were the same
@@ -640,6 +664,12 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       unlockedSpecializationIds: legacySave
         ? deriveUnlockedSpecializationIdsFromLegacyLoadout(parsedTowerLoadout)
         : parseUnlockedSpecializationIds(parsed.unlockedSpecializationIds),
+      // SISTEMA DE SLOTS DE EQUIPAMENTO (save v17 -> v18) — brand new field
+      // with no legacy analog to derive from (slot unlocking never existed
+      // before), so the correct migration is simply "sensible fresh-account
+      // default for a pre-existing save": {} — nobody has ever paid to
+      // unlock a slot 2/3 before this field existed.
+      unlockedItemSlots: parseUnlockedItemSlots(parsed.unlockedItemSlots),
       // BALANCEAMENTO DEFINITIVO (save v16 -> v17) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function. null is exactly

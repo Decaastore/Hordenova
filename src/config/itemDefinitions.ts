@@ -136,3 +136,8 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
 export function getItemDefinition(id: string): ItemDefinition | null {
   return (ITEM_DEFINITIONS as Record<string, ItemDefinition>)[id] ?? null;
 }
+
+/** Every real item definition at `rarity` — SISTEMA DE FUSÃO DE ITENS reads this to pick the superior item a successful fusion creates. Today exactly 1 per rarity (see file header); if a future catalog expansion adds more than one, the caller picks among these rather than this file inventing a tie-break rule. */
+export function getItemDefinitionsByRarity(rarity: Rarity): ItemDefinition[] {
+  return Object.values(ITEM_DEFINITIONS).filter((def) => def.rarity === rarity);
+}

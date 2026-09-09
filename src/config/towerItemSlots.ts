@@ -22,3 +22,23 @@
  * given nothing in the current 6-item catalog is itself slot-typed.
  */
 export const TOWER_ITEM_SLOT_COUNT = 3;
+
+/**
+ * SISTEMA DE SLOTS DE EQUIPAMENTO — unlock economy. Slot 0 is free and
+ * always unlocked (structurally, not by spending anything). Slots 1 and 2
+ * (the "Slot 2"/"Slot 3" the player sees, 1-indexed in UI copy) each cost a
+ * one-time, PERMANENT Gems purchase — never re-locked by a Season Reset,
+ * never re-purchasable, never priced in any other currency. These numbers
+ * are final per the task spec and are not a balance lever.
+ */
+export const TOWER_ITEM_SLOT_UNLOCK_GEM_COST: readonly number[] = [0, 250, 500];
+
+/** Gems cost to unlock `slotIndex` (0-indexed). Slot 0 is always 0 (already unlocked). Throws on an out-of-range index — callers must check bounds via TOWER_ITEM_SLOT_COUNT first. */
+export function getItemSlotUnlockCost(slotIndex: number): number {
+  const cost = TOWER_ITEM_SLOT_UNLOCK_GEM_COST[slotIndex];
+  if (cost === undefined) throw new Error(`getItemSlotUnlockCost: slotIndex ${slotIndex} out of range`);
+  return cost;
+}
+
+/** Fresh-tower default: only slot 0 (the free slot) starts unlocked. */
+export const DEFAULT_UNLOCKED_ITEM_SLOTS: readonly boolean[] = [true, false, false];

@@ -5,6 +5,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
+import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
 import { BagIcon, BoltIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
@@ -23,12 +24,22 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
       <div style={brandStyle}>HORDENOVA</div>
 
       <div style={groupStyle}>
-        <Stat
-          icon={<WaveIcon color={PALETTE.uiAccent} />}
-          label={t("hud.wave")}
-          value={String(hud.wave)}
-          sublabel={t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)}
-        />
+        <div>
+          <Stat
+            icon={<WaveIcon color={PALETTE.uiAccent} />}
+            label={t("hud.wave")}
+            // "FASE X — ONDA Y" (Y always 1..WAVES_PER_PHASE) is the primary
+            // gameplay identity — spec: "não mostrar somente a onda global
+            // como identificação principal". The real global wave (every
+            // progression formula's actual input, never replaced) stays
+            // visible as secondary info in the sublabel below, alongside the
+            // biome/phase name.
+            value={t("hud.phaseWaveValue", { phase: phaseNumberFromWave(hud.wave), onda: waveInPhase(hud.wave) })}
+            sublabel={`${t("hud.globalWaveSublabel", { wave: hud.wave })} · ${t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)}`}
+            title={t("hud.phaseWaveTooltip", { onda: waveInPhase(hud.wave), total: WAVES_PER_PHASE })}
+          />
+          <PhaseWaveProgress onda={waveInPhase(hud.wave)} />
+        </div>
         <Stat
           icon={<ShieldIcon color={hpColor} />}
           label={t("hud.baseHp")}
@@ -175,6 +186,33 @@ function GoldGainIndicator({ gold }: { gold: number }) {
   );
 }
 
+/**
+ * SISTEMA DE FASES — "a UI deve deixar claro... progresso dentro das 10
+ * ondas". Ten small ticks, filled up to the current onda-within-the-fase;
+ * the last tick reads as the fase's own closing beat (onda 10). Purely
+ * presentational — reads only `waveInPhase`'s already-computed value.
+ */
+function PhaseWaveProgress({ onda }: { onda: number }) {
+  return (
+    <div style={phaseProgressRowStyle}>
+      {Array.from({ length: WAVES_PER_PHASE }, (_, i) => {
+        const stepOnda = i + 1;
+        const filled = stepOnda <= onda;
+        const isClosing = stepOnda === WAVES_PER_PHASE;
+        return (
+          <span
+            key={stepOnda}
+            style={{
+              ...phaseProgressTickStyle,
+              background: filled ? (isClosing ? PALETTE.danger : PALETTE.uiAccent) : "rgba(255,255,255,0.15)",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 function Stat({
   icon,
   label,
@@ -256,6 +294,19 @@ const valueStyle: CSSProperties = {
   fontWeight: 700,
   color: PALETTE.uiText,
   lineHeight: 1.3,
+};
+
+const phaseProgressRowStyle: CSSProperties = {
+  display: "flex",
+  gap: 3,
+  marginTop: 3,
+};
+
+const phaseProgressTickStyle: CSSProperties = {
+  width: 8,
+  height: 4,
+  borderRadius: 2,
+  transition: "background 150ms ease",
 };
 
 const goldGainStyle: CSSProperties = {

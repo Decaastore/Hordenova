@@ -131,6 +131,24 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.gold).toBe(RUN_START.startingGold);
   });
 
+  it("SISTEMA DE SLOTS DE EQUIPAMENTO — a purchased item slot unlock is PERMANENT, exactly like Mastery ownership — untouched by a Season boundary", () => {
+    mockSeasonNumber(2);
+    updateSave({
+      ascensionLastSyncedSeason: 1,
+      seasonBestWave: 40,
+      gold: 12345,
+      unlockedItemSlots: { IRONWOOD: [true, true, false] },
+    });
+
+    syncSeasonIfNeeded();
+
+    const main = loadSave();
+    // The Gems spent to unlock slot 2 (index 1) must never be re-charged by
+    // a Season boundary — AscensionManager's season-reset updateSave call
+    // simply never names unlockedItemSlots, so it survives untouched.
+    expect(main.unlockedItemSlots.IRONWOOD).toEqual([true, true, false]);
+  });
+
   it("[Test 5/11] an owned Tower Skin (bought with Gems) persists across a Season boundary", () => {
     mockSeasonNumber(2);
     updateSave({

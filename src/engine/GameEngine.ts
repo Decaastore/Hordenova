@@ -28,6 +28,14 @@ import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
 import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY, findItem } from "./InventoryManager";
 import { appendLedgerEvent } from "./EconomyLedger";
+import {
+  checkFusionEligibility,
+  pickFusionResultDefinitionId,
+  rollFusion,
+  type FusionOutcome,
+} from "./ItemFusion";
+import { FUSION_ITEM_COUNT } from "@/config/itemFusion";
+import type { Rarity } from "@/config/rarity";
 import { checkLocalFirst, type LocalFirstDiscoveries } from "./WorldFirst";
 import {
   createTowerInstance,
@@ -50,10 +58,12 @@ import {
   canEquipItem,
   equipItem as equipItemEntity,
   unequipItem as unequipItemEntity,
+  canUnlockItemSlot,
+  unlockItemSlot as unlockItemSlotEntity,
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
+import { getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
@@ -330,6 +340,8 @@ export class GameEngine {
   private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
   /** Permanent per-TYPE Mastery ownership (the one-time 400 Gems purchase) — never reset by a Season boundary. */
   private masteryUnlocked: Partial<Record<TowerType, boolean>> = {};
+  /** SISTEMA DE SLOTS DE EQUIPAMENTO — permanent per-TYPE slot ownership (mirrors masteryUnlocked exactly, but an array per type instead of a single boolean). A one-time, per-slot Gems purchase — never reset by a Season boundary, never re-locked by removing/swapping an equipped item. */
+  private unlockedItemSlots: Partial<Record<TowerType, boolean[]>> = {};
   private ownedTowerSkinIds = new Set<string>();
   private equippedTowerSkinByType: Partial<Record<TowerType, string>> = {};
 
@@ -423,6 +435,12 @@ export class GameEngine {
     // level and equipped skin.
     this.towerMasteryLevels = { ...save.towerMasteryLevels };
     this.masteryUnlocked = { ...save.masteryUnlocked };
+    // Deep-copy each per-type array for the same reason as
+    // unlockedSpecializationIds below — a shallow spread would leave every
+    // type's array as the SAME reference as the loaded save's.
+    this.unlockedItemSlots = Object.fromEntries(
+      Object.entries(save.unlockedItemSlots).map(([type, slots]) => [type, [...(slots ?? [])]]),
+    ) as Partial<Record<TowerType, boolean[]>>;
     this.ownedTowerSkinIds = new Set(save.ownedTowerSkinIds);
     this.equippedTowerSkinByType = { ...save.equippedTowerSkinByType };
     // Deep-copy each per-type array — a shallow spread would leave every
@@ -597,6 +615,7 @@ export class GameEngine {
       this.towerMasteryLevels[entry.type] ?? 0,
       this.masteryUnlocked[entry.type] === true,
       entry.equippedItemInstanceIds,
+      this.unlockedItemSlots[entry.type] ? [...this.unlockedItemSlots[entry.type]!] : undefined,
     );
   }
 
@@ -622,6 +641,8 @@ export class GameEngine {
         this.equippedTowerSkinByType[type] ?? null,
         this.towerMasteryLevels[type] ?? 0,
         this.masteryUnlocked[type] === true,
+        undefined,
+        this.unlockedItemSlots[type] ? [...this.unlockedItemSlots[type]!] : undefined,
       ),
     );
     this.persist();
@@ -937,6 +958,169 @@ export class GameEngine {
     this.persist();
     this.notify();
     return true;
+  }
+
+  /**
+   * SISTEMA DE SLOTS DE EQUIPAMENTO — the selected tower's per-slot
+   * unlocked state, for UI rendering (index 0 is always true). Independent
+   * from getSelectedTowerItemSlots — a slot can read unlocked here with a
+   * null entry there (nothing equipped yet).
+   */
+  getSelectedTowerUnlockedSlots(): boolean[] {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return Array(TOWER_ITEM_SLOT_COUNT).fill(false);
+    return [...tower.unlockedItemSlots];
+  }
+
+  /** Gems cost to unlock `slotIndex` on the selected tower's TYPE, for UI display before purchase. Returns null for an out-of-range index. */
+  getItemSlotUnlockGemCost(slotIndex: number): number | null {
+    if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return null;
+    return getItemSlotUnlockCost(slotIndex);
+  }
+
+  /** Whether `slotIndex` is purchasable on the selected tower right now — not already unlocked, in range, and this account can afford its Gems cost. UI is responsible for the mandatory confirmation step before calling unlockItemSlotOnSelectedTower. */
+  canUnlockItemSlotOnSelectedTower(slotIndex: number): boolean {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !canUnlockItemSlot(tower, slotIndex)) return false;
+    return this.canAffordGems(getItemSlotUnlockCost(slotIndex));
+  }
+
+  /**
+   * Pays the one-time, PERMANENT Gems cost to unlock `slotIndex` on the
+   * selected tower's TYPE, forever — never re-charged for this type/slot
+   * again, never re-locked by a Season Reset (unlockedItemSlots is never
+   * touched by AscensionManager's season-reset updateSave call). Synced
+   * across every placed tower of the same type, exactly like
+   * unlockSelectedTowerMastery.
+   */
+  unlockItemSlotOnSelectedTower(slotIndex: number): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower || !this.canUnlockItemSlotOnSelectedTower(slotIndex)) return false;
+
+    const cost = getItemSlotUnlockCost(slotIndex);
+    this.spendGems(cost, `item_slot:${tower.type}:${slotIndex}`);
+    unlockItemSlotEntity(tower, slotIndex);
+    const updated = [...tower.unlockedItemSlots];
+    this.unlockedItemSlots[tower.type] = updated;
+    for (const other of this.towers) {
+      if (other.type === tower.type && other.id !== tower.id) other.unlockedItemSlots = [...updated];
+    }
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // SISTEMA DE FUSÃO DE ITENS — a large, intentional ITEM SINK. Select
+  // exactly FUSION_ITEM_COUNT (3) items of the SAME rarity for one attempt
+  // at exactly 1 item of the next tier. See config/itemFusion.ts for the
+  // final chance table (never a balance lever) and engine/ItemFusion.ts for
+  // the pure eligibility/roll functions this method calls into.
+  // -------------------------------------------------------------------
+
+  /** Read-only pre-check for the UI (enables/disables CONFIRMAR FUSÃO, and explains why when blocked) — re-validated again, unconditionally, at the top of attemptFusion itself. */
+  getFusionEligibility(selectedInstanceIds: readonly string[]): ReturnType<typeof checkFusionEligibility> {
+    return checkFusionEligibility(this.inventory, selectedInstanceIds, this.playerId);
+  }
+
+  /**
+   * ATOMIC 8-step fusion operation, exactly per spec: 1) validate the 3
+   * items; 2) validate ownership; 3) validate rarity; 4) validate
+   * eligibility — steps 1-4 are checkFusionEligibility, re-run here against
+   * the REAL, current this.inventory rather than trusting an earlier UI
+   * read, so a BLOCKED result (steps 1-4 failing) leaves the inventory
+   * completely untouched — no consumption, no roll, no persist. Steps 5-8
+   * (consume the 3 items, roll, create exactly 1 superior item ONLY on
+   * success, persist) always run together as one synchronous call, so
+   * there is no window where 3 items are consumed but the operation hasn't
+   * finished — no duplication, no double-consumption, no phantom item.
+   *
+   * The success chance is FINAL (config/itemFusion.ts) and is never
+   * increased by Prestige, Mastery, Specialization, or by paying extra
+   * Gems — this method reads nothing from any of those systems. On
+   * failure the 3 items are gone with ZERO compensation — INTENCIONAL, no
+   * pity, no guarantee-after-N-attempts state anywhere.
+   */
+  attemptFusion(selectedInstanceIds: readonly string[]): FusionOutcome {
+    // Steps 1-4.
+    const eligibility = checkFusionEligibility(this.inventory, selectedInstanceIds, this.playerId);
+    if (!eligibility.ok) return { status: "BLOCKED", reason: eligibility.reason! };
+    if (!this.canModifyLoadout()) return { status: "BLOCKED", reason: "NOT_ELIGIBLE" };
+
+    const rarity = eligibility.rarity as Rarity;
+    const nextRarity = eligibility.nextRarity as Rarity;
+
+    // Step 5 — consume exactly the 3 items. Any of them currently equipped
+    // on a tower is unequipped FIRST, so no dangling equippedItemInstanceIds
+    // reference (an "item fantasma") is ever left pointing at a now-gone
+    // instanceId — the exact gap TradeManager.ts's own doc comment notes as
+    // pre-existing and out of scope to fix generally, never replicated here.
+    const consumedIds = new Set(selectedInstanceIds);
+    for (const tower of this.towers) {
+      for (let slotIndex = 0; slotIndex < tower.equippedItemInstanceIds.length; slotIndex++) {
+        if (tower.equippedItemInstanceIds[slotIndex] && consumedIds.has(tower.equippedItemInstanceIds[slotIndex]!)) {
+          unequipItemEntity(tower, slotIndex);
+        }
+      }
+    }
+    this.inventory = this.inventory.filter((item) => !consumedIds.has(item.instanceId));
+
+    for (const instanceId of selectedInstanceIds) {
+      appendLedgerEvent({
+        itemInstanceId: instanceId,
+        source: "fusion",
+        eventType: "ITEM_CONSUMED",
+        fromOwner: this.playerId,
+        toOwner: null,
+      });
+    }
+
+    // Step 6.
+    const success = rollFusion(rarity);
+
+    if (!success) {
+      appendLedgerEvent({
+        source: "fusion",
+        eventType: "ITEM_DESTROYED",
+        fromOwner: this.playerId,
+        toOwner: null,
+        amount: FUSION_ITEM_COUNT,
+      });
+      this.persist(); // Step 8.
+      this.notify();
+      return { status: "FAILURE", rarity, nextRarity };
+    }
+
+    // Step 7 — create exactly 1 superior item, ONLY on success.
+    const resultDefinitionId = pickFusionResultDefinitionId(nextRarity);
+    if (!resultDefinitionId) {
+      // Structurally unreachable (checkFusionEligibility already confirmed
+      // nextRarity is a real tier with a real item definition) — treated
+      // defensively as a failure rather than ever risking a phantom result.
+      this.persist();
+      this.notify();
+      return { status: "FAILURE", rarity, nextRarity };
+    }
+
+    const resultItem = createItemInstance(resultDefinitionId, this.playerId, { type: "FUSION", refId: "fusion" });
+    const addResult = addItemWithCapacity(this.inventory, this.overflowInventory, resultItem, this.inventoryCapacity);
+    this.inventory = addResult.inventory;
+    this.overflowInventory = addResult.overflow;
+
+    appendLedgerEvent({
+      itemInstanceId: resultItem.instanceId,
+      itemDefinitionId: resultItem.itemDefinitionId,
+      source: "fusion",
+      eventType: "ITEM_CREATED",
+      fromOwner: null,
+      toOwner: this.playerId,
+    });
+
+    this.persist(); // Step 8.
+    this.notify();
+    return { status: "SUCCESS", rarity, nextRarity, resultItem };
   }
 
   // -------------------------------------------------------------------
@@ -1694,6 +1878,7 @@ export class GameEngine {
         seasonBestWave: this.seasonBestWave,
         towerMasteryLevels: this.towerMasteryLevels,
         masteryUnlocked: this.masteryUnlocked,
+        unlockedItemSlots: this.unlockedItemSlots,
         ownedTowerSkinIds: [...this.ownedTowerSkinIds],
         equippedTowerSkinByType: this.equippedTowerSkinByType,
         unlockedSpecializationIds: this.unlockedSpecializationIds,

@@ -68,6 +68,14 @@ interface TowerInfoPanelProps {
   canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
   onEquipItem: (instanceId: string, slotIndex: number) => void;
   onUnequipItem: (slotIndex: number) => void;
+  /** SISTEMA DE SLOTS DE EQUIPAMENTO — the selected tower's per-slot unlocked state (index 0 always true). */
+  unlockedSlots: readonly boolean[];
+  /** Gems cost to unlock `slotIndex`, or null out of range. Slot 0 always reads a cost but is never shown as purchasable — already unlocked. */
+  getSlotUnlockCost: (slotIndex: number) => number | null;
+  /** Whether `slotIndex` is purchasable right now (not already unlocked AND this account can afford it). */
+  canUnlockSlot: (slotIndex: number) => boolean;
+  /** Pays the one-time, PERMANENT Gems cost to unlock `slotIndex`. Caller (this component) owns the mandatory confirmation step beforehand — Gems must never be spent without it. */
+  onUnlockSlot: (slotIndex: number) => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -101,6 +109,10 @@ export function TowerInfoPanel({
   canEquipToSlot,
   onEquipItem,
   onUnequipItem,
+  unlockedSlots,
+  getSlotUnlockCost,
+  canUnlockSlot,
+  onUnlockSlot,
 }: TowerInfoPanelProps) {
   const { t } = useLanguage();
   const theme = TOWER_THEME[tower.type];
@@ -203,7 +215,7 @@ export function TowerInfoPanel({
       />
 
       <SpecializationSection
-        key={tower.id}
+        key={`specialization-${tower.id}`}
         tower={tower}
         gold={gold}
         gems={gems}
@@ -226,13 +238,19 @@ export function TowerInfoPanel({
       />
 
       <EquipmentSection
+        key={`equipment-${tower.id}`}
         theme={theme}
         t={t}
+        gems={gems}
         itemSlots={itemSlots}
         inventory={inventory}
         canEquipToSlot={canEquipToSlot}
         onEquip={onEquipItem}
         onUnequip={onUnequipItem}
+        unlockedSlots={unlockedSlots}
+        getSlotUnlockCost={getSlotUnlockCost}
+        canUnlockSlot={canUnlockSlot}
+        onUnlockSlot={onUnlockSlot}
       />
 
       <RepositionSection theme={theme} t={t} freeAvailable={repositionFreeAvailable} onStart={onStartReposition} />
@@ -252,21 +270,37 @@ export function TowerInfoPanel({
 function EquipmentSection({
   theme,
   t,
+  gems,
   itemSlots,
   inventory,
   canEquipToSlot,
   onEquip,
   onUnequip,
+  unlockedSlots,
+  getSlotUnlockCost,
+  canUnlockSlot,
+  onUnlockSlot,
 }: {
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
+  gems: number;
   itemSlots: readonly (ItemInstance | null)[];
   inventory: readonly ItemInstance[];
   canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
   onEquip: (instanceId: string, slotIndex: number) => void;
   onUnequip: (slotIndex: number) => void;
+  unlockedSlots: readonly boolean[];
+  getSlotUnlockCost: (slotIndex: number) => number | null;
+  canUnlockSlot: (slotIndex: number) => boolean;
+  onUnlockSlot: (slotIndex: number) => void;
 }) {
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
+  // SISTEMA DE SLOTS DE EQUIPAMENTO — "confirmação obrigatória antes de
+  // QUALQUER gasto de Gemas": clicking DESBLOQUEAR only arms this
+  // confirmation step below, mirroring SpecializationSection's own
+  // "Trocar Especialização" confirm box — Gems are only ever spent from the
+  // explicit CONFIRMAR click, never from the initial click.
+  const [confirmingUnlockSlot, setConfirmingUnlockSlot] = useState<number | null>(null);
 
   return (
     <>
@@ -276,12 +310,33 @@ function EquipmentSection({
         {Array.from({ length: TOWER_ITEM_SLOT_COUNT }, (_, slotIndex) => {
           const equipped = itemSlots[slotIndex] ?? null;
           const equippedDef = equipped ? getItemDefinition(equipped.itemDefinitionId) : null;
+          const isUnlocked = unlockedSlots[slotIndex] === true;
+          const unlockCost = getSlotUnlockCost(slotIndex);
 
           return (
             <div key={slotIndex}>
               <div style={equipmentSlotRowStyle}>
                 <span style={equipmentSlotLabelStyle}>{t("towerInfo.equipment.slot", { index: slotIndex + 1 })}</span>
-                {equipped && equippedDef ? (
+                {!isUnlocked && unlockCost !== null ? (
+                  <>
+                    <span style={equipmentEmptyLabelStyle}>
+                      {gems >= unlockCost
+                        ? t("towerInfo.equipment.unlockCost", { cost: unlockCost })
+                        : t("towerInfo.equipment.insufficientGems", { cost: unlockCost - gems })}
+                    </span>
+                    <button
+                      onClick={() => setConfirmingUnlockSlot(slotIndex)}
+                      disabled={!canUnlockSlot(slotIndex)}
+                      style={{
+                        ...equipmentActionButtonStyle,
+                        borderColor: theme.primary,
+                        opacity: canUnlockSlot(slotIndex) ? 1 : 0.5,
+                      }}
+                    >
+                      {t("towerInfo.equipment.unlock")}
+                    </button>
+                  </>
+                ) : equipped && equippedDef ? (
                   <>
                     <span style={{ ...equipmentItemNameStyle, color: getRarityDefinition(equippedDef.rarity).color }}>
                       {t(`items.${equippedDef.i18nKey}.name` as TranslationKey)}
@@ -292,7 +347,7 @@ function EquipmentSection({
                   </>
                 ) : (
                   <>
-                    <span style={equipmentEmptyLabelStyle}>{t("towerInfo.equipment.empty")}</span>
+                    <span style={equipmentEmptyLabelStyle}>{t("towerInfo.equipment.unlocked")}</span>
                     <button
                       onClick={() => setPickingSlot(pickingSlot === slotIndex ? null : slotIndex)}
                       style={{ ...equipmentActionButtonStyle, borderColor: theme.primary }}
@@ -302,6 +357,35 @@ function EquipmentSection({
                   </>
                 )}
               </div>
+
+              {confirmingUnlockSlot === slotIndex && unlockCost !== null && (
+                <div style={switchConfirmBoxStyle}>
+                  <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
+                    {t("towerInfo.equipment.unlockConfirm", { index: slotIndex + 1, cost: unlockCost })}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    <button
+                      onClick={() => {
+                        onUnlockSlot(slotIndex);
+                        setConfirmingUnlockSlot(null);
+                      }}
+                      style={{ ...upgradeButtonStyle, width: "100%", marginTop: 0, borderColor: theme.primary }}
+                    >
+                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                        {t("towerInfo.equipment.unlockConfirmYes")}
+                        <span style={{ opacity: 0.6 }}>·</span>
+                        <GemIcon size={10} color={PALETTE.gem} /> {unlockCost}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setConfirmingUnlockSlot(null)}
+                      style={{ ...switchButtonStyle, width: "100%", marginTop: 0, textAlign: "center" }}
+                    >
+                      {t("towerInfo.equipment.unlockConfirmNo")}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {pickingSlot === slotIndex && (
                 <EquipmentPicker
