@@ -2,6 +2,7 @@ import { ENEMY_DEFINITIONS, getScaledEnemyStats, type EnemyType } from "@/config
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
 import { CC_DR_DECAY_MS, CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "@/config/ccResistance";
+import { getEnragedShieldReduction } from "@/config/enrageShield";
 
 /**
  * P0 root-cause fix (mini-boss HP appearing "stuck"): passive regen
@@ -214,10 +215,25 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
  * fraction of the reduction for this hit only, without touching the
  * enemy's actual `damageReduction` field — Stormcaller's Arcane Surge is
  * the only caller that passes a non-zero value. Returns actual damage dealt.
+ *
+ * SHIELD DURANTE O MODO ENFURECIDO — a second, independent reduction layer
+ * (config/enrageShield.ts) stacks multiplicatively on top of the normal
+ * damageReduction/armorPenetration math whenever `enemy.boss.enraged` is
+ * true (the ONE real Enraged flag — see engine/BossManager.ts, never a
+ * second parallel state here). It reads that live flag on every call, so
+ * it can never linger a single tick past Enraged actually ending, and it
+ * never touches HP/maxHp directly — this is purely a smaller fraction of
+ * `rawDamage` reaching `enemy.hp`, same shape as every other reduction.
  */
 export function applyDamageToEnemy(enemy: EnemyInstance, rawDamage: number, armorPenetration = 0): number {
-  const effectiveReduction = enemy.damageReduction * (1 - armorPenetration);
-  const actualDamage = rawDamage * (1 - effectiveReduction);
+  const normalReduction = enemy.damageReduction * (1 - armorPenetration);
+  const enrageShieldReduction = getEnragedShieldReduction(
+    enemy.boss !== undefined,
+    enemy.boss?.isMainBoss === true,
+    enemy.boss?.enraged === true,
+  );
+  const survivingFraction = (1 - normalReduction) * (1 - enrageShieldReduction);
+  const actualDamage = rawDamage * survivingFraction;
   enemy.hp = Math.max(0, enemy.hp - actualDamage);
   if (actualDamage > 0) enemy.msSinceLastDamage = 0;
   return actualDamage;

@@ -410,3 +410,83 @@ describe("Regen suppression window (P0 fix: mini-boss HP appearing stuck at maxH
     );
   });
 });
+
+/**
+ * SHIELD DURANTE O MODO ENFURECIDO — the ONE real Enraged flag this reads
+ * is `enemy.boss.enraged` (set by engine/BossManager.tickBossAbilities'
+ * ENRAGE_HP_THRESHOLD crossing, or a BERSERKER mini-boss's own equivalent
+ * trigger) — never a second parallel state. These tests drive that exact
+ * field directly on real boss/mini-boss instances from createBossInstance,
+ * through the real applyDamageToEnemy pipeline, matching the 8-point
+ * contract from the feature request.
+ */
+describe("Enrage Shield damage reduction (SHIELD DURANTE O MODO ENFURECIDO)", () => {
+  it("1. a normal (not Enraged) Boss receives full damage — no shield reduction", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = false;
+    const dealt = applyDamageToEnemy(boss, 100);
+    expect(dealt).toBe(100);
+  });
+
+  it("2. a normal (not Enraged) Mini-Boss receives full damage — no shield reduction", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = false;
+    const dealt = applyDamageToEnemy(boss, 100);
+    expect(dealt).toBe(100);
+  });
+
+  it("3. an Enraged Boss takes exactly 30% less damage (100 -> 70)", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = true;
+    const dealt = applyDamageToEnemy(boss, 100);
+    expect(dealt).toBe(70);
+  });
+
+  it("4. an Enraged Mini-Boss takes exactly 20% less damage (100 -> 80)", () => {
+    const boss = createBossInstance(MINI_BOSSES["mossback-regenerator"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = true;
+    const dealt = applyDamageToEnemy(boss, 100);
+    expect(dealt).toBe(80);
+  });
+
+  it("5. leaving the Enraged state makes the shield disappear immediately — the very next hit takes full damage again", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = true;
+    expect(applyDamageToEnemy(boss, 100)).toBe(70); // shielded
+
+    boss.boss!.enraged = false; // Enraged ends (no separate shield timer to also clear — reads the live flag)
+    expect(applyDamageToEnemy(boss, 100)).toBe(100); // shield gone on this exact next hit
+  });
+
+  it("6. a normal (non-boss) enemy never receives this shield, whatever its own state", () => {
+    const grunt = createEnemyInstance("RUNNER", 30);
+    grunt.damageReduction = 0;
+    expect(grunt.boss).toBeUndefined();
+    const dealt = applyDamageToEnemy(grunt, 100);
+    expect(dealt).toBe(100);
+  });
+
+  it("7. final damage combines the shield correctly with the enemy's own damageReduction and armorPenetration (multiplicative, same shape as the existing pipeline)", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0.25;
+    boss.boss!.enraged = true;
+    const armorPenetration = 0.4;
+    const dealt = applyDamageToEnemy(boss, 200, armorPenetration);
+    const expected = 200 * (1 - 0.25 * (1 - armorPenetration)) * (1 - 0.3);
+    expect(dealt).toBeCloseTo(expected, 9);
+  });
+
+  it("8. the shield is never applied twice on a single hit — one call to applyDamageToEnemy reduces by exactly one factor of (1 - reduction), not compounded", () => {
+    const boss = createBossInstance(MAIN_BOSSES["hollow-warden"]!, 30, 0);
+    boss.damageReduction = 0;
+    boss.boss!.enraged = true;
+    const dealt = applyDamageToEnemy(boss, 100);
+    expect(dealt).toBe(70); // NOT 100 * (1-0.3) * (1-0.3) = 49 — a single application only
+    expect(dealt).not.toBeCloseTo(100 * (1 - 0.3) * (1 - 0.3), 9);
+  });
+});

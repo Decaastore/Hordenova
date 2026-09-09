@@ -1518,6 +1518,35 @@ export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance
   ctx.restore();
 }
 
+/**
+ * SHIELD DURANTE O MODO ENFURECIDO — a slowly-rotating, dashed icy-violet
+ * ring drawn on top of an Enraged Boss/Mini-Boss's own body (called after
+ * drawEnemy, unlike drawBossAura's glow-behind-the-body treatment) so the
+ * "this hit is being reduced" read is unmistakable without covering the
+ * creature or duplicating its HP bar. Reads directly off the real
+ * `enemy.boss.enraged` flag — the same one entities/Enemy.ts's
+ * applyDamageToEnemy uses for the actual damage math, never a second
+ * parallel state — so it appears and disappears in perfect lockstep with
+ * the real reduction, not a moment late or early.
+ */
+export function drawEnrageShieldRing(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
+  if (!enemy.boss?.enraged) return;
+  const baseRadius = enemy.boss.isMainBoss ? 36 : 25;
+  const pulse = 0.9 + 0.1 * Math.sin(timeMs / 260);
+  const radius = baseRadius * pulse;
+
+  ctx.save();
+  ctx.strokeStyle = STATUS_COLORS.enrageShield;
+  ctx.globalAlpha = 0.75;
+  ctx.lineWidth = enemy.boss.isMainBoss ? 2.6 : 2;
+  ctx.setLineDash([7, 6]);
+  ctx.lineDashOffset = -(timeMs / 25) % 13; // slow rotation read — a living ward, not a static ring
+  ctx.beginPath();
+  ctx.arc(enemy.position.x, enemy.position.y, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** Pulsing golden aura marking an Elite spawn (spec section 5) — a consistent "this one's different" cue independent of its base archetype's own theme color. */
 export function drawEliteAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
   if (!enemy.elite) return;
@@ -1688,8 +1717,12 @@ function drawMiniBossHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance):
     ctx.restore();
   }
 
-  ctx.strokeStyle = "rgba(255,120,60,0.9)"; // a distinct ember-orange border — reads as "important" without borrowing the main boss's own red
-  ctx.lineWidth = 1.4;
+  // SHIELD DURANTE O MODO ENFURECIDO — while Enraged (the same real flag
+  // the damage math reads), the bar's own border switches to the shield's
+  // icy-violet so the life indicator itself communicates "protected right
+  // now," not just the separate ring drawn around the body.
+  ctx.strokeStyle = enemy.boss?.enraged ? STATUS_COLORS.enrageShield : "rgba(255,120,60,0.9)"; // ember-orange border normally — reads as "important" without borrowing the main boss's own red
+  ctx.lineWidth = enemy.boss?.enraged ? 2 : 1.4;
   roundedRect(ctx, barX, barY, barWidth, barHeight, r);
   ctx.stroke();
 

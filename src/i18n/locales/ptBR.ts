@@ -202,6 +202,7 @@ export const ptBR: TranslationSchema = {
     defeatedLine: "{name} derrotado",
     rewardLine: "+{amount} Ouro",
     enraged: "ENFURECIDO",
+    enrageShield: "ESCUDO -{percent}% DANO",
   },
   progressionStopped: {
     title: "PROGRESSÃO INTERROMPIDA",
@@ -673,6 +674,9 @@ export const ptBR: TranslationSchema = {
       SYSTEMS: "Sistemas",
     },
     entries: {
+      v10: {
+        enrageShield: "Bosses e Mini-Bosses agora recebem um Escudo defensivo enquanto estão Enfurecidos: Bosses recebem 30% menos dano e Mini-Bosses 20% menos dano nesse estado, com um efeito visual claro (anel ao redor do inimigo + borda da barra de vida) que desaparece assim que o Enfurecido termina.",
+      },
       v9: {
         prestigeProfileDetail: "A aba de Estatísticas do Inventário agora mostra o Prestígio em detalhe: benefícios atuais, custo e ganho do próximo nível, e uma lista completa de progressão — tudo calculado ao vivo pelo sistema real, sem novos bônus ou mudança de preço.",
       },

@@ -1,8 +1,9 @@
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
-import { PALETTE } from "@/rendering/theme";
+import { PALETTE, STATUS_COLORS } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
+import { getEnragedShieldReduction } from "@/config/enrageShield";
 
 interface BossBannerProps {
   hud: HudSnapshot;
@@ -27,6 +28,11 @@ export function BossBanner({ hud }: BossBannerProps) {
   const bossName = t(`bosses.${hud.bossNameKey}.name` as TranslationKey);
   const hpRatio = hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1;
   const isEnraged = hud.phase === "BOSS_BATTLE" && hpRatio <= ENRAGE_HP_RATIO;
+  // SHIELD DURANTE O MODO ENFURECIDO — reuses the same real reduction
+  // function entities/Enemy.ts's applyDamageToEnemy calls (isMainBoss=true
+  // here since this banner only ever shows the main boss), so the
+  // displayed percentage can never drift from the actual damage math.
+  const shieldReduction = getEnragedShieldReduction(true, true, isEnraged);
 
   if (victoryReward !== null) {
     return (
@@ -42,7 +48,14 @@ export function BossBanner({ hud }: BossBannerProps) {
       <div style={nameStyle}>{t("boss.introLine", { name: bossName })}</div>
       {hud.phase === "BOSS_BATTLE" ? (
         <>
-          {isEnraged && <div style={enragedTagStyle}>{t("boss.enraged")}</div>}
+          {isEnraged && (
+            <div style={tagRowStyle}>
+              <div style={enragedTagStyle}>{t("boss.enraged")}</div>
+              {shieldReduction > 0 && (
+                <div style={shieldTagStyle}>{t("boss.enrageShield", { percent: Math.round(shieldReduction * 100) })}</div>
+              )}
+            </div>
+          )}
           <div style={barTrackStyle}>
             <div style={{ ...barFillStyle, width: `${hpRatio * 100}%`, background: isEnraged ? enragedGradient : barFillStyle.background }} />
           </div>
@@ -131,4 +144,19 @@ const enragedTagStyle: CSSProperties = {
   letterSpacing: 1.5,
   color: "#ff6a4a",
   textShadow: "0 0 8px rgba(255,60,30,0.8)",
+};
+
+const tagRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+};
+
+/** SHIELD DURANTE O MODO ENFURECIDO — matches drawEnrageShieldRing/the mini-boss bar's own icy-violet so the same buff reads consistently everywhere it's shown. */
+const shieldTagStyle: CSSProperties = {
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: 1.2,
+  color: STATUS_COLORS.enrageShield,
+  textShadow: `0 0 8px ${STATUS_COLORS.enrageShield}99`,
 };

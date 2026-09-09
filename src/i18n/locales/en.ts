@@ -201,6 +201,7 @@ export const en = {
     defeatedLine: "{name} defeated",
     rewardLine: "+{amount} Gold",
     enraged: "ENRAGED",
+    enrageShield: "SHIELDED -{percent}% DMG",
   },
   progressionStopped: {
     title: "PROGRESSION STOPPED",
@@ -672,6 +673,9 @@ export const en = {
       SYSTEMS: "Systems",
     },
     entries: {
+      v10: {
+        enrageShield: "Bosses and Mini-Bosses now gain a defensive Shield while Enraged: Bosses take 30% less damage and Mini-Bosses take 20% less damage in that state, with a clear visual (a ring around the enemy plus a shield-tinted HP bar border) that disappears the instant Enraged ends.",
+      },
       v9: {
         prestigeProfileDetail: "The Inventory's Stats tab now shows Prestige in full detail: current benefits, the next level's cost and gain, and a complete progression list — all computed live from the real system, with no new bonuses or price changes.",
       },

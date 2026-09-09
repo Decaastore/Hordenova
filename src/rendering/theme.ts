@@ -86,6 +86,8 @@ export const STATUS_COLORS = {
   burn: "#ff8a3a",
   critFlash: "#ffe9a0",
   hitFlash: "#ffffff",
+  /** SHIELD DURANTE O MODO ENFURECIDO (config/enrageShield.ts) — a distinct icy-violet ward color, never reused elsewhere, so a shielded Boss/Mini-Boss reads unmistakably differently from the enrage aura's own red or the slow ring's plain blue. */
+  enrageShield: "#8ec9ff",
 } as const;
 
 /**

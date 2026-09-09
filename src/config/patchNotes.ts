@@ -62,6 +62,11 @@ export interface PatchNoteVersion {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteVersion[] = [
   {
+    id: "v10",
+    dateIso: "2026-09-09",
+    items: [{ type: "NEW", category: "BOSSES", i18nKey: "enrageShield" }],
+  },
+  {
     id: "v9",
     dateIso: "2026-09-08",
     items: [{ type: "CHANGE", category: "INTERFACE", i18nKey: "prestigeProfileDetail" }],

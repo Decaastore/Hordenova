@@ -18,7 +18,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawProjectile, drawTower } from "./EntityRenderer";
+import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
@@ -214,6 +214,10 @@ export function CanvasRenderer({
         const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;
         const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
         drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale);
+        // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself
+        // (unlike drawBossAura's glow-behind treatment), reading the same
+        // real `enemy.boss.enraged` flag the damage math uses.
+        if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
 
