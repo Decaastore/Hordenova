@@ -479,7 +479,7 @@ export const en = {
     testingReset: {
       button: "RESET SEASON PROGRESS (TESTING)",
       confirm:
-        "This resets ALL season progression to zero: Best Wave, current wave, Tower Levels, Mastery Levels, Specialization Levels, and Gold. Mastery/Specialization ownership, Gems, skins, achievements, Prestige and equipment-slot unlocks are NOT affected. This cannot be undone.",
+        "This resets ALL season progression to zero: Best Wave, current wave, Gold, and it REMOVES every tower currently placed on the map (so their Levels, Mastery Levels and Specialization Levels go with them). You start the test as if you had never placed a tower this Season. Mastery/Specialization ownership, Gems, skins, achievements, Prestige, equipment-slot unlocks and your inventory are NOT affected — you can place towers again right away. This cannot be undone.",
       confirmYes: "RESET NOW",
       confirmNo: "Cancel",
       done: "Season progression reset.",

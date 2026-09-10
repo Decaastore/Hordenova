@@ -273,45 +273,53 @@ export function syncSeasonIfNeeded(): void {
  * independent reset path a tester can fire at will, any time, without
  * waiting for or faking a real season rollover.
  *
- * Shares the exact SEASONAL reset shape syncSeasonIfNeeded already uses
- * (tower level/specialization/Mastery level back to a fresh state, Gold back
- * to the run-start amount, currentWave/seasonBestWave to 0) with exactly one
- * addition: it also zeroes the all-time `bestWave` record, since spec
- * section 9 explicitly lists "Best Wave" among the fields a testing reset
- * must clear and requires that "old Best Wave must never reappear after
- * reload" — something a real season boundary deliberately never does (that
- * field is permanent there) but this manual testing tool explicitly must.
+ * Deliberately DIFFERENT from syncSeasonIfNeeded in one key way: a real
+ * Season boundary keeps every placed tower on the map (only its level/
+ * specialization/Mastery-level resets — see that function's own header),
+ * but THIS manual testing reset must clear the map itself — "the player
+ * must start the test as if they had never placed a tower this Season" is
+ * an explicit requirement, not just a fresh level-1/no-specialization state
+ * for towers that stay standing. `towerLoadout` (entities/Tower.ts's
+ * `TowerLoadoutEntry[]`) is the ONLY persisted representation of "which
+ * towers are placed on the map, in which slots" — GameEngine's constructor
+ * does exactly `this.towers = save.towerLoadout.map(instantiateFromLoadout)`
+ * on every resume, and its own `persist()` writes `this.towers` straight
+ * back into that same field — so setting it to `[]` here is both necessary
+ * and sufficient to empty the map, and (being a real `updateSave` write to
+ * the persistent save, not an in-memory GameEngine mutation) survives a
+ * reload with no separate step required. A tower's TYPE was never "unlocked
+ * by placing it" in this codebase (every owned type has always been
+ * buildable from an empty map) — clearing this array only un-places the
+ * towers, it can never un-own a type.
+ *
+ * Also zeroes the all-time `bestWave` record, since spec section 9
+ * explicitly lists "Best Wave" among the fields a testing reset must clear
+ * and requires that "old Best Wave must never reappear after reload" —
+ * something a real season boundary deliberately never does (that field is
+ * permanent there) but this manual testing tool explicitly must.
  *
  * PRESERVED — same permanent bucket this file's header already documents,
  * completely untouched by this function: `playerId`, `gems`/`gemShards`,
  * `prestigeLevel`, `masteryUnlocked` (ownership), `unlockedSpecializationIds`
  * (ownership), `unlockedItemSlots`, `ownedTowerSkinIds`/
- * `equippedTowerSkinByType`, `inventory`/`equippedItemInstanceIds`,
- * `ownedCosmetics`, `ascensionHistory`/`seasonRewardRecords`/
- * `ascensionSeasonsWon`/`ascensionTop3`/`ascensionTop5`. Spec section 9's own
- * words: "Season reset = resetar PROGRESSÃO. Season reset NÃO = apagar
- * OWNERSHIP." — never call this expecting it to touch any of the above.
+ * `equippedTowerSkinByType`, `inventory`, `ownedCosmetics`,
+ * `ascensionHistory`/`seasonRewardRecords`/`ascensionSeasonsWon`/
+ * `ascensionTop3`/`ascensionTop5`. Any item that was equipped on a now-
+ * removed tower simply goes back to being owned-but-unequipped — its
+ * `ItemInstance` in `inventory` (the actual, permanent record of ownership)
+ * is never touched by clearing `towerLoadout`. Spec section 9's own words:
+ * "Season reset = resetar PROGRESSÃO. Season reset NÃO = apagar OWNERSHIP."
+ * — never call this expecting it to touch any of the above.
  */
 export function resetSeasonProgressionForTesting(): void {
-  const main = loadSave();
-
-  const resetLoadout: TowerLoadoutEntry[] = main.towerLoadout.map((entry) => ({
-    slotId: entry.slotId,
-    type: entry.type,
-    level: 1,
-    specializationId: null,
-    specializationLevel: 0,
-    equippedSkinId: null,
-    masteryLevel: 0,
-    equippedItemInstanceIds: entry.equippedItemInstanceIds,
-  }));
-
   updateSave({
     bestWave: 0,
     seasonBestWave: 0,
+    // Empties the map — see the doc comment above for why this single
+    // field is both the necessary and sufficient persisted state to clear.
+    towerLoadout: [],
     currentWave: 0,
     gold: RUN_START.startingGold,
-    towerLoadout: resetLoadout,
     towerMasteryLevels: {},
   });
 }

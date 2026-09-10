@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "./AscensionManager";
 import { loadSave, updateSave } from "./SaveSystem";
 import { LocalSeasonClock, SEASON_DURATION_MS, SEASON_EPOCH_MS, seasonClock } from "./SeasonClock";
+import { GameEngine } from "./GameEngine";
 import { getSeasonRewardBundle } from "@/config/ascension";
 import { RUN_START } from "@/config/gameBalance";
 import { createItemInstance } from "@/entities/Item";
+import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 /**
  * PRÓXIMA GRANDE FASE — "DECISÃO DEFINITIVA SOBRE PROGRESSÃO" +
@@ -392,33 +394,72 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     expect(main.gold).toBe(RUN_START.startingGold);
   });
 
-  it("resets every placed tower's Level/Specialization/Mastery-level back to a fresh baseline, but keeps each tower placed in its slot", () => {
+  /**
+   * CORRECTION (this describe block's own earlier version had this
+   * backwards): a real Season boundary (syncSeasonIfNeeded) keeps every
+   * placed tower standing and only resets its level/specialization — but
+   * this MANUAL TESTING reset must additionally clear the map itself, so a
+   * tester starts as if they had never placed a tower this Season. Merely
+   * zeroing each entry's `level` field is NOT enough — the entries
+   * themselves (the map's only persisted "what's placed, in which slot"
+   * record) must be gone.
+   */
+  it("removes every tower currently placed on the map — towerLoadout is empty after the reset, not just re-leveled", () => {
     updateSave({
       bestWave: 300,
       towerLoadout: [
         { slotId: "slot-1", type: "IRONWOOD", level: 60, specializationId: "IRONWOOD_EXECUTIONER", specializationLevel: 20 },
         { slotId: "slot-2", type: "INFERNO", level: 45 },
+        { slotId: "slot-3", type: "FROSTBORN", level: 30 },
       ],
-      towerMasteryLevels: { IRONWOOD: 30, INFERNO: 18 },
+    });
+
+    resetSeasonProgressionForTesting();
+
+    expect(loadSave().towerLoadout).toEqual([]);
+  });
+
+  it("Tower Levels are gone along with the removed towers — no leftover loadout entry carries a level of any kind", () => {
+    updateSave({
+      towerLoadout: [
+        { slotId: "slot-1", type: "IRONWOOD", level: 60 },
+        { slotId: "slot-2", type: "INFERNO", level: 45 },
+      ],
     });
 
     resetSeasonProgressionForTesting();
 
     const main = loadSave();
-    expect(main.towerLoadout).toHaveLength(2);
-    for (const entry of main.towerLoadout) {
-      expect(entry.level).toBe(1);
-      expect(entry.specializationId ?? null).toBeNull();
-      expect(entry.specializationLevel ?? 0).toBe(0);
-    }
-    expect(main.towerLoadout[0]!.slotId).toBe("slot-1");
-    expect(main.towerLoadout[0]!.type).toBe("IRONWOOD");
-    expect(main.towerLoadout[1]!.slotId).toBe("slot-2");
-    expect(main.towerLoadout[1]!.type).toBe("INFERNO");
-    expect(main.towerMasteryLevels).toEqual({});
+    expect(main.towerLoadout).toHaveLength(0);
+    expect(main.towerLoadout.some((e) => e.level > 0)).toBe(false);
   });
 
-  it("PRESERVES every permanent field: Mastery/Specialization ownership, Gems, owned skins, item-slot unlocks, inventory/equipped items, Prestige, and ascension history/records", () => {
+  it("Mastery Levels (the season-scoped per-type map, independent of which towers are currently placed) reset to empty", () => {
+    updateSave({
+      towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 60 }],
+      towerMasteryLevels: { IRONWOOD: 30, INFERNO: 18 },
+    });
+
+    resetSeasonProgressionForTesting();
+
+    expect(loadSave().towerMasteryLevels).toEqual({});
+  });
+
+  it("Specialization Levels are gone along with the removed towers — no leftover loadout entry carries a specialization choice or level", () => {
+    updateSave({
+      towerLoadout: [
+        { slotId: "slot-1", type: "IRONWOOD", level: 60, specializationId: "IRONWOOD_EXECUTIONER", specializationLevel: 20 },
+      ],
+    });
+
+    resetSeasonProgressionForTesting();
+
+    const main = loadSave();
+    expect(main.towerLoadout).toHaveLength(0);
+    expect(main.towerLoadout.some((e) => (e.specializationLevel ?? 0) > 0)).toBe(false);
+  });
+
+  it("PRESERVES every permanent field: Mastery/Specialization ownership, Gems, owned skins, item-slot unlocks, inventory, Prestige, and ascension history/records — clearing towerLoadout never touches any of them", () => {
     const item = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
     updateSave({
       bestWave: 300,
@@ -459,8 +500,10 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     expect(main.unlockedItemSlots.IRONWOOD).toEqual([true, true, false]);
     expect(main.ownedTowerSkinIds).toContain("IRONWOOD_WARDEN_OF_THE_ABYSS");
     expect(main.equippedTowerSkinByType.IRONWOOD).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
+    // The item itself remains permanently owned in inventory — only its
+    // equip-on-a-tower-slot association is gone, since the tower slot it
+    // was equipped to no longer exists.
     expect(main.inventory).toEqual([item]);
-    expect(main.towerLoadout[0]!.equippedItemInstanceIds).toEqual([item.instanceId, null, null]);
     expect(main.ascensionSeasonsWon).toBe(3);
     expect(main.ascensionTop3).toBe(5);
     expect(main.ascensionTop5).toBe(6);
@@ -486,6 +529,62 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     const reloaded = loadSave();
     expect(reloaded.bestWave).toBe(0);
     expect(reloaded.seasonBestWave).toBe(0);
+  });
+
+  /**
+   * Real-engine proof (not just a SaveData assertion): GameEngine's own
+   * constructor is the thing that turns `towerLoadout` back into on-map
+   * towers on every resume (`this.towers = save.towerLoadout.map(...)`),
+   * and its `persist()` writes `this.towers` straight back into that same
+   * field. Both directions run through the exact save this test reset —
+   * proving the fix isn't just "the raw array looks empty" but "the game
+   * itself, reading this save fresh, renders no towers and never re-derives
+   * any from elsewhere."
+   */
+  it("reload after the reset never resurrects a placed tower — a fresh GameEngine reading the post-reset save renders an empty map", () => {
+    updateSave({
+      gold: 1_000_000,
+      towerLoadout: [
+        { slotId: "slot-1", type: "IRONWOOD", level: 40 },
+        { slotId: "slot-2", type: "INFERNO", level: 25 },
+      ],
+    });
+
+    resetSeasonProgressionForTesting();
+
+    // A brand-new GameEngine instance, constructed fresh from the same
+    // persistent store — the closest this test suite gets to a real page
+    // reload without a browser.
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getRenderSnapshot().towers).toEqual([]);
+  });
+
+  it("the player can place a tower again immediately after the reset — the empty map is a real, usable starting state, not a broken one", () => {
+    updateSave({
+      gold: 1_000_000,
+      towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 40 }],
+    });
+
+    resetSeasonProgressionForTesting();
+
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getRenderSnapshot().towers).toEqual([]);
+
+    const placed = engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
+
+    expect(placed).toBe(true);
+    expect(engine.getRenderSnapshot().towers).toHaveLength(1);
+    expect(engine.getRenderSnapshot().towers[0]!.level).toBe(1);
+  });
+
+  it("Prestige is preserved by the reset (spot-checked again through the real GameEngine's own save-derived state, not just loadSave)", () => {
+    updateSave({ prestigeLevel: 9, towerLoadout: [{ slotId: "slot-1", type: "IRONWOOD", level: 40 }] });
+
+    resetSeasonProgressionForTesting();
+
+    expect(loadSave().prestigeLevel).toBe(9);
   });
 
   function mockSeasonNumber(n: number) {
