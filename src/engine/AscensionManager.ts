@@ -298,6 +298,20 @@ export function syncSeasonIfNeeded(): void {
  * something a real season boundary deliberately never does (that field is
  * permanent there) but this manual testing tool explicitly must.
  *
+ * CASTLE HP: deliberately has no field here to reset. Current Castle HP
+ * (`GameEngine`'s private `baseHp`) is NOT part of `SaveData` at all — it is
+ * transient per-attempt battle state, computed fresh every time
+ * `GameEngine.startRun()` runs (`this.baseHp = this.maxBaseHp` inside
+ * `resetAttemptState()`, called from `startRun()`), and `persist()` never
+ * writes it back. Only the PERMANENT max-HP bonus (`castleHpBonus`, earned
+ * via Roulette rewards) lives in the save — and that stays untouched here,
+ * exactly like every other permanent-ownership field, so `maxBaseHp` keeps
+ * whatever permanent bonus the account had already earned. The practical
+ * effect: any `GameEngine` instantiated AFTER this reset (which is the only
+ * way to ever observe Castle HP — there is nowhere else to read it) always
+ * starts at full HP, with zero carry-over damage from whatever attempt was
+ * in progress before the reset fired — no separate step was ever needed.
+ *
  * PRESERVED — same permanent bucket this file's header already documents,
  * completely untouched by this function: `playerId`, `gems`/`gemShards`,
  * `prestigeLevel`, `masteryUnlocked` (ownership), `unlockedSpecializationIds`

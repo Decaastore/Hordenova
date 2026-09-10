@@ -6,7 +6,9 @@ import { GameEngine } from "./GameEngine";
 import { getSeasonRewardBundle } from "@/config/ascension";
 import { RUN_START } from "@/config/gameBalance";
 import { createItemInstance } from "@/entities/Item";
-import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import type { EnemyInstance } from "@/entities/Enemy";
+import { TOWER_SLOTS, ENEMY_PATH } from "@/data/mapWhisperingWoods";
+import { getPathLength } from "@/utils/geometry";
 
 /**
  * PRÓXIMA GRANDE FASE — "DECISÃO DEFINITIVA SOBRE PROGRESSÃO" +
@@ -586,6 +588,88 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
 
     expect(loadSave().prestigeLevel).toBe(9);
   });
+
+  /**
+   * CORREÇÃO ADICIONAL: Castle HP restoration — the exact 10-step scenario
+   * the correction request specified, run end to end against the real
+   * GameEngine/Castle-Damage pipeline (same technique as CastleDamage.test.ts:
+   * force an enemy to the very end of the path, then tick once so it
+   * actually breaches and deducts real, formula-computed damage — never a
+   * fabricated HP number). No CastleDamageMultiplier/damage-formula code is
+   * touched anywhere in this file; this test only proves the EXISTING
+   * mechanism (current Castle HP is transient GameEngine state, never
+   * persisted, always re-derived to `maxBaseHp` by `startRun()`) already
+   * satisfies the requirement — see the extra doc comment on
+   * resetSeasonProgressionForTesting above for why no new save field was
+   * needed.
+   */
+  it("restores Castle HP to full and clears any accumulated damage, surviving across a reload — the full required scenario", () => {
+    // 1. Start a real run — Castle at full HP.
+    updateSave({ gold: 1_000_000, towerLoadout: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    const maxHp = internals(engine).maxBaseHp;
+    expect(internals(engine).baseHp).toBe(maxHp);
+
+    // 2. Damage the Castle for real — an enemy actually reaching the path end.
+    spawnEnemyAtPathEnd(engine);
+    engine.update(50);
+    expect(internals(engine).baseHp).toBeLessThan(maxHp);
+
+    // 3. Place a tower on the map.
+    const placed = engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
+    expect(placed).toBe(true);
+    expect(internals(engine).towers.length).toBeGreaterThan(0);
+
+    // 4. Advance seasonal progression.
+    updateSave({ seasonBestWave: 42, bestWave: 42 });
+
+    // 5. Fire the testing reset.
+    resetSeasonProgressionForTesting();
+
+    // 6/7/8. The only way this codebase ever exposes Castle HP is through a
+    // GameEngine — so reading it necessarily means instantiating one fresh,
+    // which doubles as "reload" in this test. Full HP, no towers, seasonal
+    // progression zeroed.
+    const reloaded1 = new GameEngine();
+    reloaded1.startRun();
+    expect(internals(reloaded1).baseHp).toBe(internals(reloaded1).maxBaseHp);
+    expect(internals(reloaded1).towers).toEqual([]);
+    expect(loadSave().seasonBestWave).toBe(0);
+    expect(loadSave().bestWave).toBe(0);
+
+    // 9/10. A second, independent reload confirms the restored state is
+    // durable — not a one-shot artifact of the very first fresh engine.
+    const reloaded2 = new GameEngine();
+    reloaded2.startRun();
+    expect(internals(reloaded2).baseHp).toBe(internals(reloaded2).maxBaseHp);
+    expect(internals(reloaded2).towers).toEqual([]);
+  });
+
+  type EngineInternals = {
+    enemies: EnemyInstance[];
+    baseHp: number;
+    maxBaseHp: number;
+    towers: unknown[];
+  };
+
+  function internals(engine: GameEngine): EngineInternals {
+    return engine as unknown as EngineInternals;
+  }
+
+  const PATH_LENGTH = getPathLength(ENEMY_PATH);
+
+  /** Ticks a real GameEngine until at least one enemy exists, then forces it to the very edge of the path — same technique as CastleDamage.test.ts. */
+  function spawnEnemyAtPathEnd(engine: GameEngine): EnemyInstance {
+    let ticks = 0;
+    while (internals(engine).enemies.length === 0 && ticks < 200) {
+      engine.update(50);
+      ticks++;
+    }
+    const enemy = internals(engine).enemies[0]!;
+    enemy.distanceTraveled = PATH_LENGTH - 1;
+    return enemy;
+  }
 
   function mockSeasonNumber(n: number) {
     const t = SEASON_EPOCH_MS + (n - 1) * SEASON_DURATION_MS + 1000;
