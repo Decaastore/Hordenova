@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
+import { isWebGLAvailable } from "@/rendering3d/webglSupport";
+import { Enemy3DErrorBoundary } from "@/rendering3d/Enemy3DErrorBoundary";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { audioManager } from "@/audio/AudioManager";
 import { CanvasRenderer } from "@/rendering/CanvasRenderer";
@@ -21,6 +23,12 @@ import { RepositioningOverlay } from "@/ui/RepositioningOverlay";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 
+// INIMIGOS 3D — dynamic import so three.js/@react-three/fiber never land in
+// this screen's own bundle unless the overlay actually mounts (gated by
+// `isWebGLAvailable()` below); on any environment without WebGL, this
+// import is never even requested.
+const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
+
 interface GameScreenProps {
   onExitToMenu: () => void;
 }
@@ -35,6 +43,16 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // re-armed whenever a fresh PROGRESSION_STOPPED report comes in.
   const [reportDismissed, setReportDismissed] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+
+  // INIMIGOS 3D — pilot scope: only BRUTE gets a 3D model (see
+  // rendering3d/BruteEnemyLayer.tsx). `enable3DEnemies` starts as the
+  // WebGL-availability check and can only ever be turned OFF at runtime
+  // (by the error boundary below) — never back on — which is exactly the
+  // "never end up with no enemies" fallback contract: once disabled for
+  // this session, 2D enemy rendering (already the default when this ref
+  // stays empty) takes over permanently instead of retrying.
+  const [enable3DEnemies, setEnable3DEnemies] = useState(() => isWebGLAvailable());
+  const hidden3DEnemyIdsRef = useRef<Set<string>>(new Set());
 
   // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
   // small state machine: "picking" a destination on the map, then either
@@ -140,7 +158,20 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           onSlotClick={handleSlotClick}
           onTowerClick={handleTowerClick}
           onBackgroundClick={handleBackgroundClick}
+          hidden3DEnemyIds={hidden3DEnemyIdsRef}
         />
+        {enable3DEnemies && (
+          <Enemy3DErrorBoundary
+            onError={() => {
+              hidden3DEnemyIdsRef.current.clear();
+              setEnable3DEnemies(false);
+            }}
+          >
+            <Suspense fallback={null}>
+              <Enemy3DOverlay engine={engine} hiddenIdsRef={hidden3DEnemyIdsRef} />
+            </Suspense>
+          </Enemy3DErrorBoundary>
+        )}
 
         <AscensionHudBadge />
         <BossBanner hud={hud} />

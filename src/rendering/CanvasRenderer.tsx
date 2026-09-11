@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
 import type { TowerType } from "@/config/towerStats";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
@@ -39,6 +39,15 @@ interface CanvasRendererProps {
   onSlotClick: (slotId: string) => void;
   onTowerClick: (towerId: string) => void;
   onBackgroundClick: () => void;
+  /**
+   * INIMIGOS 3D — ids currently covered by the 3D enemy overlay (see
+   * `src/rendering3d/`), read fresh each frame so their 2D sprite is never
+   * drawn underneath it. Optional and defaults to nothing hidden, so a
+   * caller that never passes this (or an environment where the 3D overlay
+   * never mounts — no WebGL, load error) leaves 2D enemy rendering
+   * byte-for-byte identical to before this prop existed.
+   */
+  hidden3DEnemyIds?: RefObject<ReadonlySet<string>>;
 }
 
 interface PrevEnemyState {
@@ -71,6 +80,7 @@ export function CanvasRenderer({
   onSlotClick,
   onTowerClick,
   onBackgroundClick,
+  hidden3DEnemyIds,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
@@ -213,7 +223,15 @@ export function CanvasRenderer({
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;
         const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
-        drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale);
+        // INIMIGOS 3D — the only skip in this whole loop. Boss/elite aura
+        // above and the separate HP-bar pass below are untouched for every
+        // enemy either way; the slow/burn status rings ARE drawn inside
+        // drawEnemy itself, so a 3D-covered enemy loses that specific
+        // debuff-ring feedback in this pilot — a disclosed, known
+        // limitation (see rendering3d/'s report), not an oversight.
+        if (!hidden3DEnemyIds?.current?.has(enemy.id)) {
+          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale);
+        }
         // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself
         // (unlike drawBossAura's glow-behind treatment), reading the same
         // real `enemy.boss.enraged` flag the damage math uses.
