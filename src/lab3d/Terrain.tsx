@@ -112,7 +112,72 @@ export function Terrain() {
           <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.55} />
         </mesh>
       ))}
+
+      <RuinedArch />
+      <FallenColumn x={-9.5} z={5.4} rot={0.6} />
+      <FallenColumn x={-7.8} z={6.6} rot={2.1} />
     </group>
+  );
+}
+
+/**
+ * A half-collapsed stone archway — the "estruturas/ruínas/elementos
+ * arquitetônicos" requirement: this is what tells a viewer "someone
+ * built something here, long before the battle" rather than just a
+ * forest clearing. One pillar still stands with a broken lintel stub;
+ * the other side collapsed into rubble at its base.
+ */
+function RuinedArch() {
+  const x = -10.5;
+  const z = 4.5;
+  const y = terrainHeightAt(x, z);
+  return (
+    <group position={[x, y, z]} rotation={[0, 0.4, 0]}>
+      <mesh position={[-1.1, 1.7, 0]} rotation={[0, 0, 0.03]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.42, 0.5, 3.4, 8]} />
+        <meshStandardMaterial color={FOREST.rock} roughness={0.95} flatShading />
+      </mesh>
+      <mesh position={[-1.1, 3.5, 0]} rotation={[0, 0, 0.03]} castShadow>
+        <boxGeometry args={[1.05, 0.4, 1.05]} />
+        <meshStandardMaterial color={FOREST.rockDark} roughness={0.9} flatShading />
+      </mesh>
+      <mesh position={[-1.05, 3.85, 0]} rotation={[0, 0.5, 0.55]} castShadow>
+        <boxGeometry args={[1.8, 0.5, 0.9]} />
+        <meshStandardMaterial color={FOREST.rock} roughness={0.9} flatShading />
+      </mesh>
+
+      {[0, 1, 2].map((i) => (
+        <mesh
+          key={i}
+          position={[1.0 + i * 0.55, 0.3 + i * 0.07, i * 0.3]}
+          rotation={[0.2 + i * 0.4, i, 1.4 + i * 0.2]}
+          castShadow
+          receiveShadow
+        >
+          <cylinderGeometry args={[0.4 - i * 0.04, 0.46 - i * 0.04, 1.4 - i * 0.3, 8]} />
+          <meshStandardMaterial color={FOREST.rockDark} roughness={0.95} flatShading />
+        </mesh>
+      ))}
+      <mesh position={[0.2, 0.15, -0.6]} rotation={[0, 0.8, 0]} castShadow receiveShadow>
+        <dodecahedronGeometry args={[0.5, 0]} />
+        <meshStandardMaterial color={FOREST.rock} roughness={1} flatShading />
+      </mesh>
+
+      <mesh position={[-1.1, 1.2, 0.35]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.55, 8]} />
+        <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.4} />
+      </mesh>
+    </group>
+  );
+}
+
+function FallenColumn({ x, z, rot }: { x: number; z: number; rot: number }) {
+  const y = terrainHeightAt(x, z);
+  return (
+    <mesh position={[x, y + 0.34, z]} rotation={[0, rot, Math.PI / 2 + 0.08]} castShadow receiveShadow>
+      <cylinderGeometry args={[0.32, 0.38, 2.1, 8]} />
+      <meshStandardMaterial color={FOREST.rockDark} roughness={0.95} flatShading />
+    </mesh>
   );
 }
 

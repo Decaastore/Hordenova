@@ -1,8 +1,24 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { CREATURES_3D } from "../palette";
 import type { CreatureHandle } from "./creatureTypes";
+
+/** A tattered, clawed bat-wing outline (jagged trailing edge, not a smooth cone/fan) — reads as a real threat, not a friendly ghost. */
+function buildTatteredWingGeometry(): THREE.ShapeGeometry {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0.02);
+  shape.lineTo(0.52, 0.1);
+  shape.lineTo(0.46, 0.22);
+  shape.lineTo(0.36, 0.1);
+  shape.lineTo(0.3, 0.24);
+  shape.lineTo(0.2, 0.11);
+  shape.lineTo(0.12, 0.2);
+  shape.lineTo(0.06, 0.1);
+  shape.lineTo(0, 0.14);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
 
 /**
  * WRAITH — the flying archetype (requirement 5: "movimento diferente e
@@ -28,6 +44,7 @@ export function WraithCreature({
   const wingRRef = useRef<THREE.Mesh>(null);
   const hitT = useRef(0);
   const c = CREATURES_3D.DISABLER;
+  const wingGeometry = useMemo(() => buildTatteredWingGeometry(), []);
 
   useFrame((_, dt) => {
     const t = performance.now() * 0.001;
@@ -79,13 +96,17 @@ export function WraithCreature({
           <meshStandardMaterial color={c.accent} emissive={c.accent} emissiveIntensity={2.2} />
         </mesh>
 
-        <mesh ref={wingLRef} position={[0.14, 0.02, 0.05]} rotation={[0, 0, -Math.PI / 2]}>
-          <coneGeometry args={[0.42, 0.06, 3]} />
-          <meshStandardMaterial color={c.dark} roughness={0.4} transparent opacity={0.78} side={THREE.DoubleSide} />
+        <mesh ref={wingLRef} geometry={wingGeometry} position={[0.14, 0.02, 0.05]} rotation={[0, 0, 0.15]}>
+          <meshStandardMaterial color={c.dark} roughness={0.4} transparent opacity={0.82} side={THREE.DoubleSide} />
         </mesh>
-        <mesh ref={wingRRef} position={[-0.14, 0.02, 0.05]} rotation={[0, 0, Math.PI / 2]}>
-          <coneGeometry args={[0.42, 0.06, 3]} />
-          <meshStandardMaterial color={c.dark} roughness={0.4} transparent opacity={0.78} side={THREE.DoubleSide} />
+        <mesh
+          ref={wingRRef}
+          geometry={wingGeometry}
+          position={[-0.14, 0.02, 0.05]}
+          rotation={[0, Math.PI, -0.15]}
+          scale={[-1, 1, 1]}
+        >
+          <meshStandardMaterial color={c.dark} roughness={0.4} transparent opacity={0.82} side={THREE.DoubleSide} />
         </mesh>
 
         <pointLight color={c.accent} intensity={0.5} distance={1.5} />

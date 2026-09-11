@@ -28,12 +28,17 @@ export function Lighting() {
       <color attach="background" args={[FOREST.skyBottom]} />
       <fogExp2 attach="fog" args={[FOREST.fog, 0.028]} />
 
-      <hemisphereLight args={[FOREST.skyTop, FOREST.groundShadowed, 0.75]} />
+      {/* Lower ambient/hemisphere fill than a "safe", evenly-lit scene would
+          use — real contrast (bright hot spots, genuinely dark recesses)
+          rather than flat, toylike lighting — but not so low the scene reads
+          as a murky brown wash; the directional key light carries most of
+          the exposure. */}
+      <hemisphereLight args={[FOREST.skyTop, FOREST.groundShadowed, 0.65]} />
       <ambientLight color={FOREST.skyTop} intensity={0.3} />
 
       <directionalLight
         position={[14, 18, 8]}
-        intensity={1.85}
+        intensity={2.6}
         color={FOREST.accentWarm}
         castShadow
         shadow-mapSize-width={2048}
@@ -46,7 +51,11 @@ export function Lighting() {
         shadow-camera-bottom={-22}
         shadow-bias={-0.0018}
       />
-      <directionalLight position={[-10, 6, -8]} intensity={0.28} color={FOREST.waterLight} />
+      {/* Cool rim/back light from the opposite side — separates silhouettes
+          from the background and reads as ambient magic in the air rather
+          than a second sun, a HORDENOVA-specific cue (toxic rune-green,
+          not the generic teal-vs-orange contrast most dark fantasy uses). */}
+      <directionalLight position={[-11, 7, -9]} intensity={0.55} color={FOREST.accentGlow} />
 
       {shafts.map((s, i) => (
         <mesh key={i} position={[s.x, 6, s.z]} rotation={[0.18, s.rot, 0]}>

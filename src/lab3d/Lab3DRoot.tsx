@@ -22,8 +22,8 @@ export function Lab3DRoot() {
       <Canvas
         shadows
         dpr={dpr}
-        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.05 }}
-        camera={{ position: [5, 33, 21], fov: 36, near: 0.1, far: 140 }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
+        camera={{ position: [5, 15, 29], fov: 42, near: 0.1, far: 160 }}
         onCreated={({ gl }) => {
           gl.setClearColor(new THREE.Color(FOREST.skyBottom));
         }}
@@ -38,10 +38,10 @@ export function Lab3DRoot() {
           enablePan={false}
           enableDamping
           dampingFactor={0.08}
-          minDistance={22}
-          maxDistance={42}
-          minPolarAngle={Math.PI * 0.14}
-          maxPolarAngle={Math.PI * 0.34}
+          minDistance={18}
+          maxDistance={46}
+          minPolarAngle={Math.PI * 0.26}
+          maxPolarAngle={Math.PI * 0.42}
           minAzimuthAngle={-Math.PI * 0.3}
           maxAzimuthAngle={Math.PI * 0.3}
         />

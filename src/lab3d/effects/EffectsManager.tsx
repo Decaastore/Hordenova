@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { mulberry32 } from "../rng";
@@ -70,6 +70,10 @@ function Projectile({
   const t = useRef(0);
   const done = useRef(false);
   const DURATION = 0.32;
+  const quaternion = useMemo(() => {
+    const dir = new THREE.Vector3(to[0] - from[0], to[1] - from[1], to[2] - from[2]).normalize();
+    return new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), dir);
+  }, [from, to]);
 
   useFrame((_, dt) => {
     t.current += dt / DURATION;
@@ -92,25 +96,33 @@ function Projectile({
   });
 
   return (
-    <mesh ref={ref} position={from}>
-      <sphereGeometry args={[0.06, 6, 6]} />
+    <mesh ref={ref} position={from} quaternion={quaternion}>
+      <sphereGeometry args={[0.085, 8, 8]} />
       <meshBasicMaterial color={color} toneMapped={false} />
-      <pointLight color={color} intensity={1.2} distance={1.2} />
+      <pointLight color={color} intensity={2.2} distance={1.8} />
+      {/* trailing streak behind the projectile head — gives the shot weight/speed instead of reading as a floating dot */}
+      <mesh position={[0, 0, -0.22]} scale={[0.55, 0.55, 1.6]}>
+        <sphereGeometry args={[0.075, 6, 6]} />
+        <meshBasicMaterial color={color} transparent opacity={0.45} toneMapped={false} depthWrite={false} />
+      </mesh>
     </mesh>
   );
 }
 
 function Burst({ at, color, onDone }: { at: [number, number, number]; color: number; onDone: () => void }) {
   const groupRef = useRef<THREE.Group>(null);
+  const ringRef = useRef<THREE.Mesh>(null);
+  const flashRef = useRef<THREE.PointLight>(null);
   const life = useRef(0);
-  const DURATION = 0.5;
-  const velocities = useRef<[number, number, number][]>();
-  if (!velocities.current) {
-    const rand = mulberry32(at[0] * 1000 + at[2] * 7 + Date.now() % 997);
-    velocities.current = Array.from({ length: 10 }, () => {
+  const DURATION = 0.55;
+  const PARTICLE_COUNT = 16;
+  const specs = useRef<{ v: [number, number, number]; size: number }[]>();
+  if (!specs.current) {
+    const rand = mulberry32(at[0] * 1000 + at[2] * 7 + (Date.now() % 997));
+    specs.current = Array.from({ length: PARTICLE_COUNT }, () => {
       const a = rand() * Math.PI * 2;
-      const speed = 1.2 + rand() * 1.4;
-      return [Math.cos(a) * speed, 1.4 + rand() * 1.6, Math.sin(a) * speed];
+      const speed = 1.6 + rand() * 2.1;
+      return { v: [Math.cos(a) * speed, 1.8 + rand() * 2.2, Math.sin(a) * speed], size: 0.04 + rand() * 0.06 };
     });
   }
 
@@ -123,23 +135,37 @@ function Burst({ at, color, onDone }: { at: [number, number, number]; color: num
     }
     if (groupRef.current) {
       groupRef.current.children.forEach((child, i) => {
-        const v = velocities.current![i]!;
-        child.position.set(v[0] * life.current, v[1] * life.current - 2.2 * life.current * life.current, v[2] * life.current);
+        const spec = specs.current![i]!;
+        if (!spec) return;
+        const v = spec.v;
+        child.position.set(v[0] * life.current, v[1] * life.current - 3.4 * life.current * life.current, v[2] * life.current);
         const mesh = child as THREE.Mesh;
         (mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t;
-        mesh.scale.setScalar(1 - t * 0.4);
+        mesh.scale.setScalar((1 - t * 0.35) * spec.size * 20);
       });
     }
+    if (ringRef.current) {
+      const ringT = Math.min(1, t / 0.6);
+      ringRef.current.scale.setScalar(0.15 + ringT * 2.2);
+      (ringRef.current.material as THREE.MeshBasicMaterial).opacity = (1 - ringT) * 0.6;
+    }
+    if (flashRef.current) flashRef.current.intensity = Math.max(0, 3.5 - t * 12);
   });
 
   return (
     <group ref={groupRef} position={at}>
-      {velocities.current.map((_, i) => (
+      {specs.current.map((_, i) => (
         <mesh key={i}>
           <icosahedronGeometry args={[0.05, 0]} />
           <meshBasicMaterial color={color} transparent opacity={1} toneMapped={false} />
         </mesh>
       ))}
+      {/* ground shockwave — the "impacto que transmite força" cue, not just floating motes */}
+      <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.28, 0]}>
+        <ringGeometry args={[0.5, 0.68, 24]} />
+        <meshBasicMaterial color={color} transparent opacity={0.6} side={THREE.DoubleSide} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <pointLight ref={flashRef} color={color} intensity={3.5} distance={3.5} />
     </group>
   );
 }
