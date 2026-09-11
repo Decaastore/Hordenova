@@ -12,7 +12,14 @@ import { ironwoodBaseSkin } from "./towers/skins/ironwoodBaseSkin";
 import type { TowerSkinDefinition } from "./towers/towerSkinTypes";
 
 const CREATURE_SCALE = 48;
-const TOWER_SCALE = 42;
+// Derived from TESTE 3 (scale vs. Brute), not an arbitrary bump: the
+// redesigned tower's own local height (foundation to crystal tip, ~1.64
+// units) is close to the Brute's local height (~1.65 units), so matching
+// TOWER_SCALE/CREATURE_SCALE to the same ratio would make them read as
+// the same size — a defensive tower should read taller/heavier than the
+// creature attacking it, so this scale is picked to put the tower's
+// world-space height a deliberate margin above the Brute's (~96 vs ~79).
+const TOWER_SCALE = 60;
 const TOWER_RANGE = 220; // Three units (~ world units at our DISPLAY_SCALE=2)
 const TOWER_WINDUP = 0.22;
 const TOWER_COOLDOWN = 1.7;
@@ -74,7 +81,10 @@ export function HybridDemoController({ towerSkin = ironwoodBaseSkin }: Props) {
   const pathPoints = useRef(HYBRID_PATH_SEGMENT.map((p) => footprintToThree(p))).current;
   const totalLength = useRef(pathLength(pathPoints)).current;
   const towerWorldPos = useRef(footprintToThree(HYBRID_TOWER_SLOT.position)).current;
-  const towerCorePos = useRef<[number, number, number]>([towerWorldPos[0], towerWorldPos[1] + 1.55 * TOWER_SCALE, towerWorldPos[2]]).current;
+  // 1.45 must match ModularIronwoodTower's IRONWOOD_CORE_HEIGHT constant —
+  // this is where the crystal (and therefore the projectile's origin)
+  // actually sits after the hero redesign.
+  const towerCorePos = useRef<[number, number, number]>([towerWorldPos[0], towerWorldPos[1] + 1.45 * TOWER_SCALE, towerWorldPos[2]]).current;
 
   const state = useRef({
     distance: 0,
@@ -187,8 +197,8 @@ export function HybridDemoController({ towerSkin = ironwoodBaseSkin }: Props) {
           same trick the real 2D EntityRenderer.drawContactShadow already
           uses elsewhere in this game. */}
       <mesh position={[towerWorldPos[0], 0.05, towerWorldPos[2]]} rotation={[-Math.PI / 2, 0, 0]}>
-        <circleGeometry args={[34, 20]} />
-        <meshBasicMaterial color={0x000000} transparent opacity={0.32} />
+        <circleGeometry args={[46, 20]} />
+        <meshBasicMaterial color={0x000000} transparent opacity={0.34} />
       </mesh>
 
       <group ref={towerYawRef} position={towerWorldPos}>

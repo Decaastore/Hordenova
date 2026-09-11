@@ -26,6 +26,9 @@ export const ironwoodEmberSkin: TowerSkinDefinition = {
     variant: "twisted-spire",
     textureBase: 0x1c1512,
     textureDark: 0x080605,
+    // Unused by "twisted-spire" (only "gnarled-trunk" renders a separate
+    // drum) — kept equal to textureBase so the type stays fully populated.
+    stoneColor: 0x1c1512,
     roughness: 0.4,
     metalness: 0.35,
     bandColor: 0x2b211c,

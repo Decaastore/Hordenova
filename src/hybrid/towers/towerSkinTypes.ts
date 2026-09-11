@@ -34,6 +34,11 @@ export interface TowerSkinDefinition {
     variant: BodyProfileVariant;
     textureBase: number;
     textureDark: number;
+    /** The structural drum's own stone tone — deliberately separate from
+     * `base.color` (the ground-level foundation rock). Without its own
+     * value, the drum and foundation render as the same dark tone and
+     * visually fuse into one undifferentiated mass. */
+    stoneColor: number;
     roughness: number;
     metalness: number;
     bandColor: number;

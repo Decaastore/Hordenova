@@ -24,18 +24,27 @@ export const ironwoodBaseSkin: TowerSkinDefinition = {
     variant: "gnarled-trunk",
     textureBase: TOWERS_3D.IRONWOOD.primary,
     textureDark: TOWERS_3D.IRONWOOD.secondary,
+    // A distinct mid-grey stone for the drum — lighter than the
+    // foundation's near-black broken rock so the two visually separate
+    // instead of fusing into one dark mass (see the readback in the
+    // final report on why this mattered more than any geometry change).
+    stoneColor: 0x4c4842,
     roughness: 0.88,
     metalness: 0,
-    bandColor: TOWERS_3D.IRONWOOD.secondary,
-    bandRoughness: 0.7,
-    bandMetalness: 0.25,
+    bandColor: 0x9a8a5f,
+    bandRoughness: 0.5,
+    bandMetalness: 0.55,
   },
   ornaments: {
     variant: "curled-iron-prongs",
     count: 3,
-    color: TOWERS_3D.IRONWOOD.secondary,
-    roughness: 0.55,
-    metalness: 0.3,
+    // A worn-bronze metal tone, NOT the palette's darkest color (the
+    // original `TOWERS_3D.IRONWOOD.secondary` is near-black — using it
+    // for "the metal that should read as a bright accent" was the reason
+    // the collar/struts were invisible against the equally dark body).
+    color: 0x9a8a5f,
+    roughness: 0.4,
+    metalness: 0.65,
     tipGlow: 0,
   },
   core: {
