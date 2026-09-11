@@ -1,9 +1,10 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { FOREST, GOLD } from "./palette";
 import { CASTLE_POSITION_3D } from "./worldData";
 import { terrainHeightAt } from "./Terrain";
+import { getStoneTexture } from "./proceduralTextures";
 import type { CastleHandle } from "./effectsTypes";
 
 /**
@@ -22,6 +23,7 @@ export function Castle({ onReady }: { onReady?: (h: CastleHandle) => void }) {
   const damageT = useRef(0);
   const torchARef = useRef<THREE.PointLight>(null);
   const torchBRef = useRef<THREE.PointLight>(null);
+  const stoneTex = useMemo(() => getStoneTexture(0x5a5145, 0x241b12), []);
 
   useFrame((_, dt) => {
     const t = performance.now() * 0.001;
@@ -50,7 +52,7 @@ export function Castle({ onReady }: { onReady?: (h: CastleHandle) => void }) {
       {/* gate wall */}
       <mesh position={[0, 1.1, -0.3]} castShadow receiveShadow>
         <boxGeometry args={[3.4, 1.9, 0.5]} />
-        <meshStandardMaterial color={"#5a5145"} roughness={0.95} />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.95} />
       </mesh>
       <mesh position={[0, 0.75, 0]} castShadow>
         <boxGeometry args={[0.9, 1.3, 0.55]} />
@@ -61,7 +63,7 @@ export function Castle({ onReady }: { onReady?: (h: CastleHandle) => void }) {
         <group key={i} position={[x, 0, 0]}>
           <mesh position={[0, 1.55, -0.3]} castShadow>
             <cylinderGeometry args={[0.55, 0.65, 3.0, 8]} />
-            <meshStandardMaterial color={"#665a48"} roughness={0.9} />
+            <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.9} />
           </mesh>
           <mesh position={[0, 3.15, -0.3]} castShadow>
             <coneGeometry args={[0.72, 0.9, 8]} />
@@ -70,7 +72,7 @@ export function Castle({ onReady }: { onReady?: (h: CastleHandle) => void }) {
           {[0, 1, 2, 3, 4, 5].map((b) => (
             <mesh key={b} position={[Math.cos((b / 6) * Math.PI * 2) * 0.6, 3.05, -0.3 + Math.sin((b / 6) * Math.PI * 2) * 0.6]} castShadow>
               <boxGeometry args={[0.14, 0.16, 0.14]} />
-              <meshStandardMaterial color={"#665a48"} roughness={0.9} />
+              <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.9} />
             </mesh>
           ))}
           <mesh position={[x < 0 ? 0.66 : -0.66, 1.7, -0.3]} castShadow>

@@ -4,6 +4,8 @@ import { FOREST } from "./palette";
 import { PATH_3D, TOWER_SLOTS_3D } from "./worldData";
 import { fbmNoise2D } from "./noise";
 import { mulberry32 } from "./rng";
+import { buildTaperedTube } from "./geometryUtils";
+import { getStoneTexture } from "./proceduralTextures";
 
 const FIELD_W = 56;
 const FIELD_D = 36;
@@ -116,6 +118,83 @@ export function Terrain() {
       <RuinedArch />
       <FallenColumn x={-9.5} z={5.4} rot={0.6} />
       <FallenColumn x={-7.8} z={6.6} rot={2.1} />
+
+      <BackgroundRidge />
+      <ForegroundCluster />
+    </group>
+  );
+}
+
+/**
+ * A distant, faceted ridge silhouette along the far edges of the field —
+ * without it, the camera's new low cinematic angle looks straight into
+ * an empty fog void past the last row of trees. Kept intentionally flat
+ * and simple (a handful of large low-poly shapes, no fine detail) since
+ * fog and distance are doing the "far away" work, not geometry density.
+ */
+function BackgroundRidge() {
+  const ridgeSpecs = useMemo(() => {
+    const rand = mulberry32(909);
+    const specs: { x: number; z: number; w: number; h: number }[] = [];
+    for (let i = 0; i < 9; i++) {
+      specs.push({ x: -FIELD_W * 0.46 + i * (FIELD_W * 0.11), z: -FIELD_D * 0.62 - rand() * 4, w: 5 + rand() * 4, h: 3.2 + rand() * 2.6 });
+    }
+    for (let i = 0; i < 5; i++) {
+      specs.push({ x: FIELD_W * 0.56 + rand() * 3, z: -FIELD_D * 0.3 + i * (FIELD_D * 0.28), w: 4.5 + rand() * 3, h: 2.8 + rand() * 2 });
+    }
+    return specs;
+  }, []);
+  const ridgeColor = useMemo(() => new THREE.Color(FOREST.vegetationDark).lerp(new THREE.Color(FOREST.fog), 0.45).getHex(), []);
+  return (
+    <group>
+      {ridgeSpecs.map((s, i) => (
+        <mesh key={i} position={[s.x, s.h * 0.42, s.z]} scale={[s.w, s.h, s.w * 0.6]}>
+          <coneGeometry args={[0.5, 1, 5]} />
+          <meshBasicMaterial color={ridgeColor} fog />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+/**
+ * A rock-and-root cluster placed close to the camera's default framing —
+ * without something occupying the near-frame, the strategic camera reads
+ * as looking flatly at a diorama; a bold, slightly-out-of-focus-feeling
+ * foreground shape (even without real depth-of-field) gives the shot
+ * actual foreground/midground/background layering.
+ */
+function ForegroundCluster() {
+  const x = 3.2;
+  const z = 14.5;
+  const y = terrainHeightAt(x, z);
+  const stoneTex = getStoneTexture(FOREST.rock, FOREST.rockDark);
+  const rootGeo = useMemo(
+    () =>
+      buildTaperedTube(
+        [new THREE.Vector3(-1.3, 0.35, 0), new THREE.Vector3(-0.4, 0.12, 0.3), new THREE.Vector3(0.6, 0.02, -0.1), new THREE.Vector3(1.4, 0.28, 0.15)],
+        [0.22, 0.16, 0.13, 0.08],
+        6,
+      ),
+    [],
+  );
+  return (
+    <group position={[x, y, z]}>
+      <mesh geometry={rootGeo} castShadow receiveShadow>
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.95} flatShading />
+      </mesh>
+      <mesh position={[0.9, 0.42, 0.4]} rotation={[0.3, 0.6, 0.1]} scale={1.3} castShadow receiveShadow>
+        <dodecahedronGeometry args={[0.6, 0]} />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[-1.1, 0.22, -0.3]} rotation={[0.1, 1.2, 0.4]} scale={0.75} castShadow receiveShadow>
+        <dodecahedronGeometry args={[0.5, 0]} />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={1} flatShading />
+      </mesh>
+      <mesh position={[0.1, 0.02, 0.6]} rotation={[-Math.PI / 2, 0, 0.3]} receiveShadow>
+        <circleGeometry args={[0.9, 10]} />
+        <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.5} />
+      </mesh>
     </group>
   );
 }
@@ -131,19 +210,33 @@ function RuinedArch() {
   const x = -10.5;
   const z = 4.5;
   const y = terrainHeightAt(x, z);
+  const stoneTex = getStoneTexture(FOREST.rock, FOREST.rockDark);
+  const rootGeo = useMemo(
+    () =>
+      buildTaperedTube(
+        [new THREE.Vector3(-0.5, 2.6, 0.4), new THREE.Vector3(-0.9, 2.0, 0.2), new THREE.Vector3(-1.25, 1.2, 0.35), new THREE.Vector3(-1.35, 0.3, 0.15)],
+        [0.07, 0.055, 0.045, 0.02],
+        5,
+      ),
+    [],
+  );
   return (
     <group position={[x, y, z]} rotation={[0, 0.4, 0]}>
+      {/* one pillar still standing, weathered — a root has grown down across its face over the years it's stood abandoned */}
       <mesh position={[-1.1, 1.7, 0]} rotation={[0, 0, 0.03]} castShadow receiveShadow>
         <cylinderGeometry args={[0.42, 0.5, 3.4, 8]} />
-        <meshStandardMaterial color={FOREST.rock} roughness={0.95} flatShading />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.95} flatShading />
+      </mesh>
+      <mesh geometry={rootGeo} castShadow>
+        <meshStandardMaterial color={FOREST.vegetationDark} roughness={0.9} />
       </mesh>
       <mesh position={[-1.1, 3.5, 0]} rotation={[0, 0, 0.03]} castShadow>
         <boxGeometry args={[1.05, 0.4, 1.05]} />
-        <meshStandardMaterial color={FOREST.rockDark} roughness={0.9} flatShading />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.9} flatShading />
       </mesh>
       <mesh position={[-1.05, 3.85, 0]} rotation={[0, 0.5, 0.55]} castShadow>
         <boxGeometry args={[1.8, 0.5, 0.9]} />
-        <meshStandardMaterial color={FOREST.rock} roughness={0.9} flatShading />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.9} flatShading />
       </mesh>
 
       {[0, 1, 2].map((i) => (
@@ -155,17 +248,35 @@ function RuinedArch() {
           receiveShadow
         >
           <cylinderGeometry args={[0.4 - i * 0.04, 0.46 - i * 0.04, 1.4 - i * 0.3, 8]} />
-          <meshStandardMaterial color={FOREST.rockDark} roughness={0.95} flatShading />
+          <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.95} flatShading />
         </mesh>
       ))}
       <mesh position={[0.2, 0.15, -0.6]} rotation={[0, 0.8, 0]} castShadow receiveShadow>
         <dodecahedronGeometry args={[0.5, 0]} />
-        <meshStandardMaterial color={FOREST.rock} roughness={1} flatShading />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={1} flatShading />
       </mesh>
+      {/* small rubble chips scattered at the base — the collapse happened here, not just "a rock nearby" */}
+      {[0, 1, 2, 3].map((i) => (
+        <mesh
+          key={`rubble-${i}`}
+          position={[0.3 + i * 0.3 - 0.4, 0.06 + (i % 2) * 0.03, -0.9 + i * 0.22]}
+          rotation={[i, i * 1.3, i * 0.7]}
+          scale={0.14 + (i % 3) * 0.05}
+          castShadow
+          receiveShadow
+        >
+          <dodecahedronGeometry args={[0.4, 0]} />
+          <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={1} flatShading />
+        </mesh>
+      ))}
 
       <mesh position={[-1.1, 1.2, 0.35]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.55, 8]} />
         <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.4} />
+      </mesh>
+      <mesh position={[0.15, 0.42, -0.55]} rotation={[-Math.PI / 2, 0, 0.6]}>
+        <circleGeometry args={[0.32, 8]} />
+        <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.35} />
       </mesh>
     </group>
   );
@@ -173,11 +284,18 @@ function RuinedArch() {
 
 function FallenColumn({ x, z, rot }: { x: number; z: number; rot: number }) {
   const y = terrainHeightAt(x, z);
+  const stoneTex = getStoneTexture(FOREST.rockDark, FOREST.groundShadowed);
   return (
-    <mesh position={[x, y + 0.34, z]} rotation={[0, rot, Math.PI / 2 + 0.08]} castShadow receiveShadow>
-      <cylinderGeometry args={[0.32, 0.38, 2.1, 8]} />
-      <meshStandardMaterial color={FOREST.rockDark} roughness={0.95} flatShading />
-    </mesh>
+    <group>
+      <mesh position={[x, y + 0.34, z]} rotation={[0, rot, Math.PI / 2 + 0.08]} castShadow receiveShadow>
+        <cylinderGeometry args={[0.32, 0.38, 2.1, 8]} />
+        <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.95} flatShading />
+      </mesh>
+      <mesh position={[x + Math.cos(rot) * 0.7, y + 0.04, z + Math.sin(rot) * 0.7]} rotation={[-Math.PI / 2, 0, rot]}>
+        <circleGeometry args={[0.5, 8]} />
+        <meshStandardMaterial color={FOREST.vegetationHighlight} roughness={1} transparent opacity={0.4} />
+      </mesh>
+    </group>
   );
 }
 
@@ -319,10 +437,11 @@ function TreeCluster({ x, z, scale, rot, variant }: TreeSpec) {
 
 function Rock({ x, z, scale, rot }: RockSpec) {
   const y = terrainHeightAt(x, z);
+  const stoneTex = getStoneTexture(FOREST.rock, FOREST.rockDark);
   return (
     <mesh position={[x, y + 0.25 * scale, z]} rotation={[rot * 0.3, rot, rot * 0.2]} castShadow receiveShadow>
       <dodecahedronGeometry args={[0.5 * scale, 0]} />
-      <meshStandardMaterial color={FOREST.rock} roughness={1} flatShading />
+      <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={1} flatShading />
     </mesh>
   );
 }

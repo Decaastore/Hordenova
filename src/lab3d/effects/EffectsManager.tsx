@@ -2,6 +2,7 @@ import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from "reac
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { mulberry32 } from "../rng";
+import { getParticleSprite, getShardSprite } from "../proceduralTextures";
 
 /**
  * TESTE VISUAL 3D — requirement 6 (attack VFX, death VFX, gold pickup)
@@ -109,20 +110,50 @@ function Projectile({
   );
 }
 
+interface GlowSpec {
+  v: [number, number, number];
+  size: number;
+}
+interface DebrisSpec {
+  v: [number, number, number];
+  size: number;
+  spin: number;
+}
+
+/**
+ * Impact burst — split into two particle families so a hit reads as
+ * "something physical broke" rather than just a colored glow: soft round
+ * dust/energy motes (light gravity, fade out) plus a few angular debris
+ * chips (heavier gravity, tumbling via SpriteMaterial.rotation, desaturated
+ * toward rock/bone rather than the pure hit color) — on top of the ground
+ * shockwave ring and impact flash light.
+ */
 function Burst({ at, color, onDone }: { at: [number, number, number]; color: number; onDone: () => void }) {
   const groupRef = useRef<THREE.Group>(null);
+  const debrisGroupRef = useRef<THREE.Group>(null);
   const ringRef = useRef<THREE.Mesh>(null);
   const flashRef = useRef<THREE.PointLight>(null);
   const life = useRef(0);
   const DURATION = 0.55;
-  const PARTICLE_COUNT = 16;
-  const specs = useRef<{ v: [number, number, number]; size: number }[]>();
+  const GLOW_COUNT = 10;
+  const DEBRIS_COUNT = 7;
+  const glowSprite = getParticleSprite();
+  const shardSprite = getShardSprite();
+  const debrisColor = useMemo(() => new THREE.Color(color).lerp(new THREE.Color(0x33302c), 0.55).getHex(), [color]);
+
+  const specs = useRef<GlowSpec[]>();
+  const debrisSpecs = useRef<DebrisSpec[]>();
   if (!specs.current) {
     const rand = mulberry32(at[0] * 1000 + at[2] * 7 + (Date.now() % 997));
-    specs.current = Array.from({ length: PARTICLE_COUNT }, () => {
+    specs.current = Array.from({ length: GLOW_COUNT }, () => {
       const a = rand() * Math.PI * 2;
-      const speed = 1.6 + rand() * 2.1;
-      return { v: [Math.cos(a) * speed, 1.8 + rand() * 2.2, Math.sin(a) * speed], size: 0.04 + rand() * 0.06 };
+      const speed = 1.4 + rand() * 1.8;
+      return { v: [Math.cos(a) * speed, 1.6 + rand() * 1.8, Math.sin(a) * speed], size: 0.16 + rand() * 0.14 };
+    });
+    debrisSpecs.current = Array.from({ length: DEBRIS_COUNT }, () => {
+      const a = rand() * Math.PI * 2;
+      const speed = 1.8 + rand() * 2.6;
+      return { v: [Math.cos(a) * speed, 1.2 + rand() * 2.4, Math.sin(a) * speed], size: 0.05 + rand() * 0.05, spin: (rand() - 0.5) * 14 };
     });
   }
 
@@ -138,10 +169,23 @@ function Burst({ at, color, onDone }: { at: [number, number, number]; color: num
         const spec = specs.current![i]!;
         if (!spec) return;
         const v = spec.v;
-        child.position.set(v[0] * life.current, v[1] * life.current - 3.4 * life.current * life.current, v[2] * life.current);
-        const mesh = child as THREE.Mesh;
-        (mesh.material as THREE.MeshBasicMaterial).opacity = 1 - t;
-        mesh.scale.setScalar((1 - t * 0.35) * spec.size * 20);
+        child.position.set(v[0] * life.current, v[1] * life.current - 2.6 * life.current * life.current, v[2] * life.current);
+        const sprite = child as THREE.Sprite;
+        (sprite.material as THREE.SpriteMaterial).opacity = (1 - t) * 0.85;
+        sprite.scale.setScalar((1 - t * 0.3) * spec.size);
+      });
+    }
+    if (debrisGroupRef.current) {
+      debrisGroupRef.current.children.forEach((child, i) => {
+        const spec = debrisSpecs.current![i]!;
+        if (!spec) return;
+        const v = spec.v;
+        child.position.set(v[0] * life.current, v[1] * life.current - 4.2 * life.current * life.current, v[2] * life.current);
+        const sprite = child as THREE.Sprite;
+        const mat = sprite.material as THREE.SpriteMaterial;
+        mat.opacity = 1 - t;
+        mat.rotation += spec.spin * dt;
+        sprite.scale.setScalar((1 - t * 0.2) * spec.size);
       });
     }
     if (ringRef.current) {
@@ -153,13 +197,21 @@ function Burst({ at, color, onDone }: { at: [number, number, number]; color: num
   });
 
   return (
-    <group ref={groupRef} position={at}>
-      {specs.current.map((_, i) => (
-        <mesh key={i}>
-          <icosahedronGeometry args={[0.05, 0]} />
-          <meshBasicMaterial color={color} transparent opacity={1} toneMapped={false} />
-        </mesh>
-      ))}
+    <group position={at}>
+      <group ref={groupRef}>
+        {specs.current.map((_, i) => (
+          <sprite key={i} scale={0.2}>
+            <spriteMaterial map={glowSprite} color={color} transparent opacity={0.85} depthWrite={false} toneMapped={false} />
+          </sprite>
+        ))}
+      </group>
+      <group ref={debrisGroupRef}>
+        {debrisSpecs.current!.map((_, i) => (
+          <sprite key={i} scale={0.06}>
+            <spriteMaterial map={shardSprite} color={debrisColor} transparent opacity={1} depthWrite={false} toneMapped={false} />
+          </sprite>
+        ))}
+      </group>
       {/* ground shockwave — the "impacto que transmite força" cue, not just floating motes */}
       <mesh ref={ringRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.28, 0]}>
         <ringGeometry args={[0.5, 0.68, 24]} />

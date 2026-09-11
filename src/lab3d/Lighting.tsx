@@ -51,11 +51,13 @@ export function Lighting() {
         shadow-camera-bottom={-22}
         shadow-bias={-0.0018}
       />
-      {/* Cool rim/back light from the opposite side — separates silhouettes
-          from the background and reads as ambient magic in the air rather
-          than a second sun, a HORDENOVA-specific cue (toxic rune-green,
-          not the generic teal-vs-orange contrast most dark fantasy uses). */}
-      <directionalLight position={[-11, 7, -9]} intensity={0.55} color={FOREST.accentGlow} />
+      {/* Cool neutral rim/back light from the opposite side — separates
+          silhouettes from the background without washing the whole scene
+          in the toxic-green magic accent. That green stays reserved for
+          actual magic sources (rune-cores, crystals, attacks) via their
+          own localized emissives/point-lights, per the palette's own
+          comment: "used sparingly so towers/enemies/VFX still pop." */}
+      <directionalLight position={[-11, 7, -9]} intensity={0.5} color={FOREST.waterLight} />
 
       {shafts.map((s, i) => (
         <mesh key={i} position={[s.x, 6, s.z]} rotation={[0.18, s.rot, 0]}>

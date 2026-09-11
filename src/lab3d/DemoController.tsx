@@ -28,6 +28,12 @@ interface CreatureState {
   flightAltitude: number;
 }
 
+interface TowerCombatState {
+  timer: number;
+  phase: "idle" | "windup";
+  targetKey: ArchetypeKey | null;
+}
+
 const ARCHETYPES: Record<ArchetypeKey, { speed: number; maxHp: number; flightAltitude: number; color: number }> = {
   RUNNER: { speed: 3.4, maxHp: 2, flightAltitude: 0, color: CREATURES_3D.RUNNER.accent },
   BRUTE: { speed: 1.1, maxHp: 5, flightAltitude: 0, color: CREATURES_3D.BRUTE.accent },
@@ -38,6 +44,9 @@ const ARCHETYPES: Record<ArchetypeKey, { speed: number; maxHp: number; flightAlt
 const TOTAL_PATH_LENGTH = path3DLength();
 const TOWER_RANGE = 7.5;
 const TOWER_ATTACK_INTERVAL = 1.9;
+const TOWER_WINDUP_DURATION = 0.22;
+const DEATH_ANIM_DURATION = 0.45;
+const RESPAWN_DELAY = 1.3;
 
 /**
  * Pulled out to a plain function (rather than inline `let` + closure
@@ -83,7 +92,12 @@ export function DemoController() {
   const shadowMeshRef = useRef<THREE.Mesh | null>(null);
   const castleHandle = useRef<CastleHandle | null>(null);
   const effectsHandle = useRef<EffectsHandle | null>(null);
-  const towerCooldowns = useRef<number[]>([0.3, 0.9, 1.5, 0.6]);
+  const towerCombat = useRef<TowerCombatState[]>([
+    { timer: 0.3, phase: "idle", targetKey: null },
+    { timer: 0.9, phase: "idle", targetKey: null },
+    { timer: 1.5, phase: "idle", targetKey: null },
+    { timer: 0.6, phase: "idle", targetKey: null },
+  ]);
 
   const creatureStates = useRef<Record<ArchetypeKey, CreatureState>>({
     RUNNER: { distance: 0, hp: ARCHETYPES.RUNNER.maxHp, maxHp: ARCHETYPES.RUNNER.maxHp, alive: true, respawnTimer: 0, speed: ARCHETYPES.RUNNER.speed, flightAltitude: 0 },
@@ -97,11 +111,12 @@ export function DemoController() {
     const handle = creatureHandles.current[key];
     if (!handle || !state.alive) return;
     state.alive = false;
-    state.respawnTimer = 1.3;
+    state.respawnTimer = RESPAWN_DELAY;
     const pos = handle.root.position;
     effectsHandle.current?.burst([pos.x, pos.y + 0.3, pos.z], ARCHETYPES[key].color);
     effectsHandle.current?.goldSparkle([pos.x, pos.y + 0.4, pos.z]);
-    handle.root.visible = false;
+    // death plays out in-place (collapse + sink, see the per-frame update below)
+    // rather than vanishing instantly — "morte convincente" instead of a pop.
   };
 
   useFrame((_, dtRaw) => {
@@ -114,11 +129,22 @@ export function DemoController() {
 
       if (!state.alive) {
         state.respawnTimer -= dt;
+        const elapsed = RESPAWN_DELAY - state.respawnTimer;
+        if (elapsed < DEATH_ANIM_DURATION) {
+          const deathProgress = elapsed / DEATH_ANIM_DURATION;
+          handle.root.visible = true;
+          handle.root.scale.setScalar(Math.max(0.001, 1 - deathProgress));
+          handle.root.rotation.z = deathProgress * 0.6;
+        } else {
+          handle.root.visible = false;
+        }
         if (state.respawnTimer <= 0) {
           state.alive = true;
           state.hp = state.maxHp;
           state.distance = 0;
           handle.root.visible = true;
+          handle.root.scale.setScalar(1);
+          handle.root.rotation.z = 0;
         }
         return;
       }
@@ -138,16 +164,39 @@ export function DemoController() {
       }
     });
 
-    towerCooldowns.current = towerCooldowns.current.map((cd, i) => {
-      const next = cd - dt;
-      if (next > 0) return next;
+    // Two-phase fire sequence — "preparação" (anticipate/charge) then the
+    // actual shot on windup completion — instead of firing instantly the
+    // moment the cooldown hits zero, so towers read as winding up rather
+    // than snapping to attention.
+    towerCombat.current.forEach((combat, i) => {
       const tower = towerHandles.current[i];
-      if (!tower) return TOWER_ATTACK_INTERVAL;
+      if (!tower) return;
 
-      const targetKey = findNearestAliveTarget(tower.position, creatureStates.current, creatureHandles.current, TOWER_RANGE);
-      if (targetKey === null) return 0.25; // keep checking soon rather than waiting a full cooldown with nothing in range
+      combat.timer -= dt;
+      if (combat.timer > 0) return;
+
+      if (combat.phase === "idle") {
+        const targetKey = findNearestAliveTarget(tower.position, creatureStates.current, creatureHandles.current, TOWER_RANGE);
+        if (targetKey === null) {
+          combat.timer = 0.25; // keep checking soon rather than waiting a full cooldown with nothing in range
+          return;
+        }
+        tower.anticipate?.();
+        combat.phase = "windup";
+        combat.targetKey = targetKey;
+        combat.timer = TOWER_WINDUP_DURATION;
+        return;
+      }
+
+      // windup complete — fire, provided the target is still alive and in range
+      combat.phase = "idle";
+      const targetKey = combat.targetKey;
+      combat.targetKey = null;
+      combat.timer = TOWER_ATTACK_INTERVAL + (i % 3) * 0.15;
+      if (!targetKey) return;
       const targetHandle = creatureHandles.current[targetKey];
-      if (!targetHandle) return TOWER_ATTACK_INTERVAL;
+      const targetState = creatureStates.current[targetKey];
+      if (!targetHandle || !targetState.alive) return;
 
       tower.trigger();
       const from: [number, number, number] = [tower.position.x, tower.position.y, tower.position.z];
@@ -161,7 +210,6 @@ export function DemoController() {
         state.hp -= 1;
         if (state.hp <= 0) killCreature(targetKey);
       });
-      return TOWER_ATTACK_INTERVAL + (i % 3) * 0.15;
     });
   });
 
