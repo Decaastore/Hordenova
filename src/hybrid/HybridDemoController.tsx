@@ -3,12 +3,13 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { BruteCreature } from "@/lab3d/creatures/BruteCreature";
 import type { CreatureHandle } from "@/lab3d/creatures/creatureTypes";
-import { IronwoodTower } from "@/lab3d/towers/IronwoodTower";
 import type { TowerHandle } from "@/lab3d/towers/towerTypes";
-import { TOWERS_3D } from "@/lab3d/palette";
 import { EffectsManager, type EffectsHandle } from "@/lab3d/effects/EffectsManager";
 import { HYBRID_PATH_SEGMENT, HYBRID_TOWER_SLOT } from "./hybridWorldData";
 import { footprintToThree } from "./hybridProjection";
+import { ModularIronwoodTower } from "./towers/ModularIronwoodTower";
+import { ironwoodBaseSkin } from "./towers/skins/ironwoodBaseSkin";
+import type { TowerSkinDefinition } from "./towers/towerSkinTypes";
 
 const CREATURE_SCALE = 48;
 const TOWER_SCALE = 42;
@@ -55,7 +56,11 @@ function pointAtDistance(points: [number, number, number][], distance: number): 
  * demo. All cosmetic — no real damage numbers, no real Tower/Enemy
  * stats read or written anywhere in this file.
  */
-export function HybridDemoController() {
+interface Props {
+  towerSkin?: TowerSkinDefinition;
+}
+
+export function HybridDemoController({ towerSkin = ironwoodBaseSkin }: Props) {
   const towerHandleRef = useRef<TowerHandle | null>(null);
   const towerYawRef = useRef<THREE.Group>(null);
   const creatureHandleRef = useRef<CreatureHandle | null>(null);
@@ -88,7 +93,7 @@ export function HybridDemoController() {
     s.alive = false;
     s.respawnTimer = RESPAWN_DELAY;
     const pos = anchor.position;
-    effectsRef.current?.burst([pos.x, pos.y + 30, pos.z], TOWERS_3D.IRONWOOD.accent);
+    effectsRef.current?.burst([pos.x, pos.y + 30, pos.z], towerSkin.effects.impactColor);
     effectsRef.current?.goldSparkle([pos.x, pos.y + 40, pos.z]);
   };
 
@@ -162,7 +167,7 @@ export function HybridDemoController() {
           if (s.alive) {
             tower.trigger();
             const to: [number, number, number] = [anchor.position.x, anchor.position.y + 25, anchor.position.z];
-            effectsRef.current?.fireProjectile(towerCorePos, to, TOWERS_3D.IRONWOOD.accent, () => {
+            effectsRef.current?.fireProjectile(towerCorePos, to, towerSkin.effects.boltColor, () => {
               if (!state.current.alive) return;
               creatureHandleRef.current?.pulseHit();
               state.current.hits += 1;
@@ -188,7 +193,7 @@ export function HybridDemoController() {
 
       <group ref={towerYawRef} position={towerWorldPos}>
         <group scale={TOWER_SCALE}>
-          <IronwoodTower position={[0, 0, 0]} onReady={(h) => (towerHandleRef.current = h)} />
+          <ModularIronwoodTower position={[0, 0, 0]} skin={towerSkin} onReady={(h) => (towerHandleRef.current = h)} />
         </group>
       </group>
 

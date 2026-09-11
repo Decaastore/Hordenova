@@ -3,6 +3,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { HybridDemoController } from "./HybridDemoController";
 import { cameraPosition } from "./hybridProjection";
+import type { TowerSkinDefinition } from "./towers/towerSkinTypes";
 
 /**
  * PROVA DE CONCEITO HÍBRIDA — the 3D half. A transparent, absolutely-
@@ -37,7 +38,7 @@ function CameraRig() {
   return null;
 }
 
-export function HybridScene3D() {
+export function HybridScene3D({ towerSkin }: { towerSkin?: TowerSkinDefinition }) {
   return (
     <Canvas
       orthographic
@@ -51,7 +52,7 @@ export function HybridScene3D() {
       <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
       <directionalLight position={[40, 90, 55]} intensity={1.6} color={"#ffcf8a"} />
 
-      <HybridDemoController />
+      <HybridDemoController towerSkin={towerSkin} />
     </Canvas>
   );
 }
