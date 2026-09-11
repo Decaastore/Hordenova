@@ -27,6 +27,19 @@ if (window.location.hash === "#lab3d") {
       </React.StrictMode>,
     );
   });
+} else if (window.location.hash === "#hybrid") {
+  // PROVA DE CONCEITO HÍBRIDA — same isolation contract as `#lab3d`
+  // above: reachable only by typing this hash directly, its own dynamic
+  // import so `src/hybrid/` (and the Three.js/@react-three/* it pulls
+  // in) never reaches the real game's bundle, and a fully separate React
+  // root sharing no state with `<App/>`.
+  void import("./hybrid/HybridRoot").then(({ HybridRoot }) => {
+    ReactDOM.createRoot(rootElement).render(
+      <React.StrictMode>
+        <HybridRoot />
+      </React.StrictMode>,
+    );
+  });
 } else {
   void import("./App").then(({ default: App }) => {
     // Restores persisted SFX/music volume/mute onto AudioManager BEFORE the
