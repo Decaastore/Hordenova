@@ -59,6 +59,17 @@ interface CanvasRendererProps {
    */
   hidden3DEnemyIds?: RefObject<ReadonlySet<string>>;
   /**
+   * MUNDO 3D — FASE 3 gameplay-integration test: id of the ONE tower
+   * currently covered by `WorldGameplayTestLayer`'s 3D body (IRONWOOD
+   * only, at most one at a time in this test), read fresh each frame so
+   * its 2D sprite is never drawn underneath it. The tower's range circle
+   * (drawn separately, right after this) is NEVER skipped — selection
+   * feedback always stays visible even for the 3D-covered tower. Optional,
+   * defaults to nothing hidden — same fallback contract as
+   * `hidden3DEnemyIds`.
+   */
+  hidden3DTowerIds?: RefObject<ReadonlySet<string>>;
+  /**
    * MUNDO 3D — true while the background 3D terrain/atmosphere layer
    * (`src/rendering3d/world/`) is mounted and rendering behind this
    * canvas. Skips ONLY the flat 2D `drawBackground` fill (and makes the
@@ -107,6 +118,7 @@ export function CanvasRenderer({
   onTowerClick,
   onBackgroundClick,
   hidden3DEnemyIds,
+  hidden3DTowerIds,
   worldLayerActive = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -223,7 +235,7 @@ export function CanvasRenderer({
       if (!worldLayerOn) drawBackground(ctx, biome);
       drawDecorations(ctx, biome, timestamp, worldLayerOn ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
       drawPath(ctx, ENEMY_PATH, biome, worldLayerOn);
-      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
+      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent, worldLayerOn);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
@@ -240,7 +252,13 @@ export function CanvasRenderer({
 
       for (const tower of snapshot.towers) {
         const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
-        drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs);
+        // MUNDO 3D — FASE 3: the ONE tower `WorldGameplayTestLayer` is
+        // currently rendering a 3D body for skips its 2D sprite here — the
+        // range circle below is drawn unconditionally regardless, so
+        // selection feedback is never lost for it.
+        if (!hidden3DTowerIds?.current?.has(tower.id)) {
+          drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs);
+        }
         if (tower.id === snapshot.selectedTowerId) {
           drawRangeCircle(ctx, tower.position, getTowerStats(tower).range);
         }

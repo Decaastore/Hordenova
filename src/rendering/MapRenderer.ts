@@ -669,6 +669,20 @@ function drawRoadEdgeGrowth(ctx: CanvasRenderingContext2D, road: OrganicRoad, bi
  */
 const ENDPOINT_INSET = 130;
 
+/**
+ * MUNDO 3D — FASE 3 gameplay-integration test: the exact same anchor
+ * `drawPathEndpoints` computes for the fortress, pulled out so a 3D castle
+ * test layer (`rendering3d/world/WorldGameplayTestLayer.tsx`) can position
+ * itself there too, from the SAME `ENEMY_PATH`-derived math — never a
+ * second, independently-guessed castle position.
+ */
+export function getFortressAnchor(path: readonly Vector2[]): { position: Vector2; facingDir: Vector2 } {
+  const end = path[path.length - 1]!;
+  const prev = path[path.length - 2]!;
+  const endDir = normalize(end.x - prev.x, end.y - prev.y);
+  return { position: { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, facingDir: endDir };
+}
+
 export function drawPathEndpoints(
   ctx: CanvasRenderingContext2D,
   path: readonly Vector2[],
@@ -676,24 +690,25 @@ export function drawPathEndpoints(
   timeMs: number,
   /** 0..1 — baseHp/maxBaseHp for the current attempt. Defaults to 1 (pristine) for callers with no gameplay HP concept (e.g. the main menu). */
   hpPercent = 1,
+  /**
+   * MUNDO 3D — FASE 3: true while `WorldGameplayTestLayer`'s 3D castle body
+   * is mounted, so this skips ONLY the fortress's own wall/tower/gate
+   * drawing (`drawFortress`'s `skipBody`) — the HP-tier damage overlay
+   * (cracks/smoke/fire, `drawFortressDamageOverlay`) keeps drawing on top
+   * of the 3D model at the exact same anchor, since that's real gameplay
+   * state (Castle HP) that must never silently stop being shown. Defaults
+   * to false, so every existing caller (main menu's cinematic fortress,
+   * any test) is pixel-identical to before this param existed.
+   */
+  skipCastleBody = false,
 ): void {
   if (path.length < 2) return;
   const start = path[0]!;
   const startDir = normalize(path[1]!.x - start.x, path[1]!.y - start.y);
   drawMagicPortal(ctx, { x: start.x + startDir.x * ENDPOINT_INSET, y: start.y + startDir.y * ENDPOINT_INSET }, timeMs);
 
-  const end = path[path.length - 1]!;
-  const prev = path[path.length - 2]!;
-  const endDir = normalize(end.x - prev.x, end.y - prev.y);
-  drawFortress(
-    ctx,
-    { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET },
-    biome,
-    timeMs,
-    1,
-    0,
-    hpPercent,
-  );
+  const { position: fortressPos } = getFortressAnchor(path);
+  drawFortress(ctx, fortressPos, biome, timeMs, 1, 0, hpPercent, null, skipCastleBody);
 }
 
 function normalize(x: number, y: number): Vector2 {
@@ -786,12 +801,15 @@ export function drawFortress(
   hpPercent = 1,
   /** Castle Skin architecture (spec section 20, config/castleSkins.ts) — overrides only the fortress's own stonework colors (rock/rockDark), never any other biome-driven element (terrain, decorations, path stay biome-accurate). Defaults to null so every existing caller is pixel-identical to before. */
   skin: CastleSkinDefinition | null = null,
+  /** MUNDO 3D — FASE 3: true while a 3D castle body is rendered in its place — skips every wall/tower/gate draw call below, but `drawFortressDamageOverlay` (called unconditionally further down, in this same translate+scale space) still runs, so the HP-tier damage read never silently disappears. Defaults to false — every existing caller unaffected. */
+  skipBody = false,
 ): FortressAnchors {
   const p = { ...biome.palette, ...skin?.paletteOverride };
   ctx.save();
   ctx.translate(position.x, position.y);
   ctx.scale(scale, scale);
 
+  if (!skipBody) {
   // Stone platform the fortress stands on, with roots breaking through cracks.
   ctx.fillStyle = "rgba(8,8,3,0.4)";
   ctx.beginPath();
@@ -975,6 +993,7 @@ export function drawFortress(
   }
 
   drawBanner(ctx, 0, -26, biome, timeMs, 1, 0, windIntensity);
+  }
 
   drawFortressDamageOverlay(ctx, timeMs, hpPercent);
 

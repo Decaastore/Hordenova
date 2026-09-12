@@ -3,6 +3,7 @@ import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
 import { WorldTerrain } from "./WorldTerrain";
+import { TestTowerLayer, TestCastleLayer } from "./WorldGameplayTestLayer";
 import { cameraPosition, computeScreenTransform } from "../enemyProjection";
 
 /** Same manual orthographic-frustum rig as `rendering3d/Enemy3DOverlay.tsx`'s `CameraRig` — kept as its own small copy (not shared) so this layer and the enemy overlay stay independently mountable/removable while both use the identical tilt, matching camera math (`enemyProjection.ts` is the single source of truth for the numbers either rig uses). */
@@ -33,12 +34,27 @@ function CameraRig() {
  * `enemyProjection.ts`'s `worldToLocalGround` doc comment for the identity
  * that makes the letterbox offset cancel out here).
  */
-function ScaledWorld({ biomeId }: { biomeId: string }) {
+function ScaledWorld({
+  biomeId,
+  engine,
+  hiddenTowerIdsRef,
+}: {
+  biomeId: string;
+  engine: GameEngine;
+  hiddenTowerIdsRef: React.RefObject<Set<string>>;
+}) {
   const { size } = useThree();
   const transform = computeScreenTransform(size.width, size.height);
   return (
     <group scale={transform.scale}>
       <WorldTerrain biomeId={biomeId} />
+      {/* MUNDO 3D — FASE 3 gameplay-integration test: mounted INSIDE this
+          same scaled group (not a separate overlay) so the test tower/
+          castle share the terrain's own directional light and cast/receive
+          real shadow-mapped shadows onto the ground — see
+          WorldGameplayTestLayer.tsx's own doc comment for why. */}
+      <TestTowerLayer engine={engine} hiddenIdsRef={hiddenTowerIdsRef} />
+      <TestCastleLayer />
     </group>
   );
 }
@@ -55,7 +71,14 @@ function ScaledWorld({ biomeId }: { biomeId: string }) {
  * otherwise re-asserts "auto" on its own canvas, which would eat clicks
  * even though this layer already renders behind everything visually.
  */
-export function WorldSceneOverlay({ engine }: { engine: GameEngine }) {
+export function WorldSceneOverlay({
+  engine,
+  hiddenTowerIdsRef,
+}: {
+  engine: GameEngine;
+  /** MUNDO 3D — FASE 3: ids of towers currently covered by `TestTowerLayer`'s 3D body — written every frame, read by `CanvasRenderer`'s `hidden3DTowerIds` prop. Owned by the caller (GameScreen.tsx), same lifecycle as `hidden3DEnemyIdsRef`. */
+  hiddenTowerIdsRef: React.RefObject<Set<string>>;
+}) {
   const [biomeId, setBiomeId] = useState(() => engine.getRenderSnapshot().biomeId);
 
   useEffect(() => {
@@ -79,7 +102,7 @@ export function WorldSceneOverlay({ engine }: { engine: GameEngine }) {
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />
-        <ScaledWorld biomeId={biomeId} />
+        <ScaledWorld biomeId={biomeId} engine={engine} hiddenTowerIdsRef={hiddenTowerIdsRef} />
       </Canvas>
     </div>
   );

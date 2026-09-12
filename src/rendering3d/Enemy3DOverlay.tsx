@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
+import { getBiome } from "@/rendering/biomes";
 import { Enemy3DLayer } from "./Enemy3DLayer";
 import { cameraPosition } from "./enemyProjection";
 
@@ -41,6 +42,24 @@ function CameraRig() {
  * this actually mounts, so the main game bundle is unaffected either way.
  */
 export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; hiddenIdsRef: React.RefObject<Set<string>> }) {
+  // MUNDO 3D — FASE 3: this overlay is a SEPARATE Canvas/scene from
+  // `rendering3d/world/WorldSceneOverlay.tsx` (structurally can't share
+  // shadows/lighting with it without merging the two — see
+  // WorldGameplayTestLayer.tsx's doc comment for why that's out of scope
+  // this phase), but it CAN match the world layer's own key-light color
+  // (same `biome.palette.accentWarm` WorldTerrain.tsx uses) instead of a
+  // hardcoded warm tone — so a 3D enemy walking across the 3D terrain at
+  // least reads as lit by the same "sun," even though the shadow itself is
+  // still the fake contact-shadow texture, not a real cast shadow.
+  const [keyLightColor, setKeyLightColor] = useState(() => getBiome(engine.getRenderSnapshot().biomeId).palette.accentWarm);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const current = getBiome(engine.getRenderSnapshot().biomeId).palette.accentWarm;
+      setKeyLightColor((prev) => (prev === current ? prev : current));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [engine]);
+
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
       <Canvas
@@ -61,7 +80,7 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
         <CameraRig />
         <ambientLight intensity={0.75} />
         <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
-        <directionalLight position={[600, 1200, 800]} intensity={1.6} color={"#ffcf8a"} />
+        <directionalLight position={[600, 1200, 800]} intensity={1.6} color={keyLightColor} />
         <Enemy3DLayer engine={engine} hiddenIdsRef={hiddenIdsRef} />
       </Canvas>
     </div>

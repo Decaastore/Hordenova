@@ -67,6 +67,12 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // error flips this to false, CanvasRenderer's `worldLayerActive` prop
   // follows it and the existing 2D drawBackground fill resumes instantly.
   const [enableWorldLayer, setEnableWorldLayer] = useState(() => isWebGLAvailable());
+  // MUNDO 3D — FASE 3 gameplay-integration test: same hidden-ids-ref
+  // pattern as `hidden3DEnemyIdsRef` above, for the ONE tower type
+  // (IRONWOOD) `WorldGameplayTestLayer.tsx`'s `TestTowerLayer` currently
+  // gives a 3D body — cleared on any world-layer failure below so a crash
+  // never leaves a tower's 2D sprite permanently hidden.
+  const hidden3DTowerIdsRef = useRef<Set<string>>(new Set());
 
   // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
   // small state machine: "picking" a destination on the map, then either
@@ -180,9 +186,14 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
       */}
       <div style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
         {enableWorldLayer && (
-          <Enemy3DErrorBoundary onError={() => setEnableWorldLayer(false)}>
+          <Enemy3DErrorBoundary
+            onError={() => {
+              hidden3DTowerIdsRef.current.clear();
+              setEnableWorldLayer(false);
+            }}
+          >
             <Suspense fallback={null}>
-              <WorldSceneOverlay engine={engine} />
+              <WorldSceneOverlay engine={engine} hiddenTowerIdsRef={hidden3DTowerIdsRef} />
             </Suspense>
           </Enemy3DErrorBoundary>
         )}
@@ -193,6 +204,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           onTowerClick={handleTowerClick}
           onBackgroundClick={handleBackgroundClick}
           hidden3DEnemyIds={hidden3DEnemyIdsRef}
+          hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
         />
         {enable3DEnemies && (
