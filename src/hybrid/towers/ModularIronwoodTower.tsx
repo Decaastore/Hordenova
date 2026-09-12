@@ -7,6 +7,8 @@ import { mulberry32 } from "@/lab3d/rng";
 import { buildSpirePoints, buildShardPoints } from "../proceduralExtras";
 import type { TowerHandle } from "@/lab3d/towers/towerTypes";
 import type { TowerSkinDefinition } from "./towerSkinTypes";
+import { getToonGradientMap } from "@/rendering3d/toonShading";
+import { OutlineMesh } from "@/rendering3d/OutlineMesh";
 
 interface Props {
   position: [number, number, number];
@@ -199,13 +201,16 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
       {/* ---------- BASE ---------- */}
       {skin.base.variant === "broken-rock" && brokenRockGeo && (
         <mesh geometry={brokenRockGeo} rotation={[-Math.PI / 2, 0, 0.3]} position={[0, 0.02, 0]} receiveShadow castShadow>
-          <meshStandardMaterial color={skin.base.color} roughness={skin.base.roughness} metalness={skin.base.metalness} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.base.color} />
         </mesh>
+      )}
+      {skin.base.variant === "broken-rock" && brokenRockGeo && (
+        <OutlineMesh geometry={brokenRockGeo} rotation={[-Math.PI / 2, 0, 0.3]} position={[0, 0.02, 0]} thickness={1.05} />
       )}
       {skin.base.variant === "obsidian-shard-cluster" && shardDiscGeo && baseShardGeo && (
         <>
           <mesh geometry={shardDiscGeo} rotation={[-Math.PI / 2, 0, 0.3]} position={[0, 0.02, 0]} receiveShadow castShadow>
-            <meshStandardMaterial color={skin.base.color} roughness={skin.base.roughness} metalness={skin.base.metalness} emissive={skin.base.veinColor || 0} emissiveMap={veinTex ?? undefined} emissiveIntensity={veinTex ? 1.1 : 0} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.base.color} emissive={skin.base.veinColor || 0} emissiveMap={veinTex ?? undefined} emissiveIntensity={veinTex ? 1.1 : 0} />
           </mesh>
           {baseShards.map((s, i) => (
             <mesh
@@ -216,7 +221,7 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
               scale={s.scale}
               castShadow
             >
-              <meshStandardMaterial color={skin.base.color} roughness={skin.base.roughness} metalness={skin.base.metalness + 0.15} emissive={skin.base.veinColor || 0} emissiveMap={veinTex ?? undefined} emissiveIntensity={veinTex ? 1.4 : 0} flatShading />
+              <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.base.color} emissive={skin.base.veinColor || 0} emissiveMap={veinTex ?? undefined} emissiveIntensity={veinTex ? 1.4 : 0} />
             </mesh>
           ))}
         </>
@@ -228,29 +233,34 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
           <>
             {/* PEDRA — wide, heavy, matte, load-bearing drum */}
             <mesh geometry={drumGeo} position={[0, 0.1, 0]} castShadow>
-              <meshStandardMaterial map={stoneTex} color={0xffffff} roughness={0.93} metalness={0} flatShading />
+              <meshToonMaterial gradientMap={getToonGradientMap()} map={stoneTex} color={0xffffff} />
             </mesh>
+            <OutlineMesh geometry={drumGeo} position={[0, 0.1, 0]} thickness={1.05} />
             {/* rune shoulder-band — the visible seam where stone becomes
                 wood, marked as a deliberate joint rather than hidden */}
             <mesh position={[0, 0.5, 0]} castShadow>
               <torusGeometry args={[0.41, 0.03, 6, 20]} />
-              <meshStandardMaterial color={skin.body.bandColor} emissive={skin.core.emissive} emissiveMap={crackTex} emissiveIntensity={0.9} roughness={skin.body.bandRoughness} metalness={skin.body.bandMetalness} />
+              <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.body.bandColor} emissive={skin.core.emissive} emissiveMap={crackTex} emissiveIntensity={0.9} />
             </mesh>
             {/* MADEIRA — slender, organic, tapering neck rising out of the drum */}
             <mesh geometry={spireGeoBase} position={[0, 0.1, 0]} castShadow>
-              <meshStandardMaterial map={woodTex} color={0xffffff} roughness={0.85} metalness={0} />
+              <meshToonMaterial gradientMap={getToonGradientMap()} map={woodTex} color={0xffffff} />
             </mesh>
+            <OutlineMesh geometry={spireGeoBase} position={[0, 0.1, 0]} thickness={1.08} />
           </>
         )}
         {skin.body.variant === "twisted-spire" && spireGeo && (
-          <mesh geometry={spireGeo} position={[0, 0.08, 0]} castShadow>
-            <meshStandardMaterial map={bodyTexNonWood} color={0xffffff} roughness={skin.body.roughness} metalness={skin.body.metalness} flatShading />
-          </mesh>
+          <>
+            <mesh geometry={spireGeo} position={[0, 0.08, 0]} castShadow>
+              <meshToonMaterial gradientMap={getToonGradientMap()} map={bodyTexNonWood} color={0xffffff} />
+            </mesh>
+            <OutlineMesh geometry={spireGeo} position={[0, 0.08, 0]} thickness={1.06} />
+          </>
         )}
         {skin.body.variant === "twisted-spire" && (
           <mesh position={[0, 1.3, 0]} castShadow>
             <torusGeometry args={[0.16, 0.045, 6, 12]} />
-            <meshStandardMaterial color={skin.body.bandColor} roughness={skin.body.bandRoughness} metalness={skin.body.bandMetalness} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.body.bandColor} />
           </mesh>
         )}
 
@@ -268,13 +278,13 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
             {/* A faint glow tying the socket to what it holds — the "eye"
                 read (dark body / bright metal ring / glowing center) is
                 the single strongest cue at the game's real top-down angle. */}
-            <meshStandardMaterial color={skin.ornaments.color} emissive={skin.core.emissive} emissiveIntensity={0.35} roughness={0.35} metalness={0.7} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.ornaments.color} emissive={skin.core.emissive} emissiveIntensity={0.35} />
           </mesh>
         )}
         {isBaseTower &&
           strutList.map((geo, i) => (
             <mesh key={i} geometry={geo} castShadow>
-              <meshStandardMaterial color={skin.ornaments.color} roughness={0.45} metalness={0.6} />
+              <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.ornaments.color} />
             </mesh>
           ))}
         {skin.ornaments.variant === "jagged-horn-vents" &&
@@ -284,12 +294,12 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
             return (
               <group key={i} position={[Math.cos(a) * 0.14, 1.45, Math.sin(a) * 0.14]} rotation={[0, -a, 0]}>
                 <mesh geometry={hornGeo} castShadow>
-                  <meshStandardMaterial color={skin.ornaments.color} roughness={skin.ornaments.roughness} metalness={skin.ornaments.metalness} flatShading />
+                  <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.ornaments.color} />
                 </mesh>
                 {skin.ornaments.tipGlow !== 0 && (
                   <mesh position={[0.42 * Math.sin(0.55), 0.42 * Math.cos(0.55), 0]}>
                     <icosahedronGeometry args={[0.045, 0]} />
-                    <meshStandardMaterial color={"#1a0d08"} emissive={skin.ornaments.tipGlow} emissiveIntensity={2.4} flatShading />
+                    <meshToonMaterial gradientMap={getToonGradientMap()} color={"#1a0d08"} emissive={skin.ornaments.tipGlow} emissiveIntensity={2.4} />
                   </mesh>
                 )}
               </group>
@@ -314,13 +324,11 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
         {isBaseTower && gemGeo ? (
           <mesh ref={coreMeshRef} position={[0, coreHeight, 0]}>
             <primitive object={gemGeo} attach="geometry" />
-            <meshStandardMaterial
+            <meshToonMaterial gradientMap={getToonGradientMap()}
               color={skin.core.shellColor}
               emissive={skin.core.emissive}
               emissiveMap={crackTex}
               emissiveIntensity={skin.core.emissiveIntensity}
-              roughness={0.25}
-              metalness={0.08}
               transparent
               opacity={0.82}
             />
@@ -328,14 +336,11 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
         ) : (
           <mesh ref={coreMeshRef} position={[0, coreHeight, 0]}>
             <icosahedronGeometry args={[isEmberCore ? 0.26 : 0.17, isEmberCore ? 0 : 1]} />
-            <meshStandardMaterial
+            <meshToonMaterial gradientMap={getToonGradientMap()}
               color={skin.core.shellColor}
               emissive={skin.core.emissive}
               emissiveMap={crackTex}
               emissiveIntensity={skin.core.emissiveIntensity}
-              roughness={isEmberCore ? 0.55 : 0.3}
-              metalness={0.1}
-              flatShading={isEmberCore}
               transparent
               opacity={0.88}
             />
@@ -345,7 +350,7 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
           [0, 1, 2].map((i) => (
             <mesh key={i} ref={(m) => void (m && (emberRefs.current[i] = m))} position={[0, coreHeight + 0.22, 0]}>
               <sphereGeometry args={[0.03, 6, 6]} />
-              <meshStandardMaterial color={skin.core.emissive} emissive={skin.core.emissive} emissiveIntensity={2.6} />
+              <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.core.emissive} emissive={skin.core.emissive} emissiveIntensity={2.6} />
             </mesh>
           ))}
 
@@ -389,12 +394,12 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
             {[0, 1, 2].map((s) => (
               <mesh key={s} position={[0, -s * 0.11, 0]} rotation={[0, s * 0.6, Math.PI / 2]}>
                 <torusGeometry args={[0.035, 0.012, 5, 8]} />
-                <meshStandardMaterial color={skin.sideElements.chainColor} roughness={0.6} metalness={0.5} />
+                <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.sideElements.chainColor} />
               </mesh>
             ))}
             <mesh position={[0, -0.4, 0]}>
               <icosahedronGeometry args={[0.03, 0]} />
-              <meshStandardMaterial color={"#100b08"} emissive={skin.sideElements.glowColor} emissiveIntensity={1.8} flatShading />
+              <meshToonMaterial gradientMap={getToonGradientMap()} color={"#100b08"} emissive={skin.sideElements.glowColor} emissiveIntensity={1.8} />
             </mesh>
           </group>
         );

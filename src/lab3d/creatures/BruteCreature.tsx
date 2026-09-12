@@ -6,6 +6,8 @@ import { buildTaperedTube, buildJaggedPlateShape } from "../geometryUtils";
 import { getStoneTexture } from "../proceduralTextures";
 import { mulberry32 } from "../rng";
 import type { CreatureHandle } from "./creatureTypes";
+import { getToonGradientMap } from "@/rendering3d/toonShading";
+import { OutlineMesh } from "@/rendering3d/OutlineMesh";
 
 const V2 = (r: number, y: number) => new THREE.Vector2(r, y);
 
@@ -139,8 +141,9 @@ export function BruteCreature({
     >
       <group ref={bodyRef} position={[0, 0.5 * scale, 0]}>
         <mesh geometry={torsoGeo} scale={[1, 1, 0.86]} castShadow>
-          <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.82} metalness={0.04} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
         </mesh>
+        <OutlineMesh geometry={torsoGeo} scale={[1, 1, 0.86]} thickness={1.06} />
 
         {/* asymmetric spine ridge — decreasing shard scale toward the head */}
         {[0, 1, 2, 3].map((i) => (
@@ -152,28 +155,29 @@ export function BruteCreature({
             scale={1 - i * 0.14}
             castShadow
           >
-            <meshStandardMaterial color={c.dark} roughness={0.6} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={c.dark} />
           </mesh>
         ))}
 
         {/* forward-jutting wedge skull, low and integrated into the shoulders */}
         <group position={[0, 0.86, -0.18]} rotation={[1.35, 0, 0]}>
           <mesh geometry={headGeo} castShadow>
-            <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.78} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
           </mesh>
+          <OutlineMesh geometry={headGeo} thickness={1.08} />
           <mesh geometry={tuskGeo} position={[0.09, 0.06, 0.3]} rotation={[0, 0.2, 0]} castShadow>
-            <meshStandardMaterial color={"#e9dcc3"} roughness={0.35} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={"#e9dcc3"} />
           </mesh>
           <mesh geometry={tuskGeo} position={[-0.09, 0.06, 0.3]} rotation={[0, -0.2, 0]} scale={[-1, 1, 1]} castShadow>
-            <meshStandardMaterial color={"#e9dcc3"} roughness={0.35} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={"#e9dcc3"} />
           </mesh>
           <mesh position={[0.08, 0.2, 0.24]}>
             <sphereGeometry args={[0.028, 6, 6]} />
-            <meshStandardMaterial color={c.accent} emissive={c.accent} emissiveIntensity={1.8} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={c.accent} emissive={c.accent} emissiveIntensity={1.8} />
           </mesh>
           <mesh position={[-0.08, 0.2, 0.24]}>
             <sphereGeometry args={[0.028, 6, 6]} />
-            <meshStandardMaterial color={c.accent} emissive={c.accent} emissiveIntensity={1.8} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={c.accent} emissive={c.accent} emissiveIntensity={1.8} />
           </mesh>
           {/* character fill light (front + back), carried with the creature —
               keeps it legible from any angle along its patrol loop, independent
@@ -186,20 +190,21 @@ export function BruteCreature({
         {/* big armored club-arm — the dominant, asymmetric silhouette element */}
         <group position={[0.44, 0.86, -0.02]}>
           <mesh geometry={pauldronGeo} rotation={[0.3, 0.4, 0.5]} castShadow>
-            <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.75} metalness={0.15} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
           </mesh>
           <group ref={armRef}>
             <mesh geometry={armGeo} castShadow>
-              <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.82} flatShading />
+              <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
             </mesh>
+            <OutlineMesh geometry={armGeo} thickness={1.1} />
             <group position={[0.42, -0.4, 0.05]} rotation={[0.4, 0.3, 0.2]}>
               <mesh geometry={clubHeadGeo} castShadow>
-                <meshStandardMaterial color={c.dark} roughness={0.7} metalness={0.1} flatShading />
+                <meshToonMaterial gradientMap={getToonGradientMap()} color={c.dark} />
               </mesh>
               {[0, 1, 2].map((i) => (
                 <mesh key={i} position={[Math.cos(i * 2.1) * 0.16, Math.sin(i * 2.1) * 0.16, 0.1]} rotation={[1.5, 0, i]} castShadow>
                   <coneGeometry args={[0.035, 0.16, 4]} />
-                  <meshStandardMaterial color={"#d8c9a8"} roughness={0.5} flatShading />
+                  <meshToonMaterial gradientMap={getToonGradientMap()} color={"#d8c9a8"} />
                 </mesh>
               ))}
             </group>
@@ -209,15 +214,16 @@ export function BruteCreature({
         {/* smaller clawed off-hand — deliberately asymmetric with the club arm */}
         <group position={[-0.4, 0.82, -0.02]}>
           <mesh geometry={smallPauldronGeo} rotation={[0.2, -0.3, -0.4]} castShadow>
-            <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.75} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
           </mesh>
           <mesh geometry={clawArmGeo} castShadow>
-            <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.82} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
           </mesh>
+          <OutlineMesh geometry={clawArmGeo} thickness={1.12} />
           <group position={[-0.32, -0.38, 0.08]}>
             {[0, 1, 2].map((i) => (
               <mesh key={i} geometry={clawGeo} position={[Math.cos(i * 2.3) * 0.05, Math.sin(i * 2.3) * 0.05, 0]} rotation={[0, 0, i]} castShadow>
-                <meshStandardMaterial color={"#3a3128"} roughness={0.4} />
+                <meshToonMaterial gradientMap={getToonGradientMap()} color={"#3a3128"} />
               </mesh>
             ))}
           </group>
@@ -226,13 +232,15 @@ export function BruteCreature({
 
       <group ref={legLRef} position={[0.18 * scale, 0.5 * scale, -0.04 * scale]} scale={scale}>
         <mesh geometry={legGeoL} castShadow>
-          <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
         </mesh>
+        <OutlineMesh geometry={legGeoL} thickness={1.12} />
       </group>
       <group ref={legRRef} position={[-0.18 * scale, 0.5 * scale, -0.04 * scale]} scale={scale}>
         <mesh geometry={legGeoR} castShadow>
-          <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} map={hideTex} color={0xffffff} />
         </mesh>
+        <OutlineMesh geometry={legGeoR} thickness={1.12} />
       </group>
     </group>
   );

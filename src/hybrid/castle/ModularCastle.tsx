@@ -6,6 +6,8 @@ import { getStoneTexture, getCrackTexture } from "@/lab3d/proceduralTextures";
 import { mulberry32 } from "@/lab3d/rng";
 import type { CastleHandle } from "@/lab3d/effectsTypes";
 import type { CastleSkinDefinition } from "./castleSkinTypes";
+import { getToonGradientMap } from "@/rendering3d/toonShading";
+import { OutlineMesh } from "@/rendering3d/OutlineMesh";
 
 interface Props {
   skin: CastleSkinDefinition;
@@ -110,68 +112,71 @@ export function ModularCastle({ skin, onReady }: Props) {
     >
       {/* ---------- FOUNDATION ---------- */}
       <mesh geometry={foundationGeo} rotation={[-Math.PI / 2, 0, 0.15]} position={[0, -0.02, 0]} receiveShadow>
-        <meshStandardMaterial map={foundationTex} color={0xffffff} roughness={skin.foundation.roughness} flatShading />
+        <meshToonMaterial gradientMap={getToonGradientMap()} map={foundationTex} color={0xffffff} />
       </mesh>
+      <OutlineMesh geometry={foundationGeo} rotation={[-Math.PI / 2, 0, 0.15]} position={[0, -0.02, 0]} thickness={1.03} />
 
       {/* ---------- OUTER WALL (crenellated ring with a gate gap facing +Z) ---------- */}
       <mesh position={[0, 0.55, 0]}>
         <cylinderGeometry args={[2.55, 2.7, 1.1, 28, 1, true, ((gateHalfAngleDeg + 0.5) * Math.PI) / 180, ((360 - 2 * (gateHalfAngleDeg + 0.5)) * Math.PI) / 180]} />
-        <meshStandardMaterial map={wallTex} color={0xffffff} roughness={skin.wall.roughness} side={THREE.DoubleSide} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} map={wallTex} color={0xffffff} side={THREE.DoubleSide} />
       </mesh>
       {crenellations.map((c, i) => (
         <mesh key={i} position={[Math.sin(c.angle) * 2.62, 1.18, Math.cos(c.angle) * 2.62]} rotation={[0, -c.angle, 0]}>
           <boxGeometry args={[0.28, 0.32, 0.24]} />
-          <meshStandardMaterial color={skin.wall.crenelColor} roughness={0.85} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.wall.crenelColor} />
         </mesh>
       ))}
 
       {/* ---------- KEEP (central tower) ---------- */}
       <mesh geometry={keepGeo} position={[0, 0.15, -0.3]} castShadow>
-        <meshStandardMaterial map={keepTex} color={0xffffff} roughness={skin.keep.roughness} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} map={keepTex} color={0xffffff} />
       </mesh>
+      <OutlineMesh geometry={keepGeo} position={[0, 0.15, -0.3]} thickness={1.05} />
       {[0.85, 1.75].map((y, i) => (
         <mesh key={i} position={[0, y, -0.3]}>
           <torusGeometry args={[0.68 - i * 0.15, 0.055, 6, 16]} />
-          <meshStandardMaterial color={skin.keep.bandColor} roughness={0.6} metalness={skin.keep.bandMetalness} />
+          <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.keep.bandColor} />
         </mesh>
       ))}
       {buttressAngles.map((a, i) => (
         <mesh key={i} position={[Math.sin(a) * 0.62, 1.4, -0.3 + Math.cos(a) * 0.62]} rotation={[0, -a, 0]}>
           <boxGeometry args={[0.12, 2.2, 0.1]} />
-          <meshStandardMaterial color={skin.buttressColor} roughness={0.9} flatShading />
+          <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.buttressColor} />
         </mesh>
       ))}
       <mesh position={[0, 3.0, -0.3]} castShadow>
         <coneGeometry args={[0.58, 1.0, 10]} />
-        <meshStandardMaterial color={skin.roof.color} roughness={skin.roof.roughness} metalness={skin.roof.metalness} flatShading />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.roof.color} />
       </mesh>
       <mesh position={[0, 3.62, -0.3]}>
         <coneGeometry args={[0.05, 0.28, 6]} />
-        <meshStandardMaterial color={skin.keep.bandColor} roughness={0.4} metalness={0.7} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.keep.bandColor} />
       </mesh>
 
       {/* ---------- GATE + FLANKING TOWERS ---------- */}
       <mesh geometry={gateGeo} position={[0, 0, 1.05]} rotation={[0, 0, 0]}>
-        <meshStandardMaterial color={"#0d0906"} roughness={1} side={THREE.DoubleSide} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={"#0d0906"} side={THREE.DoubleSide} />
       </mesh>
       {[-1.55, 1.55].map((x, i) => (
         <group key={i} position={[x, 0, 0.75]}>
           <mesh geometry={sideTowerGeo} castShadow>
-            <meshStandardMaterial map={wallTex} color={0xffffff} roughness={skin.wall.roughness} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} map={wallTex} color={0xffffff} />
           </mesh>
+          <OutlineMesh geometry={sideTowerGeo} thickness={1.06} />
           <mesh position={[0, 1.7, 0]} castShadow>
             <coneGeometry args={[0.42, 0.62, 8]} />
-            <meshStandardMaterial color={skin.roof.color} roughness={skin.roof.roughness} flatShading />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.roof.color} />
           </mesh>
           {[0, 1, 2, 3, 4, 5].map((b) => (
             <mesh key={b} position={[Math.cos((b / 6) * Math.PI * 2) * 0.36, 1.42, Math.sin((b / 6) * Math.PI * 2) * 0.36]}>
               <boxGeometry args={[0.1, 0.12, 0.1]} />
-              <meshStandardMaterial map={wallTex} color={0xffffff} roughness={0.9} />
+              <meshToonMaterial gradientMap={getToonGradientMap()} map={wallTex} color={0xffffff} />
             </mesh>
           ))}
           <mesh position={[x < 0 ? 0.36 : -0.36, 0.95, 0]}>
             <planeGeometry args={[0.22, 0.6]} />
-            <meshStandardMaterial color={skin.banner.color} roughness={0.6} side={THREE.DoubleSide} />
+            <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.banner.color} side={THREE.DoubleSide} />
           </mesh>
         </group>
       ))}
@@ -191,7 +196,7 @@ export function ModularCastle({ skin, onReady }: Props) {
       </mesh>
       <mesh ref={crystalRef} position={[0, 4.15, 0.15]}>
         <icosahedronGeometry args={[0.36, 1]} />
-        <meshStandardMaterial color={skin.wardCrystal.shellColor} emissive={skin.wardCrystal.emissive} emissiveMap={crackTex} emissiveIntensity={skin.wardCrystal.emissiveIntensity} roughness={0.3} metalness={0.1} transparent opacity={0.85} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.wardCrystal.shellColor} emissive={skin.wardCrystal.emissive} emissiveMap={crackTex} emissiveIntensity={skin.wardCrystal.emissiveIntensity} transparent opacity={0.85} />
       </mesh>
       <pointLight position={[0, 4.15, 0.15]} color={skin.wardCrystal.emissive} intensity={1.8} distance={5.5} />
 
