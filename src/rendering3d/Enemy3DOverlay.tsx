@@ -43,7 +43,21 @@ function CameraRig() {
 export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; hiddenIdsRef: React.RefObject<Set<string>> }) {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-      <Canvas orthographic camera={{ near: 0.1, far: 4000 }} gl={{ alpha: true, antialias: true }} style={{ width: "100%", height: "100%", display: "block" }}>
+      <Canvas
+        orthographic
+        camera={{ near: 0.1, far: 4000 }}
+        gl={{ alpha: true, antialias: true }}
+        // react-three-fiber sets its own canvas element's pointer-events to
+        // "auto" by default (for its internal raycasting), which OVERRIDES
+        // the inherited "none" from the wrapping div above — this canvas
+        // sits on top of the real 2D game canvas in paint order, so without
+        // this explicit override it silently ate every click on the map
+        // (towers became unselectable). Forcing it here, on the actual
+        // canvas element r3f renders, is what actually takes the 3D layer
+        // out of the input chain — the wrapping div's pointer-events:none
+        // alone was not enough.
+        style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
+      >
         <CameraRig />
         <ambientLight intensity={0.75} />
         <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
