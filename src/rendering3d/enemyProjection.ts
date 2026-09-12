@@ -53,3 +53,23 @@ export function worldDirectionToThreeYaw(dir: Vector2): number {
 export function cameraPosition(distance: number): [number, number, number] {
   return [0, TILT_COS * distance, -TILT_SIN * distance];
 }
+
+/**
+ * MUNDO 3D — a static mesh (terrain, road) can't be rebuilt every resize
+ * the way a per-enemy group is repositioned every frame. Instead it's
+ * built ONCE in this "unit" ground space (as if scale=1, offset=0, and the
+ * screen were exactly WORLD_SIZE big) and the whole mesh/group is then
+ * scaled by the real `transform.scale` at render time — nothing else.
+ * This works because of the letterbox centering identity offsetX = (width
+ * - WORLD_SIZE.width*scale)/2 (same for Y): substituting into
+ * `worldToThreeGround` shows the real screen position of any world point
+ * equals exactly `transform.scale` times its position in this unit space,
+ * with the offset term canceling out perfectly — so a mesh built here and
+ * then given `group.scale.setScalar(transform.scale)` lands pixel-perfect
+ * with zero position term needed, exactly like the enemy layer's own
+ * per-instance scale (`Enemy3DLayer.tsx`), just without the per-frame
+ * position write since the terrain never moves in world space.
+ */
+export function worldToLocalGround(p: Vector2): [number, number, number] {
+  return worldToThreeGround(p, { scale: 1, offsetX: 0, offsetY: 0, width: WORLD_SIZE.width, height: WORLD_SIZE.height });
+}

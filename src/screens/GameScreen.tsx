@@ -29,6 +29,12 @@ import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 // import is never even requested.
 const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
 
+// MUNDO 3D — same lazy/WebGL-gated pattern as the enemy overlay above, for
+// the background terrain/atmosphere layer (src/rendering3d/world/).
+const WorldSceneOverlay = lazy(() =>
+  import("@/rendering3d/world/WorldSceneOverlay").then((m) => ({ default: m.WorldSceneOverlay })),
+);
+
 interface GameScreenProps {
   onExitToMenu: () => void;
 }
@@ -53,6 +59,14 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // stays empty) takes over permanently instead of retrying.
   const [enable3DEnemies, setEnable3DEnemies] = useState(() => isWebGLAvailable());
   const hidden3DEnemyIdsRef = useRef<Set<string>>(new Set());
+
+  // MUNDO 3D — FASE 1: background terrain/atmosphere layer, independent
+  // on/off state from `enable3DEnemies` (own error boundary, own WebGL
+  // gate check) so a failure in one layer never disables the other. Same
+  // one-way "never re-enable" fallback contract: once a load/runtime
+  // error flips this to false, CanvasRenderer's `worldLayerActive` prop
+  // follows it and the existing 2D drawBackground fill resumes instantly.
+  const [enableWorldLayer, setEnableWorldLayer] = useState(() => isWebGLAvailable());
 
   // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
   // small state machine: "picking" a destination on the map, then either
@@ -151,7 +165,27 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
       <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} />
 
-      <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+      {/*
+        MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
+        bearing: it makes THIS div establish its own CSS stacking context,
+        so WorldSceneOverlay's `zIndex: -1` wrapper is scoped to stack
+        behind CanvasRenderer's canvas WITHIN this container — without it,
+        a negative z-index with no enclosing stacking context resolves
+        against the page's own root stacking context instead (verified
+        live: the terrain rendered fine at zIndex 999 but was invisible at
+        zIndex -1 without this, hidden behind the page's own background,
+        nowhere near where drawBackground's flat fill even was). Every
+        other child here keeps its default `auto` z-index and stacks by
+        DOM order exactly as before — this changes nothing for them.
+      */}
+      <div style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
+        {enableWorldLayer && (
+          <Enemy3DErrorBoundary onError={() => setEnableWorldLayer(false)}>
+            <Suspense fallback={null}>
+              <WorldSceneOverlay engine={engine} />
+            </Suspense>
+          </Enemy3DErrorBoundary>
+        )}
         <CanvasRenderer
           engine={engine}
           pendingTowerType={pendingTowerType}
@@ -159,6 +193,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           onTowerClick={handleTowerClick}
           onBackgroundClick={handleBackgroundClick}
           hidden3DEnemyIds={hidden3DEnemyIdsRef}
+          worldLayerActive={enableWorldLayer}
         />
         {enable3DEnemies && (
           <Enemy3DErrorBoundary

@@ -48,6 +48,22 @@ interface CanvasRendererProps {
    * byte-for-byte identical to before this prop existed.
    */
   hidden3DEnemyIds?: RefObject<ReadonlySet<string>>;
+  /**
+   * MUNDO 3D — true while the background 3D terrain/atmosphere layer
+   * (`src/rendering3d/world/`) is mounted and rendering behind this
+   * canvas. Skips ONLY the flat 2D `drawBackground` fill (and makes the
+   * canvas element's own CSS background transparent) so the 3D layer
+   * shows through where the 2D canvas used to paint solid ground/sky —
+   * every other 2D draw call (path, decorations, towers, enemies, HP
+   * bars, fog, vignette, the castle's HP-tier visuals) is untouched and
+   * keeps drawing exactly as before, on top of the 3D backdrop. Optional,
+   * defaults to false, so a caller that never passes this (or an
+   * environment where the 3D layer never mounts — no WebGL, load error)
+   * leaves 2D rendering byte-for-byte identical to before this prop
+   * existed — the same fallback contract `hidden3DEnemyIds` already
+   * established.
+   */
+  worldLayerActive?: boolean;
 }
 
 interface PrevEnemyState {
@@ -81,12 +97,15 @@ export function CanvasRenderer({
   onTowerClick,
   onBackgroundClick,
   hidden3DEnemyIds,
+  worldLayerActive = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const latestSnapshotRef = useRef<RenderSnapshot | null>(null);
   const pendingTowerTypeRef = useRef<TowerType | null>(pendingTowerType);
   pendingTowerTypeRef.current = pendingTowerType;
+  const worldLayerActiveRef = useRef(worldLayerActive);
+  worldLayerActiveRef.current = worldLayerActive;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -190,7 +209,7 @@ export function CanvasRenderer({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offsetX + shake.x * scale, offsetY + shake.y * scale);
 
-      drawBackground(ctx, biome);
+      if (!worldLayerActiveRef.current) drawBackground(ctx, biome);
       drawDecorations(ctx, biome, timestamp);
       drawPath(ctx, ENEMY_PATH, biome);
       drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
@@ -305,7 +324,7 @@ export function CanvasRenderer({
         height: "100%",
         display: "block",
         cursor: "pointer",
-        backgroundColor: PALETTE.mapBackgroundFallback,
+        backgroundColor: worldLayerActive ? "transparent" : PALETTE.mapBackgroundFallback,
       }}
     />
   );
