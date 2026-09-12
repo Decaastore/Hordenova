@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { CREATURES_3D } from "../palette";
@@ -15,8 +15,9 @@ const TORSO_PROFILE = [V2(0.02, 0), V2(0.32, 0.05), V2(0.46, 0.24), V2(0.52, 0.5
 /** Low, forward-jutting wedge skull with a heavy brow ridge — no round head-ball. */
 const HEAD_PROFILE = [V2(0.0, 0), V2(0.2, 0.02), V2(0.25, 0.14), V2(0.19, 0.27), V2(0.06, 0.35), V2(0.0, 0.37)];
 
-function legPoints(hipY: number, kneeOffsetX: number): THREE.Vector3[] {
-  return [new THREE.Vector3(0, hipY, 0), new THREE.Vector3(kneeOffsetX, hipY * 0.5, 0.06), new THREE.Vector3(kneeOffsetX * 0.6, 0.02, -0.02)];
+/** Leg points relative to the HIP (local origin, not the ground) — [0]=hip, [1]=knee, [2]=foot — so the whole leg can hinge from the hip when its wrapping group rotates. Same silhouette as the original ground-relative curve (hip 0.5, knee 0.25, foot 0.02), just re-based to hip=0. */
+function legPoints(kneeOffsetX: number): THREE.Vector3[] {
+  return [new THREE.Vector3(0, 0, 0), new THREE.Vector3(kneeOffsetX, -0.25, 0.06), new THREE.Vector3(kneeOffsetX * 0.6, -0.48, -0.02)];
 }
 
 /**
@@ -28,18 +29,33 @@ function legPoints(hipY: number, kneeOffsetX: number): THREE.Vector3[] {
  * together." Stone-hide surface detail comes from a procedural canvas
  * texture, not a flat fill color.
  */
-export function BruteCreature({ onReady, scale = 1 }: { onReady?: (h: CreatureHandle) => void; scale?: number }) {
+export function BruteCreature({
+  onReady,
+  scale = 1,
+  speedMultiplier = 1,
+}: {
+  onReady?: (h: CreatureHandle) => void;
+  scale?: number;
+  /** Multiplies the walk-cycle rate (legs/torso bob) so it visibly tracks the creature's REAL current speed — 1 = normal, less while slowed. Purely cosmetic; defaults to 1 so every existing caller (Hybrid/lab3d demos) looks exactly as before. */
+  speedMultiplier?: number;
+}) {
   const bodyRef = useRef<THREE.Group>(null);
   const armRef = useRef<THREE.Group>(null);
+  const legLRef = useRef<THREE.Group>(null);
+  const legRRef = useRef<THREE.Group>(null);
   const hitT = useRef(0);
+  const speedMultiplierRef = useRef(speedMultiplier);
+  useEffect(() => {
+    speedMultiplierRef.current = speedMultiplier;
+  }, [speedMultiplier]);
   const c = CREATURES_3D.BRUTE;
 
   const torsoGeo = useMemo(() => new THREE.LatheGeometry(TORSO_PROFILE, 9), []);
   const headGeo = useMemo(() => new THREE.LatheGeometry(HEAD_PROFILE, 8), []);
   const hideTex = useMemo(() => getStoneTexture(c.body, c.dark), [c.body, c.dark]);
 
-  const legGeoL = useMemo(() => buildTaperedTube(legPoints(0.5, 0.06), [0.17, 0.14, 0.09], 6), []);
-  const legGeoR = useMemo(() => buildTaperedTube(legPoints(0.5, -0.06), [0.17, 0.14, 0.09], 6), []);
+  const legGeoL = useMemo(() => buildTaperedTube(legPoints(0.06), [0.17, 0.14, 0.09], 6), []);
+  const legGeoR = useMemo(() => buildTaperedTube(legPoints(-0.06), [0.17, 0.14, 0.09], 6), []);
   const armGeo = useMemo(
     () =>
       buildTaperedTube(
@@ -89,13 +105,19 @@ export function BruteCreature({ onReady, scale = 1 }: { onReady?: (h: CreatureHa
 
   useFrame((_, dt) => {
     const t = performance.now() * 0.001;
-    const stomp = t * 3.0;
+    const stomp = t * 3.0 * speedMultiplierRef.current;
     if (bodyRef.current) {
       bodyRef.current.position.y = 0.5 * scale - Math.abs(Math.sin(stomp)) * 0.09 * scale;
       bodyRef.current.rotation.z = Math.sin(stomp) * 0.06;
       bodyRef.current.rotation.x = 0.14 + Math.sin(stomp * 0.5) * 0.02;
     }
     if (armRef.current) armRef.current.rotation.x = -0.3 + Math.sin(stomp + 1) * 0.35;
+    // Heavy alternating stride, hinged from the hip (see legPoints) — legs
+    // used to be static meshes with a baked pose, which read as a stiff,
+    // shuffling "mummy" walk; this ties them to the same stomp cadence the
+    // torso bob already uses so foot-plant and body-bob land together.
+    if (legLRef.current) legLRef.current.rotation.x = Math.sin(stomp) * 0.32;
+    if (legRRef.current) legRRef.current.rotation.x = Math.sin(stomp + Math.PI) * 0.32;
     if (hitT.current > 0) {
       hitT.current = Math.max(0, hitT.current - dt * 5);
       if (bodyRef.current) bodyRef.current.scale.setScalar(scale * (1 + hitT.current * 0.18));
@@ -107,7 +129,12 @@ export function BruteCreature({ onReady, scale = 1 }: { onReady?: (h: CreatureHa
   return (
     <group
       ref={(g) => {
-        if (g && onReady) onReady({ root: g, pulseHit: () => (hitT.current = 1) });
+        if (g && onReady)
+          onReady({
+            root: g,
+            pulseHit: () => (hitT.current = 1),
+            setSpeedMultiplier: (m) => (speedMultiplierRef.current = m),
+          });
       }}
     >
       <group ref={bodyRef} position={[0, 0.5 * scale, 0]}>
@@ -197,12 +224,16 @@ export function BruteCreature({ onReady, scale = 1 }: { onReady?: (h: CreatureHa
         </group>
       </group>
 
-      <mesh geometry={legGeoL} position={[0.18 * scale, 0, -0.04 * scale]} scale={scale} castShadow>
-        <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
-      </mesh>
-      <mesh geometry={legGeoR} position={[-0.18 * scale, 0, -0.04 * scale]} scale={scale} castShadow>
-        <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
-      </mesh>
+      <group ref={legLRef} position={[0.18 * scale, 0.5 * scale, -0.04 * scale]} scale={scale}>
+        <mesh geometry={legGeoL} castShadow>
+          <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
+        </mesh>
+      </group>
+      <group ref={legRRef} position={[-0.18 * scale, 0.5 * scale, -0.04 * scale]} scale={scale}>
+        <mesh geometry={legGeoR} castShadow>
+          <meshStandardMaterial map={hideTex} color={0xffffff} roughness={0.88} flatShading />
+        </mesh>
+      </group>
     </group>
   );
 }

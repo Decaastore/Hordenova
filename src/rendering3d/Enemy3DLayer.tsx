@@ -2,66 +2,80 @@ import { useRef, useState } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
-import { BruteCreature } from "@/lab3d/creatures/BruteCreature";
+import type { EnemyType } from "@/config/enemyStats";
+import type { EnemyInstance } from "@/entities/Enemy";
+import { getEffectiveSpeed } from "@/entities/Enemy";
 import type { CreatureHandle } from "@/lab3d/creatures/creatureTypes";
+import { ENEMY_3D_REGISTRY } from "./creatureRegistry";
+import { getContactShadowTexture } from "./contactShadowTexture";
 import { computeScreenTransform, worldDirectionToThreeYaw, worldToThreeGround } from "./enemyProjection";
 
-/**
- * How tall a BRUTE's 3D model reads on screen, in WORLD units (the same
- * 1000x600 space `entities/Enemy.ts` positions live in) — NOT a fixed
- * pixel/Three-unit count, so it scales exactly the way the 2D sprites do
- * when the window resizes (CanvasRenderer's own `scale` is reapplied
- * every frame below). `BruteCreature`'s own unscaled model is ~1.65
- * local units tall (torso + legs), so this is converted to a model
- * scale factor, not used directly.
- */
-const BRUTE_WORLD_HEIGHT = 34;
-const BRUTE_LOCAL_HEIGHT = 1.65;
 const DEATH_DURATION_S = 0.45;
 
 interface TrackedEnemy {
+  type: EnemyType;
   hp: number;
   dying: boolean;
   deathElapsed: number;
 }
 
 /**
- * INIMIGOS 3D — purely visual. Reads `engine.getRenderSnapshot()` itself
+ * INIMIGOS 3D — purely visual, generic across every registered enemy type
+ * (see creatureRegistry.ts). Reads `engine.getRenderSnapshot()` itself
  * every frame (the same read `CanvasRenderer` already does) and mirrors
- * BRUTE positions/orientations onto 3D models; it never computes a
- * position, moves an enemy, changes HP, or grants gold — the logical
- * enemy in `entities/Enemy.ts`/`engine/GameEngine.ts` is the only source
- * of truth. `hiddenIdsRef.current` is written here (the ids currently
- * covered by a 3D model) so `CanvasRenderer` can skip drawing the 2D
- * sprite underneath — see CanvasRenderer.tsx's `hidden3DEnemyIds` prop.
+ * each REGISTERED enemy's position/orientation/HP/death onto its matching
+ * 3D model; enemy types with no registry entry are left alone so
+ * `CanvasRenderer` keeps drawing their existing 2D sprite. This layer
+ * never computes a position, moves an enemy, changes HP, or grants gold —
+ * the logical enemy in `entities/Enemy.ts`/`engine/GameEngine.ts` is the
+ * only source of truth, and there is exactly ONE tracked instance per real
+ * enemy id (no second entity, no second HP, no second route).
+ * `hiddenIdsRef.current` is written here (the ids currently covered by a
+ * 3D model) so `CanvasRenderer` can skip drawing the 2D sprite underneath
+ * — see CanvasRenderer.tsx's `hidden3DEnemyIds` prop. The existing 2D HP
+ * bar pass is NOT skipped for these ids — there is still only one HP bar,
+ * drawn by the same code every other enemy uses.
  */
-export function BruteEnemyLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hiddenIdsRef: React.RefObject<Set<string>> }) {
+export function Enemy3DLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hiddenIdsRef: React.RefObject<Set<string>> }) {
   const [renderedIds, setRenderedIds] = useState<string[]>([]);
   const trackedRef = useRef(new Map<string, TrackedEnemy>());
   const anchorsRef = useRef(new Map<string, THREE.Group>());
   const scaleGroupsRef = useRef(new Map<string, THREE.Group>());
   const handlesRef = useRef(new Map<string, CreatureHandle>());
   const renderedIdsRef = useRef<string[]>([]);
+  const latestEnemiesRef = useRef(new Map<string, EnemyInstance>());
 
   useFrame((state, dt) => {
     const { width, height } = state.size;
     const transform = computeScreenTransform(width, height);
-    const modelScale = (BRUTE_WORLD_HEIGHT / BRUTE_LOCAL_HEIGHT) * transform.scale;
 
     const snapshot = engine.getRenderSnapshot();
-    const brutes = snapshot.enemies.filter((e) => e.type === "BRUTE");
-    const aliveIds = new Set(brutes.map((e) => e.id));
+    const registered = snapshot.enemies.filter((e) => ENEMY_3D_REGISTRY[e.type] !== undefined);
+    const aliveIds = new Set(registered.map((e) => e.id));
     const tracked = trackedRef.current;
 
-    for (const enemy of brutes) {
+    latestEnemiesRef.current.clear();
+    for (const enemy of registered) latestEnemiesRef.current.set(enemy.id, enemy);
+
+    for (const enemy of registered) {
+      const def = ENEMY_3D_REGISTRY[enemy.type]!;
+      const modelScale = (def.worldHeight / def.localHeight) * transform.scale;
+
       let entry = tracked.get(enemy.id);
       if (!entry) {
-        entry = { hp: enemy.hp, dying: false, deathElapsed: 0 };
+        entry = { type: enemy.type, hp: enemy.hp, dying: false, deathElapsed: 0 };
         tracked.set(enemy.id, entry);
       } else if (enemy.hp < entry.hp) {
         handlesRef.current.get(enemy.id)?.pulseHit();
       }
       entry.hp = enemy.hp;
+
+      // Ties the walk-cycle rate to the enemy's REAL current speed (slowed,
+      // frozen, etc.) every frame via the handle's imperative setter — a
+      // plain React prop would only refresh when this component itself
+      // re-renders (i.e. when an enemy spawns/dies), not continuously.
+      const speedRatio = Math.max(0.15, getEffectiveSpeed(enemy) / Math.max(enemy.baseSpeed, 0.0001));
+      handlesRef.current.get(enemy.id)?.setSpeedMultiplier?.(speedRatio);
 
       const anchor = anchorsRef.current.get(enemy.id);
       const scaleGroup = scaleGroupsRef.current.get(enemy.id);
@@ -96,8 +110,10 @@ export function BruteEnemyLayer({ engine, hiddenIdsRef }: { engine: GameEngine; 
     for (const [id, entry] of tracked) {
       if (!entry.dying) continue;
       entry.deathElapsed += dt;
+      const def = ENEMY_3D_REGISTRY[entry.type];
       const scaleGroup = scaleGroupsRef.current.get(id);
-      if (scaleGroup) {
+      if (scaleGroup && def) {
+        const modelScale = (def.worldHeight / def.localHeight) * transform.scale;
         const t = Math.min(1, entry.deathElapsed / DEATH_DURATION_S);
         scaleGroup.scale.setScalar(modelScale * Math.max(0.001, 1 - t));
       }
@@ -126,28 +142,39 @@ export function BruteEnemyLayer({ engine, hiddenIdsRef }: { engine: GameEngine; 
     }
   });
 
+  const shadowTexture = getContactShadowTexture();
+
   return (
     <>
-      {renderedIds.map((id) => (
-        <group
-          key={id}
-          ref={(g) => {
-            if (g) anchorsRef.current.set(id, g);
-          }}
-        >
-          <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]}>
-            <circleGeometry args={[0.32, 16]} />
-            <meshBasicMaterial color={0x000000} transparent opacity={0.35} />
-          </mesh>
+      {renderedIds.map((id) => {
+        const entry = trackedRef.current.get(id);
+        const def = entry && ENEMY_3D_REGISTRY[entry.type];
+        if (!def) return null;
+        const enemy = latestEnemiesRef.current.get(id);
+        const speedMultiplier = enemy ? Math.max(0.15, getEffectiveSpeed(enemy) / Math.max(enemy.baseSpeed, 0.0001)) : 1;
+        const Component = def.Component;
+        const shadowRadius = def.localHeight * def.shadowRadiusRatio;
+        return (
           <group
+            key={id}
             ref={(g) => {
-              if (g) scaleGroupsRef.current.set(id, g);
+              if (g) anchorsRef.current.set(id, g);
             }}
           >
-            <BruteCreature onReady={(h) => handlesRef.current.set(id, h)} />
+            <group
+              ref={(g) => {
+                if (g) scaleGroupsRef.current.set(id, g);
+              }}
+            >
+              <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1, 0.72, 1]}>
+                <circleGeometry args={[shadowRadius, 24]} />
+                <meshBasicMaterial map={shadowTexture} transparent depthWrite={false} />
+              </mesh>
+              <Component onReady={(h) => handlesRef.current.set(id, h)} speedMultiplier={speedMultiplier} />
+            </group>
           </group>
-        </group>
-      ))}
+        );
+      })}
     </>
   );
 }

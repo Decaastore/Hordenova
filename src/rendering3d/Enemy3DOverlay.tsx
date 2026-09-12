@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
-import { BruteEnemyLayer } from "./BruteEnemyLayer";
+import { Enemy3DLayer } from "./Enemy3DLayer";
 import { cameraPosition } from "./enemyProjection";
 
 /**
@@ -48,7 +48,7 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
         <ambientLight intensity={0.75} />
         <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
         <directionalLight position={[600, 1200, 800]} intensity={1.6} color={"#ffcf8a"} />
-        <BruteEnemyLayer engine={engine} hiddenIdsRef={hiddenIdsRef} />
+        <Enemy3DLayer engine={engine} hiddenIdsRef={hiddenIdsRef} />
       </Canvas>
     </div>
   );
