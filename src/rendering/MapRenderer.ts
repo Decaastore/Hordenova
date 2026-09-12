@@ -5,7 +5,7 @@ import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
 import type { BiomeDefinition } from "./biomes";
-import { MAP_DECORATIONS, type Decoration } from "./mapDecorations";
+import { MAP_DECORATIONS, type Decoration, type DecorationKind } from "./mapDecorations";
 
 /**
  * Pure drawing helpers — world-space coordinates in, pixels on screen out
@@ -105,8 +105,25 @@ export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefiniti
 // all recolored from the active biome's palette.
 // ---------------------------------------------------------------------------
 
-export function drawDecorations(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
+/**
+ * MUNDO 3D — FASE 2 `skipKinds` lets the caller omit specific decoration
+ * kinds entirely (optional, defaults to none skipped so every existing
+ * caller — the menu preview, any test — is byte-for-byte unchanged). When
+ * the 3D world layer is active, `CanvasRenderer.tsx` passes TREE/ROCK/RUIN
+ * here because `rendering3d/world/worldVegetation.ts` now draws a REAL 3D
+ * counterpart at these exact same positions (same `MAP_DECORATIONS` array)
+ * — this is what stops each of those three kinds from being drawn twice
+ * (once flat in 2D, once with real height/shadow in 3D) rather than adding
+ * a second, competing decoration system.
+ */
+export function drawDecorations(
+  ctx: CanvasRenderingContext2D,
+  biome: BiomeDefinition,
+  timeMs: number,
+  skipKinds?: ReadonlySet<DecorationKind>,
+): void {
   for (const deco of MAP_DECORATIONS) {
+    if (skipKinds?.has(deco.kind)) continue;
     ctx.save();
     ctx.translate(deco.position.x, deco.position.y);
     if (deco.kind !== "WATER") {
@@ -466,12 +483,17 @@ export function buildOrganicRoad(path: readonly Vector2[], baseWidth: number, wi
   return { smoothed, left, right };
 }
 
-function fillRibbon(ctx: CanvasRenderingContext2D, left: readonly Vector2[], right: readonly Vector2[]): void {
+/** Builds the ribbon path on `ctx` without painting it — shared by `fillRibbon` (which fills it) and the surface-detail clip below (which only ever needs the shape, not a visible paint). */
+function ribbonPath(ctx: CanvasRenderingContext2D, left: readonly Vector2[], right: readonly Vector2[]): void {
   ctx.beginPath();
   ctx.moveTo(left[0]!.x, left[0]!.y);
   for (let i = 1; i < left.length; i++) ctx.lineTo(left[i]!.x, left[i]!.y);
   for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i]!.x, right[i]!.y);
   ctx.closePath();
+}
+
+function fillRibbon(ctx: CanvasRenderingContext2D, left: readonly Vector2[], right: readonly Vector2[]): void {
+  ribbonPath(ctx, left, right);
   ctx.fill();
 }
 
@@ -484,7 +506,26 @@ function strokeSmoothedCenterline(ctx: CanvasRenderingContext2D, smoothed: reado
 
 const ROAD_SEED = 11;
 
-export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[], biome: BiomeDefinition): void {
+/**
+ * MUNDO 3D — FASE 2 `skipFill`: when the 3D world layer is active, its own
+ * road mesh (`rendering3d/world/worldTerrainGeometry.ts`'s
+ * `buildRoadGeometry`, built from this exact SAME `path` array) already
+ * paints the actual road surface — lit, shadowed, sitting on the real
+ * terrain elevation. Passing `skipFill=true` here skips only the three
+ * flat, opaque 2D fills (halo/edge/fill ribbon) that would otherwise paint
+ * over and hide it completely, while every 2D readability/detail pass
+ * (worn centerline rut, dirt patches, fallen leaves, edge rocks/roots/
+ * grass) still draws normally on top — the road stays exactly as legible,
+ * it's just the 3D layer's own material providing the base surface color/
+ * shading instead of a second, competing flat fill. Defaults to false, so
+ * every existing caller (menu preview, tests) is unchanged.
+ */
+export function drawPath(
+  ctx: CanvasRenderingContext2D,
+  path: readonly Vector2[],
+  biome: BiomeDefinition,
+  skipFill = false,
+): void {
   if (path.length < 2) return;
   const p = biome.palette;
 
@@ -492,20 +533,22 @@ export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
 
-  const halo = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 9, ROAD_SEED);
-  ctx.fillStyle = "rgba(15,11,6,0.32)";
-  fillRibbon(ctx, halo.left, halo.right);
+  if (!skipFill) {
+    const halo = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 9, ROAD_SEED);
+    ctx.fillStyle = "rgba(15,11,6,0.32)";
+    fillRibbon(ctx, halo.left, halo.right);
 
-  const edge = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 3, ROAD_SEED);
-  ctx.fillStyle = p.roadEdge;
-  fillRibbon(ctx, edge.left, edge.right);
+    const edge = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 3, ROAD_SEED);
+    ctx.fillStyle = p.roadEdge;
+    fillRibbon(ctx, edge.left, edge.right);
 
+    const roadGradient = ctx.createLinearGradient(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    roadGradient.addColorStop(0, p.roadFillLight);
+    roadGradient.addColorStop(1, p.roadFill);
+    ctx.fillStyle = roadGradient;
+  }
   const fill = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 0, ROAD_SEED);
-  const roadGradient = ctx.createLinearGradient(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
-  roadGradient.addColorStop(0, p.roadFillLight);
-  roadGradient.addColorStop(1, p.roadFill);
-  ctx.fillStyle = roadGradient;
-  fillRibbon(ctx, fill.left, fill.right);
+  if (!skipFill) fillRibbon(ctx, fill.left, fill.right);
 
   // Worn centerline rut, following the same curve.
   ctx.strokeStyle = p.roadRut;
@@ -529,7 +572,7 @@ export function drawPath(ctx: CanvasRenderingContext2D, path: readonly Vector2[]
 function drawRoadSurfaceDetail(ctx: CanvasRenderingContext2D, fill: OrganicRoad, biome: BiomeDefinition): void {
   const p = biome.palette;
   ctx.save();
-  fillRibbon(ctx, fill.left, fill.right);
+  ribbonPath(ctx, fill.left, fill.right);
   ctx.clip();
 
   const step = 5;

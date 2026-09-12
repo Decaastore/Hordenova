@@ -20,9 +20,16 @@ import type { BiomePalette } from "@/rendering/biomes";
  */
 
 const NOISE_FREQ = 0.0055;
-const MAX_ELEVATION = 22;
+// MUNDO 3D — FASE 2: raised from 22 and pulled the roll-in closer to the
+// road (2.6x -> 1.9x) so visible elevation actually reaches most of the
+// PLAY AREA the camera frames, not just the far margins beyond it — the
+// FASE 1 report's own honest finding was that depth read as confined to
+// the letterbox corners. Still purely cosmetic (`terrainElevationAt` never
+// feeds pathfinding/placement) and still flat under the road itself
+// (`FLATTEN_INNER` unchanged) so gameplay readability is untouched.
+const MAX_ELEVATION = 34;
 const FLATTEN_INNER = PATH_VISUAL_WIDTH * 1.35;
-const FLATTEN_OUTER = PATH_VISUAL_WIDTH * 2.6;
+const FLATTEN_OUTER = PATH_VISUAL_WIDTH * 1.9;
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
@@ -37,7 +44,8 @@ export function terrainElevationAt(worldX: number, worldY: number): number {
   return raw * MAX_ELEVATION * roughness;
 }
 
-function parseBiomeColor(css: string): THREE.Color {
+/** Shared by every FASE 2 world-layer file (WorldTerrain.tsx, worldVegetation.ts) so a biome's CSS colors (used by the 2D renderer too) never need a second, drifting copy of this parser. */
+export function parseBiomeColor(css: string): THREE.Color {
   const rgbaMatch = css.match(/rgba?\(([^)]+)\)/);
   if (rgbaMatch) {
     const [r, g, b] = rgbaMatch[1]!.split(",").map((n) => parseFloat(n.trim()));

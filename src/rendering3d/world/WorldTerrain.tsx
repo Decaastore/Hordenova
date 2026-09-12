@@ -1,16 +1,7 @@
 import { useMemo } from "react";
-import * as THREE from "three";
 import { getBiome } from "@/rendering/biomes";
-import { buildGroundGeometry, buildMountainSilhouettes, buildRoadGeometry } from "./worldTerrainGeometry";
-
-function parseBiomeColor(css: string): THREE.Color {
-  const rgbaMatch = css.match(/rgba?\(([^)]+)\)/);
-  if (rgbaMatch) {
-    const [r, g, b] = rgbaMatch[1]!.split(",").map((n) => parseFloat(n.trim()));
-    return new THREE.Color(r! / 255, g! / 255, b! / 255);
-  }
-  return new THREE.Color(css);
-}
+import { buildGroundGeometry, buildMountainSilhouettes, buildRoadGeometry, parseBiomeColor } from "./worldTerrainGeometry";
+import { buildVegetationMeshes } from "./worldVegetation";
 
 /**
  * MUNDO 3D — FASE 1 fundamento visual: terrain shape + material + a
@@ -33,6 +24,12 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
   const groundGeometry = useMemo(() => buildGroundGeometry(palette), [biomeId]);
   const roadGeometry = useMemo(() => buildRoadGeometry(palette), [biomeId]);
   const mountains = useMemo(() => buildMountainSilhouettes(7), []);
+  // MUNDO 3D — FASE 2 midground: real 3D trees/rocks at the SAME positions
+  // `rendering/mapDecorations.ts` already scattered for the 2D TREE/ROCK/
+  // RUIN sprites (CanvasRenderer skips drawing those specific kinds while
+  // this layer is active — see its `skipDecorationKinds` — so each one
+  // exists exactly once, never duplicated).
+  const vegetation = useMemo(() => buildVegetationMeshes(palette), [biomeId]);
 
   const fogColor = useMemo(() => parseBiomeColor(palette.fogColor), [biomeId]);
   const skyColor = useMemo(() => parseBiomeColor(palette.skyBottom), [biomeId]);
@@ -46,11 +43,19 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
       <color attach="background" args={[skyColor]} />
       <fogExp2 attach="fog" args={[fogColor, 0.0016]} />
 
-      <hemisphereLight args={[hemiSky, hemiGround, 0.6]} />
-      <ambientLight color={hemiSky} intensity={0.32} />
+      <hemisphereLight args={[hemiSky, hemiGround, 0.75]} />
+      <ambientLight color={hemiSky} intensity={0.4} />
+      {/* MUNDO 3D — FASE 2: key light raised 1.9->2.6 and the fill light
+          0.35->0.6 — the deep-forest palette's vegetation tones are close
+          to black, so under the FASE 1 intensities the directional light
+          could never carve out visible highlight/shadow facets on trees or
+          terrain, which is the concrete reason the play area read as flat.
+          Paired with worldVegetation.ts's own lifted (3D-only) canopy/rock
+          tones, this is what actually makes shading — not just geometry —
+          visible within the play area. */}
       <directionalLight
         position={[420, 900, 260]}
-        intensity={1.9}
+        intensity={2.6}
         color={keyLightColor}
         castShadow
         shadow-mapSize-width={1024}
@@ -63,7 +68,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
         shadow-camera-bottom={-460}
         shadow-bias={-0.0012}
       />
-      <directionalLight position={[-300, 500, -400]} intensity={0.35} color={hemiSky} />
+      <directionalLight position={[-300, 500, -400]} intensity={0.6} color={hemiSky} />
 
       <mesh geometry={groundGeometry} receiveShadow>
         <meshStandardMaterial vertexColors roughness={0.95} metalness={0.02} />
@@ -76,6 +81,10 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
         <mesh key={i} geometry={m.geometry} position={m.position}>
           <meshStandardMaterial color={mountainColor} roughness={1} flatShading fog />
         </mesh>
+      ))}
+
+      {vegetation.map((mesh, i) => (
+        <primitive key={i} object={mesh} />
       ))}
     </>
   );

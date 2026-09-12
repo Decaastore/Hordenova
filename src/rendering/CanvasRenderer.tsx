@@ -23,9 +23,19 @@ import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { RunPhase } from "@/engine/types";
+import type { DecorationKind } from "./mapDecorations";
 
 const SLOT_HIT_RADIUS = 22;
 const TOWER_HIT_RADIUS = 20;
+
+/**
+ * MUNDO 3D — FASE 2: while the 3D world layer is active, TREE/ROCK/RUIN
+ * decorations get a real 3D counterpart (`rendering3d/world/worldVegetation.ts`,
+ * built from this exact same `MAP_DECORATIONS` array) — these three kinds
+ * are the ones skipped here so nothing is ever drawn twice. GRASS/FLOWER/
+ * WATER/TORCH/ROOT/CRYSTAL stay 2D either way.
+ */
+const WORLD_LAYER_3D_DECORATION_KINDS: ReadonlySet<DecorationKind> = new Set(["TREE", "ROCK", "RUIN"]);
 
 interface Transform {
   scale: number;
@@ -209,9 +219,10 @@ export function CanvasRenderer({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offsetX + shake.x * scale, offsetY + shake.y * scale);
 
-      if (!worldLayerActiveRef.current) drawBackground(ctx, biome);
-      drawDecorations(ctx, biome, timestamp);
-      drawPath(ctx, ENEMY_PATH, biome);
+      const worldLayerOn = worldLayerActiveRef.current;
+      if (!worldLayerOn) drawBackground(ctx, biome);
+      drawDecorations(ctx, biome, timestamp, worldLayerOn ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
+      drawPath(ctx, ENEMY_PATH, biome, worldLayerOn);
       drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
