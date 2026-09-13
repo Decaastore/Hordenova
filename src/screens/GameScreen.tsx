@@ -193,7 +193,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             }}
           >
             <Suspense fallback={null}>
-              <WorldSceneOverlay engine={engine} hiddenTowerIdsRef={hidden3DTowerIdsRef} />
+              <WorldSceneOverlay engine={engine} />
             </Suspense>
           </Enemy3DErrorBoundary>
         )}

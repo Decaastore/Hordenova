@@ -235,7 +235,13 @@ export function CanvasRenderer({
       if (!worldLayerOn) drawBackground(ctx, biome);
       drawDecorations(ctx, biome, timestamp, worldLayerOn ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
       drawPath(ctx, ENEMY_PATH, biome, worldLayerOn);
-      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent, worldLayerOn);
+      // ROLLBACK NOTE — this used to pass `worldLayerOn` as `skipCastleBody`
+      // so the 2D fortress body would hide whenever the 3D world layer's
+      // now-removed `TestCastleLayer` was standing in for it (FASE 3). That
+      // 3D castle has been rolled back per user direction, so the 2D
+      // fortress always draws its full body again — omitted here, which
+      // keeps the parameter at its default (false).
+      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
