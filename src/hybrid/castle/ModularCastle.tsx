@@ -84,6 +84,18 @@ export function ModularCastle({ skin, onReady }: Props) {
   }, []);
 
   const buttressAngles = useMemo(() => [0.5, 1.6, 2.6, 3.6, 4.7, 5.7], []);
+  // TORRES LATERAIS — 4 corner towers (2 flanking the gate, 2 at the rear
+  // corners), not just 2, so the wall's silhouette reads as a fortress
+  // with towers at every corner rather than a keep with two gate-posts.
+  const sideTowerPositions = useMemo(
+    () => [
+      { x: -1.55, z: 0.75 },
+      { x: 1.55, z: 0.75 },
+      { x: -1.35, z: -1.15 },
+      { x: 1.35, z: -1.15 },
+    ],
+    [],
+  );
 
   useFrame((_, dt) => {
     const t = performance.now() * 0.001;
@@ -158,8 +170,8 @@ export function ModularCastle({ skin, onReady }: Props) {
       <mesh geometry={gateGeo} position={[0, 0, 1.05]} rotation={[0, 0, 0]}>
         <meshToonMaterial gradientMap={getToonGradientMap()} color={"#0d0906"} side={THREE.DoubleSide} />
       </mesh>
-      {[-1.55, 1.55].map((x, i) => (
-        <group key={i} position={[x, 0, 0.75]}>
+      {sideTowerPositions.map((pos, i) => (
+        <group key={i} position={[pos.x, 0, pos.z]}>
           <mesh geometry={sideTowerGeo} castShadow>
             <meshToonMaterial gradientMap={getToonGradientMap()} map={wallTex} color={0xffffff} />
           </mesh>
@@ -174,7 +186,7 @@ export function ModularCastle({ skin, onReady }: Props) {
               <meshToonMaterial gradientMap={getToonGradientMap()} map={wallTex} color={0xffffff} />
             </mesh>
           ))}
-          <mesh position={[x < 0 ? 0.36 : -0.36, 0.95, 0]}>
+          <mesh position={[pos.x < 0 ? 0.36 : -0.36, 0.95, 0]}>
             <planeGeometry args={[0.22, 0.6]} />
             <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.banner.color} side={THREE.DoubleSide} />
           </mesh>
@@ -190,6 +202,17 @@ export function ModularCastle({ skin, onReady }: Props) {
           why: a crack-map-only emissive gem reads as near-solid-black once
           it's small on screen, since the map's background is pure black
           between veins) + the faceted vein-detail shell on top. */}
+      {/* Mount/pedestal — bridges the finial spike up to the orb's socket so
+          the core reads as ENCAIXADO in the keep's roof, not floating
+          disconnected above it. */}
+      <mesh position={[0, 3.82, 0.1]} castShadow>
+        <coneGeometry args={[0.2, 0.22, 8]} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.keep.bandColor} />
+      </mesh>
+      <mesh position={[0, 3.95, 0.12]}>
+        <torusGeometry args={[0.23, 0.04, 6, 16]} />
+        <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.keep.bandColor} emissive={skin.wardCrystal.emissive} emissiveIntensity={0.35} />
+      </mesh>
       <mesh position={[0, 4.15, 0.15]}>
         <sphereGeometry args={[0.22, 10, 10]} />
         <meshBasicMaterial color={skin.wardCrystal.emissive} />

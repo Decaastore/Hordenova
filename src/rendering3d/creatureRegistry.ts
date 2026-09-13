@@ -1,5 +1,6 @@
 import type { EnemyType } from "@/config/enemyStats";
 import { BruteCreature } from "@/lab3d/creatures/BruteCreature";
+import { CrawlerCreature } from "@/lab3d/creatures/CrawlerCreature";
 import type { CreatureHandle } from "@/lab3d/creatures/creatureTypes";
 
 export interface Enemy3DCreatureProps {
@@ -36,5 +37,11 @@ export const ENEMY_3D_REGISTRY: Partial<Record<EnemyType, Enemy3DDefinition>> = 
     localHeight: 1.65,
     worldHeight: 26,
     shadowRadiusRatio: 0.3,
+  },
+  CRAWLER: {
+    Component: CrawlerCreature,
+    localHeight: 0.6,
+    worldHeight: 18,
+    shadowRadiusRatio: 0.32,
   },
 };
