@@ -221,15 +221,7 @@ export function ModularCastle({ skin, onReady }: Props) {
         <icosahedronGeometry args={[0.36, 1]} />
         <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.wardCrystal.shellColor} emissive={skin.wardCrystal.emissive} emissiveMap={crackTex} emissiveIntensity={skin.wardCrystal.emissiveIntensity} transparent opacity={0.85} />
       </mesh>
-      {/* EXPOSURE PASS — the old intensity/distance-cutoff pair (1.8 /
-          5.5) only ever lit the crystal's own mesh: at decay=2 falloff,
-          1.8 has faded to near-nothing by the time it reaches the corner
-          towers or the wall (footprint radius ~3.5). Removing the cutoff
-          (distance=0 = pure inverse-square, matching the tower core's own
-          light pattern) and raising intensity lets the core actually read
-          as the castle's light source, illuminating the keep roof and the
-          nearer corner towers instead of glowing alone in the dark. */}
-      <pointLight position={[0, 4.15, 0.15]} color={skin.wardCrystal.emissive} intensity={7} distance={0} decay={2} />
+      <pointLight position={[0, 4.15, 0.15]} color={skin.wardCrystal.emissive} intensity={1.8} distance={5.5} />
 
       <pointLight ref={torchARef} position={[-0.85, 0.85, 1.15]} color={skin.torchColor} intensity={0.9} distance={2.6} />
       <pointLight ref={torchBRef} position={[0.85, 0.85, 1.15]} color={skin.torchColor} intensity={0.9} distance={2.6} />

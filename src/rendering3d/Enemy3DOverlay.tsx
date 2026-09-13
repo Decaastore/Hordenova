@@ -65,7 +65,7 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
       <Canvas
         orthographic
         camera={{ near: 0.1, far: 4000 }}
-        gl={{ alpha: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
+        gl={{ alpha: true, antialias: true }}
         // react-three-fiber sets its own canvas element's pointer-events to
         // "auto" by default (for its internal raycasting), which OVERRIDES
         // the inherited "none" from the wrapping div above — this canvas
@@ -78,19 +78,9 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />
-        {/* EXPOSURE PASS — raised so a creature's legs/dorsal plates/shadowed
-            flank stay readable instead of crushing to solid black; the
-            added fill directional light (opposite the key) does the same
-            job the world layer's own fill light does for the terrain. */}
-        {/* EXPOSURE PASS — same finding as HybridScene3D.tsx: this canvas
-            renders ONLY creatures (no shared terrain to overexpose), and
-            their base materials needed a much larger ambient/hemisphere
-            push than a "normal" scene to actually lift out of the toon
-            gradient's bottom band instead of reading as solid black. */}
-        <ambientLight intensity={14} />
-        <hemisphereLight args={[0xdfe8c8, 0x5a5048, 8]} />
+        <ambientLight intensity={0.75} />
+        <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
         <directionalLight position={[600, 1200, 800]} intensity={1.6} color={keyLightColor} />
-        <directionalLight position={[-500, 700, -600]} intensity={0.8} color={0xdfe8ff} />
         <Enemy3DLayer engine={engine} hiddenIdsRef={hiddenIdsRef} />
       </Canvas>
     </div>
