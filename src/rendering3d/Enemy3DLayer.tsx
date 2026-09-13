@@ -50,7 +50,20 @@ export function Enemy3DLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hid
     const transform = computeScreenTransform(width, height);
 
     const snapshot = engine.getRenderSnapshot();
-    const registered = snapshot.enemies.filter((e) => ENEMY_3D_REGISTRY[e.type] !== undefined);
+    // BUG FIX (Chefe Maior desaparecendo): a Boss/Mini-Boss reuses the
+    // BRUTE enemy type (see engine/BossManager.ts's `type: def.isMainBoss
+    // ? "BRUTE" : "SHIELDBEARER"`), so this registry match used to also
+    // swap IT for the 3D model below — but that model's `worldHeight: 26`
+    // (creatureRegistry.ts) is calibrated for a normal-sized Brute, with no
+    // concept of the 2D renderer's own boss-scale multiplier (1.9x main
+    // boss / 1.4x mini-boss, CanvasRenderer.tsx) or of `drawBossAura`'s
+    // pulsing aura ring. The boss was still technically rendered, just as
+    // a tiny, unscaled, aura-less creature indistinguishable from an
+    // ordinary enemy — reading as "the boss stopped appearing". Excluding
+    // `enemy.boss` here restores the real, correctly-scaled 2D sprite +
+    // aura for every Boss/Mini-Boss, unchanged from before this overlay
+    // existed; ordinary BRUTE enemies keep the 3D treatment exactly as before.
+    const registered = snapshot.enemies.filter((e) => ENEMY_3D_REGISTRY[e.type] !== undefined && !e.boss);
     const aliveIds = new Set(registered.map((e) => e.id));
     const tracked = trackedRef.current;
 
