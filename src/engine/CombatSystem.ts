@@ -41,6 +41,8 @@ export interface DamageEvent {
   targetDamageReduction: number;
   /** True only for the hit that just froze the target (100% slow, not a partial one) — purely descriptive, read by GameEngine's audio layer to fire the "real freeze" SFX exactly once per freeze (Audio spec section 3), never derived from damage math. */
   isFreeze?: boolean;
+  /** True only when this exact hit rolled a REAL critical (Ironwood's `Math.random() < critChance`) — read by the floating-damage-number system for crit styling. Never inferred from the resulting damage amount; every other tower type simply omits this (defaults false). */
+  isCrit?: boolean;
 }
 
 export interface CombatTickResult {
@@ -142,6 +144,7 @@ export function tickCombat(
     enemy: EnemyInstance,
     rawDamage: number,
     armorPenetration = 0,
+    isCrit = false,
   ): DamageEvent => {
     const targetDamageReduction = enemy.damageReduction;
     // U1: a direct multiplier on the player's effective damage against the
@@ -155,6 +158,7 @@ export function tickCombat(
       enemyId: enemy.id,
       amount: actual,
       targetDamageReduction,
+      isCrit,
     };
     damageEvents.push(event);
     return event;
@@ -184,7 +188,7 @@ export function tickCombat(
 function resolveNormalAttack(
   tower: TowerInstance,
   enemies: readonly EnemyInstance[],
-  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number) => DamageEvent,
+  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number, isCrit?: boolean) => DamageEvent,
   projectiles: ProjectileInstance[],
 ): void {
   const stats = getTowerStats(tower);
@@ -203,7 +207,7 @@ function resolveNormalAttack(
       const bossMult = (enemy: EnemyInstance) => (enemy.boss ? special.bossDamageMultiplier : 1);
       const armorPen = special.bonusArmorPenetration ?? 0;
       const isCrit = Math.random() < special.critChance;
-      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target), armorPen);
+      dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target), armorPen, isCrit);
       projectiles.push(createProjectile(tower.type, tower.position, target.position));
 
       // Extra projectiles (unlocked at level 10/20, see towerStats.ts, plus
@@ -216,7 +220,7 @@ function resolveNormalAttack(
         const extra = findNearestUnhit(tower.position, stats.range, enemies, alreadyHit);
         if (!extra) break;
         const extraCrit = Math.random() < special.critChance;
-        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra), armorPen);
+        dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra), armorPen, extraCrit);
         projectiles.push(createProjectile(tower.type, tower.position, extra.position));
         alreadyHit.add(extra.id);
       }
@@ -291,7 +295,7 @@ function resolveNormalAttack(
 function resolveSpecialAttack(
   tower: TowerInstance,
   enemies: readonly EnemyInstance[],
-  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number) => DamageEvent,
+  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number, isCrit?: boolean) => DamageEvent,
   projectiles: ProjectileInstance[],
 ): void {
   const stats = getTowerStats(tower);

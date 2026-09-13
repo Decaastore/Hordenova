@@ -105,6 +105,7 @@ import {
 import { computeOfflineCapacityMs, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
+import type { CombatVfxEvent } from "./CombatVfxEvents";
 import { getMilestoneUnlockForLevel } from "@/config/towerStats";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 
@@ -379,6 +380,8 @@ export class GameEngine {
 
   /** Audio spec sections 1/16 — plain data queue, drained once per tick by audio/GameAudioBridge.ts. GameEngine never imports anything from src/audio/. */
   private audioEvents: GameAudioEvent[] = [];
+  /** Floating Damage Numbers rewrite — same queue pattern as audioEvents above, drained every render frame by CanvasRenderer.tsx. Each entry describes damage that was REALLY just subtracted from an enemy's hp this tick (see CombatVfxEvents.ts) — never a projectile fired or an hp-diff guess. GameEngine never imports anything from src/rendering/. */
+  private combatVfxEvents: CombatVfxEvent[] = [];
   private waveCompleteAudioFiredForWave: number | null = null;
   private enrageAudioFired = new Set<string>();
 
@@ -1424,8 +1427,20 @@ export class GameEngine {
 
     const reachedBaseIds = new Set<string>();
     for (const enemy of this.enemies) {
-      const { reachedEnd } = advanceEnemy(enemy, scaledDt);
+      const { reachedEnd, burnDamageDealt } = advanceEnemy(enemy, scaledDt);
       if (reachedEnd) reachedBaseIds.add(enemy.id);
+      // Floating Damage Numbers rewrite — burn previously applied smoothly
+      // to enemy.hp every single tick with NO event of any kind reaching
+      // the render layer; CanvasRenderer's old per-frame hp-diff fallback
+      // was the only thing that ever noticed it, spawning a tiny number on
+      // literally every rendered frame a burn was active (spec: exactly
+      // the "aparecem rápido demais" complaint). Reporting it here, once
+      // per tick, with the EXACT amount just subtracted from enemy.hp,
+      // lets the rendering layer aggregate DOT ticks into readable
+      // periodic numbers instead — see VfxManager.reportEnemyDamage.
+      if (burnDamageDealt > 0) {
+        this.emitCombatVfx({ kind: "DOT", enemyId: enemy.id, position: enemy.position, amount: burnDamageDealt, isCrit: false });
+      }
     }
 
     const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave);
@@ -1447,6 +1462,18 @@ export class GameEngine {
       const target = this.enemies.find((e) => e.id === damageEvent.enemyId);
       if (target) {
         this.emitAudio({ type: "enemy_hit", towerType: damageEvent.towerType, tier: this.classifyEnemyTier(target) });
+        // Floating Damage Numbers rewrite — the ONE place a HIT vfx event is
+        // ever emitted: `damageEvent.amount` is already `applyDamageToEnemy`'s
+        // real return value (the exact post-reduction amount just subtracted
+        // from `target.hp`), so the number shown can never drift from the
+        // actual HP change — no separate render-side hp-diff guess needed.
+        this.emitCombatVfx({
+          kind: "HIT",
+          enemyId: target.id,
+          position: target.position,
+          amount: damageEvent.amount,
+          isCrit: damageEvent.isCrit === true,
+        });
       }
       if (damageEvent.isFreeze) this.emitAudio({ type: "frostborn_freeze" });
     }
@@ -1848,6 +1875,17 @@ export class GameEngine {
   drainAudioEvents(): GameAudioEvent[] {
     const events = this.audioEvents;
     this.audioEvents = [];
+    return events;
+  }
+
+  private emitCombatVfx(event: CombatVfxEvent): void {
+    this.combatVfxEvents.push(event);
+  }
+
+  /** Floating Damage Numbers rewrite — the ONLY way the rendering layer observes real damage application. Safe to drain every render frame (unlike audio, which is tick-cadenced): an empty array is the overwhelmingly common case, and nothing is lost between drains since this is a plain queue like drainAudioEvents above. */
+  drainCombatVfxEvents(): CombatVfxEvent[] {
+    const events = this.combatVfxEvents;
+    this.combatVfxEvents = [];
     return events;
   }
 

@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
+import type { CombatVfxEvent } from "@/engine/CombatVfxEvents";
 import type { TowerType } from "@/config/towerStats";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
@@ -186,7 +187,18 @@ export function CanvasRenderer({
       // ui/HUD.tsx's GoldGainIndicator) that diffs hud.gold itself — no
       // canvas involvement, no camera shake, same aggregated "+N" text,
       // zero change to the actual Gold value/economy.
-      detectVfxEvents(snapshot, castleHpPercent, hud.phase, prevPhase, vfx, prevEnemies, prevTowerLevels, prevTowerHp, gateHomePosition);
+      detectVfxEvents(
+        snapshot,
+        castleHpPercent,
+        hud.phase,
+        prevPhase,
+        vfx,
+        prevEnemies,
+        prevTowerLevels,
+        prevTowerHp,
+        gateHomePosition,
+        engine.drainCombatVfxEvents(),
+      );
       prevPhase = hud.phase;
 
       // Attack detection: a tower's cooldown only ever counts down during
@@ -393,6 +405,7 @@ export function detectVfxEvents(
   prevTowerLevels: Map<string, number>,
   prevTowerHp: Map<string, number>,
   gatePosition: Vector2,
+  combatVfxEvents: CombatVfxEvent[] = [],
 ): void {
   // Boss entrance — the moment BOSS_INTRO begins (once, not every frame
   // spent in it) is the one big scripted beat camera shake is meant for.
@@ -400,25 +413,36 @@ export function detectVfxEvents(
     vfx.triggerShake(BOSS_INTRO_SHAKE_MAGNITUDE, BOSS_INTRO_SHAKE_DURATION_MS);
   }
 
-  // Enemies still alive: damage numbers when their hp dropped since last frame.
-  // The Crawler proof piece additionally gets the premium white-hot impact
-  // burst (spec: "impacto" + "partículas") instead of just a number popping.
+  // Floating Damage Numbers rewrite: numbers are born ONLY from
+  // `GameEngine.drainCombatVfxEvents()` — the exact, final, real HP
+  // reduction applied by CombatSystem's dealDamage / Enemy.advanceEnemy's
+  // burn tick — never from a frame-to-frame hp diff (which used to see a
+  // burning enemy losing hp on literally every rendered frame, and could
+  // never tell a real crit from a merely large hit). `VfxManager.
+  // reportEnemyDamage` does the batching/aggregation and per-enemy cap;
+  // this call site just forwards the real events.
+  const enemyById = new Map(snapshot.enemies.map((e) => [e.id, e]));
+  for (const event of combatVfxEvents) {
+    vfx.reportEnemyDamage(event.enemyId, event.position, event.amount, event.isCrit, event.kind);
+    // The Crawler proof piece's premium white-hot impact burst (spec:
+    // "impacto" + "partículas") stays tied to each real HIT, same as
+    // before — it's a particle effect, not a number, so it isn't subject
+    // to the number-aggregation rules above.
+    if (event.kind === "HIT" && enemyById.get(event.enemyId)?.type === "CRAWLER") {
+      const enemy = enemyById.get(event.enemyId)!;
+      vfx.spawnHitImpact(event.position, ENEMY_THEME.CRAWLER.accent, enemy.direction);
+    }
+  }
+
+  // Enemies still alive: Freeze SHATTER (spec section 11/12) — fires
+  // exactly once, the instant a full Frostborn freeze naturally expires
+  // (was frozen last frame, isn't anymore, and is still alive — a death
+  // while frozen is handled by the normal death-burst branch below, not
+  // this one). Pure render-side diffing of gameplay state (entities/
+  // Enemy.ts's time-based slow/freeze expiry, untouched here) — never
+  // influences it.
   for (const enemy of snapshot.enemies) {
     const prev = prevEnemies.get(enemy.id);
-    if (prev && enemy.hp < prev.hp) {
-      const damage = prev.hp - enemy.hp;
-      vfx.spawnDamageNumber(enemy.position, damage, damage >= 15);
-      if (enemy.type === "CRAWLER") {
-        vfx.spawnHitImpact(enemy.position, ENEMY_THEME.CRAWLER.accent, enemy.direction);
-      }
-    }
-
-    // Freeze SHATTER (spec section 11/12) — fires exactly once, the
-    // instant a full Frostborn freeze naturally expires (was frozen last
-    // frame, isn't anymore, and is still alive — a death while frozen is
-    // handled by the normal death-burst branch below, not this one). Pure
-    // render-side diffing of gameplay state (entities/Enemy.ts's
-    // time-based slow/freeze expiry, untouched here) — never influences it.
     if (prev?.wasFrozen && enemy.slow?.percent !== 1) {
       vfx.spawnFreezeShatter(enemy.position);
     }

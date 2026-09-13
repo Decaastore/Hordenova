@@ -14,6 +14,13 @@ import type { CastleHpTier } from "@/config/castleConfig";
  * run length.
  */
 
+/**
+ * Floating Damage Numbers — kept as its own tagged union of concerns:
+ * `kind` drives both the merge-cap logic (`reportEnemyDamage` below) and
+ * the draw-time styling split between a real tower hit and a DOT tick.
+ * `"OTHER"` is every pre-existing non-damage use of a floating text (the
+ * "UPGRADED" label) — never merge-capped, never DOT-styled.
+ */
 interface FloatingText {
   x: number;
   y: number;
@@ -21,6 +28,13 @@ interface FloatingText {
   color: string;
   remainingMs: number;
   totalMs: number;
+  /** Numeric running total for HIT/DOT texts — lets `reportEnemyDamage` merge more damage into an already-visible number instead of stacking a second one. Unused (0) for "OTHER" texts. */
+  amount: number;
+  kind: "HIT" | "DOT" | "OTHER";
+  /** Present only for HIT/DOT — the enemy this number is tracking, so at most one live HIT text and one live DOT text can ever exist per enemy (see MAX_TEXTS_PER_ENEMY_PER_KIND). */
+  enemyId?: string;
+  isCrit: boolean;
+  fontSizePx: number;
 }
 
 interface Burst {
@@ -47,6 +61,28 @@ const MAX_FLOATING_TEXTS = 24;
 const MAX_BURSTS = 16;
 const MAX_RINGS = 8;
 
+/**
+ * Fixed (non-sliding) aggregation windows for `reportEnemyDamage`: the
+ * window starts on the FIRST hit/tick reported for an enemy and always
+ * flushes after this many ms, however many more hits arrived in between —
+ * it is never extended by a new incoming hit. That's what lets sustained
+ * real damage still surface new numbers at a bounded, real cadence (rule
+ * 3: "não quero números aparecendo muito mais rapidamente do que o
+ * inimigo realmente está recebendo dano") instead of being deferred
+ * indefinitely under continuous fire. HIT gets a short window since a
+ * volley of towers firing together should read as one number; DOT gets a
+ * longer one since burn ticks every frame and needs heavier aggregation.
+ */
+const HIT_BATCH_WINDOW_MS = 90;
+const DOT_BATCH_WINDOW_MS = 450;
+
+interface PendingDamage {
+  position: Vector2;
+  amount: number;
+  isCrit: boolean;
+  remainingMs: number;
+}
+
 export class VfxManager {
   private floatingTexts: FloatingText[] = [];
   private bursts: Burst[] = [];
@@ -54,16 +90,108 @@ export class VfxManager {
   private shakeRemainingMs = 0;
   private shakeTotalMs = 0;
   private shakeMagnitude = 0;
+  private pendingHits = new Map<string, PendingDamage>();
+  private pendingDot = new Map<string, PendingDamage>();
 
-  spawnDamageNumber(position: Vector2, amount: number, isCrit: boolean): void {
+  /**
+   * Entry point for the REAL damage pipeline (CanvasRenderer draining
+   * `GameEngine.drainCombatVfxEvents()`) — never called with a guessed or
+   * projectile-fired amount. Accumulates into a fixed per-enemy time
+   * bucket (see HIT_BATCH_WINDOW_MS / DOT_BATCH_WINDOW_MS) instead of
+   * spawning immediately, so N hits landing within the same short window
+   * become exactly one floating number (rule 2/13). HIT and DOT are
+   * tracked in separate maps so periodic damage never competes with or
+   * suppresses discrete hit numbers (rule 9).
+   */
+  reportEnemyDamage(enemyId: string, position: Vector2, amount: number, isCrit: boolean, kind: "HIT" | "DOT"): void {
+    if (amount <= 0) return;
+    const map = kind === "HIT" ? this.pendingHits : this.pendingDot;
+    const pending = map.get(enemyId);
+    if (pending) {
+      pending.amount += amount;
+      pending.position = position;
+      if (isCrit) pending.isCrit = true;
+    } else {
+      map.set(enemyId, {
+        position,
+        amount,
+        isCrit,
+        remainingMs: kind === "HIT" ? HIT_BATCH_WINDOW_MS : DOT_BATCH_WINDOW_MS,
+      });
+    }
+  }
+
+  private flushPending(map: Map<string, PendingDamage>, dtMs: number, kind: "HIT" | "DOT"): void {
+    for (const [enemyId, pending] of map) {
+      pending.remainingMs -= dtMs;
+      if (pending.remainingMs <= 0) {
+        this.spawnDamageNumber(pending.position, pending.amount, pending.isCrit, enemyId, kind);
+        map.delete(enemyId);
+      }
+    }
+  }
+
+  private colorFor(kind: "HIT" | "DOT" | "OTHER", isCrit: boolean): string {
+    if (kind === "DOT") return "#ff9d5c";
+    return isCrit ? "#ffd75e" : "#f1ecff";
+  }
+
+  private fontSizeFor(kind: "HIT" | "DOT" | "OTHER", isCrit: boolean): number {
+    if (kind === "DOT") return 10;
+    return isCrit ? 17 : 13;
+  }
+
+  /**
+   * Public spawn primitive — kept 3-arg-compatible (position, amount,
+   * isCrit) for direct/one-off callers and the existing test suite. The
+   * two optional trailing params are how `reportEnemyDamage`'s flush
+   * enforces the hard per-enemy-per-kind cap (rule 6/7): when an
+   * `enemyId`+`kind` is given and a live text for that exact pair already
+   * exists on screen, the new damage MERGES into it (adds to its amount,
+   * restarts its pop/fade animation) instead of stacking a second,
+   * overlapping number. Calls with no `enemyId` (or `kind: "OTHER"`, e.g.
+   * the "UPGRADED" label) always push a fresh entry, unchanged from the
+   * original behavior.
+   */
+  spawnDamageNumber(
+    position: Vector2,
+    amount: number,
+    isCrit: boolean,
+    enemyId?: string,
+    kind: "HIT" | "DOT" | "OTHER" = "OTHER",
+  ): void {
     if (amount < 0.5) return;
+    const offsetX = kind === "DOT" ? 9 : (Math.random() - 0.5) * 8;
+    const offsetY = kind === "DOT" ? 10 : 0;
+
+    if (enemyId && kind !== "OTHER") {
+      const existing = this.floatingTexts.find((t) => t.enemyId === enemyId && t.kind === kind);
+      if (existing) {
+        existing.amount += amount;
+        existing.isCrit = existing.isCrit || isCrit;
+        existing.text = `-${Math.round(existing.amount)}`;
+        existing.color = this.colorFor(kind, existing.isCrit);
+        existing.fontSizePx = this.fontSizeFor(kind, existing.isCrit);
+        existing.x = position.x + offsetX;
+        existing.y = position.y - 12 + offsetY;
+        existing.remainingMs = existing.totalMs;
+        return;
+      }
+    }
+
+    const totalMs = kind === "DOT" ? 550 : isCrit ? 750 : 650;
     this.pushFloatingText({
-      x: position.x + (Math.random() - 0.5) * 8,
-      y: position.y - 12,
+      x: position.x + offsetX,
+      y: position.y - 12 + offsetY,
       text: `-${Math.round(amount)}`,
-      color: isCrit ? "#ffd75e" : "#f1ecff",
-      remainingMs: 650,
-      totalMs: 650,
+      color: this.colorFor(kind, isCrit),
+      remainingMs: totalMs,
+      totalMs,
+      amount,
+      kind,
+      enemyId,
+      isCrit,
+      fontSizePx: this.fontSizeFor(kind, isCrit),
     });
   }
 
@@ -242,6 +370,10 @@ export class VfxManager {
       color,
       remainingMs: 600,
       totalMs: 600,
+      amount: 0,
+      kind: "OTHER",
+      isCrit: false,
+      fontSizePx: 12,
     });
   }
 
@@ -268,6 +400,8 @@ export class VfxManager {
     this.bursts = this.bursts.filter((b) => b.remainingMs > 0);
     this.rings = this.rings.filter((r) => r.remainingMs > 0);
     if (this.shakeRemainingMs > 0) this.shakeRemainingMs = Math.max(0, this.shakeRemainingMs - dtMs);
+    this.flushPending(this.pendingHits, dtMs, "HIT");
+    this.flushPending(this.pendingDot, dtMs, "DOT");
   }
 
   draw(ctx: CanvasRenderingContext2D): void {
@@ -325,17 +459,25 @@ export class VfxManager {
 
     for (const t of this.floatingTexts) {
       const progress = 1 - t.remainingMs / t.totalMs;
-      // "Pop" on impact: the number overshoots to 1.35x scale in the first
-      // ~18% of its life, then eases back to 1x for the rest of its rise —
-      // reads as a hit landing, not text quietly fading in.
-      const pop = progress < 0.18 ? 1 + (1 - progress / 0.18) * 0.35 : 1;
+      // "Pop" on impact: the number overshoots scale in the first ~18% of
+      // its life (crits pop a bit harder), then eases back to 1x — reads
+      // as a hit landing, not text quietly fading in.
+      const popStrength = t.isCrit ? 0.5 : 0.35;
+      const pop = progress < 0.18 ? 1 + (1 - progress / 0.18) * popStrength : 1;
+      // Ease-out rise: fast at first, settling near the top — smoother and
+      // less mechanical than a linear climb. DOT numbers rise a shorter
+      // distance so they read as a lighter, secondary signal next to a
+      // full tower hit.
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const rise = t.kind === "DOT" ? 20 : 28;
+      const alphaMul = t.kind === "DOT" ? 0.85 : 1;
       ctx.save();
-      ctx.globalAlpha = Math.min(1, (1 - progress) * 1.6);
-      ctx.font = "bold 12px system-ui, sans-serif";
+      ctx.globalAlpha = Math.min(1, (1 - progress) * 1.6) * alphaMul;
+      ctx.font = `bold ${t.fontSizePx}px system-ui, sans-serif`;
       ctx.textAlign = "center";
-      ctx.translate(t.x, t.y - progress * 16);
+      ctx.translate(t.x, t.y - eased * rise);
       ctx.scale(pop, pop);
-      ctx.lineWidth = 3;
+      ctx.lineWidth = t.kind === "DOT" ? 2 : 3;
       ctx.strokeStyle = "rgba(10,8,5,0.85)";
       ctx.strokeText(t.text, 0, 0);
       ctx.fillStyle = t.color;
