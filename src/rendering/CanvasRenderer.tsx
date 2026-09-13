@@ -287,8 +287,12 @@ export function CanvasRenderer({
           enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
         // CHEFE MAIOR — "Void Colossus" identity: the main boss's body/aura
         // recolor per the active terrain biome's own accent color, instead
-        // of one fixed palette, the same way the castle already does.
-        const bossColor = enemy.boss?.isMainBoss ? biome.palette.accentGlow : undefined;
+        // of one fixed palette, the same way the castle already does. The
+        // mini-boss now shares this exact body language (see
+        // drawMiniBossColossus) and gets the SAME per-biome color, so the
+        // two read as the same creature family within a given biome, not
+        // just "two bosses that happen to both be purple."
+        const bossColor = enemy.boss ? biome.palette.accentGlow : undefined;
         if (enemy.boss) drawBossAura(ctx, enemy, timestamp, bossColor);
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;

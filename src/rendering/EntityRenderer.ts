@@ -1604,10 +1604,17 @@ export function drawEnemy(
   ctx.rotate(angle);
   if (enemy.boss?.isMainBoss) {
     // CHEFE MAIOR — "Void Colossus" identity replaces the old scaled-up
-    // Brute body for every MAIN boss (mini-bosses fall through to the
-    // normal switch below, unchanged). Colored per biome/boss via
+    // Brute body for every MAIN boss. Colored per biome/boss via
     // `bossColor` rather than ENEMY_THEME's fixed BRUTE palette.
     drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+  } else if (enemy.boss) {
+    // MINI CHEFE — "Void Colossus, Jr." (see drawMiniBossColossus's own doc
+    // comment): a deliberately simplified/smaller build of the EXACT SAME
+    // creature, not a different archetype (the old SHIELDBEARER-based look
+    // this replaces was a completely unrelated humanoid-with-a-shield —
+    // the "mini boss doesn't even look related to the main boss" bug this
+    // fixes). Same per-biome `bossColor`, same real enrage/hp reads.
+    drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
   } else {
     switch (enemy.type) {
       case "CRAWLER":
@@ -1703,7 +1710,7 @@ export function drawBossAura(
   ctx: CanvasRenderingContext2D,
   enemy: EnemyInstance,
   timeMs: number,
-  /** CHEFE MAIOR — the same per-biome accent color drawMainBossColossus uses, so the ambient field around the body reads as the same "Void Colossus" identity, not the old fixed reddish tone. Ignored for mini-bosses. */
+  /** CHEFE MAIOR — the same per-biome accent color drawMainBossColossus/drawMiniBossColossus use, so the ambient field around the body reads as the same "Void Colossus" family identity for BOTH boss and mini-boss, not the old fixed reddish/orange tones. */
   bossColor?: string,
 ): void {
   if (!enemy.boss) return;
@@ -1716,11 +1723,7 @@ export function drawBossAura(
   const pulseSpeed = isEnraged ? 160 : 400;
   const pulse = 0.55 + 0.25 * Math.sin(timeMs / pulseSpeed);
   const radius = (enemy.boss.isMainBoss ? 34 : 20) * pulse * (isEnraged ? 1.15 : 1);
-  const color = isEnraged
-    ? "rgba(255,60,20,0.6)"
-    : enemy.boss.isMainBoss
-      ? hexToRgbaLocal(bossColor ?? "#e2574a", 0.45)
-      : "rgba(255,180,80,0.4)";
+  const color = isEnraged ? "rgba(255,60,20,0.6)" : hexToRgbaLocal(bossColor ?? "#8b5cf6", enemy.boss.isMainBoss ? 0.45 : 0.35);
   const gradient = ctx.createRadialGradient(
     enemy.position.x,
     enemy.position.y,
@@ -2513,6 +2516,157 @@ function drawMainBossColossus(
     ctx.arc(0, 0, 0.6, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+}
+
+/**
+ * MINI CHEFE — "Void Colossus, Jr.": a deliberately miniaturized, simplified
+ * build of the exact same creature as `drawMainBossColossus` above, not a
+ * different monster and not that function merely called at a smaller
+ * `ctx.scale`. It reuses every element that makes the Void Colossus
+ * recognizable — the angular weathered-rock body, the pale crystal
+ * shoulder-shards, the glowing diamond core, the orbiting rock fragments,
+ * the same two-tone stone gradient and the same per-biome `color` — but
+ * each layer is hand-simplified rather than uniformly scaled: fewer limbs
+ * (3, not 4), a smaller/plainer body silhouette, a single faint vein crack
+ * instead of three, NO engraved rune facets at all (the mini has no
+ * ornamentation layer), only 2 shoulder crystals instead of 4, and only 2
+ * orbiting fragments instead of 5. The result reads as "the same guardian,
+ * but young/lesser" rather than "a different rock monster" or "the boss
+ * shrunk in Photoshop." Combined with CanvasRenderer's own smaller boss
+ * scale multiplier for mini-bosses (1.4x vs the main boss's 1.9x), the main
+ * boss stays unmistakably the larger, more elaborate, more imposing of the
+ * two. `enraged`/`hpPercent` mirror the main boss's own real, gameplay-
+ * driven inputs (BossManager's Enrage applies to mini-bosses too) so a
+ * mini-boss visibly "wears down" and enrages exactly like its big sibling —
+ * purely cosmetic reads of real state, same as the main boss's version.
+ */
+function drawMiniBossColossus(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  timeMs: number,
+  enraged: boolean,
+  hpPercent: number,
+): void {
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 260 : 550));
+  const rage = enraged ? 1.35 : 1;
+  const damageIntensity = Math.max(0, 1 - hpPercent);
+
+  drawContactShadow(ctx, 13, 6, 0.42);
+
+  // --- Three shorter, thinner clawed limbs (main boss has four, longer
+  // ones) — an immediately smaller, less elaborate stance. ---
+  for (const a of [-Math.PI / 2, Math.PI / 2 - 0.9, Math.PI / 2 + 0.9]) {
+    const lx = Math.cos(a) * 10;
+    const ly = Math.sin(a) * 10;
+    const limbGrad = ctx.createLinearGradient(0, 0, lx, ly);
+    limbGrad.addColorStop(0, "#4a4650");
+    limbGrad.addColorStop(1, "#1c1a20");
+    ctx.strokeStyle = limbGrad;
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 3.5, Math.sin(a) * 3.5);
+    ctx.lineTo(lx, ly);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8 + damageIntensity * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(lx + Math.cos(a) * 1.8, ly + Math.sin(a) * 1.8);
+    ctx.lineTo(lx + Math.cos(a + 1.9) * 1.2, ly + Math.sin(a + 1.9) * 1.2);
+    ctx.lineTo(lx + Math.cos(a - 1.9) * 1.2, ly + Math.sin(a - 1.9) * 1.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Body: the same irregular boulder-mass silhouette language, at
+  // roughly 60% of the main boss's size and with fewer facets (6, not 7). ---
+  const bodyGrad = ctx.createRadialGradient(-2, -2.5, 1, 0, 0, 9);
+  bodyGrad.addColorStop(0, "#4e4a56");
+  bodyGrad.addColorStop(0.6, "#2c2932");
+  bodyGrad.addColorStop(1, "#141218");
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, -8.5);
+  ctx.lineTo(7.5, -3);
+  ctx.lineTo(7, 6.5);
+  ctx.lineTo(-6.5, 7.5);
+  ctx.lineTo(-7.5, -2.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // A single faint vein crack — the main boss has three; the mini reads as
+  // "less power coursing through it" as much as "less ornamented."
+  const veinAlpha = 0.4 + damageIntensity * 0.35 + (enraged ? 0.2 : 0);
+  drawEnergyCrack(ctx, -5.5, -1.5, -2.5, -4.5, 1, -6.5, color, veinAlpha);
+
+  // No rune-facet layer at all (spec: "menos ornamentações") — the mini
+  // skips straight from body to crystal crown and core.
+
+  // --- Crystal crown: 2 shards instead of 4, shorter. ---
+  for (const [sx, sy, tipAngle, len] of [
+    [-2, -7.5, -1.75, 5],
+    [3, -7, -1.0, 4],
+  ] as const) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(tipAngle);
+    const shardGrad = ctx.createLinearGradient(0, 0, 0, -len);
+    shardGrad.addColorStop(0, "#7a7684");
+    shardGrad.addColorStop(1, "#d8d4e0");
+    ctx.fillStyle = shardGrad;
+    ctx.beginPath();
+    ctx.moveTo(-1, 0);
+    ctx.lineTo(0, -len);
+    ctx.lineTo(1, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // CAMADA 2 — Núcleo: same diamond-core focal point, smaller and with a
+  // plainer (2-stop, no white-hot highlight) gradient than the main boss's.
+  glowBlob(ctx, 0, 0, (7.5 + damageIntensity * 3.5) * rage, color);
+  const coreGrad = ctx.createRadialGradient(-0.5, -0.6, 0, 0, 0, 3.4);
+  coreGrad.addColorStop(0, color);
+  coreGrad.addColorStop(1, "rgba(0,0,0,0.4)");
+  ctx.fillStyle = coreGrad;
+  ctx.globalAlpha = 0.8 + 0.15 * pulse;
+  ctx.beginPath();
+  ctx.moveTo(0, -4);
+  ctx.lineTo(2.6, 0);
+  ctx.lineTo(0, 4);
+  ctx.lineTo(-2.6, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.6)";
+  ctx.lineWidth = 0.6;
+  ctx.stroke();
+
+  // CAMADA 4 — 2 orbiting rock fragments instead of 5, on a tighter orbit.
+  for (let i = 0; i < 2; i++) {
+    const orbitSpeed = 1500 + i * 300;
+    const orbitRadius = 11 + i * 2.5;
+    const a = timeMs / orbitSpeed + i * Math.PI;
+    const fx = Math.cos(a) * orbitRadius;
+    const fy = Math.sin(a) * orbitRadius * 0.55;
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(a * 2);
+    ctx.fillStyle = "#3a3640";
+    ctx.beginPath();
+    ctx.moveTo(-0.9, -0.9);
+    ctx.lineTo(1, -0.6);
+    ctx.lineTo(0.75, 1);
+    ctx.lineTo(-1, 0.7);
+    ctx.closePath();
+    ctx.fill();
     ctx.restore();
   }
 }
