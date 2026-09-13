@@ -132,8 +132,12 @@ export function buildMountainSilhouettes(count: number): MountainPlacement[] {
   const rand = mulberry32(777);
   const placements: MountainPlacement[] = [];
   for (let i = 0; i < count; i++) {
-    const baseRadius = 55 + rand() * 45;
-    const height = 140 + rand() * 120;
+    // Scaled down from the original 55-100/140-260 range — those read as
+    // oversized formations crowding the sides of the screen instead of a
+    // distant backdrop hint, especially in saturated-fog biomes (see
+    // WorldTerrain.tsx's mountainColor comment).
+    const baseRadius = 22 + rand() * 18;
+    const height = 55 + rand() * 45;
     const segments = 3 + Math.floor(rand() * 2);
     const points: THREE.Vector3[] = [];
     const radii: number[] = [];
@@ -147,18 +151,20 @@ export function buildMountainSilhouettes(count: number): MountainPlacement[] {
 
     // Scatter around the terrain's far/side edges (never in front, so it
     // never competes with the playable area) in WORLD space, then project
-    // through the same local-ground math everything else uses.
+    // through the same local-ground math everything else uses. Pushed
+    // further out than before (150-360 vs. the old 80-240) so the smaller
+    // silhouettes still read as a distant backdrop, not a nearby wall.
     const edge = Math.floor(rand() * 3); // 0 = far (north), 1 = left, 2 = right
     let worldX: number;
     let worldY: number;
     if (edge === 0) {
       worldX = rand() * WORLD_SIZE.width;
-      worldY = -80 - rand() * 160;
+      worldY = -150 - rand() * 210;
     } else if (edge === 1) {
-      worldX = -80 - rand() * 160;
+      worldX = -150 - rand() * 210;
       worldY = rand() * WORLD_SIZE.height;
     } else {
-      worldX = WORLD_SIZE.width + 80 + rand() * 160;
+      worldX = WORLD_SIZE.width + 150 + rand() * 210;
       worldY = rand() * WORLD_SIZE.height;
     }
     const [lx, , lz] = worldToLocalGround({ x: worldX, y: worldY });

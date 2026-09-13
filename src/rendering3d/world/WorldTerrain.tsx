@@ -23,7 +23,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
 
   const groundGeometry = useMemo(() => buildGroundGeometry(palette), [biomeId]);
   const roadGeometry = useMemo(() => buildRoadGeometry(palette), [biomeId]);
-  const mountains = useMemo(() => buildMountainSilhouettes(7), []);
+  const mountains = useMemo(() => buildMountainSilhouettes(5), []);
   // MUNDO 3D — FASE 2 midground: real 3D trees/rocks at the SAME positions
   // `rendering/mapDecorations.ts` already scattered for the 2D TREE/ROCK/
   // RUIN sprites (CanvasRenderer skips drawing those specific kinds while
@@ -33,7 +33,12 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
 
   const fogColor = useMemo(() => parseBiomeColor(palette.fogColor), [biomeId]);
   const skyColor = useMemo(() => parseBiomeColor(palette.skyBottom), [biomeId]);
-  const mountainColor = useMemo(() => parseBiomeColor(palette.groundShadowed).lerp(fogColor, 0.55), [biomeId, fogColor]);
+  // Blended toward the biome's own SKY color (always a dark, low-saturation
+  // tone meant for backdrop use), not `fogColor` — that field is tuned as a
+  // semi-transparent atmosphere tint and can be vividly saturated (Abyss's
+  // is a strong purple), which read as oversized, invasive purple rock
+  // formations once painted flat and opaque across a whole mountain.
+  const mountainColor = useMemo(() => parseBiomeColor(palette.groundShadowed).lerp(skyColor, 0.35), [biomeId, skyColor]);
   const keyLightColor = useMemo(() => parseBiomeColor(palette.accentWarm), [biomeId]);
   const hemiSky = useMemo(() => parseBiomeColor(palette.skyTop), [biomeId]);
   const hemiGround = useMemo(() => parseBiomeColor(palette.groundShadowed), [biomeId]);
