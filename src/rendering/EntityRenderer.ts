@@ -1573,6 +1573,8 @@ export function drawEnemy(
   timeMs: number,
   hitFlashMs = Infinity,
   scale = 1,
+  /** CHEFE MAIOR — the active biome's accent color, used only for the MAIN boss's "Void Colossus" body (see drawMainBossColossus) so it recolors per biome/boss instead of a fixed palette. Ignored for every other enemy. */
+  bossColor?: string,
 ): void {
   const theme = ENEMY_THEME[enemy.type];
   const angle = Math.atan2(enemy.direction.y, enemy.direction.x);
@@ -1600,35 +1602,43 @@ export function drawEnemy(
 
   ctx.save();
   ctx.rotate(angle);
-  switch (enemy.type) {
-    case "CRAWLER":
-      drawCrawler(ctx, theme, timeMs, hitFlashMs);
-      break;
-    case "RUNNER":
-      drawRunner(ctx, theme, timeMs);
-      break;
-    case "BRUTE":
-      drawBrute(ctx, theme, timeMs);
-      break;
-    case "SHIELDBEARER":
-      drawShieldbearer(ctx, theme, timeMs);
-      break;
-    // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
-    // Progression archetype now has its own bespoke silhouette (see their
-    // draw* functions' own doc comments) instead of reusing one of the
-    // original 4 shapes with just a different theme color/scale.
-    case "SWARMLING":
-      drawSwarmling(ctx, theme, timeMs);
-      break;
-    case "REGENERATOR":
-      drawRegenerator(ctx, theme, timeMs);
-      break;
-    case "IRONCLAD":
-      drawIronclad(ctx, theme);
-      break;
-    case "DISABLER":
-      drawDisabler(ctx, theme, timeMs);
-      break;
+  if (enemy.boss?.isMainBoss) {
+    // CHEFE MAIOR — "Void Colossus" identity replaces the old scaled-up
+    // Brute body for every MAIN boss (mini-bosses fall through to the
+    // normal switch below, unchanged). Colored per biome/boss via
+    // `bossColor` rather than ENEMY_THEME's fixed BRUTE palette.
+    drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+  } else {
+    switch (enemy.type) {
+      case "CRAWLER":
+        drawCrawler(ctx, theme, timeMs, hitFlashMs);
+        break;
+      case "RUNNER":
+        drawRunner(ctx, theme, timeMs);
+        break;
+      case "BRUTE":
+        drawBrute(ctx, theme, timeMs);
+        break;
+      case "SHIELDBEARER":
+        drawShieldbearer(ctx, theme, timeMs);
+        break;
+      // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
+      // Progression archetype now has its own bespoke silhouette (see their
+      // draw* functions' own doc comments) instead of reusing one of the
+      // original 4 shapes with just a different theme color/scale.
+      case "SWARMLING":
+        drawSwarmling(ctx, theme, timeMs);
+        break;
+      case "REGENERATOR":
+        drawRegenerator(ctx, theme, timeMs);
+        break;
+      case "IRONCLAD":
+        drawIronclad(ctx, theme);
+        break;
+      case "DISABLER":
+        drawDisabler(ctx, theme, timeMs);
+        break;
+    }
   }
   ctx.restore();
 
@@ -1681,7 +1691,21 @@ export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstan
 }
 
 /** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
-export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
+/** Local hex->rgba helper (mirrors MapRenderer.ts's own private one) — only used for CHEFE MAIOR's per-biome aura tint below. */
+function hexToRgbaLocal(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+export function drawBossAura(
+  ctx: CanvasRenderingContext2D,
+  enemy: EnemyInstance,
+  timeMs: number,
+  /** CHEFE MAIOR — the same per-biome accent color drawMainBossColossus uses, so the ambient field around the body reads as the same "Void Colossus" identity, not the old fixed reddish tone. Ignored for mini-bosses. */
+  bossColor?: string,
+): void {
   if (!enemy.boss) return;
   // Enraged reads through the aura itself: faster pulse, hotter color.
   // Reads the real `enemy.boss.enraged` flag (see BossManager.tickBossAbilities)
@@ -1691,11 +1715,11 @@ export function drawBossAura(ctx: CanvasRenderingContext2D, enemy: EnemyInstance
   const isEnraged = enemy.boss.enraged;
   const pulseSpeed = isEnraged ? 160 : 400;
   const pulse = 0.55 + 0.25 * Math.sin(timeMs / pulseSpeed);
-  const radius = (enemy.boss.isMainBoss ? 30 : 20) * pulse * (isEnraged ? 1.15 : 1);
+  const radius = (enemy.boss.isMainBoss ? 34 : 20) * pulse * (isEnraged ? 1.15 : 1);
   const color = isEnraged
     ? "rgba(255,60,20,0.6)"
     : enemy.boss.isMainBoss
-      ? "rgba(226,87,74,0.45)"
+      ? hexToRgbaLocal(bossColor ?? "#e2574a", 0.45)
       : "rgba(255,180,80,0.4)";
   const gradient = ctx.createRadialGradient(
     enemy.position.x,
@@ -2321,6 +2345,176 @@ function drawBrute(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["B
   ctx.globalAlpha = 1;
 
   ctx.restore();
+}
+
+/**
+ * CHEFE MAIOR — "Void Colossus" identity (concept art reference): an
+ * ancient rock-and-crystal guardian, recolored per biome/boss instead of
+ * one fixed palette, reusing the same 4-layer magic language as the
+ * towers/castle (veios de energia / núcleo / runas / partículas). Replaces
+ * the old "scaled-up Brute" body for every MAIN boss only — mini-bosses
+ * keep their existing SHIELDBEARER-based look untouched. Drawn at the same
+ * base scale other creatures use; the real size read still comes from
+ * CanvasRenderer's own boss scale multiplier (1.9x), exactly like before.
+ */
+function drawMainBossColossus(
+  ctx: CanvasRenderingContext2D,
+  color: string,
+  timeMs: number,
+  enraged: boolean,
+  hpPercent: number,
+): void {
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 260 : 550));
+  const rage = enraged ? 1.5 : 1;
+  const damageIntensity = Math.max(0, 1 - hpPercent); // veins/core burn brighter as the colossus is worn down.
+
+  drawContactShadow(ctx, 22, 10, 0.48);
+
+  // --- Four heavy clawed limbs radiating from the core, dark weathered
+  // stone with a pale crystal claw-tip — the "ancient guardian" stance. ---
+  for (const a of [-2.35, -0.75, 0.75, 2.35]) {
+    const lx = Math.cos(a) * 17;
+    const ly = Math.sin(a) * 17;
+    const limbGrad = ctx.createLinearGradient(0, 0, lx, ly);
+    limbGrad.addColorStop(0, "#4a4650");
+    limbGrad.addColorStop(1, "#1c1a20");
+    ctx.strokeStyle = limbGrad;
+    ctx.lineWidth = 5;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+    ctx.lineTo(lx, ly);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.8 + damageIntensity * 0.2;
+    ctx.beginPath();
+    ctx.moveTo(lx + Math.cos(a) * 3, ly + Math.sin(a) * 3);
+    ctx.lineTo(lx + Math.cos(a + 1.9) * 2, ly + Math.sin(a + 1.9) * 2);
+    ctx.lineTo(lx + Math.cos(a - 1.9) * 2, ly + Math.sin(a - 1.9) * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  // --- Body: a broad, irregular boulder mass — angular, not a clean circle. ---
+  const bodyGrad = ctx.createRadialGradient(-3, -4, 2, 0, 0, 15);
+  bodyGrad.addColorStop(0, "#4e4a56");
+  bodyGrad.addColorStop(0.6, "#2c2932");
+  bodyGrad.addColorStop(1, "#141218");
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  ctx.moveTo(0, -14);
+  ctx.lineTo(10, -8);
+  ctx.lineTo(13, 2);
+  ctx.lineTo(8, 12);
+  ctx.lineTo(-8, 13);
+  ctx.lineTo(-13, 3);
+  ctx.lineTo(-10, -9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // CAMADA 1 — Veios de Energia: cracks running through the rock, burning
+  // brighter the more damage the colossus has taken.
+  const veinAlpha = 0.5 + damageIntensity * 0.4 + (enraged ? 0.25 : 0);
+  drawEnergyCrack(ctx, -9, -3, -4, -8, 2, -12, color, veinAlpha);
+  drawEnergyCrack(ctx, 9, 4, 5, 9, -3, 11, color, veinAlpha * 0.85);
+  drawEnergyCrack(ctx, -11, 2, -6, 6, -1, 9, color, veinAlpha * 0.7);
+
+  // CAMADA 3 — Runas Gravadas: engraved facet-lines on the shoulders.
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.25 * pulse;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 0.9;
+  for (const [sx, sy, r] of [
+    [-8, -6, 2.4],
+    [8, 6, 2.4],
+  ] as const) {
+    ctx.beginPath();
+    ctx.moveTo(sx - r, sy);
+    ctx.lineTo(sx, sy - r);
+    ctx.lineTo(sx + r, sy);
+    ctx.lineTo(sx, sy + r);
+    ctx.closePath();
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // --- Crystal crown: pale stone shards jutting from the shoulders/head,
+  // echoing the reference's crystal head/back growths. ---
+  for (const [sx, sy, tipAngle, len] of [
+    [-3, -13, -1.75, 8],
+    [4, -12, -1.15, 6.5],
+    [-9, -8, -2.3, 5],
+    [10, -6, -0.6, 5],
+  ] as const) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.rotate(tipAngle);
+    const shardGrad = ctx.createLinearGradient(0, 0, 0, -len);
+    shardGrad.addColorStop(0, "#7a7684");
+    shardGrad.addColorStop(1, "#d8d4e0");
+    ctx.fillStyle = shardGrad;
+    ctx.beginPath();
+    ctx.moveTo(-1.6, 0);
+    ctx.lineTo(0, -len);
+    ctx.lineTo(1.6, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // CAMADA 2 — Núcleo: the colossus's power heart, a bright diamond core
+  // set in the chest — the reference's single strongest focal point.
+  glowBlob(ctx, 0, 0, (13 + damageIntensity * 6) * rage, color);
+  const coreGrad = ctx.createRadialGradient(-0.8, -1, 0, 0, 0, 5.5);
+  coreGrad.addColorStop(0, "#ffffff");
+  coreGrad.addColorStop(0.45, color);
+  coreGrad.addColorStop(1, "rgba(0,0,0,0.4)");
+  ctx.fillStyle = coreGrad;
+  ctx.globalAlpha = 0.85 + 0.15 * pulse;
+  ctx.beginPath();
+  ctx.moveTo(0, -6.5);
+  ctx.lineTo(4.2, 0);
+  ctx.lineTo(0, 6.5);
+  ctx.lineTo(-4.2, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = "rgba(255,255,255,0.7)";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // CAMADA 4 — Partículas Flutuantes: broken rock fragments orbiting the
+  // core (spec's "Invocação de Fragmentos" flavor) — angular chips, not
+  // round motes, each on its own slow independent orbit.
+  for (let i = 0; i < 5; i++) {
+    const orbitSpeed = 1400 + i * 260;
+    const orbitRadius = 19 + (i % 2) * 4;
+    const a = timeMs / orbitSpeed + i * ((Math.PI * 2) / 5);
+    const fx = Math.cos(a) * orbitRadius;
+    const fy = Math.sin(a) * orbitRadius * 0.55; // squashed for the top-down read
+    ctx.save();
+    ctx.translate(fx, fy);
+    ctx.rotate(a * 2);
+    ctx.fillStyle = "#3a3640";
+    ctx.beginPath();
+    ctx.moveTo(-1.4, -1.4);
+    ctx.lineTo(1.6, -1);
+    ctx.lineTo(1.2, 1.6);
+    ctx.lineTo(-1.6, 1.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
 }
 
 /**

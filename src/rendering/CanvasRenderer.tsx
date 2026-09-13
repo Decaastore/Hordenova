@@ -273,7 +273,11 @@ export function CanvasRenderer({
       for (const enemy of snapshot.enemies) {
         const hitFlashMs =
           enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
-        if (enemy.boss) drawBossAura(ctx, enemy, timestamp);
+        // CHEFE MAIOR — "Void Colossus" identity: the main boss's body/aura
+        // recolor per the active terrain biome's own accent color, instead
+        // of one fixed palette, the same way the castle already does.
+        const bossColor = enemy.boss?.isMainBoss ? biome.palette.accentGlow : undefined;
+        if (enemy.boss) drawBossAura(ctx, enemy, timestamp, bossColor);
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;
         const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
@@ -284,7 +288,7 @@ export function CanvasRenderer({
         // debuff-ring feedback in this pilot — a disclosed, known
         // limitation (see rendering3d/'s report), not an oversight.
         if (!hidden3DEnemyIds?.current?.has(enemy.id)) {
-          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale);
+          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor);
         }
         // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself
         // (unlike drawBossAura's glow-behind treatment), reading the same
