@@ -1081,15 +1081,52 @@ function drawStormcaller(
   // ready, so it reads as "building up" rather than being on the whole time.
   const charge = Math.max(0, (Math.max(0, Math.min(1, readiness)) - 0.6) / 0.4);
 
-  // Two-tier stone plinth.
-  ctx.fillStyle = "#4a3f30";
+  // REFINEMENT PASS — base relief: same two-tier silhouette as before, now
+  // with a real contact shadow (matching Ironwood/Inferno's pattern instead
+  // of the generic flat plinth ellipse) and gradient + carved-groove detail
+  // on both tiers so the base reads as cut stone, not a flat color fill.
+  drawContactShadow(ctx, 18, 8, 0.4);
+
+  const outerGrad = ctx.createLinearGradient(-17, -2, 17, 10);
+  outerGrad.addColorStop(0, "#5c4f3c");
+  outerGrad.addColorStop(0.55, "#4a3f30");
+  outerGrad.addColorStop(1, "#2e2618");
+  ctx.fillStyle = outerGrad;
   ctx.beginPath();
   ctx.ellipse(0, 7, 17, 8, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#5a4a38";
+  ctx.strokeStyle = "rgba(20,16,10,0.5)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  const innerGrad = ctx.createLinearGradient(-12, -3, 12, 6);
+  innerGrad.addColorStop(0, "#6f5d44");
+  innerGrad.addColorStop(0.55, "#5a4a38");
+  innerGrad.addColorStop(1, "#3a2f22");
+  ctx.fillStyle = innerGrad;
   ctx.beginPath();
   ctx.ellipse(0, 3, 12, 6, 0, 0, Math.PI * 2);
   ctx.fill();
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.ellipse(0, 3, 12, 6, 0, Math.PI * 1.15, Math.PI * 1.85);
+    },
+    "#c9b48a",
+    1,
+    0.35,
+  );
+  // Carved grooves radiating from the pillar base — the same "this is cut
+  // stone" cue Frostborn's faceted plinth and Ironwood's root mound use.
+  ctx.strokeStyle = "rgba(20,16,10,0.4)";
+  ctx.lineWidth = 1;
+  for (const a of [-0.55, -0.18, 0.18, 0.55]) {
+    ctx.beginPath();
+    ctx.moveTo(Math.sin(a) * 5, 1 + Math.cos(a) * 2);
+    ctx.lineTo(Math.sin(a) * 15, 6 + Math.cos(a) * 4);
+    ctx.stroke();
+  }
 
   // Discharge beat: a bright ground ring stamps outward from the plinth
   // the instant the attack fires — the "energy just left the structure"
@@ -1183,7 +1220,11 @@ function drawStormcaller(
   const levelProgress = (level - 1) / (MAX_TOWER_LEVEL - 1);
   const orbY = -32 - levelProgress * 16;
   const chargeGlow = 1 + charge * 0.5 + discharge * 0.8;
-  glowBlob(ctx, 0, orbY, (16 + levelProgress * 8) * chargeGlow, theme.glow);
+  // REFINEMENT PASS — reinforced power-element glow: a wider soft halo plus
+  // a tighter, brighter inner glow layered on top, so the orb reads as the
+  // clear "this is the power source" focal point even before it discharges.
+  glowBlob(ctx, 0, orbY, (18 + levelProgress * 9) * chargeGlow, theme.glow);
+  glowBlob(ctx, 0, orbY, (9 + levelProgress * 4) * chargeGlow, theme.accent);
 
   // A rotating arcane ring around the orb (drawn as a squashed ellipse for
   // a top-down "ring" read) — spins faster as the charge builds.
