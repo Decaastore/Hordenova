@@ -75,7 +75,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
   const emberRefs = useRef<THREE.Mesh[]>([]);
   const attackT = useRef(0);
   const chargeT = useRef(0);
-  const shardOrbitRefs = useRef<THREE.Mesh[]>([]);
 
   const coreHeight = IRONWOOD_CORE_HEIGHT * skin.core.scale;
 
@@ -105,11 +104,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
     }));
   }, [skin.base.variant]);
   const veinTex = useMemo(() => (skin.base.veinColor ? getCrackTexture(skin.base.veinColor) : null), [skin.base.veinColor]);
-  // Two stacked masonry-course cylinders under the rubble plate — the base
-  // needs real ground VOLUME (widest/lowest silhouette layer), not just a
-  // flat extruded disc lying on the ground.
-  const baseFootingGeo = useMemo(() => (skin.body.variant === "gnarled-trunk" ? new THREE.CylinderGeometry(0.62, 0.74, 0.11, 12) : null), [skin.body.variant]);
-  const baseCollarGeo = useMemo(() => (skin.body.variant === "gnarled-trunk" ? new THREE.CylinderGeometry(0.54, 0.6, 0.09, 12) : null), [skin.body.variant]);
 
   // --- BODY -----------------------------------------------------------
   const drumGeo = useMemo(() => (skin.body.variant === "gnarled-trunk" ? buildTaperedTube(DRUM_POINTS, DRUM_RADII, 9) : null), [skin.body.variant]);
@@ -180,16 +174,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
     } else if (flashRef.current) {
       flashRef.current.intensity = 0;
     }
-    // Orbiting power-element fragments — slow ring orbit around the main
-    // gem so the "elemento de poder" reads as a cluster, not a solitary
-    // sphere-on-a-stick silhouette.
-    shardOrbitRefs.current.forEach((m, i) => {
-      if (!m) return;
-      const a = t * 0.55 + (i / 3) * Math.PI * 2;
-      const r = 0.3 + Math.sin(t * 0.6 + i * 1.7) * 0.02;
-      m.position.set(Math.cos(a) * r, coreHeight + Math.sin(t * 1.1 + i * 2.4) * 0.05, Math.sin(a) * r);
-      m.rotation.y += dt * 1.4;
-    });
   });
 
   const isEmberCore = skin.core.variant === "molten-ember-core";
@@ -222,20 +206,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
       )}
       {skin.base.variant === "broken-rock" && brokenRockGeo && (
         <OutlineMesh geometry={brokenRockGeo} rotation={[-Math.PI / 2, 0, 0.3]} position={[0, 0.02, 0]} thickness={1.05} />
-      )}
-      {isBaseTower && baseFootingGeo && baseCollarGeo && (
-        <>
-          {/* BASE — two stacked masonry-course cylinders under the rubble
-              plate: real ground volume, widest layer of the silhouette,
-              slight rim relief between the two courses. */}
-          <mesh geometry={baseFootingGeo} position={[0, 0.055, 0]} receiveShadow castShadow>
-            <meshToonMaterial gradientMap={getToonGradientMap()} map={stoneTex} color={0xffffff} />
-          </mesh>
-          <OutlineMesh geometry={baseFootingGeo} position={[0, 0.055, 0]} thickness={1.04} />
-          <mesh geometry={baseCollarGeo} position={[0, 0.14, 0]} castShadow>
-            <meshToonMaterial gradientMap={getToonGradientMap()} map={stoneTex} color={0xffffff} />
-          </mesh>
-        </>
       )}
       {skin.base.variant === "obsidian-shard-cluster" && shardDiscGeo && baseShardGeo && (
         <>
@@ -277,19 +247,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
               <meshToonMaterial gradientMap={getToonGradientMap()} map={woodTex} color={0xffffff} />
             </mesh>
             <OutlineMesh geometry={spireGeoBase} position={[0, 0.1, 0]} thickness={1.08} />
-            {/* Embedded crystal studs along the shaft — break up the "plain
-                thin cylinder" read with 3 protruding details at different
-                heights/angles, echoing the power-element's color. */}
-            {[
-              { y: 0.32, r: 0.38, a: 0.4 },
-              { y: 0.62, r: 0.26, a: 2.6 },
-              { y: 0.92, r: 0.17, a: 4.5 },
-            ].map((s, i) => (
-              <mesh key={i} position={[Math.cos(s.a) * s.r, s.y, Math.sin(s.a) * s.r]} castShadow>
-                <icosahedronGeometry args={[0.045, 0]} />
-                <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.core.shellColor} emissive={skin.core.emissive} emissiveIntensity={1.6} />
-              </mesh>
-            ))}
           </>
         )}
         {skin.body.variant === "twisted-spire" && spireGeo && (
@@ -394,26 +351,6 @@ export function ModularIronwoodTower({ position, skin, onReady }: Props) {
             <mesh key={i} ref={(m) => void (m && (emberRefs.current[i] = m))} position={[0, coreHeight + 0.22, 0]}>
               <sphereGeometry args={[0.03, 6, 6]} />
               <meshToonMaterial gradientMap={getToonGradientMap()} color={skin.core.emissive} emissive={skin.core.emissive} emissiveIntensity={2.6} />
-            </mesh>
-          ))}
-        {/* ORBITING FRAGMENTS — 3 smaller faceted shards circling the main
-            gem at different angles, so the power-element reads as a
-            voluminous cluster (visually the most striking part) rather
-            than a single sphere sitting on top of the shaft. */}
-        {isBaseTower &&
-          gemGeo &&
-          [0, 1, 2].map((i) => (
-            <mesh key={i} ref={(m) => void (m && (shardOrbitRefs.current[i] = m))} scale={0.4}>
-              <primitive object={gemGeo} attach="geometry" />
-              <meshToonMaterial
-                gradientMap={getToonGradientMap()}
-                color={skin.core.shellColor}
-                emissive={skin.core.emissive}
-                emissiveMap={crackTex}
-                emissiveIntensity={skin.core.emissiveIntensity * 0.8}
-                transparent
-                opacity={0.8}
-              />
             </mesh>
           ))}
 

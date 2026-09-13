@@ -72,7 +72,6 @@ export const TOWERS_3D = {
 } as const;
 
 export const CREATURES_3D = {
-  CRAWLER: { body: cssToHex(ENEMY_THEME.CRAWLER.body), dark: cssToHex(ENEMY_THEME.CRAWLER.dark), accent: cssToHex(ENEMY_THEME.CRAWLER.accent) },
   RUNNER: { body: cssToHex(ENEMY_THEME.RUNNER.body), dark: cssToHex(ENEMY_THEME.RUNNER.dark), accent: cssToHex(ENEMY_THEME.RUNNER.accent) },
   BRUTE: { body: cssToHex(ENEMY_THEME.BRUTE.body), dark: cssToHex(ENEMY_THEME.BRUTE.dark), accent: cssToHex(ENEMY_THEME.BRUTE.accent) },
   SHIELDBEARER: {
