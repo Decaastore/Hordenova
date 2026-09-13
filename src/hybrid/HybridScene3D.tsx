@@ -43,14 +43,26 @@ export function HybridScene3D({ towerSkin }: { towerSkin?: TowerSkinDefinition }
     <Canvas
       orthographic
       camera={{ near: 0.1, far: 1000 }}
-      gl={{ alpha: true, antialias: true }}
+      gl={{ alpha: true, antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
       style={{ position: "absolute", inset: 0 }}
     >
       <CameraRig />
 
-      <ambientLight intensity={0.75} />
-      <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />
+      {/* EXPOSURE PASS — raised ambient/hemisphere + a fill light opposite
+          the key so the tower's shaft/base and the creature's far side
+          read as dark-but-visible toon bands instead of solid black. */}
+      {/* EXPOSURE PASS — this canvas is composited (alpha:true) over a
+          SEPARATE 2D background canvas, so it has no shared terrain/ground
+          to wash out: ambient/hemisphere here only ever lights the tower
+          and creature. Their base materials (rockDark stone, near-black
+          wood/hide tones) turned out to need a much larger push than a
+          "normal" scene to lift out of the toon gradient's bottom band —
+          verified empirically by comparing 1.1/0.8 (still solid black),
+          3/2 (barely visible) and 20/10 (clearly readable) side by side. */}
+      <ambientLight intensity={14} />
+      <hemisphereLight args={[0xdfe8c8, 0x5a5048, 8]} />
       <directionalLight position={[40, 90, 55]} intensity={1.6} color={"#ffcf8a"} />
+      <directionalLight position={[-35, 60, -45]} intensity={1.1} color={"#7fa0ff"} />
 
       <HybridDemoController towerSkin={towerSkin} />
     </Canvas>

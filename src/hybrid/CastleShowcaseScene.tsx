@@ -45,14 +45,21 @@ function CastleCameraRig() {
  */
 export function CastleShowcaseScene() {
   return (
-    <Canvas camera={{ fov: 38 }} gl={{ antialias: true }} style={{ position: "absolute", inset: 0 }}>
+    <Canvas
+      camera={{ fov: 38 }}
+      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
+      style={{ position: "absolute", inset: 0 }}
+    >
       <CastleCameraRig />
       <color attach="background" args={["#0a0c07"]} />
       <fog attach="fog" args={["#0a0c07", 9, 20]} />
-      <ambientLight intensity={0.75} />
-      <hemisphereLight args={[0xdfe8c8, 0x140f0a, 0.6]} />
+      {/* EXPOSURE PASS — raised ambient/hemisphere + a brighter fill light
+          opposite the key so the far corner towers and the wall's shadowed
+          side stay readable instead of crushing to solid black. */}
+      <ambientLight intensity={1.05} />
+      <hemisphereLight args={[0xdfe8c8, 0x140f0a, 0.85]} />
       <directionalLight position={[5, 8, 4]} intensity={2.1} color={"#ffd9a0"} />
-      <directionalLight position={[-6, 3, -4]} intensity={0.45} color={"#7fa0ff"} />
+      <directionalLight position={[-6, 3, -4]} intensity={0.65} color={"#7fa0ff"} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]}>
         <circleGeometry args={[7, 36]} />

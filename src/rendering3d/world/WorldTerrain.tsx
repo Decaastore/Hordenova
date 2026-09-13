@@ -43,8 +43,14 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
       <color attach="background" args={[skyColor]} />
       <fogExp2 attach="fog" args={[fogColor, 0.0016]} />
 
-      <hemisphereLight args={[hemiSky, hemiGround, 0.75]} />
-      <ambientLight color={hemiSky} intensity={0.4} />
+      {/* EXPOSURE PASS — hemisphere/ambient raised so shadowed faces of the
+          new multi-part tower/castle/creature geometry (base footing,
+          legs, the far side of a wall ring) stay readable as dark-but-not-
+          solid-black toon bands, instead of crushing to the gradient map's
+          bottom step. The directional key light below still carries most
+          of the scene's contrast — this only lifts the floor. */}
+      <hemisphereLight args={[hemiSky, hemiGround, 2.4]} />
+      <ambientLight color={hemiSky} intensity={1.8} />
       {/* MUNDO 3D — FASE 2: key light raised 1.9->2.6 and the fill light
           0.35->0.6 — the deep-forest palette's vegetation tones are close
           to black, so under the FASE 1 intensities the directional light
@@ -68,7 +74,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
         shadow-camera-bottom={-460}
         shadow-bias={-0.0012}
       />
-      <directionalLight position={[-300, 500, -400]} intensity={0.6} color={hemiSky} />
+      <directionalLight position={[-300, 500, -400]} intensity={0.85} color={hemiSky} />
 
       <mesh geometry={groundGeometry} receiveShadow>
         <meshStandardMaterial vertexColors roughness={0.95} metalness={0.02} />

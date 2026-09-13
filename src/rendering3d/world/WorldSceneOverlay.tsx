@@ -98,7 +98,7 @@ export function WorldSceneOverlay({
         shadows
         orthographic
         camera={{ near: 0.1, far: 4000 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.35 }}
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />
