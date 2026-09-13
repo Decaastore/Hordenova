@@ -5,7 +5,7 @@ import { getTowerStats } from "@/entities/Tower";
 import { getTowerVisualStage, MAX_TOWER_LEVEL } from "@/config/towerStats";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
-import { drawContactShadow, drawMagicCore, rimHighlight } from "./lighting";
+import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 
 /** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
@@ -253,6 +253,16 @@ export function drawIronwood(
     ctx.stroke();
   }
 
+  // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): sap-like green veins
+  // running up through the bark, organic/branching rather than straight
+  // (spec's Forest-identity form) — the trunk's own power made visible in
+  // the dark wood, not a decal painted over it. A brief brighter pulse the
+  // instant the tower fires so the veins visibly carry the shot's energy.
+  const veinPulse = 1 + (attackFlashMs < 200 ? (1 - attackFlashMs / 200) * 0.8 : 0);
+  drawEnergyCrack(ctx, -3, -2, -7, -14, -4, -26 - level * 0.5, theme.accent, 0.55 * veinPulse);
+  drawEnergyCrack(ctx, 2, 0, 5, -12, 3, -24 - level * 0.5, theme.accent, 0.45 * veinPulse);
+  drawEnergyCrack(ctx, -4, -26 - level * 0.5, -1, -20 - level * 0.5, 2, -24 - level * 0.5, theme.accent, 0.4 * veinPulse);
+
   // Iron reinforcement bands — a visibly different material from the bark.
   for (const bandY of [-9, -20 - level * 0.4]) {
     ctx.fillStyle = "#33363a";
@@ -283,10 +293,29 @@ export function drawIronwood(
     }
   }
 
-  // Carved rune — the only strong saturated color on the whole structure,
-  // brighter with level (spec: cada tipo identificável, poder visível).
-  const runeGlow = 0.3 + Math.min(level, 5) * 0.11 + 0.15 * Math.sin(timeMs / 500);
-  glowBlob(ctx, 0, -15, 9 + level * 0.6, theme.glow);
+  // IDENTIDADE VISUAL — CAMADA 2 (Núcleo): a living wood-knot core embedded
+  // in the trunk — the structure's "power heart", brighter with level (spec:
+  // cada tipo identificável, poder visível). A brief brighter flare the
+  // instant the tower fires (release beat), matching the ballista's own
+  // flash so the core visibly powers the shot.
+  const coreFlare = attackFlashMs < 160 ? 1 - attackFlashMs / 160 : 0;
+  const runeGlow = 0.3 + Math.min(level, 5) * 0.11 + 0.15 * Math.sin(timeMs / 500) + coreFlare * 0.4;
+  glowBlob(ctx, 0, -15, (9 + level * 0.6) * (1 + coreFlare * 0.3), theme.glow);
+  const knotGrad = ctx.createRadialGradient(-0.8, -16, 0, 0, -15, 4.6);
+  knotGrad.addColorStop(0, "#f2ffe0");
+  knotGrad.addColorStop(0.55, theme.accent);
+  knotGrad.addColorStop(1, "#2c4016");
+  ctx.fillStyle = knotGrad;
+  ctx.beginPath();
+  ctx.arc(0, -15, 3.6 + coreFlare * 0.6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "rgba(20,14,7,0.6)";
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): a carved bark-rune over the
+  // knot, its own glow layered on top of the core's — pulses/intensifies
+  // whenever the tower actually attacks, not on a purely decorative clock.
   ctx.fillStyle = theme.accent;
   ctx.globalAlpha = runeGlow;
   ctx.beginPath();
@@ -297,6 +326,19 @@ export function drawIronwood(
   ctx.fill();
   ctx.globalAlpha = 1;
   ctx.restore();
+
+  // IDENTIDADE VISUAL — CAMADA 4 (Partículas Flutuantes): luminous spores/
+  // pollen drifting slowly around the platform/mount, upward and gently
+  // wandering (Forest-identity particle behavior) — continuous, not tied to
+  // combat, so the structure always reads as quietly alive with magic.
+  drawFloatingMotes(ctx, 0, -30 - level * 0.6, timeMs, 11, {
+    count: 5,
+    spreadX: 15,
+    spreadY: 26,
+    color: theme.accent,
+    periodMs: 3400,
+    size: 1.1,
+  });
 
   // --- Support platform: a crossed-beam wooden deck lashed to the trunk
   // just below the mount — reads as "built structure carrying a weapon,"
@@ -627,6 +669,13 @@ function drawInferno(
     ctx.fill();
   }
 
+  // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): red-orange cracks
+  // running through the dark iron shell, like lava under black rock
+  // (Volcanic-identity vein form) — a real texture in the material, not the
+  // molten seams already on the platform below it.
+  drawEnergyCrack(ctx, -7, -1, -5, -8, -6, -12.5, theme.primary, 0.6 * pulse);
+  drawEnergyCrack(ctx, 7, 1, 6, -6, 8, -12, theme.primary, 0.5 * pulse);
+
   // Visual Evolution stage 2+: reinforcement plates bolted over the base
   // shell — a real added part, not just a bigger furnace.
   if (visualStage >= 2) {
@@ -660,6 +709,19 @@ function drawInferno(
   ctx.beginPath();
   ctx.ellipse(0, -4, 5.6 + launchFlare * 1.8, 7.2 + launchFlare * 1.8, 0, 0, Math.PI * 2);
   ctx.fill();
+  // IDENTIDADE VISUAL — CAMADA 2 (Núcleo): the mouth IS the living magma
+  // sphere (spec: "esfera de magma viva") — 3 small brighter bubble-dots
+  // surface-and-pop inside it on independent phases, so the core reads as
+  // bubbling/aggressive rather than a flat glowing disc.
+  for (let i = 0; i < 3; i++) {
+    const bubble = (timeMs / 480 + i * 0.33) % 1;
+    ctx.globalAlpha = Math.sin(bubble * Math.PI) * 0.8;
+    ctx.fillStyle = "#fff6dd";
+    ctx.beginPath();
+    ctx.arc(Math.sin(i * 2.1) * 2.6, -5 + Math.cos(i * 1.7) * 2 - bubble * 1.5, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
   // Muzzle ring — a distinct metal collar around the opening (stage 3+, "arma mais sofisticada").
   if (visualStage >= 3) {
     ctx.strokeStyle = "#6a5f52";
@@ -716,26 +778,25 @@ function drawInferno(
     ctx.restore();
   }
 
-  // Visual Evolution stage 5+: runic engravings glowing across the plating.
-  if (visualStage >= 5) {
-    ctx.save();
-    ctx.globalAlpha = 0.4 + 0.35 * pulse;
-    ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 1;
-    for (const [rx, ry, r] of [
-      [-9, -3, 1.6],
-      [9, -3, 1.6],
-    ] as const) {
-      ctx.beginPath();
-      ctx.moveTo(rx - r, ry);
-      ctx.lineTo(rx, ry - r);
-      ctx.lineTo(rx + r, ry);
-      ctx.lineTo(rx, ry + r);
-      ctx.closePath();
-      ctx.stroke();
-    }
-    ctx.restore();
+  // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): ember-engraved diamond
+  // runes on the plating, as if the fire itself burned the marks into the
+  // iron (Volcanic-identity rune style) — present from the start at a low
+  // simmer, stage 5+ adds the second reinforced pair and burns brighter.
+  ctx.save();
+  ctx.globalAlpha = (0.22 + 0.2 * pulse + launchFlare * 0.3) * (visualStage >= 5 ? 1.8 : 1);
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 1;
+  const infernoRunes: readonly [number, number, number][] = visualStage >= 5 ? [[-9, -3, 1.6], [9, -3, 1.6]] : [[0, -3, 1.4]];
+  for (const [rx, ry, r] of infernoRunes) {
+    ctx.beginPath();
+    ctx.moveTo(rx - r, ry);
+    ctx.lineTo(rx, ry - r);
+    ctx.lineTo(rx + r, ry);
+    ctx.lineTo(rx, ry + r);
+    ctx.closePath();
+    ctx.stroke();
   }
+  ctx.restore();
 
   ctx.restore(); // end bodyScale
 
@@ -752,6 +813,18 @@ function drawInferno(
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // IDENTIDADE VISUAL — CAMADA 4 (Partículas Flutuantes): slower drifting
+  // ash motes alongside the fast rising embers above (Volcanic-identity
+  // asks for "sparks AND ash" — the embers are the sparks, this is the ash).
+  drawFloatingMotes(ctx, 0, -14, timeMs, 23, {
+    count: 4,
+    spreadX: 10,
+    spreadY: 30,
+    color: "#8a7a6a",
+    periodMs: 4200,
+    size: 1,
+  });
 
   // Visual Evolution stage 6 (final form): twin dual chimneys (the second
   // one added on the opposite flank) + a full molten-crack aura — the
@@ -869,12 +942,29 @@ function drawFrostborn(
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): cyan-blue cracks
+  // through the stone, like fissures in frozen glass (Ice-identity vein
+  // form) — thin and glassy rather than the organic/molten cracks the other
+  // towers use, matching the "fissuras" spec language exactly.
+  drawEnergyCrack(ctx, -4, -1, -6, -8, -5.5, -spireH * 0.5, theme.accent, 0.5 + 0.15 * pulse);
+  drawEnergyCrack(ctx, 4, 0, 6, -7, 5, -spireH * 0.48, theme.accent, 0.4 + 0.15 * pulse);
+
   // Carved rune band, low on the spire — always present, brighter with level.
   const runeGlow = 0.35 + Math.min(level, 10) * 0.045 + 0.2 * pulse;
   ctx.globalAlpha = runeGlow;
   ctx.fillStyle = theme.accent;
   ctx.fillRect(-5.5, -6, 11, 2.2);
   ctx.globalAlpha = 1;
+  // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): a thin frost-engraved
+  // outline traced around the filled band, whitish like ice etched into the
+  // stone (Ice-identity rune style, distinct from the filled glyphs the
+  // other towers use).
+  ctx.save();
+  ctx.globalAlpha = 0.4 + 0.25 * pulse;
+  ctx.strokeStyle = "#eafcff";
+  ctx.lineWidth = 0.6;
+  ctx.strokeRect(-5.5, -6, 11, 2.2);
+  ctx.restore();
 
   // Visual Evolution stage 3+: a second, higher rune band — the spire has
   // grown a real second architectural tier. Dimmed alongside the icicles
@@ -919,6 +1009,20 @@ function drawFrostborn(
   ctx.strokeStyle = "rgba(255,255,255,0.6)";
   ctx.lineWidth = 0.9;
   ctx.stroke();
+  // IDENTIDADE VISUAL — CAMADA 2 reinforcement: facet lines across the orb
+  // so it reads as a cut/faceted ice crystal (Ice-identity core shape),
+  // pulsing slowly like cold breathing via the shared `pulse` clock.
+  ctx.save();
+  ctx.globalAlpha = 0.4 + 0.25 * pulse;
+  ctx.strokeStyle = "#ffffff";
+  ctx.lineWidth = 0.5;
+  for (const a of [-0.9, -0.3, 0.3, 0.9]) {
+    ctx.beginPath();
+    ctx.moveTo(0, coreY);
+    ctx.lineTo(Math.sin(a) * 4.3, coreY + Math.cos(a) * 3.6);
+    ctx.stroke();
+  }
+  ctx.restore();
 
   // Visual Evolution stage 2+: crystal outcrops breaking through the
   // spire's own stone near the base — ice growing FROM the architecture.
@@ -1005,6 +1109,19 @@ function drawFrostborn(
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+
+  // IDENTIDADE VISUAL — CAMADA 4 (Partículas Flutuantes): luminous
+  // snowflakes rising slowly past the spire (Ice-identity particle
+  // behavior — rising motes, not sparks), independent of the static
+  // twinkles above.
+  drawFloatingMotes(ctx, 0, coreY, timeMs, 37, {
+    count: 5,
+    spreadX: 12,
+    spreadY: spireH + 14,
+    color: "#eafcff",
+    periodMs: 5200,
+    size: 1,
+  });
 
   // Visual Evolution stage 6 (final form): a crystalline crown atop the
   // spire's tip — the ancient-monument payoff at max level.
@@ -1128,6 +1245,14 @@ function drawStormcaller(
     ctx.stroke();
   }
 
+  // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): violet-purple cracks
+  // through the stone base, brighter while charging/discharging — the same
+  // "power contained within the material" read the other 3 towers get,
+  // using Stormcaller's own arcane color instead of an elemental one.
+  const veinIntensity = 0.45 + charge * 0.35 + discharge * 0.5;
+  drawEnergyCrack(ctx, -8, 4, -10, -1, -6, -5, theme.primary, veinIntensity);
+  drawEnergyCrack(ctx, 8, 5, 10, 0, 6, -4, theme.primary, veinIntensity * 0.8);
+
   // Discharge beat: a bright ground ring stamps outward from the plinth
   // the instant the attack fires — the "energy just left the structure"
   // beat, distinct from the ordinary projectile-impact VFX at the target.
@@ -1152,6 +1277,21 @@ function drawStormcaller(
     ctx.fillRect(-6, -22 + i * 8, 12, 2.4);
   }
   ctx.globalAlpha = 1;
+
+  // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): a distinct bolt-shaped
+  // glyph engraved over the pillar's bands — a real symbol, not just
+  // stacked rectangles — pulsing/intensifying on attack.
+  ctx.save();
+  ctx.globalAlpha = 0.5 + 0.3 * Math.sin(timeMs / 450) + discharge * 0.4;
+  ctx.strokeStyle = theme.accent;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(-1.5, -20);
+  ctx.lineTo(1.5, -12);
+  ctx.lineTo(-1, -12);
+  ctx.lineTo(2, -4);
+  ctx.stroke();
+  ctx.restore();
 
   // Discharge beat: a bright bolt races down the pillar's core into the
   // ground the instant the attack fires — energy visibly leaving the
@@ -1225,6 +1365,20 @@ function drawStormcaller(
   // clear "this is the power source" focal point even before it discharges.
   glowBlob(ctx, 0, orbY, (18 + levelProgress * 9) * chargeGlow, theme.glow);
   glowBlob(ctx, 0, orbY, (9 + levelProgress * 4) * chargeGlow, theme.accent);
+
+  // IDENTIDADE VISUAL — CAMADA 4 (Partículas Flutuantes): idle spark motes
+  // drifting around the orb continuously (Storm-identity particle behavior
+  // — erratic/quick, unlike the slow spores/snow the other towers use),
+  // independent of the discharge-only residual sparks below.
+  drawFloatingMotes(ctx, 0, orbY, timeMs, 47, {
+    count: 4,
+    spreadX: 13,
+    spreadY: 14,
+    color: theme.accent,
+    periodMs: 1800,
+    flicker: 0.5,
+    size: 0.9,
+  });
 
   // A rotating arcane ring around the orb (drawn as a squashed ellipse for
   // a top-down "ring" read) — spins faster as the charge builds.
@@ -2282,21 +2436,46 @@ function drawSwarmling(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME
     }
   }
 
-  // Lumpy, irregular body — an uneven blob rather than Crawler's sharp angular carapace.
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.moveTo(5.5 + jitter, 0);
-  ctx.bezierCurveTo(5, -4.5, 1.5, -6, -1.5, -5);
-  ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
-  ctx.bezierCurveTo(-6, 3, -3.5, 5, 0, 5);
-  ctx.bezierCurveTo(3, 4.8, 5.5, 2.5, 5.5 + jitter, 0);
-  ctx.closePath();
+  // Lumpy, irregular body — an uneven blob rather than Crawler's sharp
+  // angular carapace. BUG FIX (identidade visual audit): this used to fill
+  // with a single flat `theme.body` tone and only a 0.4-alpha outline for
+  // relief — at SWARMLING's small on-screen scale (archetypeScale 0.65,
+  // CanvasRenderer.tsx) that read as a solid dark silhouette with no visible
+  // shape. A lit gradient + rim highlight (matching Crawler/Ironclad's own
+  // construction) gives it the same top-left-lit material read every other
+  // enemy already has.
+  const bodyPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(5.5 + jitter, 0);
+    ctx.bezierCurveTo(5, -4.5, 1.5, -6, -1.5, -5);
+    ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
+    ctx.bezierCurveTo(-6, 3, -3.5, 5, 0, 5);
+    ctx.bezierCurveTo(3, 4.8, 5.5, 2.5, 5.5 + jitter, 0);
+    ctx.closePath();
+  };
+  const bodyGradient = ctx.createLinearGradient(-4, -5, 4, 4);
+  bodyGradient.addColorStop(0, theme.accent);
+  bodyGradient.addColorStop(0.4, theme.body);
+  bodyGradient.addColorStop(1, theme.dark);
+  ctx.fillStyle = bodyGradient;
+  bodyPath();
   ctx.fill();
   ctx.strokeStyle = theme.dark;
   ctx.globalAlpha = 0.4;
   ctx.lineWidth = 0.8;
   ctx.stroke();
   ctx.globalAlpha = 1;
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(-1.5, -5);
+      ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
+    },
+    theme.accent,
+    0.8,
+    0.4,
+  );
 
   // A tight cluster of small glowing eyes — the "many of me" identity cue.
   const flicker = 0.6 + 0.4 * Math.sin(timeMs / 180);
@@ -2344,8 +2523,15 @@ function drawRegenerator(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THE
     ctx.globalAlpha = 1;
   }
 
-  // Asymmetric fleshy body — deliberately lopsided, like a growth/mound rather than a creature with clean bilateral symmetry.
-  ctx.fillStyle = theme.body;
+  // Asymmetric fleshy body — deliberately lopsided, like a growth/mound
+  // rather than a creature with clean bilateral symmetry. Lit gradient
+  // (matching the SWARMLING fix above) instead of a flat fill, so the shape
+  // still reads clearly even where the healing core's glow doesn't reach.
+  const regenGradient = ctx.createLinearGradient(-6, -6, 6, 5);
+  regenGradient.addColorStop(0, theme.accent);
+  regenGradient.addColorStop(0.4, theme.body);
+  regenGradient.addColorStop(1, theme.dark);
+  ctx.fillStyle = regenGradient;
   ctx.beginPath();
   ctx.moveTo(7, -1);
   ctx.bezierCurveTo(6.5, -6, 1, -8, -3, -6);

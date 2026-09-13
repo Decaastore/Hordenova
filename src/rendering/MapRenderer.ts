@@ -4,6 +4,7 @@ import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
+import { drawEnergyCrack, drawFloatingMotes } from "./lighting";
 import type { BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration, type DecorationKind } from "./mapDecorations";
 
@@ -993,6 +994,66 @@ export function drawFortress(
   }
 
   drawBanner(ctx, 0, -26, biome, timeMs, 1, 0, windIntensity);
+
+  // IDENTIDADE VISUAL HORDENOVA — the fortress gets the same 4-layer magic
+  // read as every tower, using the active BIOME's own accent color (the
+  // castle is the one structure that already reads terrain-biome palette,
+  // per this file's header) rather than a fixed elemental theme.
+  const castleAccent = p.accentGlow;
+  const damageIntensity = Math.max(0, 1 - hpPercent); // CAMADA 3: runes burn brighter as the castle takes real damage.
+  const castlePulse = 0.5 + 0.5 * Math.sin(timeMs / 700);
+
+  // CAMADA 1 (Veios de Energia): glowing cracks through the central wall's
+  // own stonework, brighter the more damaged the castle is — the wall's
+  // remaining power visibly straining to hold.
+  drawEnergyCrack(ctx, -14, 16, -17, 2, -10, -18, castleAccent, 0.35 + damageIntensity * 0.5);
+  drawEnergyCrack(ctx, 14, 16, 17, 4, 11, -14, castleAccent, 0.3 + damageIntensity * 0.5);
+
+  // CAMADA 2 (Núcleo): a crystal heart set in the gate's keystone — the
+  // fortress's own focal power source, the same role a tower's core plays.
+  const keystoneHalo = ctx.createRadialGradient(0, -22, 0, 0, -22, 9 + damageIntensity * 4);
+  keystoneHalo.addColorStop(0, castleAccent);
+  keystoneHalo.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = keystoneHalo;
+  ctx.beginPath();
+  ctx.arc(0, -22, 9 + damageIntensity * 4, 0, Math.PI * 2);
+  ctx.fill();
+  const keystoneGrad = ctx.createRadialGradient(-0.5, -22.8, 0, 0, -22, 3.2);
+  keystoneGrad.addColorStop(0, "#ffffff");
+  keystoneGrad.addColorStop(0.55, castleAccent);
+  keystoneGrad.addColorStop(1, "rgba(0,0,0,0.4)");
+  ctx.fillStyle = keystoneGrad;
+  ctx.beginPath();
+  ctx.arc(0, -22, 2.8, 0, Math.PI * 2);
+  ctx.fill();
+
+  // CAMADA 3 (Runas Gravadas): engraved marks flanking the keystone on the
+  // central wall — pulse continuously, flare further with real damage.
+  ctx.save();
+  ctx.globalAlpha = 0.35 + 0.25 * castlePulse + damageIntensity * 0.4;
+  ctx.strokeStyle = castleAccent;
+  ctx.lineWidth = 1;
+  for (const rx of [-16, 16]) {
+    ctx.beginPath();
+    ctx.moveTo(rx, -8);
+    ctx.lineTo(rx, -18);
+    ctx.moveTo(rx - 2.4, -13);
+    ctx.lineTo(rx + 2.4, -13);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // CAMADA 4 (Partículas Flutuantes): motes drifting slowly around the rear
+  // keep, biome-colored — the same continuous "alive with magic" read a
+  // tower's core gets, scaled up to the fortress's own height.
+  drawFloatingMotes(ctx, 0, -70, timeMs, 61, {
+    count: 6,
+    spreadX: 26,
+    spreadY: 60,
+    color: castleAccent,
+    periodMs: 4600,
+    size: 1.2,
+  });
   }
 
   drawFortressDamageOverlay(ctx, timeMs, hpPercent);

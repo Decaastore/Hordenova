@@ -23,7 +23,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
 
   const groundGeometry = useMemo(() => buildGroundGeometry(palette), [biomeId]);
   const roadGeometry = useMemo(() => buildRoadGeometry(palette), [biomeId]);
-  const mountains = useMemo(() => buildMountainSilhouettes(5), []);
+  const mountains = useMemo(() => buildMountainSilhouettes(4), []);
   // MUNDO 3D — FASE 2 midground: real 3D trees/rocks at the SAME positions
   // `rendering/mapDecorations.ts` already scattered for the 2D TREE/ROCK/
   // RUIN sprites (CanvasRenderer skips drawing those specific kinds while
@@ -38,7 +38,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
   // semi-transparent atmosphere tint and can be vividly saturated (Abyss's
   // is a strong purple), which read as oversized, invasive purple rock
   // formations once painted flat and opaque across a whole mountain.
-  const mountainColor = useMemo(() => parseBiomeColor(palette.groundShadowed).lerp(skyColor, 0.35), [biomeId, skyColor]);
+  const mountainColor = useMemo(() => parseBiomeColor(palette.groundShadowed).lerp(skyColor, 0.5), [biomeId, skyColor]);
   const keyLightColor = useMemo(() => parseBiomeColor(palette.accentWarm), [biomeId]);
   const hemiSky = useMemo(() => parseBiomeColor(palette.skyTop), [biomeId]);
   const hemiGround = useMemo(() => parseBiomeColor(palette.groundShadowed), [biomeId]);

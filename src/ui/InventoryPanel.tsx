@@ -13,6 +13,30 @@ import { TradeScreen } from "./TradeScreen";
 import { EconomyStatsPanel } from "./EconomyStatsPanel";
 import { GameEngine } from "@/engine/GameEngine";
 
+/**
+ * IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items: EPIC+
+ * tiles pulse their rarity-colored glow slowly instead of holding a static
+ * shadow, the same "power heart" read a tower's core gets. Items aren't
+ * canvas-rendered on the map (see RarityBadge/ItemTile), so this layer is
+ * CSS rather than a canvas draw call — same underlying idea (a magical
+ * object's glow breathes, it isn't decoration painted on top).
+ */
+const ITEM_PULSE_KEYFRAMES = `
+@keyframes hordenova-item-core-pulse {
+  0%, 100% { box-shadow: 0 0 10px var(--pulse-color); }
+  50% { box-shadow: 0 0 20px var(--pulse-color); }
+}
+`;
+
+/** EPIC (order 3) and above get the pulsing core read; COMMON/UNCOMMON/RARE stay static. */
+function rarityPulseStyle(rarityDef: { order: number; glow: string }): CSSProperties {
+  if (rarityDef.order < 3) return {};
+  return {
+    animation: "hordenova-item-core-pulse 2.2s ease-in-out infinite",
+    "--pulse-color": rarityDef.glow,
+  } as CSSProperties;
+}
+
 interface InventoryPanelProps {
   inventory: readonly ItemInstance[];
   localEconomyTotals: { bossesDefeatedTotal: number; miniBossesDefeatedTotal: number };
@@ -97,6 +121,12 @@ export function InventoryPanel({
 
   return (
     <div style={overlayStyle} onClick={onClose}>
+      {/* IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items:
+          EPIC+ tiles get a slow pulsing glow instead of a static shadow, the
+          same "power heart" read a tower's core gets. Rarity itself already
+          drives every item tile's border/shadow color (see ItemTile/
+          OverflowItemTile below); this only adds the pulse animation. */}
+      <style>{ITEM_PULSE_KEYFRAMES}</style>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} style={closeButtonStyle}>
           ×
@@ -270,6 +300,7 @@ function ItemTile({
         boxShadow: fusionSelected ? `0 0 12px ${PALETTE.uiAccent}` : `0 0 12px ${rarityDef.glow}`,
         padding: 0,
         cursor: "default",
+        ...(fusionSelected ? {} : rarityPulseStyle(rarityDef)),
       }}
     >
       <button onClick={onClick} style={tileContentButtonStyle}>
@@ -297,7 +328,7 @@ function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () =
   const rarityDef = getRarityDefinition(def.rarity);
 
   return (
-    <button onClick={onClaim} style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85 }}>
+    <button onClick={onClaim} style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85, ...rarityPulseStyle(rarityDef) }}>
       <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
       <RarityBadge rarity={def.rarity} />
       <span style={claimLabelStyle}>{t("inventory.claim")}</span>

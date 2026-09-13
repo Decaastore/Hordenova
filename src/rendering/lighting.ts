@@ -74,4 +74,97 @@ export function rimHighlight(
   ctx.restore();
 }
 
+/**
+ * Identidade Visual HORDENOVA — CAMADA 1 (Veios de Energia). A single crack
+ * running through dark structural material, glowing in the object's own
+ * elemental color — the "power contained within the material" read, never a
+ * decal on top. Two-pass stroke: a soft 3.2px glow underneath (low alpha, so
+ * it reads as light escaping through the crack, not a colored line) plus a
+ * tight 0.9px bright core on top (the crack itself). `mx,my` bends the crack
+ * through a midpoint so it reads as a jagged fissure, not a straight scratch.
+ * `intensity` (0..~1.6) lets callers tie brightness to level/attack state
+ * without duplicating the draw call.
+ */
+export function drawEnergyCrack(
+  ctx: CanvasRenderingContext2D,
+  x1: number,
+  y1: number,
+  mx: number,
+  my: number,
+  x2: number,
+  y2: number,
+  color: string,
+  intensity = 1,
+): void {
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = Math.min(1, 0.22 * intensity);
+  ctx.lineWidth = 3.2;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(mx, my, x2, y2);
+  ctx.stroke();
+  ctx.globalAlpha = Math.min(1, 0.85 * intensity);
+  ctx.lineWidth = 0.9;
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(mx, my, x2, y2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+export interface FloatingMoteStyle {
+  /** How many motes drift in the field at once. */
+  count: number;
+  /** Horizontal wander radius (px) around the anchor. */
+  spreadX: number;
+  /** Vertical travel range (px) — a mote rises/loops through this span before recycling. */
+  spreadY: number;
+  color: string;
+  /** ms for one full rise-and-recycle cycle — lower = faster (e.g. embers/sparks), higher = slower (e.g. spores/snow). */
+  periodMs: number;
+  /** 0..1 extra high-frequency jitter on top of the base drift — sparks/ash use this, snow/spores stay near 0. */
+  flicker?: number;
+  /** Base mote radius in px. */
+  size?: number;
+}
+
+/**
+ * Identidade Visual HORDENOVA — CAMADA 4 (Partículas de Energia Flutuante).
+ * A small field of luminous motes drifting slowly and continuously around an
+ * anchor point (a tower core, the castle keep) — deterministic per-frame
+ * from `timeMs` alone (no stored particle state, so it can never leak or
+ * desync), differentiated purely by `style` (spread/speed/color/flicker) so
+ * the same function serves every biome's "snowflake / ember-ash / spore /
+ * spark" behavior without a fork per biome.
+ */
+export function drawFloatingMotes(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  timeMs: number,
+  seed: number,
+  style: FloatingMoteStyle,
+): void {
+  const { count, spreadX, spreadY, color, periodMs, flicker = 0, size = 1.3 } = style;
+  ctx.save();
+  ctx.fillStyle = color;
+  for (let i = 0; i < count; i++) {
+    const cycle = ((timeMs / periodMs + i / count) % 1 + 1) % 1;
+    const wander = Math.sin(timeMs / 1400 + i * 2.3 + seed) * spreadX * (0.35 + cycle * 0.65);
+    const jitter = flicker > 0 ? Math.sin(timeMs / 90 + i * 7 + seed) * flicker * 3 : 0;
+    const x = cx + wander + jitter;
+    const y = cy + spreadY * 0.5 - cycle * spreadY;
+    const alpha = Math.sin(cycle * Math.PI) * (0.55 + flicker * 0.3);
+    if (alpha <= 0.02) continue;
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(x, y, size * (0.7 + (1 - cycle) * 0.5), 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.restore();
+}
+
 export { LIGHT_DIRECTION };

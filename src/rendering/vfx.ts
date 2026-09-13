@@ -325,12 +325,21 @@ export class VfxManager {
 
     for (const t of this.floatingTexts) {
       const progress = 1 - t.remainingMs / t.totalMs;
+      // "Pop" on impact: the number overshoots to 1.35x scale in the first
+      // ~18% of its life, then eases back to 1x for the rest of its rise —
+      // reads as a hit landing, not text quietly fading in.
+      const pop = progress < 0.18 ? 1 + (1 - progress / 0.18) * 0.35 : 1;
       ctx.save();
       ctx.globalAlpha = Math.min(1, (1 - progress) * 1.6);
-      ctx.fillStyle = t.color;
-      ctx.font = "bold 11px system-ui, sans-serif";
+      ctx.font = "bold 12px system-ui, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(t.text, t.x, t.y - progress * 16);
+      ctx.translate(t.x, t.y - progress * 16);
+      ctx.scale(pop, pop);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(10,8,5,0.85)";
+      ctx.strokeText(t.text, 0, 0);
+      ctx.fillStyle = t.color;
+      ctx.fillText(t.text, 0, 0);
       ctx.restore();
     }
   }
