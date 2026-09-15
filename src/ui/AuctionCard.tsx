@@ -41,7 +41,7 @@ export function AuctionCard({ listing, onOpen, nowMs }: AuctionCardProps) {
     >
       {contested && <div style={hotBadgeStyle}>{t("marketplace.card.hotBadge")}</div>}
       <div style={cardTopRowStyle}>
-        <ItemGlyph category={def.category} rarity={rarity} />
+        <ItemGlyph itemDefinitionId={def.id} />
         <div style={cardTitleColStyle}>
           <div style={cardNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <RarityBadge rarity={def.rarity} />

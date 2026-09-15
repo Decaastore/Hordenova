@@ -3,7 +3,6 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import { getRarityDefinition } from "@/config/rarity";
 import { getDropTable } from "@/config/dropTables";
 import { getItemHistory } from "@/engine/EconomyLedger";
 import type { ItemInstance } from "@/entities/Item";
@@ -31,7 +30,6 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
   // original acquisition and any later trade.
   const history = getItemHistory(item.instanceId).filter((e) => e.eventType === "ITEM_ACQUIRED" || e.eventType === "ITEM_TRADED");
   const sourceTable = def.source.type !== "PHASE_MILESTONE" ? getDropTable(def.source.refId) : null;
-  const rarityDef = getRarityDefinition(def.rarity);
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -41,7 +39,7 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
         </button>
 
         <div style={headerRowStyle}>
-          <ItemGlyph category={def.category} rarity={rarityDef} size={64} />
+          <ItemGlyph itemDefinitionId={def.id} size={64} />
           <div>
             <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
             <RarityBadge rarity={def.rarity} size="md" />

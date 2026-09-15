@@ -61,3 +61,19 @@ describe("itemDefinitions — AMULET category", () => {
     expect(categories).toContain("AMULET");
   });
 });
+
+/**
+ * IDENTIDADE VISUAL DEFINITIVA — every item declares its own `visualAssetId`
+ * (the hook config/itemAssets.ts's registry keys off, and ItemGlyph reads),
+ * never a shared category-level fallback as the real design. Locks in that
+ * every item in the real catalog has one, and that it defaults to the
+ * item's own id (the only mapping today, but an explicit field rather than
+ * an implicit assumption).
+ */
+describe("itemDefinitions — visualAssetId (IDENTIDADE VISUAL DEFINITIVA)", () => {
+  it("every item declares its own visualAssetId, equal to its id", () => {
+    for (const def of Object.values(ITEM_DEFINITIONS)) {
+      expect(def.visualAssetId).toBe(def.id);
+    }
+  });
+});

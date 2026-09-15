@@ -386,7 +386,7 @@ function ItemTile({
         }}
       >
         <button onClick={onClick} style={tileContentButtonStyle}>
-          <ItemGlyph category={def.category} rarity={rarityDef} size={44} />
+          <ItemGlyph itemDefinitionId={def.id} size={44} />
           <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <RarityBadge rarity={def.rarity} />
         </button>
@@ -418,7 +418,7 @@ function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () =
         onClick={onClaim}
         style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85, ...rarityPulseStyle(rarityDef) }}
       >
-        <ItemGlyph category={def.category} rarity={rarityDef} size={44} />
+        <ItemGlyph itemDefinitionId={def.id} size={44} />
         <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
         <RarityBadge rarity={def.rarity} />
         <span style={claimLabelStyle}>{t("inventory.claim")}</span>

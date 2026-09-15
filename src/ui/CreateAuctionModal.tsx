@@ -65,7 +65,7 @@ export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCrea
                       }}
                       style={{ ...pickTileStyle, borderColor: itemRarity.color }}
                     >
-                      <ItemGlyph category={itemDef.category} rarity={itemRarity} size={40} />
+                      <ItemGlyph itemDefinitionId={itemDef.id} size={40} />
                       <div style={pickTileNameStyle}>{t(`items.${itemDef.i18nKey}.name` as TranslationKey)}</div>
                       <RarityBadge rarity={itemDef.rarity} />
                     </button>
@@ -83,7 +83,7 @@ export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCrea
             </button>
 
             <div style={selectedRowStyle}>
-              <ItemGlyph category={def.category} rarity={rarity} size={52} />
+              <ItemGlyph itemDefinitionId={def.id} size={52} />
               <div>
                 <div style={selectedNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
                 <RarityBadge rarity={def.rarity} />

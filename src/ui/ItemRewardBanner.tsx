@@ -45,7 +45,7 @@ export function ItemRewardBanner({ itemDefinitionId, onAcknowledge, onOpenInvent
     >
       <div style={eyebrowStyle}>{t("itemReward.gotItem")}</div>
       <div style={glyphRowStyle}>
-        <ItemGlyph category={def.category} rarity={rarityDef} size={48} />
+        <ItemGlyph itemDefinitionId={itemDefinitionId} size={48} />
       </div>
       <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
       <RarityBadge rarity={def.rarity} size="md" />

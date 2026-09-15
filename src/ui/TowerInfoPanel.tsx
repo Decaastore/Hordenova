@@ -340,7 +340,7 @@ function EquipmentSection({
                 ) : equipped && equippedDef ? (
                   <>
                     <span style={equippedItemRowStyle}>
-                      <ItemGlyph category={equippedDef.category} rarity={getRarityDefinition(equippedDef.rarity)} size={18} />
+                      <ItemGlyph itemDefinitionId={equippedDef.id} size={18} />
                       <span style={{ ...equipmentItemNameStyle, color: getRarityDefinition(equippedDef.rarity).color }}>
                         {t(`items.${equippedDef.i18nKey}.name` as TranslationKey)}
                       </span>
@@ -442,7 +442,7 @@ function EquipmentPicker({
             onClick={() => onPick(item.instanceId)}
             style={{ ...equipmentPickerItemStyle, borderColor: rarityDef.color }}
           >
-            <ItemGlyph category={def.category} rarity={rarityDef} size={18} />
+            <ItemGlyph itemDefinitionId={def.id} size={18} />
             {t(`items.${def.i18nKey}.name` as TranslationKey)}
           </button>
         );

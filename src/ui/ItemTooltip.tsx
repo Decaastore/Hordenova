@@ -50,7 +50,7 @@ export function ItemTooltip({ itemDefinitionId }: { itemDefinitionId: string }) 
   return (
     <div style={{ ...tooltipStyle, borderColor: rarityDef.color, boxShadow: `0 0 24px ${rarityDef.glow}, 0 10px 30px rgba(0,0,0,0.6)` }}>
       <div style={headerRowStyle}>
-        <ItemGlyph category={def.category} rarity={rarityDef} size={48} />
+        <ItemGlyph itemDefinitionId={itemDefinitionId} size={48} />
         <div>
           <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <div style={badgeRowStyle}>

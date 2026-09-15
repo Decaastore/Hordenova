@@ -3,7 +3,6 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import { getRarityDefinition } from "@/config/rarity";
 import { getCurrentBidAmount, type AuctionListing, type AuctionStatus } from "@/entities/Auction";
 import { isDemoBidder } from "@/config/marketplace";
 import { formatCountdownClock } from "@/utils/formatDuration";
@@ -105,14 +104,13 @@ function ListingRow({ listing, nowMs, onOpen, children }: { listing: AuctionList
   const { t } = useLanguage();
   const def = getItemDefinition(listing.itemDefinitionId);
   if (!def) return null;
-  const rarity = getRarityDefinition(def.rarity);
   const remainingMs = listing.endsAt - nowMs;
   const winningBid = listing.bids[listing.bids.length - 1] ?? null;
 
   return (
     <div style={rowStyle}>
       <button onClick={onOpen} style={rowClickableStyle}>
-        <ItemGlyph category={def.category} rarity={rarity} size={38} />
+        <ItemGlyph itemDefinitionId={def.id} size={38} />
         <div style={rowInfoStyle}>
           <div style={rowNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <RarityBadge rarity={def.rarity} />

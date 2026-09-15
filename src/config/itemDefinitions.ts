@@ -58,6 +58,18 @@ export interface ItemDefinition {
   source: ItemSource;
   /** Soulbound items (spec section 17) bind to the owner at acquisition and can never enter a trade. */
   tradable: boolean;
+  /**
+   * IDENTIDADE VISUAL DEFINITIVA — the item's own visual identity, looked up
+   * in config/itemAssets.ts's ITEM_VISUAL_ASSETS registry by ItemGlyph (the
+   * ONE component that renders an item's picture anywhere in the app — see
+   * ItemGlyph.tsx). Every item declares its own asset id on purpose, even
+   * though it equals `id` for every item today: this is the hook a future
+   * item could reuse another's art through (a recolor/variant) without ever
+   * inventing a second "category -> generic icon" fallback system as the
+   * real design. Never a category-level default going forward — see the
+   * registry file's own header for the exact contract.
+   */
+  visualAssetId: string;
 }
 
 export const ITEM_TYPES = [
@@ -92,6 +104,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: false,
+    visualAssetId: "warden_fragment",
   },
   // AMULETOS COMO ITENS REAIS — the game's one existing amulet (its own
   // en/ptBR name is literally "Charm"/"Amuleto", see i18n/locales/*.ts's
@@ -106,6 +119,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 2 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
+    visualAssetId: "mosswood_charm",
   },
   ancient_core: {
     id: "ancient_core",
@@ -115,6 +129,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [{ kind: "TOWER_ATTACK_SPEED_PERCENT", value: 3 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
+    visualAssetId: "ancient_core",
   },
   // AMULETOS COMO ITENS REAIS — confirmed as an amulet (a sigil worn as a
   // pendant). Previously ARTIFACT; only the category changed.
@@ -126,6 +141,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [{ kind: "BOSS_DAMAGE_PERCENT", value: 5 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
+    visualAssetId: "hollow_sigil",
   },
   // AMULETOS COMO ITENS REAIS — confirmed as an amulet (an eye pendant).
   // Previously ARTIFACT; only the category changed.
@@ -137,6 +153,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [{ kind: "CRIT_CHANCE_PERCENT", value: 4 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
+    visualAssetId: "wardens_eye",
   },
   // The Mythic. Extremely low weight in the drop table (0.10%) is the
   // ENTIRE reason this feels rare — no hidden pity, no separate "guaranteed
@@ -150,6 +167,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 8 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
+    visualAssetId: "crown_of_the_hollow_king",
   },
 };
 

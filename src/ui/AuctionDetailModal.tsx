@@ -3,7 +3,6 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import { getRarityDefinition } from "@/config/rarity";
 import { getDropTable } from "@/config/dropTables";
 import { getBossDefinitionById } from "@/config/bossConfig";
 import { getCurrentBidAmount, getLeadingBidderId, type AuctionListing } from "@/entities/Auction";
@@ -30,7 +29,6 @@ export function AuctionDetailModal({ listing, nowMs, gemsBalance, priceHistory, 
 
   const def = getItemDefinition(listing.itemDefinitionId);
   if (!def) return null;
-  const rarity = getRarityDefinition(def.rarity);
   const currentBid = getCurrentBidAmount(listing);
   const nextBid = getMinimumNextBid(currentBid);
   const leaderId = getLeadingBidderId(listing);
@@ -51,7 +49,7 @@ export function AuctionDetailModal({ listing, nowMs, gemsBalance, priceHistory, 
         </button>
 
         <div style={headerRowStyle}>
-          <ItemGlyph category={def.category} rarity={rarity} size={84} />
+          <ItemGlyph itemDefinitionId={def.id} size={84} />
           <div>
             <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
             <RarityBadge rarity={def.rarity} size="md" />
