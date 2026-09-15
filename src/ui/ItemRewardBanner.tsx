@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
 import { RarityBadge } from "./RarityBadge";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface ItemRewardBannerProps {
   itemDefinitionId: string;
@@ -43,6 +44,9 @@ export function ItemRewardBanner({ itemDefinitionId, onAcknowledge, onOpenInvent
       role="button"
     >
       <div style={eyebrowStyle}>{t("itemReward.gotItem")}</div>
+      <div style={glyphRowStyle}>
+        <ItemGlyph category={def.category} rarity={rarityDef} size={48} />
+      </div>
       <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
       <RarityBadge rarity={def.rarity} size="md" />
       <div style={tapStyle}>{t("itemReward.tapToView")}</div>
@@ -80,6 +84,12 @@ const eyebrowStyle: CSSProperties = {
   color: PALETTE.uiTextDim,
   fontWeight: 700,
   textTransform: "uppercase",
+};
+
+const glyphRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "center",
+  marginTop: 6,
 };
 
 const nameStyle: CSSProperties = {

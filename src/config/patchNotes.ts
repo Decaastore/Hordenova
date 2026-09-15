@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v16",
+    dateIso: "2026-09-15",
+    category: "ITEMS",
+    title: {
+      en: "Amulets Are Now Real Items",
+      ptBR: "Amuletos Agora São Itens Reais",
+    },
+    description: {
+      en: "Mosswood Charm, Hollow Sigil, and Warden's Eye now have their own dedicated Amulet identity throughout the game instead of being lumped in with generic relics and artifacts: a proper icon, a rarity-colored border and glow, and a real hover tooltip everywhere an item can appear.",
+      ptBR: "Amuleto do Bosque Musgoso, Sigilo Oco e Olho do Guardião agora têm identidade própria de Amuleto em todo o jogo, em vez de ficarem misturados com relíquias e artefatos genéricos: um ícone dedicado, borda e brilho na cor da raridade, e uma tooltip real ao passar o mouse em qualquer lugar onde um item apareça.",
+    },
+    highlights: [
+      {
+        en: "New hand-drawn Amulet icon (a cord loop over a faceted pendant) distinguishes amulets from every other item category at a glance — in the Inventory grid, the item details view, the boss-drop reward popup, tower equipment slots, and the Marketplace.",
+        ptBR: "Novo ícone desenhado à mão para Amuleto (um laço de cordão sobre um pingente facetado) distingue amuletos de qualquer outra categoria à primeira vista — na grade do Inventário, na tela de detalhes do item, no popup de recompensa de drop de Boss, nos slots de equipamento das torres e no Marketplace.",
+      },
+      {
+        en: "The Inventory now has a category filter row (All / Amulet / Material / etc.) that appears automatically once you own items from more than one category, so amulets are easy to find at a glance.",
+        ptBR: "O Inventário agora tem uma linha de filtro por categoria (Todos / Amuleto / Material / etc.) que aparece automaticamente assim que você possui itens de mais de uma categoria, deixando os amuletos fáceis de encontrar.",
+      },
+      {
+        en: "Hovering any item tile now shows an instant tooltip with its icon, name, rarity, type, description, real effects, and which Boss it drops from — no click required.",
+        ptBR: "Passar o mouse sobre qualquer item agora mostra uma tooltip instantânea com ícone, nome, raridade, tipo, descrição, efeitos reais e de qual Boss ele cai — sem precisar clicar.",
+      },
+      {
+        en: "Purely a presentation and categorization upgrade: no amulet's rarity, effect, drop rate, or tradability changed, and equipping/trading them works exactly as before.",
+        ptBR: "Uma melhoria puramente de apresentação e categorização: nenhuma raridade, efeito, chance de drop ou negociabilidade de amuleto mudou, e equipar/negociar continua funcionando exatamente como antes.",
+      },
+    ],
+  },
+  {
     id: "v15",
     dateIso: "2026-09-15",
     category: "SYSTEMS",

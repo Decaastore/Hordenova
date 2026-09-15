@@ -15,7 +15,18 @@ import type { Rarity } from "./rarity";
  * dedicated balance pass would be irresponsible. The shape below is what a
  * future CombatSystem hook would read.
  */
-export type ItemCategory = "MATERIAL" | "RELIC" | "RUNE" | "ARTIFACT" | "COSMETIC";
+/**
+ * AMULETOS COMO ITENS REAIS — "AMULET" joins the category union as its own
+ * first-class type rather than staying folded into the generic "RELIC"
+ * bucket. This is a RECLASSIFICATION of the one real amulet this catalog
+ * already has (mosswood_charm, below) — its id/name/description/lore/
+ * rarity/effects/source/tradable are all untouched, only the category value
+ * changes. The union stays extensible on purpose (spec: "quero que o
+ * sistema fique preparado para... AMULETOS, ARMAS, ARMADURAS, RECURSOS,
+ * ITENS DE BOSS, ITENS RAROS") — a future WEAPON/ARMOR category is exactly
+ * this same one-line addition, not a parallel item system.
+ */
+export type ItemCategory = "MATERIAL" | "AMULET" | "RELIC" | "RUNE" | "ARTIFACT" | "COSMETIC";
 
 export type ItemEffectKind =
   | "TOWER_DAMAGE_PERCENT"
@@ -82,11 +93,16 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: false,
   },
+  // AMULETOS COMO ITENS REAIS — the game's one existing amulet (its own
+  // en/ptBR name is literally "Charm"/"Amuleto", see i18n/locales/*.ts's
+  // items.mosswood_charm.name). Previously filed under the generic RELIC
+  // category; now correctly its own AMULET type. Nothing else about this
+  // definition changed.
   mosswood_charm: {
     id: "mosswood_charm",
     i18nKey: "mosswood_charm",
     rarity: "UNCOMMON",
-    category: "RELIC",
+    category: "AMULET",
     effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 2 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
@@ -100,20 +116,24 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
   },
+  // AMULETOS COMO ITENS REAIS — confirmed as an amulet (a sigil worn as a
+  // pendant). Previously ARTIFACT; only the category changed.
   hollow_sigil: {
     id: "hollow_sigil",
     i18nKey: "hollow_sigil",
     rarity: "EPIC",
-    category: "ARTIFACT",
+    category: "AMULET",
     effects: [{ kind: "BOSS_DAMAGE_PERCENT", value: 5 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
   },
+  // AMULETOS COMO ITENS REAIS — confirmed as an amulet (an eye pendant).
+  // Previously ARTIFACT; only the category changed.
   wardens_eye: {
     id: "wardens_eye",
     i18nKey: "wardens_eye",
     rarity: "LEGENDARY",
-    category: "ARTIFACT",
+    category: "AMULET",
     effects: [{ kind: "CRIT_CHANCE_PERCENT", value: 4 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,

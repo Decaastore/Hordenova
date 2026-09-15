@@ -8,7 +8,7 @@ import { getCurrentBidAmount, type AuctionListing, type AuctionStatus } from "@/
 import { isDemoBidder } from "@/config/marketplace";
 import { formatCountdownClock } from "@/utils/formatDuration";
 import { RarityBadge } from "./RarityBadge";
-import { ItemGlyph } from "./AuctionCard";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface MyMarketPanelProps {
   listings: readonly AuctionListing[];
@@ -112,7 +112,7 @@ function ListingRow({ listing, nowMs, onOpen, children }: { listing: AuctionList
   return (
     <div style={rowStyle}>
       <button onClick={onOpen} style={rowClickableStyle}>
-        <ItemGlyph rarity={rarity} size={38} />
+        <ItemGlyph category={def.category} rarity={rarity} size={38} />
         <div style={rowInfoStyle}>
           <div style={rowNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <RarityBadge rarity={def.rarity} />

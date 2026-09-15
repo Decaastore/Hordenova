@@ -8,35 +8,7 @@ import { getCurrentBidAmount, getLeadingBidderId, type AuctionListing } from "@/
 import { getMinimumNextBid, isDemoBidder } from "@/config/marketplace";
 import { formatCountdownClock } from "@/utils/formatDuration";
 import { RarityBadge } from "./RarityBadge";
-import { GemIcon } from "./icons";
-
-/**
- * MARKETPLACE / LEILÃO — a listed item's "art" is a hand-drawn SVG gem
- * (icons.tsx's existing GemIcon, the same no-emoji/no-fabricated-image rule
- * every other item tile in this codebase already follows — see
- * InventoryPanel.tsx's ItemTile), colored and glowing by the item's real
- * rarity rather than a placeholder image nobody actually shipped.
- */
-export function ItemGlyph({ rarity, size = 56 }: { rarity: ReturnType<typeof getRarityDefinition>; size?: number }) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 12,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        background: `radial-gradient(circle at 35% 30%, ${rarity.color}33, rgba(8,6,4,0.9))`,
-        border: `1px solid ${rarity.color}`,
-        boxShadow: `0 0 ${size * 0.35}px ${rarity.glow}`,
-      }}
-    >
-      <GemIcon size={size * 0.55} color={rarity.color} />
-    </div>
-  );
-}
+import { ItemGlyph } from "./ItemGlyph";
 
 interface AuctionCardProps {
   listing: AuctionListing;
@@ -69,7 +41,7 @@ export function AuctionCard({ listing, onOpen, nowMs }: AuctionCardProps) {
     >
       {contested && <div style={hotBadgeStyle}>{t("marketplace.card.hotBadge")}</div>}
       <div style={cardTopRowStyle}>
-        <ItemGlyph rarity={rarity} />
+        <ItemGlyph category={def.category} rarity={rarity} />
         <div style={cardTitleColStyle}>
           <div style={cardNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
           <RarityBadge rarity={def.rarity} />

@@ -3,11 +3,13 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
+import { getRarityDefinition } from "@/config/rarity";
 import { getDropTable } from "@/config/dropTables";
 import { getItemHistory } from "@/engine/EconomyLedger";
 import type { ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
 import { DropTableView } from "./DropTableView";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface ItemDetailsModalProps {
   item: ItemInstance;
@@ -29,6 +31,7 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
   // original acquisition and any later trade.
   const history = getItemHistory(item.instanceId).filter((e) => e.eventType === "ITEM_ACQUIRED" || e.eventType === "ITEM_TRADED");
   const sourceTable = def.source.type !== "PHASE_MILESTONE" ? getDropTable(def.source.refId) : null;
+  const rarityDef = getRarityDefinition(def.rarity);
 
   return (
     <div style={overlayStyle} onClick={onClose}>
@@ -37,9 +40,14 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
           ×
         </button>
 
-        <RarityBadge rarity={def.rarity} size="md" />
-        <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-        <div style={categoryStyle}>{t(`itemCategory.${def.category}` as TranslationKey)}</div>
+        <div style={headerRowStyle}>
+          <ItemGlyph category={def.category} rarity={rarityDef} size={64} />
+          <div>
+            <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+            <RarityBadge rarity={def.rarity} size="md" />
+            <div style={categoryStyle}>{t(`itemCategory.${def.category}` as TranslationKey)}</div>
+          </div>
+        </div>
         <div style={descriptionStyle}>{t(`items.${def.i18nKey}.description` as TranslationKey)}</div>
         <div style={loreStyle}>{t(`items.${def.i18nKey}.lore` as TranslationKey)}</div>
 
@@ -134,12 +142,19 @@ const closeButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+const headerRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "flex-start",
+  gap: 14,
+  marginTop: 8,
+};
+
 const nameStyle: CSSProperties = {
   fontFamily: "Georgia, 'Times New Roman', serif",
   fontSize: 19,
   fontWeight: 700,
   color: PALETTE.uiAccentBright,
-  marginTop: 8,
+  marginBottom: 6,
 };
 
 const categoryStyle: CSSProperties = {
@@ -147,7 +162,7 @@ const categoryStyle: CSSProperties = {
   letterSpacing: 1,
   textTransform: "uppercase",
   color: PALETTE.uiTextDim,
-  marginTop: 2,
+  marginTop: 5,
 };
 
 const descriptionStyle: CSSProperties = {

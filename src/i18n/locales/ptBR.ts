@@ -340,6 +340,7 @@ export const ptBR: TranslationSchema = {
   },
   itemCategory: {
     MATERIAL: "Material",
+    AMULET: "Amuleto",
     RELIC: "Relíquia",
     RUNE: "Runa",
     ARTIFACT: "Artefato",
@@ -393,6 +394,8 @@ export const ptBR: TranslationSchema = {
     title: "INVENTÁRIO",
     empty: "Nenhum item ainda. Derrote chefes para encontrar itens.",
     tabs: { items: "ITENS", trade: "TROCA", stats: "ESTATÍSTICAS" },
+    categoryAll: "Todos",
+    noItemsInCategory: "Nenhum item nesta categoria ainda.",
     tradable: "Negociável",
     soulbound: "Vinculado à Alma",
     acquiredFrom: "Obtido de",

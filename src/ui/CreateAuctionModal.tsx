@@ -7,7 +7,7 @@ import { getRarityDefinition } from "@/config/rarity";
 import { AUCTION_DURATION_HOURS, getAuctionListingFee, getAuctionMinBid, type AuctionDurationHours } from "@/config/marketplace";
 import type { ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
-import { ItemGlyph } from "./AuctionCard";
+import { ItemGlyph } from "./ItemGlyph";
 import type { CreateListingResult } from "@/engine/MarketplaceService";
 
 interface CreateAuctionModalProps {
@@ -65,7 +65,7 @@ export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCrea
                       }}
                       style={{ ...pickTileStyle, borderColor: itemRarity.color }}
                     >
-                      <ItemGlyph rarity={itemRarity} size={40} />
+                      <ItemGlyph category={itemDef.category} rarity={itemRarity} size={40} />
                       <div style={pickTileNameStyle}>{t(`items.${itemDef.i18nKey}.name` as TranslationKey)}</div>
                       <RarityBadge rarity={itemDef.rarity} />
                     </button>
@@ -83,7 +83,7 @@ export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCrea
             </button>
 
             <div style={selectedRowStyle}>
-              <ItemGlyph rarity={rarity} size={52} />
+              <ItemGlyph category={def.category} rarity={rarity} size={52} />
               <div>
                 <div style={selectedNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
                 <RarityBadge rarity={def.rarity} />

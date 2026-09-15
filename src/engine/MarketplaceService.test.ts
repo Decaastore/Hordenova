@@ -14,6 +14,7 @@ import {
 } from "./MarketplaceService";
 import { DEMO_BIDDER_ID, getAuctionListingFee, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
 import { checkFusionEligibility } from "./ItemFusion";
+import { getItemDefinition } from "@/config/itemDefinitions";
 
 const PLAYER = "player-1";
 const HOUR = 60 * 60 * 1000;
@@ -207,5 +208,39 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(history.sales).toHaveLength(1);
     expect(history.sales[0]!.isDemo).toBe(true);
     expect(history.averageAmount).toBe(FIRST_BID);
+  });
+
+  /**
+   * AMULETOS COMO ITENS REAIS — every seedTradableItem() call above already
+   * lists, bids on, and settles a real AMULET-category item (mosswood_charm)
+   * through the unmodified Marketplace flow, proving the Marketplace needs
+   * no AMULET-specific code path. This test makes that fact explicit: the
+   * field the spec calls "type" is really `category` in this codebase, its
+   * value is really "AMULET", and every one of the 3 confirmed amulets
+   * (all tradable: true) lists exactly like any other tradable item.
+   */
+  it("Marketplace lists/settles real AMULET-category items (mosswood_charm/hollow_sigil/wardens_eye) exactly like any other tradable item", () => {
+    for (const amuletId of ["mosswood_charm", "hollow_sigil", "wardens_eye"] as const) {
+      window.localStorage.clear();
+      vi.setSystemTime(DAY0);
+      const def = getItemDefinition(amuletId)!;
+      expect(def.category).toBe("AMULET");
+      expect(def.tradable).toBe(true);
+
+      const item = createItemInstance(amuletId, PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
+      updateSave({ playerId: PLAYER, inventory: [item], gems: 1000 });
+
+      const floor = getAuctionMinBid(def.rarity);
+      const result = createAuctionListingForItem(item.instanceId, floor, 24);
+      expect(result.ok).toBe(true);
+
+      const listingId = loadSave().auctionListings[0]!.id;
+      const bid = getMinimumNextBid(floor);
+      expect(placeDemoBid(listingId, bid)).toBe(true);
+
+      vi.setSystemTime(DAY0 + 25 * HOUR);
+      refreshMarketplace();
+      expect(loadSave().auctionListings[0]!.status).toBe("SOLD");
+    }
   });
 });

@@ -11,7 +11,7 @@ import { getMinimumNextBid, isDemoBidder } from "@/config/marketplace";
 import { formatCountdownClock } from "@/utils/formatDuration";
 import type { PriceHistory } from "@/engine/MarketplaceService";
 import { RarityBadge } from "./RarityBadge";
-import { ItemGlyph } from "./AuctionCard";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface AuctionDetailModalProps {
   listing: AuctionListing;
@@ -51,7 +51,7 @@ export function AuctionDetailModal({ listing, nowMs, gemsBalance, priceHistory, 
         </button>
 
         <div style={headerRowStyle}>
-          <ItemGlyph rarity={rarity} size={84} />
+          <ItemGlyph category={def.category} rarity={rarity} size={84} />
           <div>
             <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
             <RarityBadge rarity={def.rarity} size="md" />

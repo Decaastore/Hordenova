@@ -1,8 +1,8 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { getItemDefinition } from "@/config/itemDefinitions";
+import { getItemDefinition, type ItemCategory } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
 import { FUSION_ITEM_COUNT, getFusionSuccessChance } from "@/config/itemFusion";
 import type { ItemInstance } from "@/entities/Item";
@@ -12,6 +12,17 @@ import { ItemDetailsModal } from "./ItemDetailsModal";
 import { TradeScreen } from "./TradeScreen";
 import { EconomyStatsPanel } from "./EconomyStatsPanel";
 import { GameEngine } from "@/engine/GameEngine";
+import { ItemGlyph } from "./ItemGlyph";
+import { ItemHoverCard, ITEM_TOOLTIP_KEYFRAMES } from "./ItemTooltip";
+
+/**
+ * ITENS COMO ITENS REAIS — fixed display order for the inventory's category
+ * filter row (real ItemCategory values only — never a fabricated one). A
+ * category only shows as a filter chip when the player actually owns at
+ * least one item in it (see `availableCategories` below), so a 1-item
+ * catalog phase like this one doesn't clutter the UI with empty tabs.
+ */
+const CATEGORY_DISPLAY_ORDER: readonly ItemCategory[] = ["AMULET", "MATERIAL", "RELIC", "RUNE", "ARTIFACT", "COSMETIC"];
 
 /**
  * IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items: EPIC+
@@ -26,6 +37,11 @@ const ITEM_PULSE_KEYFRAMES = `
   0%, 100% { box-shadow: 0 0 10px var(--pulse-color); }
   50% { box-shadow: 0 0 20px var(--pulse-color); }
 }
+`;
+
+/** A subtle lift on hover — collectible-card feel without any exaggerated motion. */
+const ITEM_TILE_HOVER_CSS = `
+.hordenova-item-tile:hover { transform: translateY(-2px); }
 `;
 
 /** EPIC (order 3) and above get the pulsing core read; COMMON/UNCOMMON/RARE stay static. */
@@ -95,6 +111,11 @@ export function InventoryPanel({
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
+  // ITENS COMO ITENS REAIS — category filter is local UI state; "ALL" (the
+  // default) shows every real item exactly as before this feature, so
+  // nothing about the existing grid changes unless the player actively
+  // narrows it down.
+  const [categoryFilter, setCategoryFilter] = useState<ItemCategory | "ALL">("ALL");
   // SISTEMA DE FUSÃO DE ITENS — selection is local UI state, not engine
   // state (nothing is consumed until CONFIRMAR FUSÃO). Auto-drops any
   // instanceId that stops existing in `inventory` — e.g. after a
@@ -119,6 +140,25 @@ export function InventoryPanel({
 
   const selectedItem = selectedInstanceId ? inventory.find((i) => i.instanceId === selectedInstanceId) ?? null : null;
 
+  // ITENS COMO ITENS REAIS — a category only ever appears as a filter chip
+  // if the player actually owns a real item in it (never a fabricated
+  // category placeholder), and the filter itself only ever excludes items
+  // the player already owns — it never changes what's actually in
+  // `inventory`.
+  const availableCategories = useMemo(() => {
+    const present = new Set<ItemCategory>();
+    for (const item of inventory) {
+      const def = getItemDefinition(item.itemDefinitionId);
+      if (def) present.add(def.category);
+    }
+    return CATEGORY_DISPLAY_ORDER.filter((c) => present.has(c));
+  }, [inventory]);
+
+  const filteredInventory = useMemo(() => {
+    if (categoryFilter === "ALL") return inventory;
+    return inventory.filter((item) => getItemDefinition(item.itemDefinitionId)?.category === categoryFilter);
+  }, [inventory, categoryFilter]);
+
   return (
     <div style={overlayStyle} onClick={onClose}>
       {/* IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items:
@@ -126,7 +166,7 @@ export function InventoryPanel({
           same "power heart" read a tower's core gets. Rarity itself already
           drives every item tile's border/shadow color (see ItemTile/
           OverflowItemTile below); this only adds the pulse animation. */}
-      <style>{ITEM_PULSE_KEYFRAMES}</style>
+      <style>{ITEM_PULSE_KEYFRAMES}{ITEM_TOOLTIP_KEYFRAMES}{ITEM_TILE_HOVER_CSS}</style>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} style={closeButtonStyle}>
           ×
@@ -182,25 +222,49 @@ export function InventoryPanel({
             {inventory.length === 0 ? (
               <div style={emptyStyle}>{t("inventory.empty")}</div>
             ) : (
-              <div style={gridStyle}>
-                {inventory.map((item) => (
-                  <ItemTile
-                    key={item.instanceId}
-                    item={item}
-                    onClick={() => setSelectedInstanceId(item.instanceId)}
-                    fusionSelected={fusionSelectedIds.includes(item.instanceId)}
-                    onToggleFusionSelect={() => {
-                      setFusionOutcome(null);
-                      setFusionConfirming(false);
-                      setFusionSelectedIds((prev) => {
-                        if (prev.includes(item.instanceId)) return prev.filter((id) => id !== item.instanceId);
-                        if (prev.length >= FUSION_ITEM_COUNT) return prev; // never selects a 4th — the extra is simply ignored
-                        return [...prev, item.instanceId];
-                      });
-                    }}
-                  />
-                ))}
-              </div>
+              <>
+                {availableCategories.length > 1 && (
+                  <div style={categoryFilterRowStyle}>
+                    <CategoryChip
+                      active={categoryFilter === "ALL"}
+                      label={t("inventory.categoryAll")}
+                      onClick={() => setCategoryFilter("ALL")}
+                    />
+                    {availableCategories.map((category) => (
+                      <CategoryChip
+                        key={category}
+                        active={categoryFilter === category}
+                        label={t(`itemCategory.${category}` as TranslationKey)}
+                        onClick={() => setCategoryFilter(category)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {filteredInventory.length === 0 ? (
+                  <div style={emptyStyle}>{t("inventory.noItemsInCategory")}</div>
+                ) : (
+                  <div style={gridStyle}>
+                    {filteredInventory.map((item) => (
+                      <ItemTile
+                        key={item.instanceId}
+                        item={item}
+                        onClick={() => setSelectedInstanceId(item.instanceId)}
+                        fusionSelected={fusionSelectedIds.includes(item.instanceId)}
+                        onToggleFusionSelect={() => {
+                          setFusionOutcome(null);
+                          setFusionConfirming(false);
+                          setFusionSelectedIds((prev) => {
+                            if (prev.includes(item.instanceId)) return prev.filter((id) => id !== item.instanceId);
+                            if (prev.length >= FUSION_ITEM_COUNT) return prev; // never selects a 4th — the extra is simply ignored
+                            return [...prev, item.instanceId];
+                          });
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
 
             <FusionSection
@@ -274,6 +338,22 @@ function TabButton({ active, onClick, label }: { active: boolean; onClick: () =>
   );
 }
 
+function CategoryChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...categoryChipStyle,
+        borderColor: active ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
+        color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
+        background: active ? "rgba(255,210,87,0.14)" : "transparent",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 function ItemTile({
   item,
   onClick,
@@ -292,32 +372,36 @@ function ItemTile({
   const rarityDef = getRarityDefinition(def.rarity);
 
   return (
-    <div
-      style={{
-        ...tileStyle,
-        position: "relative",
-        borderColor: fusionSelected ? PALETTE.uiAccent : rarityDef.color,
-        boxShadow: fusionSelected ? `0 0 12px ${PALETTE.uiAccent}` : `0 0 12px ${rarityDef.glow}`,
-        padding: 0,
-        cursor: "default",
-        ...(fusionSelected ? {} : rarityPulseStyle(rarityDef)),
-      }}
-    >
-      <button onClick={onClick} style={tileContentButtonStyle}>
-        <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-        <RarityBadge rarity={def.rarity} />
-      </button>
-      <button
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleFusionSelect();
+    <ItemHoverCard itemDefinitionId={item.itemDefinitionId}>
+      <div
+        className="hordenova-item-tile"
+        style={{
+          ...tileStyle,
+          position: "relative",
+          borderColor: fusionSelected ? PALETTE.uiAccent : rarityDef.color,
+          boxShadow: fusionSelected ? `0 0 12px ${PALETTE.uiAccent}` : `0 0 12px ${rarityDef.glow}`,
+          padding: 0,
+          cursor: "default",
+          ...(fusionSelected ? {} : rarityPulseStyle(rarityDef)),
         }}
-        title={t(fusionSelected ? "inventory.fusion.deselectItem" : "inventory.fusion.selectItem")}
-        style={{ ...fusionCheckboxStyle, borderColor: fusionSelected ? PALETTE.uiAccent : PALETTE.uiPanelBorder }}
       >
-        {fusionSelected ? "✓" : ""}
-      </button>
-    </div>
+        <button onClick={onClick} style={tileContentButtonStyle}>
+          <ItemGlyph category={def.category} rarity={rarityDef} size={44} />
+          <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+          <RarityBadge rarity={def.rarity} />
+        </button>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleFusionSelect();
+          }}
+          title={t(fusionSelected ? "inventory.fusion.deselectItem" : "inventory.fusion.selectItem")}
+          style={{ ...fusionCheckboxStyle, borderColor: fusionSelected ? PALETTE.uiAccent : PALETTE.uiPanelBorder }}
+        >
+          {fusionSelected ? "✓" : ""}
+        </button>
+      </div>
+    </ItemHoverCard>
   );
 }
 
@@ -328,11 +412,18 @@ function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () =
   const rarityDef = getRarityDefinition(def.rarity);
 
   return (
-    <button onClick={onClaim} style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85, ...rarityPulseStyle(rarityDef) }}>
-      <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-      <RarityBadge rarity={def.rarity} />
-      <span style={claimLabelStyle}>{t("inventory.claim")}</span>
-    </button>
+    <ItemHoverCard itemDefinitionId={item.itemDefinitionId}>
+      <button
+        className="hordenova-item-tile"
+        onClick={onClaim}
+        style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85, ...rarityPulseStyle(rarityDef) }}
+      >
+        <ItemGlyph category={def.category} rarity={rarityDef} size={44} />
+        <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+        <RarityBadge rarity={def.rarity} />
+        <span style={claimLabelStyle}>{t("inventory.claim")}</span>
+      </button>
+    </ItemHoverCard>
   );
 }
 
@@ -563,23 +654,43 @@ const gridStyle: CSSProperties = {
   gap: 10,
 };
 
+const categoryFilterRowStyle: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: 6,
+  marginBottom: 10,
+};
+
+const categoryChipStyle: CSSProperties = {
+  padding: "5px 11px",
+  borderRadius: 999,
+  border: "1px solid",
+  fontWeight: 700,
+  fontSize: 10,
+  letterSpacing: 0.4,
+  textTransform: "uppercase",
+  cursor: "pointer",
+};
+
 const tileStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start",
+  alignItems: "center",
   gap: 6,
-  padding: "10px 12px",
-  borderRadius: 8,
+  padding: "14px 10px 10px",
+  borderRadius: 10,
   border: "1px solid",
   background: "rgba(0,0,0,0.25)",
-  textAlign: "left",
+  textAlign: "center",
   cursor: "pointer",
+  transition: "transform 140ms ease, box-shadow 140ms ease",
 };
 
 const tileNameStyle: CSSProperties = {
   fontSize: 11.5,
   fontWeight: 700,
   color: PALETTE.uiText,
+  textAlign: "center",
 };
 
 const emptyStyle: CSSProperties = {
@@ -655,14 +766,14 @@ const claimLabelStyle: CSSProperties = {
 const tileContentButtonStyle: CSSProperties = {
   display: "flex",
   flexDirection: "column",
-  alignItems: "flex-start",
-  gap: 6,
+  alignItems: "center",
+  gap: 8,
   width: "100%",
-  padding: "10px 12px",
+  padding: "4px 10px 10px",
   border: "none",
   background: "transparent",
   color: "inherit",
-  textAlign: "left",
+  textAlign: "center",
   cursor: "pointer",
 };
 

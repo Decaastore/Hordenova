@@ -339,6 +339,7 @@ export const en = {
   },
   itemCategory: {
     MATERIAL: "Material",
+    AMULET: "Amulet",
     RELIC: "Relic",
     RUNE: "Rune",
     ARTIFACT: "Artifact",
@@ -392,6 +393,8 @@ export const en = {
     title: "INVENTORY",
     empty: "No items yet. Defeat bosses to find loot.",
     tabs: { items: "ITEMS", trade: "TRADE", stats: "STATS" },
+    categoryAll: "All",
+    noItemsInCategory: "No items in this category yet.",
     tradable: "Tradable",
     soulbound: "Soulbound",
     acquiredFrom: "Acquired from",

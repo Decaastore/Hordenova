@@ -35,6 +35,7 @@ import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { CoinIcon, GemIcon } from "./icons";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface TowerInfoPanelProps {
   tower: TowerInstance;
@@ -338,8 +339,11 @@ function EquipmentSection({
                   </>
                 ) : equipped && equippedDef ? (
                   <>
-                    <span style={{ ...equipmentItemNameStyle, color: getRarityDefinition(equippedDef.rarity).color }}>
-                      {t(`items.${equippedDef.i18nKey}.name` as TranslationKey)}
+                    <span style={equippedItemRowStyle}>
+                      <ItemGlyph category={equippedDef.category} rarity={getRarityDefinition(equippedDef.rarity)} size={18} />
+                      <span style={{ ...equipmentItemNameStyle, color: getRarityDefinition(equippedDef.rarity).color }}>
+                        {t(`items.${equippedDef.i18nKey}.name` as TranslationKey)}
+                      </span>
                     </span>
                     <button onClick={() => onUnequip(slotIndex)} style={equipmentActionButtonStyle}>
                       {t("towerInfo.equipment.remove")}
@@ -438,6 +442,7 @@ function EquipmentPicker({
             onClick={() => onPick(item.instanceId)}
             style={{ ...equipmentPickerItemStyle, borderColor: rarityDef.color }}
           >
+            <ItemGlyph category={def.category} rarity={rarityDef} size={18} />
             {t(`items.${def.i18nKey}.name` as TranslationKey)}
           </button>
         );
@@ -1081,10 +1086,21 @@ const equipmentEmptyLabelStyle: CSSProperties = {
   flex: 1,
 };
 
+const equippedItemRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  flex: 1,
+  minWidth: 0,
+};
+
 const equipmentItemNameStyle: CSSProperties = {
   fontSize: 11,
   fontWeight: 700,
   flex: 1,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
 };
 
 const equipmentActionButtonStyle: CSSProperties = {
@@ -1112,6 +1128,9 @@ const equipmentPickerStyle: CSSProperties = {
 };
 
 const equipmentPickerItemStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 5,
   padding: "4px 8px",
   borderRadius: 6,
   border: "1px solid",

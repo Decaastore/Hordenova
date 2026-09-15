@@ -78,6 +78,23 @@ export function GemShardIcon({ size = 14, color = "currentColor", style }: IconP
   );
 }
 
+/**
+ * AMULETOS COMO ITENS REAIS — a pendant on its cord: a small loop (the
+ * cord's ring), a short link down to a faceted gem body. Deliberately
+ * distinct from GemIcon (a single loose gem with no cord/loop) so an
+ * amulet reads as a wearable item at a glance, never a generic gem tile.
+ */
+export function AmuletIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <circle cx="12" cy="4" r="1.8" stroke={color} strokeWidth="1.6" />
+      <path d="M12 5.8v3" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M12 8.8 5 13.5 12 22.5l7-9Z" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M12 8.8v13.7M5 13.5h14" stroke={color} strokeWidth="1" strokeLinejoin="round" opacity="0.55" />
+    </svg>
+  );
+}
+
 export function BoltIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

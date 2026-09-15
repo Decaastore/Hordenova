@@ -190,3 +190,88 @@ describe("InventoryPanel — Item Fusion section (SISTEMA DE FUSÃO DE ITENS)", 
     expect(container.textContent).toContain("3/3 selected");
   });
 });
+
+/**
+ * AMULETOS COMO ITENS REAIS — the 3 confirmed real amulets (mosswood_charm/
+ * hollow_sigil/wardens_eye) must show up as real inventory items: a
+ * category filter chip, the AMULET tag, a rarity-colored icon, and a hover
+ * tooltip with real effect/origin data — never flat text.
+ */
+describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("shows no category filter row when every owned item is the same category (single-category inventory)", () => {
+    const items = [makeItem("mosswood_charm"), makeItem("hollow_sigil")];
+    const { container } = renderPanel({ inventory: items });
+    expect(container.textContent).not.toContain("Amulet");
+  });
+
+  it("shows an ALL + AMULET filter chip row once the inventory mixes an amulet with a non-amulet item", () => {
+    const items = [makeItem("warden_fragment"), makeItem("mosswood_charm")];
+    const { container } = renderPanel({ inventory: items });
+    const allChip = findExactButton(container, "All");
+    const amuletChip = findExactButton(container, "Amulet");
+    expect(allChip).not.toBeNull();
+    expect(amuletChip).not.toBeNull();
+  });
+
+  it("clicking the AMULET chip filters the grid down to only the amulet items", () => {
+    const items = [makeItem("warden_fragment"), makeItem("mosswood_charm"), makeItem("hollow_sigil")];
+    const { container } = renderPanel({ inventory: items });
+
+    expect(container.textContent).toContain("Warden Fragment");
+    expect(container.textContent).toContain("Mosswood Charm");
+
+    act(() => findExactButton(container, "Amulet")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(container.textContent).not.toContain("Warden Fragment");
+    expect(container.textContent).toContain("Mosswood Charm");
+    expect(container.textContent).toContain("Hollow Sigil");
+  });
+
+  it("each of the 3 confirmed amulets renders its real name and rarity badge as a tile — not flat text", () => {
+    const items = [makeItem("mosswood_charm"), makeItem("hollow_sigil"), makeItem("wardens_eye"), makeItem("warden_fragment")];
+    const { container } = renderPanel({ inventory: items });
+
+    expect(container.textContent).toContain("Mosswood Charm");
+    expect(container.textContent).toContain("Hollow Sigil");
+    expect(container.textContent).toContain("Warden's Eye");
+    // Each tile renders its item as an SVG glyph inside a bordered tile, not a plain text row.
+    expect(container.querySelectorAll(".hordenova-item-tile svg").length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("hovering an amulet tile reveals its tooltip with name, AMULET tag, and its real effect", () => {
+    const items = [makeItem("hollow_sigil")];
+    const { container } = renderPanel({ inventory: items });
+
+    expect(container.textContent).not.toContain("+5% Boss Damage");
+
+    // React listens for native "mouseover"/"mouseout" (not "mouseenter"/"mouseleave",
+    // which don't bubble) to simulate onMouseEnter/onMouseLeave, so the event must
+    // be dispatched as one of those and bubble up to ItemHoverCard's wrapper div.
+    const tile = container.querySelector(".hordenova-item-tile") as HTMLElement;
+    expect(tile).not.toBeNull();
+    act(() => tile.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
+
+    expect(container.textContent).toContain("Hollow Sigil");
+    expect(container.textContent).toContain("Amulet");
+    expect(container.textContent).toContain("+5% Boss Damage");
+
+    act(() => tile.dispatchEvent(new MouseEvent("mouseout", { bubbles: true })));
+    expect(container.textContent).not.toContain("+5% Boss Damage");
+  });
+
+  it("clicking an amulet tile opens ItemDetailsModal with its real data (large icon, name, category, effect)", () => {
+    const items = [makeItem("wardens_eye")];
+    const { container } = renderPanel({ inventory: items });
+
+    // The tile's clickable content button wraps the icon, name, AND rarity
+    // badge together, so its textContent isn't the name alone.
+    const nameButton = Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes("Warden's Eye"));
+    expect(nameButton).not.toBeUndefined();
+    act(() => nameButton!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(container.textContent).toContain("Amulet");
+    expect(container.textContent).toContain("+4% Crit Chance");
+  });
+});

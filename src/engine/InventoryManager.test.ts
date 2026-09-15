@@ -29,9 +29,10 @@ describe("InventoryManager", () => {
 
   it("getItemsByCategory filters by the definition's category", () => {
     const material = item("warden_fragment"); // MATERIAL
-    const relic = item("mosswood_charm"); // RELIC
-    const result = getItemsByCategory([material, relic], "MATERIAL");
+    const amulet = item("mosswood_charm"); // AMULET
+    const result = getItemsByCategory([material, amulet], "MATERIAL");
     expect(result).toEqual([material]);
+    expect(getItemsByCategory([material, amulet], "AMULET")).toEqual([amulet]);
   });
 
   it("getItemsByRarity filters by the definition's rarity", () => {
