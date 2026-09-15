@@ -32,6 +32,8 @@ export interface ItemInstance {
   tradable: boolean;
   /** True once involved in a TradeManager session that hasn't completed or been cancelled yet — blocks a second concurrent trade from touching the same instance (spec section 16: no double-spend). */
   pendingTrade: boolean;
+  /** MARKETPLACE / LEILÃO spec section 17 — true while this exact copy is listed in an ACTIVE auction. Mirrors pendingTrade's guard exactly (blocks equip via entities/Tower.ts's canEquipItem and Item Fusion via engine/ItemFusion.ts's checkFusionEligibility) so a listed item is genuinely unusable elsewhere, never just visually greyed out. Cleared the moment the auction settles or is cancelled — see engine/AuctionManager.ts. */
+  pendingAuction: boolean;
   history: ItemHistoryEntry[];
 }
 
@@ -45,6 +47,7 @@ export function createItemInstance(itemDefinitionId: string, ownerId: string, so
     source,
     tradable: def?.tradable ?? false,
     pendingTrade: false,
+    pendingAuction: false,
     history: [{ timestamp: now, event: "ACQUIRED", fromOwner: null, toOwner: ownerId }],
   };
 }

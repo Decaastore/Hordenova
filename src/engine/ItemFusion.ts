@@ -62,9 +62,10 @@ export function checkFusionEligibility(
   }
 
   if (items.some((item) => item.ownerId !== ownerId)) return { ok: false, reason: "NOT_OWNED" };
-  // Mirrors canEquipItem's own pendingTrade guard — an item mid-trade must
-  // never be consumed out from under that trade.
-  if (items.some((item) => item.pendingTrade)) return { ok: false, reason: "NOT_ELIGIBLE" };
+  // Mirrors canEquipItem's own pendingTrade/pendingAuction guard — an item
+  // mid-trade or listed in an active auction must never be consumed out
+  // from under that exchange.
+  if (items.some((item) => item.pendingTrade || item.pendingAuction)) return { ok: false, reason: "NOT_ELIGIBLE" };
 
   const defs = items.map((item) => getItemDefinition(item.itemDefinitionId));
   if (defs.some((def) => !def)) return { ok: false, reason: "ITEM_NOT_FOUND" };

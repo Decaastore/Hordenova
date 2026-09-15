@@ -4,7 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { MusicControl } from "./MusicControl";
 
-export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES";
+export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE";
 
 interface TopNavProps {
   active: NavView;
@@ -43,6 +43,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
         </button>
         <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
         <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
+        <NavLink label={t("nav.marketplace")} isActive={active === "MARKETPLACE"} onClick={() => onNavigate("MARKETPLACE")} />
         <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
         <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
         {/* MÚSICA GLOBAL spec section 22 — the ambient-music control (and the

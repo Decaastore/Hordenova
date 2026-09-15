@@ -11,6 +11,7 @@ import type { LocalFirstDiscoveries } from "./WorldFirst";
 import type { AscensionHistoryEntry, SeasonRewardRecord } from "@/config/ascension";
 import { generateId } from "@/utils/id";
 import { seasonClock } from "./SeasonClock";
+import type { AuctionListing } from "@/entities/Auction";
 
 /**
  * Master Implementation spec section 2/36 — the ASCENSION season's own
@@ -205,9 +206,22 @@ export interface SaveData {
    * this field at all — only the one free use per day does.
    */
   lastFreeRepositionDayIndex: number | null;
+
+  /**
+   * MARKETPLACE / LEILÃO — every auction this account has ever created, as
+   * seller, PERMANENT and append-only, exactly like ascensionHistory above:
+   * a closed/cancelled auction is never deleted, only its `status` changes,
+   * so "My Market > Closed Auctions" (spec section 18) always has real
+   * history to show. Settlement itself is lazy (see engine/AuctionManager's
+   * own header) — an expired ACTIVE auction here just hasn't been read
+   * since it expired yet; GameEngine.settleExpiredAuctions() closes it the
+   * next time this save is loaded or the Marketplace is opened, the exact
+   * same lazy-boundary pattern SeasonClock already uses for Season resets.
+   */
+  auctionListings: AuctionListing[];
 }
 
-export const SAVE_DATA_VERSION = 18;
+export const SAVE_DATA_VERSION = 19;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -255,6 +269,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   unlockedSpecializationIds: {},
   unlockedItemSlots: {},
   lastFreeRepositionDayIndex: null,
+  auctionListings: [],
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -348,9 +363,10 @@ function isValidItemInstance(raw: unknown): raw is ItemInstance {
   );
 }
 
+/** MARKETPLACE / LEILÃO (save v18 -> v19) — `pendingAuction` is a brand new field; a save written before it existed never had an item locked in an auction, so `false` is the only correct default (self-healing, same pattern as every other additive field in this file). */
 function parseInventory(raw: unknown): ItemInstance[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isValidItemInstance);
+  return raw.filter(isValidItemInstance).map((item) => ({ ...item, pendingAuction: item.pendingAuction === true }));
 }
 
 function parseLocalFirstDiscoveries(raw: unknown): LocalFirstDiscoveries {
@@ -386,6 +402,7 @@ function emptySaveData(): SaveData {
     seasonRewardRecords: [],
     unlockedCastleSkinIds: [],
     pendingRouletteSpinWaves: [],
+    auctionListings: [],
   };
 }
 
@@ -538,6 +555,46 @@ function deriveUnlockedSpecializationIdsFromLegacyLoadout(loadout: readonly Towe
   return result;
 }
 
+/**
+ * Self-healing parse for `auctionListings` (save v18 -> v19) — a brand new
+ * field, so a pre-existing save gets an empty history rather than an
+ * invented one (nobody has ever listed anything before this field
+ * existed). A malformed entry (missing/wrong-typed core fields) is dropped
+ * rather than trusted; `bids` defaults to [] rather than failing the whole
+ * listing, since a listing with a corrupted bid array is still a real
+ * listing worth keeping.
+ */
+function isValidBid(raw: unknown): raw is AuctionListing["bids"][number] {
+  if (!raw || typeof raw !== "object") return false;
+  const b = raw as Partial<AuctionListing["bids"][number]>;
+  return typeof b.id === "string" && typeof b.bidderId === "string" && typeof b.amount === "number" && typeof b.placedAt === "number";
+}
+
+function isValidAuctionListing(raw: unknown): raw is AuctionListing {
+  if (!raw || typeof raw !== "object") return false;
+  const l = raw as Partial<AuctionListing>;
+  return (
+    typeof l.id === "string" &&
+    typeof l.sellerId === "string" &&
+    typeof l.itemInstanceId === "string" &&
+    typeof l.itemDefinitionId === "string" &&
+    typeof l.minBid === "number" &&
+    typeof l.listingFeePaid === "number" &&
+    typeof l.createdAt === "number" &&
+    typeof l.endsAt === "number" &&
+    (l.status === "ACTIVE" || l.status === "SOLD" || l.status === "UNSOLD" || l.status === "CANCELLED")
+  );
+}
+
+function parseAuctionListings(raw: unknown): AuctionListing[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isValidAuctionListing).map((listing) => ({
+    ...listing,
+    bids: Array.isArray(listing.bids) ? listing.bids.filter(isValidBid) : [],
+    settledAt: typeof listing.settledAt === "number" ? listing.settledAt : null,
+  }));
+}
+
 /** Self-healing parse for `equippedTowerSkinByType` — drops any key that isn't a real TowerType, or a skin id that doesn't actually belong to that tower type. */
 function parseEquippedTowerSkinByType(raw: unknown): Partial<Record<TowerType, string>> {
   if (!raw || typeof raw !== "object") return {};
@@ -678,6 +735,11 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // must be free — never treated as already-spent.
       lastFreeRepositionDayIndex:
         typeof parsed.lastFreeRepositionDayIndex === "number" ? parsed.lastFreeRepositionDayIndex : null,
+      // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
+      // "sensible fresh-account default for a pre-existing save" pattern as
+      // every other additive migration in this function: no auction has
+      // ever existed for a save older than this field.
+      auctionListings: parseAuctionListings(parsed.auctionListings),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v15",
+    dateIso: "2026-09-15",
+    category: "SYSTEMS",
+    title: {
+      en: "New: Marketplace — Player Auction House",
+      ptBR: "Novo: Marketplace — Casa de Leilões",
+    },
+    description: {
+      en: "A new Marketplace page joins Home/Season/Ranking/Wiki/Novidades in the top navigation: list a tradable item for auction, set your own minimum bid, choose a duration, and let bidding decide the real price. Anti-sniping protects a close finish, and every listed item is locked (unequippable, excluded from Fusion) until its auction ends.",
+      ptBR: "Uma nova página de Marketplace se junta a Home/Season/Ranking/Wiki/Novidades na navegação superior: liste um item negociável em leilão, defina seu próprio lance mínimo, escolha uma duração, e deixe os lances decidirem o preço real. Anti-sniping protege um final disputado, e todo item listado fica bloqueado (não pode ser equipado nem entrar em Fusão) até o leilão encerrar.",
+    },
+    highlights: [
+      {
+        en: "Create Auction: pick a tradable item, set a minimum bid (never below a real, rarity-based floor), choose 12h/24h/48h/72h, and pay a small Gems listing fee — never refunded, even if nobody bids.",
+        ptBR: "Criar Leilão: escolha um item negociável, defina um lance mínimo (nunca abaixo de um piso real baseado em raridade), escolha 12h/24h/48h/72h, e pague uma pequena taxa de listagem em Gemas — nunca devolvida, mesmo se ninguém der lance.",
+      },
+      {
+        en: "Featured Auctions, filters (rarity/category), search, and sort (ending soon / highest / lowest / most contested / most recent) on the Browse tab; My Market tracks every listing you've ever created, permanently.",
+        ptBR: "Leilões em Destaque, filtros (raridade/categoria), busca e ordenação (encerrando em breve / maior / menor / mais disputado / mais recente) na aba Explorar; Meu Mercado guarda permanentemente todos os leilões que você já criou.",
+      },
+      {
+        en: "Item detail shows origin Boss, drop chance, bid history, and real Price History (average/median/lowest/highest) sourced only from sales that actually happened in your save — nothing invented.",
+        ptBR: "O detalhe do item mostra o Boss de origem, chance de drop, histórico de lances e um Histórico de Preços real (média/mediana/menor/maior) baseado apenas em vendas que realmente aconteceram no seu save — nada inventado.",
+      },
+      {
+        en: "Honest about today's limits: HORDENOVA has no live multiplayer server yet, so bidding uses a clearly labeled local demonstration identity — never a fabricated other player — while the underlying auction engine (bids, outbid handling, anti-sniping, atomic settlement) is fully real and server-ready.",
+        ptBR: "Honesto sobre os limites de hoje: HORDENOVA ainda não tem um servidor multiplayer real, então os lances usam uma identidade de demonstração local claramente rotulada — nunca um jogador falso inventado — enquanto o motor de leilão por trás (lances, superação, anti-sniping, liquidação atômica) é totalmente real e pronto para um servidor.",
+      },
+    ],
+  },
+  {
     id: "v14",
     dateIso: "2026-09-15",
     category: "SYSTEMS",

@@ -130,6 +130,7 @@ describe("GameEngine — Active Idle progression", () => {
       source: { type: "BOSS_DROP" as const, refId: "hollow-warden" },
       tradable: true,
       pendingTrade: false,
+      pendingAuction: false,
       history: [{ timestamp: 1000, event: "ACQUIRED" as const, fromOwner: null, toOwner: "player-seed-1" }],
     };
     updateSave({

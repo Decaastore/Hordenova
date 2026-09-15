@@ -103,7 +103,7 @@ describe("SaveSystem", () => {
       SAVE_STORAGE_KEY,
       JSON.stringify({ ...DEFAULT_SAVE_DATA, inventory: [validItem, "garbage", { instanceId: "missing-fields" }] }),
     );
-    expect(loadSave().inventory).toEqual([validItem]);
+    expect(loadSave().inventory).toEqual([{ ...validItem, pendingAuction: false }]);
   });
 
   describe("Save versioning (Master Implementation Pass spec section 39)", () => {
@@ -304,6 +304,78 @@ describe("SaveSystem", () => {
       const loaded = loadSave();
       expect(loaded.towerLoadout[0]?.equippedItemInstanceIds).toEqual(["item-real-1", null, null]);
       expect(loaded.towerLoadout[1]?.equippedItemInstanceIds).toEqual([null, null, null]);
+    });
+
+    it("MARKETPLACE / LEILÃO (save v18 -> v19): a pre-Marketplace save (missing auctionListings and every inventory item's pendingAuction entirely) self-heals both to fresh-account defaults without losing any pre-existing progress", () => {
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          version: 18,
+          bestWave: 400,
+          gold: 9000,
+          gems: 1200,
+          inventory: [
+            {
+              instanceId: "item-real-1",
+              itemDefinitionId: "ancient_core",
+              ownerId: "player-1",
+              acquiredAt: 0,
+              source: { type: "BOSS_DROP", refId: "hollow-warden" },
+              tradable: true,
+              pendingTrade: false,
+              history: [],
+            },
+          ],
+        }),
+      );
+      const loaded = loadSave();
+      expect(loaded.version).toBe(SAVE_DATA_VERSION);
+      expect(loaded.bestWave).toBe(400);
+      expect(loaded.gold).toBe(9000);
+      expect(loaded.gems).toBe(1200);
+      expect(loaded.auctionListings).toEqual([]);
+      expect(loaded.inventory[0]?.pendingAuction).toBe(false);
+    });
+
+    it("auctionListings round-trips through save/load exactly, and a malformed listing/bid self-heals instead of throwing", () => {
+      writeSave({
+        ...DEFAULT_SAVE_DATA,
+        auctionListings: [
+          {
+            id: "auction-1",
+            sellerId: "player-1",
+            itemInstanceId: "item-1",
+            itemDefinitionId: "ancient_core",
+            minBid: 120,
+            listingFeePaid: 10,
+            createdAt: 1000,
+            endsAt: 1000 + 3600_000,
+            status: "ACTIVE",
+            bids: [{ id: "bid-1", bidderId: "demo-bidder", amount: 150, placedAt: 1500 }],
+            settledAt: null,
+          },
+        ],
+      });
+      const loaded = loadSave();
+      expect(loaded.auctionListings).toHaveLength(1);
+      expect(loaded.auctionListings[0]?.bids).toHaveLength(1);
+
+      window.localStorage.setItem(
+        SAVE_STORAGE_KEY,
+        JSON.stringify({
+          ...DEFAULT_SAVE_DATA,
+          version: SAVE_DATA_VERSION,
+          auctionListings: [
+            { id: "auction-real", sellerId: "p1", itemInstanceId: "i1", itemDefinitionId: "ancient_core", minBid: 10, listingFeePaid: 1, createdAt: 0, endsAt: 100, status: "ACTIVE", bids: ["garbage", { id: "b1", bidderId: "x", amount: 10, placedAt: 1 }] },
+            { missingRequiredFields: true },
+            "not-even-an-object",
+          ],
+        }),
+      );
+      const tamperedLoad = loadSave();
+      expect(tamperedLoad.auctionListings).toHaveLength(1);
+      expect(tamperedLoad.auctionListings[0]?.id).toBe("auction-real");
+      expect(tamperedLoad.auctionListings[0]?.bids).toEqual([{ id: "b1", bidderId: "x", amount: 10, placedAt: 1 }]);
     });
   });
 

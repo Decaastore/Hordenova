@@ -458,13 +458,13 @@ export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinI
 export function canEquipItem(
   tower: TowerInstance,
   slotIndex: number,
-  item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade">,
+  item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade" | "pendingAuction">,
   alreadyEquippedElsewhere: boolean,
 ): boolean {
   if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return false;
   if (!tower.unlockedItemSlots[slotIndex]) return false;
   if (alreadyEquippedElsewhere) return false;
-  if (item.pendingTrade) return false;
+  if (item.pendingTrade || item.pendingAuction) return false;
   const def = getItemDefinition(item.itemDefinitionId);
   return !!def && def.category !== "COSMETIC";
 }

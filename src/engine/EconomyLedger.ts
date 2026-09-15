@@ -29,18 +29,27 @@ export type LedgerEventType =
   | "GEMS_SPENT"
   | "GEM_SHARDS_EARNED"
   | "INVENTORY_EXPANSION_PURCHASED"
-  | "COSMETIC_PURCHASED";
+  | "COSMETIC_PURCHASED"
+  // MARKETPLACE / LEILÃO (spec section 20/22) — reuses this SAME ledger,
+  // same as the Gem Economy events above, so auction activity feeds the
+  // exact same "trade volume / average price / auction count" analysis
+  // this file was already built to support, rather than a parallel log.
+  | "AUCTION_LISTED"
+  | "AUCTION_BID_PLACED"
+  | "AUCTION_SETTLED_SOLD"
+  | "AUCTION_SETTLED_UNSOLD"
+  | "AUCTION_CANCELLED";
 
 export interface LedgerEvent {
   eventId: string;
   timestamp: number;
   eventType: LedgerEventType;
-  /** Present for ITEM_* events, absent for the Gem Economy event types (GEMS_EARNED, GEMS_SPENT, GEM_SHARDS_EARNED, INVENTORY_EXPANSION_PURCHASED, COSMETIC_PURCHASED). */
+  /** Present for ITEM_* events and the AUCTION_* events (which are always about one real item instance), absent for the Gem Economy event types (GEMS_EARNED, GEMS_SPENT, GEM_SHARDS_EARNED, INVENTORY_EXPANSION_PURCHASED, COSMETIC_PURCHASED). */
   itemInstanceId?: string;
   itemDefinitionId?: string;
   fromOwner: string | null;
   toOwner: string | null;
-  /** Free-form provenance string — a boss id, "trade:<sessionId>", a milestone wave number, "specialization:<id>", etc. */
+  /** Free-form provenance string — a boss id, "trade:<sessionId>", "auction:<listingId>", a milestone wave number, "specialization:<id>", etc. */
   source: string;
   /** Present for GEMS_EARNED/GEMS_SPENT/GEM_SHARDS_EARNED — the gold-equivalent quantity, and for COSMETIC_PURCHASED/INVENTORY_EXPANSION_PURCHASED the gem cost paid. Absent for ITEM_* events. */
   amount?: number;
