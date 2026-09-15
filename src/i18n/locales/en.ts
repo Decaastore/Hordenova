@@ -696,13 +696,6 @@ export const en = {
     title: "NOVIDADES",
     subtitle: "A real, honest log of what changed in HORDENOVA — nothing here is invented history.",
     latest: "Latest",
-    types: {
-      NEW: "New",
-      CHANGE: "Change",
-      FIX: "Fix",
-      BALANCE: "Balance",
-      REMOVAL: "Removal",
-    },
     categories: {
       CONTENT: "New Content",
       FIXES: "Fixes",
@@ -714,84 +707,6 @@ export const en = {
       BOSSES: "Bosses",
       INTERFACE: "Interface",
       SYSTEMS: "Systems",
-    },
-    entries: {
-      v13: {
-        individualDifficulty: "Normal and Elite enemy HP now factors in a small, bounded read of your own account's real strength (Tower Levels, Mastery, active Specializations) on top of the usual per-wave difficulty curve — a stronger account meets slightly tougher enemies, a newer account meets slightly gentler ones, always within a modest range. It never touches Boss or Mini-Boss HP, never becomes a combat bonus, and never affects rewards.",
-        seasonProgressionTestReset: "Added a manual \"Reset Season Progress\" option on the Season screen for testers: it zeroes Best Wave, current wave, Tower/Mastery/Specialization Levels and Gold back to a fresh start. Gems, permanent unlocks (Mastery/Specialization ownership, equipment slots), skins, achievements and Prestige are never touched, and it always asks for confirmation first.",
-      },
-      v12: {
-        phaseWaveDisplay: "The HUD now shows your progress as \"PHASE X — WAVE Y\" (waves 1-10 per Phase, restarting every Phase) as the primary readout, with the real global wave kept as secondary info — purely a clearer way to read the same progression, with no change to any difficulty or reward formula.",
-        equipmentSlotGemUnlock: "Tower Equipment Slots now have a real unlock cost: Slot 1 stays free, Slot 2 costs 250 Gems and Slot 3 costs 500 Gems — a one-time, permanent purchase per tower type that a Season Reset never undoes.",
-        itemFusion: "Added Item Fusion to the Inventory: combine 3 items of the same rarity for a chance at 1 item of the next rarity tier (40% at Common, dropping sharply to 0.25% at Legendary). Failure destroys the 3 items with no compensation — there is no pity system, and the chance can never be boosted by anything.",
-      },
-      v11: {
-        miniBossEnrageForAll: "Fixed: only Berserker-type Mini-Bosses could ever become Enraged. Every Mini-Boss now enrages below 30% HP, same as a Boss — and so every Mini-Boss now correctly gains the Enraged Shield too (20% damage reduction).",
-      },
-      v10: {
-        enrageShield: "Bosses and Mini-Bosses now gain a defensive Shield while Enraged: Bosses take 30% less damage and Mini-Bosses take 20% less damage in that state, with a clear visual (a ring around the enemy plus a shield-tinted HP bar border) that disappears the instant Enraged ends.",
-      },
-      v9: {
-        prestigeProfileDetail: "The Inventory's Stats tab now shows Prestige in full detail: current benefits, the next level's cost and gain, and a complete progression list — all computed live from the real system, with no new bonuses or price changes.",
-      },
-      v8: {
-        gemShardRateCorrection: "Adjusted how many Gem Shards a Boss or Mini-Boss kill grants to a healthier long-term rate for an infinite game — the conversion stays 10 Shards = 1 Gem.",
-      },
-      v7: {
-        executionerBudgetRetune: "Another fine-tuning pass on the Ironwood Executioner path: its edge against bosses is now more in line with the other Ironwood paths (Breaker/Vanguard), keeping its boss-specialist identity without trivializing boss fights.",
-      },
-      v6: {
-        specializationSwitchVisible: "Fixed \"Switch Specialization\" not appearing in a tower's info panel once you owned 2 or more specialization paths for that tower type — the action itself always worked, it just wasn't showing up.",
-        executionerBossDamageCap: "Rebalanced the Ironwood Executioner path's boss-damage bonus so it stops compounding without limit at very high specialization levels — keeps late-game boss fights meaningful for a heavily invested Executioner build.",
-        castleDamageScaling: "Castle damage from an enemy reaching your base is now a percentage of the Castle's own max HP (10% Normal / 25% Mini-Boss / 50% Boss) that grows smoothly with wave progression, instead of a fixed number that never changed — early waves are gentler, late waves carry real weight.",
-        towerRepositioning: "You can now move an already-built tower to a different building spot on the map — 1 free move per day, 200 Gems for additional moves the same day. Moving onto another tower's spot swaps the two.",
-        equipmentSlots: "Towers now have 3 Equipment Slots where you can equip items you already own. This is the foundation for future rare Boss-dropped gear — equipping doesn't change combat power yet.",
-      },
-      v5: {
-        homeRedesign: "Home now has a real top navigation bar (Play/Season/Ranking/Wiki/News) and a portal section below the hero with live Season, Ranking, Wiki and News teasers — no longer a single empty-feeling screen.",
-        rankingScreen: "Added a dedicated Ranking screen showing your own Season Score and Prestige — honestly marked as unavailable without a server, never a fabricated leaderboard.",
-        seasonOverviewEnriched: "The Season screen now shows Season Score, Bosses Defeated, Best Phase, a season-progress bar, and your Prestige tier alongside the existing Play/Collection actions.",
-        ambientMusicClickFix: "Rebuilt the Home ambient pad with richer harmonics and a slow volume swell, and fixed an audible click/pop when the music stopped or was muted.",
-        enemyAnatomyPass: "Runner, Brute and Shieldbearer were rebuilt with real anatomy (jointed legs, arms, a head) — they no longer reuse a bare triangle/ellipse/shield-polygon shape.",
-        endgamePhaseNameFix: "Fixed the phase name showing as a raw, untranslated key during the post-wave-130 boss rotation.",
-      },
-      v4: {
-        rouletteAutoGrant: "The wave-milestone Roulette no longer grants its reward automatically — it now waits, visibly, until you actually spin it.",
-        castleHpDrift: "Fixed Castle HP silently increasing without an actual Roulette win behind it.",
-        gemConvertButton: "The Gem Shard conversion button now correctly disables when you don't have enough Shards to convert.",
-        ccResistanceTiers: "Bosses and Mini-Bosses can no longer be frozen or slowed indefinitely — crowd control now has a real, tiered resistance that recovers over time.",
-        enemyHpBars: "Every enemy, including Elites and Mini-Bosses, now shows a real HP bar.",
-        movementVfx: "Enemies now show a distinct movement effect per archetype — dust, a speed trail, a wisp, a trailing shadow.",
-        towerSpacing: "Tower build slots can no longer overlap — a structural minimum-spacing rule now guarantees it.",
-        miniBossRegenStall: "Fixed a Regenerator Mini-Boss's healing being able to fully cancel out weak sustained fire, making its HP look permanently stuck — damage now always outpaces regen under real, ongoing fire.",
-        gemsVsShards: "Gems and Gem Shards are now shown as two clearly separate stats — a Gem Shard reward can no longer be misread as a Gem reward.",
-        homeWikiNovidades: "Added a proper Home screen with ambient music, a Wiki built directly from the game's real data, and this Novidades screen.",
-      },
-      v3: {
-        sfxSystem: "Added a full sound-effects system, with volume and mute controls.",
-        attackVfxRebuild: "Rebuilt each tower's attack visuals into a distinct anticipation/charge/impact sequence instead of one generic effect.",
-        castleSkinArchitecture: "Added Castle Skins — purely cosmetic, never affecting HP or combat.",
-        goldSinkSaturation: "Fixed Gold piling up with nothing left to spend it on once towers were upgraded.",
-        frostbornPermafreeze: "Fixed Frostborn's Freeze effect being able to lock an enemy in place indefinitely under certain conditions.",
-      },
-      v2: {
-        persistentProgression: "Tower levels and gold now persist across sessions instead of resetting on defeat.",
-        phasesAndBiomes: "Added multiple phases/biomes, each with its own enemy archetypes.",
-        bossMiniBossSystem: "Added recurring Boss and Mini-Boss encounters with real ability sets.",
-        itemSystem: "Added a full Item System: rarity tiers, real drop-chance tables, and an inventory.",
-        ascensionSeasons: "Added Ascension — a competitive, time-boxed season mode with permanent cosmetic rewards.",
-        rouletteRewards: "Added the wave-milestone Roulette reward.",
-        towerMastery: "Added Tower Mastery — ongoing tower progression past the level cap.",
-        sinkRegistries: "Added structured Gold and Gem sinks — Profile Prestige among them.",
-        specialAttacks: "Added a unique Special Attack per tower type.",
-        towerSurvival: "Towers can now be damaged and temporarily disabled by boss siege attacks.",
-      },
-      v1: {
-        fourTowers: "Launched with four towers: Ironwood, Inferno, Frostborn, and Stormcaller.",
-        waveDefenseLoop: "Launched the core automatic wave-defense loop.",
-        languageSelector: "Added English / Português (Brasil) language selection.",
-        cinematicMenu: "Added the cinematic main menu.",
-      },
     },
   },
 } as const;

@@ -3,29 +3,37 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
-import { PATCH_NOTES, type PatchNoteType } from "@/config/patchNotes";
+import { PATCH_NOTES, type PatchNoteCategory } from "@/config/patchNotes";
 
 interface NovidadesScreenProps {
   onNavigate: (view: NavView) => void;
   onPlay: () => void;
 }
 
-const TYPE_COLOR: Record<PatchNoteType, string> = {
-  NEW: PALETTE.success,
-  CHANGE: PALETTE.uiAccent,
-  FIX: PALETTE.danger,
-  BALANCE: PALETTE.gem,
-  REMOVAL: PALETTE.uiTextDim,
+const CATEGORY_COLOR: Record<PatchNoteCategory, string> = {
+  CONTENT: PALETTE.success,
+  TOWERS: PALETTE.uiAccent,
+  BOSSES: PALETTE.danger,
+  CASTLE: PALETTE.gold,
+  ITEMS: PALETTE.gem,
+  ASCENSION: PALETTE.gem,
+  INTERFACE: PALETTE.uiAccent,
+  SYSTEMS: PALETTE.uiAccentBright,
+  BALANCE: PALETTE.gold,
+  FIXES: PALETTE.danger,
 };
 
 /**
- * Real, ongoing changelog — every item rendered here comes from
- * config/patchNotes.ts, which documents only changes that actually
- * shipped (cross-referenced against this repo's own commit history).
- * Spec: "Não inventar histórico."
+ * Real, ongoing changelog — every entry rendered here comes straight from
+ * config/patchNotes.ts, the single source of truth for both this screen
+ * and the Home teaser (MainMenu.tsx). Each entry documents only a change
+ * that actually shipped, already implemented/tested/validated before it
+ * was added there (see patchNotes.ts's own header and CLAUDE.md's
+ * "Novidades / Changelog" section for the exact contract). Spec: "Não
+ * inventar histórico."
  */
 export function NovidadesScreen({ onNavigate, onPlay }: NovidadesScreenProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
 
   return (
     <div style={rootStyle}>
@@ -34,25 +42,33 @@ export function NovidadesScreen({ onNavigate, onPlay }: NovidadesScreenProps) {
         <h1 style={titleStyle}>{t("novidades.title")}</h1>
         <p style={subtitleStyle}>{t("novidades.subtitle")}</p>
 
-        {PATCH_NOTES.map((version, index) => (
-          <section key={version.id} style={versionStyle}>
-            <div style={versionHeaderStyle}>
-              <span style={versionIdStyle}>{version.id}</span>
+        {PATCH_NOTES.map((entry, index) => (
+          <article key={entry.id} style={entryStyle}>
+            <div style={entryHeaderStyle}>
+              {entry.dateIso && <span style={dateStyle}>{entry.dateIso}</span>}
               {index === 0 && <span style={latestBadgeStyle}>{t("novidades.latest")}</span>}
-              {version.dateIso && <span style={dateStyle}>{version.dateIso}</span>}
+              <span
+                style={{
+                  ...categoryChipStyle,
+                  color: CATEGORY_COLOR[entry.category],
+                  borderColor: CATEGORY_COLOR[entry.category],
+                }}
+              >
+                {t(`novidades.categories.${entry.category}` as TranslationKey)}
+              </span>
             </div>
-            <ul style={itemListStyle}>
-              {version.items.map((item) => (
-                <li key={item.i18nKey} style={itemRowStyle}>
-                  <span style={{ ...typeChipStyle, color: TYPE_COLOR[item.type], borderColor: TYPE_COLOR[item.type] }}>
-                    {t(`novidades.types.${item.type}` as TranslationKey)}
-                  </span>
-                  <span style={categoryChipStyle}>{t(`novidades.categories.${item.category}` as TranslationKey)}</span>
-                  <span style={itemTextStyle}>{t(`novidades.entries.${version.id}.${item.i18nKey}` as TranslationKey)}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+            <h2 style={entryTitleStyle}>{entry.title[language]}</h2>
+            <p style={entryDescriptionStyle}>{entry.description[language]}</p>
+            {entry.highlights.length > 0 && (
+              <ul style={highlightListStyle}>
+                {entry.highlights.map((highlight, i) => (
+                  <li key={i} style={highlightRowStyle}>
+                    • {highlight[language]}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </article>
         ))}
       </div>
     </div>
@@ -92,24 +108,25 @@ const subtitleStyle: CSSProperties = {
   marginBottom: 28,
 };
 
-const versionStyle: CSSProperties = {
+const entryStyle: CSSProperties = {
   marginBottom: 30,
-  paddingBottom: 20,
+  paddingBottom: 22,
   borderBottom: `1px solid ${PALETTE.uiPanelBorder}`,
 };
 
-const versionHeaderStyle: CSSProperties = {
+const entryHeaderStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: 10,
-  marginBottom: 12,
+  marginBottom: 8,
 };
 
-const versionIdStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 18,
+const dateStyle: CSSProperties = {
+  fontSize: 11,
   fontWeight: 700,
-  color: PALETTE.gold,
+  letterSpacing: 0.4,
+  color: PALETTE.uiTextDim,
+  textTransform: "uppercase",
 };
 
 const latestBadgeStyle: CSSProperties = {
@@ -123,49 +140,44 @@ const latestBadgeStyle: CSSProperties = {
   color: "#0e2a0a",
 };
 
-const dateStyle: CSSProperties = {
-  fontSize: 11,
-  color: PALETTE.uiTextDim,
-};
-
-const itemListStyle: CSSProperties = {
-  listStyle: "none",
-  margin: 0,
-  padding: 0,
-  display: "flex",
-  flexDirection: "column",
-  gap: 8,
-};
-
-const itemRowStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "baseline",
-  gap: 8,
-  fontSize: 13,
-  lineHeight: 1.5,
-  flexWrap: "wrap",
-};
-
-const typeChipStyle: CSSProperties = {
+const categoryChipStyle: CSSProperties = {
+  marginLeft: "auto",
   flexShrink: 0,
-  fontSize: 9,
+  fontSize: 9.5,
   fontWeight: 800,
   letterSpacing: 0.6,
   textTransform: "uppercase",
-  padding: "1px 6px",
+  padding: "1px 7px",
   borderRadius: 4,
   border: "1px solid",
 };
 
-const categoryChipStyle: CSSProperties = {
-  flexShrink: 0,
-  fontSize: 9.5,
+const entryTitleStyle: CSSProperties = {
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 18,
   fontWeight: 700,
-  color: PALETTE.uiTextDim,
-  textTransform: "uppercase",
-  letterSpacing: 0.4,
+  color: PALETTE.gold,
+  margin: "0 0 8px",
 };
 
-const itemTextStyle: CSSProperties = {
+const entryDescriptionStyle: CSSProperties = {
+  fontSize: 13.5,
+  lineHeight: 1.55,
   color: PALETTE.uiText,
+  margin: "0 0 10px",
+};
+
+const highlightListStyle: CSSProperties = {
+  margin: 0,
+  padding: 0,
+  listStyle: "none",
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+
+const highlightRowStyle: CSSProperties = {
+  fontSize: 12.5,
+  lineHeight: 1.5,
+  color: PALETTE.uiTextDim,
 };

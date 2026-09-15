@@ -697,13 +697,6 @@ export const ptBR: TranslationSchema = {
     title: "NOVIDADES",
     subtitle: "Um registro real e honesto do que mudou em HORDENOVA — nada aqui é histórico inventado.",
     latest: "Mais recente",
-    types: {
-      NEW: "Novo",
-      CHANGE: "Alteração",
-      FIX: "Correção",
-      BALANCE: "Balanceamento",
-      REMOVAL: "Remoção",
-    },
     categories: {
       CONTENT: "Novos Conteúdos",
       FIXES: "Correções",
@@ -715,84 +708,6 @@ export const ptBR: TranslationSchema = {
       BOSSES: "Bosses",
       INTERFACE: "Interface",
       SYSTEMS: "Sistemas",
-    },
-    entries: {
-      v13: {
-        individualDifficulty: "O HP dos inimigos normais e Elite agora leva em conta uma leitura pequena e limitada da força real da sua própria conta (Níveis de Torre, Maestria, Especializações ativas) além da curva de dificuldade normal por onda — uma conta mais forte encontra inimigos um pouco mais duros, uma conta mais nova encontra inimigos um pouco mais fáceis, sempre dentro de uma faixa moderada. Isso nunca afeta o HP de Boss ou Mini-Boss, nunca vira um bônus de combate e nunca afeta recompensas.",
-        seasonProgressionTestReset: "Adicionada uma opção manual \"Resetar Progressão da Season\" na tela de Season para testadores: ela zera Best Wave, wave atual, Níveis de Torre/Maestria/Especialização e Gold, voltando a um início limpo. Gems, desbloqueios permanentes (ownership de Maestria/Especialização, slots de equipamento), skins, conquistas e Prestígio nunca são afetados, e sempre é pedida confirmação antes.",
-      },
-      v12: {
-        phaseWaveDisplay: "O HUD agora mostra seu progresso como \"FASE X — ONDA Y\" (ondas 1-10 por Fase, recomeçando a cada Fase) como a informação principal, com a onda global real mantida como informação secundária — apenas uma forma mais clara de ler o mesmo progresso, sem nenhuma mudança em fórmula de dificuldade ou recompensa.",
-        equipmentSlotGemUnlock: "Os Slots de Equipamento das torres agora têm um custo real de desbloqueio: o Slot 1 continua gratuito, o Slot 2 custa 250 Gemas e o Slot 3 custa 500 Gemas — uma compra única e permanente por tipo de torre que um Reset de Season nunca desfaz.",
-        itemFusion: "Adicionada a Fusão de Itens no Inventário: combine 3 itens da mesma raridade por uma chance de obter 1 item da raridade seguinte (40% em Comum, caindo drasticamente até 0,25% em Lendário). A falha destrói os 3 itens sem nenhuma compensação — não existe sistema de pity, e a chance nunca pode ser aumentada por nada.",
-      },
-      v11: {
-        miniBossEnrageForAll: "Corrigido: apenas Mini-Bosses do tipo Berserker conseguiam entrar em Enfurecido. Agora TODOS os Mini-Bosses entram em Enfurecido abaixo de 30% de HP, igual aos Bosses — e por isso todos também recebem corretamente o Escudo do Enfurecido (20% de redução de dano).",
-      },
-      v10: {
-        enrageShield: "Bosses e Mini-Bosses agora recebem um Escudo defensivo enquanto estão Enfurecidos: Bosses recebem 30% menos dano e Mini-Bosses 20% menos dano nesse estado, com um efeito visual claro (anel ao redor do inimigo + borda da barra de vida) que desaparece assim que o Enfurecido termina.",
-      },
-      v9: {
-        prestigeProfileDetail: "A aba de Estatísticas do Inventário agora mostra o Prestígio em detalhe: benefícios atuais, custo e ganho do próximo nível, e uma lista completa de progressão — tudo calculado ao vivo pelo sistema real, sem novos bônus ou mudança de preço.",
-      },
-      v8: {
-        gemShardRateCorrection: "Ajustada a quantidade de Fragmentos de Gema (Gem Shards) concedida ao derrotar Bosses e Mini-Bosses para uma taxa mais saudável no longo prazo de um jogo infinito — a conversão continua sendo 10 Fragmentos = 1 Gem.",
-      },
-      v7: {
-        executionerBudgetRetune: "Novo ajuste fino no caminho Executioner do Ironwood: sua vantagem contra chefes agora fica mais alinhada com os outros caminhos do Ironwood (Breaker/Vanguard), mantendo a identidade de especialista em chefes sem tornar as lutas triviais.",
-      },
-      v6: {
-        specializationSwitchVisible: "Corrigido \"Trocar Especialização\" não aparecendo no painel de informações da torre quando você já possuía 2 ou mais caminhos de especialização para aquele tipo de torre — a ação em si sempre funcionou, apenas não estava sendo exibida.",
-        executionerBossDamageCap: "Rebalanceado o bônus de dano contra chefes do caminho Executioner do Ironwood para parar de crescer sem limite em níveis de especialização muito altos — mantém as lutas contra chefes relevantes no fim de jogo para uma build Executioner bem investida.",
-        castleDamageScaling: "O dano ao Castelo quando um inimigo alcança sua base agora é uma porcentagem do HP máximo do próprio Castelo (10% Normal / 25% Mini-Boss / 50% Boss) que cresce suavemente com a progressão de waves, em vez de um número fixo que nunca mudava — waves iniciais são mais tranquilas, waves avançadas carregam peso real.",
-        towerRepositioning: "Agora você pode mover uma torre já construída para outro espaço de construção no mapa — 1 movimento grátis por dia, 200 Gems para movimentos adicionais no mesmo dia. Mover para o espaço de outra torre troca as duas de lugar.",
-        equipmentSlots: "Torres agora têm 3 Slots de Equipamento onde você pode equipar itens que já possui. Esta é a base para futuros equipamentos raros dropados por chefes — equipar ainda não altera o poder de combate.",
-      },
-      v5: {
-        homeRedesign: "A Home agora tem uma navegação superior real (Jogar/Season/Ranking/Wiki/Novidades) e uma seção de portal abaixo do hero com resumos ao vivo de Season, Ranking, Wiki e Novidades — não é mais uma tela única com sensação de vazia.",
-        rankingScreen: "Adicionada uma tela de Ranking dedicada mostrando seu próprio Season Score e Prestígio — marcada honestamente como indisponível sem servidor, nunca um ranking fabricado.",
-        seasonOverviewEnriched: "A tela de Season agora mostra Season Score, Bosses Derrotados, Melhor Fase, uma barra de progresso da season e seu tier de Prestígio junto às ações existentes de Jogar/Coleção.",
-        ambientMusicClickFix: "Reconstruído o pad ambiente da Home com harmônicos mais ricos e uma variação lenta de volume, e corrigido um clique/estalo audível ao parar ou mutar a música.",
-        enemyAnatomyPass: "Runner, Brute e Shieldbearer foram reconstruídos com anatomia real (pernas articuladas, braços, cabeça) — não reaproveitam mais um triângulo/elipse/polígono de escudo genérico.",
-        endgamePhaseNameFix: "Corrigido o nome da fase aparecendo como uma chave crua e não traduzida durante a rotação de bosses pós-wave-130.",
-      },
-      v4: {
-        rouletteAutoGrant: "A Roleta de marco de onda não concede mais sua recompensa automaticamente — agora ela espera, de forma visível, até você realmente girar.",
-        castleHpDrift: "Corrigido o HP do Castelo aumentando silenciosamente sem uma vitória real na Roleta por trás disso.",
-        gemConvertButton: "O botão de conversão de Fragmentos de Gema agora desativa corretamente quando você não tem Fragmentos suficientes para converter.",
-        ccResistanceTiers: "Chefes e Mini-Chefes não podem mais ser congelados ou desacelerados indefinidamente — o controle de grupo agora tem uma resistência real e escalonada que se recupera com o tempo.",
-        enemyHpBars: "Todo inimigo, incluindo Elites e Mini-Chefes, agora mostra uma barra de HP real.",
-        movementVfx: "Os inimigos agora mostram um efeito de movimento distinto por arquétipo — poeira, rastro de velocidade, névoa, sombra arrastada.",
-        towerSpacing: "As posições de construção de torres não podem mais se sobrepor — uma regra estrutural de espaçamento mínimo agora garante isso.",
-        miniBossRegenStall: "Corrigido um Mini-Chefe Regenerador cuja cura conseguia cancelar completamente um fogo sustentado fraco, fazendo seu HP parecer permanentemente travado — o dano agora sempre supera a regeneração sob fogo real e contínuo.",
-        gemsVsShards: "Gemas e Fragmentos de Gema agora são exibidos como duas estatísticas claramente separadas — uma recompensa de Fragmento não pode mais ser confundida com uma recompensa de Gema.",
-        homeWikiNovidades: "Adicionada uma Home de verdade com música ambiente, uma Wiki construída diretamente a partir dos dados reais do jogo, e esta tela de Novidades.",
-      },
-      v3: {
-        sfxSystem: "Adicionado um sistema completo de efeitos sonoros, com controles de volume e mudo.",
-        attackVfxRebuild: "Reconstruído o visual de ataque de cada torre em uma sequência distinta de antecipação/carga/impacto, em vez de um efeito genérico único.",
-        castleSkinArchitecture: "Adicionadas Skins de Castelo — puramente cosméticas, nunca afetando HP ou combate.",
-        goldSinkSaturation: "Corrigido o Ouro se acumulando sem nada mais para gastar após as torres serem melhoradas.",
-        frostbornPermafreeze: "Corrigido o efeito de Congelamento do Frostborn podendo travar um inimigo no lugar indefinidamente em certas condições.",
-      },
-      v2: {
-        persistentProgression: "Níveis de torre e ouro agora persistem entre sessões em vez de reiniciar na derrota.",
-        phasesAndBiomes: "Adicionadas múltiplas fases/biomas, cada uma com seus próprios arquétipos de inimigos.",
-        bossMiniBossSystem: "Adicionados encontros recorrentes de Chefe e Mini-Chefe com conjuntos de habilidades reais.",
-        itemSystem: "Adicionado um Sistema de Itens completo: níveis de raridade, tabelas reais de chance de drop e um inventário.",
-        ascensionSeasons: "Adicionada a Ascensão — um modo de temporada competitivo e cronometrado com recompensas cosméticas permanentes.",
-        rouletteRewards: "Adicionada a recompensa da Roleta de marco de onda.",
-        towerMastery: "Adicionada a Maestria da Torre — progressão contínua da torre além do limite de nível.",
-        sinkRegistries: "Adicionados sinks estruturados de Ouro e Gemas — incluindo o Prestígio de Perfil.",
-        specialAttacks: "Adicionado um Ataque Especial único para cada tipo de torre.",
-        towerSurvival: "As torres agora podem ser danificadas e temporariamente desativadas por ataques de cerco de chefes.",
-      },
-      v1: {
-        fourTowers: "Lançado com quatro torres: Ironwood, Inferno, Frostborn e Stormcaller.",
-        waveDefenseLoop: "Lançado o loop principal de defesa automática por ondas.",
-        languageSelector: "Adicionada a seleção de idioma Inglês / Português (Brasil).",
-        cinematicMenu: "Adicionado o menu principal cinematográfico.",
-      },
     },
   },
 };

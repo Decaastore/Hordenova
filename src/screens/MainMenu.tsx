@@ -30,10 +30,9 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
   const save = loadSave();
   const [hover, setHover] = useState(false);
   const [transitionAt, setTransitionAt] = useState<number | null>(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const status = useMemo(() => getAscensionStatus(), []);
   const latestPatch = PATCH_NOTES[0];
-  const latestPatchTeaserItem = latestPatch?.items[0];
 
   const handlePlay = () => {
     if (transitionAt !== null) return;
@@ -173,13 +172,9 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
           />
           <PortalCard
             icon={<ScrollIcon size={22} color={PALETTE.success} />}
-            eyebrow={latestPatch ? latestPatch.id : t("nav.novidades")}
+            eyebrow={latestPatch ? latestPatch.title[language] : t("nav.novidades")}
             title={t("menu.novidadesLink")}
-            body={
-              latestPatchTeaserItem
-                ? t(`novidades.entries.${latestPatch!.id}.${latestPatchTeaserItem.i18nKey}` as TranslationKey)
-                : t("novidades.subtitle")
-            }
+            body={latestPatch ? latestPatch.description[language] : t("novidades.subtitle")}
             cta={t("nav.novidades")}
             onClick={() => onNavigate("NOVIDADES")}
             accent={PALETTE.success}

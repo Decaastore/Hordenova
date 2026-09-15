@@ -74,11 +74,15 @@ function main() {
   console.log(
     "\nFor each commit above, decide: is this something a PLAYER would notice or care about\n" +
       "(new content, new system, balance change, economy change, a bug fix that affected\n" +
-      `players, a relevant UI change, new Season)? If yes, add ONE entry to ${PATCH_NOTES_PATH}\n` +
-      "(a new version block at the top, i18n text in en.ts + ptBR.ts) describing the REAL\n" +
-      "change in plain, honest, non-technical language — never the raw commit message.\n" +
-      "If nothing above is player-relevant, do not create an entry — see patchNotes.ts's\n" +
-      'own header: "Não inventar novidades."',
+      `players, a relevant UI change, new Season)? If several commits above are all part of\n` +
+      "the SAME piece of work, group them into ONE entry — never one entry per commit.\n" +
+      `If yes, add ONE new PatchNoteEntry at the top of PATCH_NOTES in ${PATCH_NOTES_PATH}\n` +
+      "(id, dateIso, category, title.{en,ptBR}, description.{en,ptBR}, highlights[].{en,ptBR})\n" +
+      "— that one file is the complete, single source of truth (both languages, no separate\n" +
+      "i18n file to touch) for both this screen and the Home teaser. Write plain, honest,\n" +
+      "non-technical language — never the raw commit message. If nothing above is player-\n" +
+      'relevant, do not create an entry — see patchNotes.ts\'s own header: "Não inventar\n' +
+      'novidades." See CLAUDE.md\'s "Novidades / Changelog" section for the full contract.',
   );
 }
 
