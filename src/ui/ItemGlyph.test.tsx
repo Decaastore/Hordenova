@@ -24,19 +24,19 @@ function render(itemDefinitionId: string, size?: number): { container: HTMLDivEl
  * hand-drawn category icon is the graceful fallback when it isn't (or the
  * file fails to load) — nothing ever renders broken or blank.
  *
- * mosswood_charm and hollow_sigil have real supplied artwork registered by
- * default (see itemAssets.ts); wardens_eye is still honestly empty, so the
- * manually-injected-registry scenarios below use it to stay independent of
- * whether any given item currently has real art.
+ * All 3 amulets have real supplied artwork registered by default (see
+ * itemAssets.ts); crown_of_the_hollow_king (the MYTHIC item) is still
+ * honestly empty, so the manually-injected-registry scenarios below use it
+ * to stay independent of whether any given item currently has real art.
  */
 describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
   afterEach(() => {
     // Never leak a test-only imageSrc into another test — the registry is a shared module singleton.
-    delete ITEM_VISUAL_ASSETS.wardens_eye!.imageSrc;
+    delete ITEM_VISUAL_ASSETS.crown_of_the_hollow_king!.imageSrc;
   });
 
   it("renders the fallback hand-drawn icon (no <img>) for an item with no real art registered", () => {
-    const { container } = render("wardens_eye");
+    const { container } = render("crown_of_the_hollow_king");
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).not.toBeNull();
   });
@@ -57,8 +57,7 @@ describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
     expect(container.querySelector("svg")).toBeNull();
   });
 
-  it("renders real artwork via <img> once one is registered for any item's visualAssetId", () => {
-    ITEM_VISUAL_ASSETS.wardens_eye!.imageSrc = "/items/amulets/wardens_eye.png";
+  it("renders wardens_eye's real supplied artwork via <img>, not the fallback icon", () => {
     const { container } = render("wardens_eye");
     const img = container.querySelector("img");
     expect(img).not.toBeNull();
@@ -66,9 +65,18 @@ describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
     expect(container.querySelector("svg")).toBeNull();
   });
 
+  it("renders real artwork via <img> once one is registered for any item's visualAssetId", () => {
+    ITEM_VISUAL_ASSETS.crown_of_the_hollow_king!.imageSrc = "/items/artifacts/crown_of_the_hollow_king.png";
+    const { container } = render("crown_of_the_hollow_king");
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe("/items/artifacts/crown_of_the_hollow_king.png");
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("falls back to the hand-drawn icon if the registered image fails to load (404), never leaving a broken image", () => {
-    ITEM_VISUAL_ASSETS.wardens_eye!.imageSrc = "/items/amulets/does-not-exist.png";
-    const { container } = render("wardens_eye");
+    ITEM_VISUAL_ASSETS.crown_of_the_hollow_king!.imageSrc = "/items/artifacts/does-not-exist.png";
+    const { container } = render("crown_of_the_hollow_king");
     const img = container.querySelector("img")!;
     act(() => img.dispatchEvent(new Event("error")));
     expect(container.querySelector("img")).toBeNull();
@@ -81,12 +89,12 @@ describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
   });
 
   it("real art never bakes in a rarity color — the wrapper's rarity border/glow applies identically with or without registered art", () => {
-    const withoutArt = render("wardens_eye", 48);
+    const withoutArt = render("crown_of_the_hollow_king", 48);
     const wrapperNoArt = withoutArt.container.firstElementChild as HTMLElement;
     const borderNoArt = wrapperNoArt.style.border;
 
-    ITEM_VISUAL_ASSETS.wardens_eye!.imageSrc = "/items/amulets/wardens_eye.png";
-    const withArt = render("wardens_eye", 48);
+    ITEM_VISUAL_ASSETS.crown_of_the_hollow_king!.imageSrc = "/items/artifacts/crown_of_the_hollow_king.png";
+    const withArt = render("crown_of_the_hollow_king", 48);
     const wrapperWithArt = withArt.container.firstElementChild as HTMLElement;
     expect(wrapperWithArt.style.border).toBe(borderNoArt);
   });

@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v19",
+    dateIso: "2026-09-16",
+    category: "ITEMS",
+    title: {
+      en: "Warden's Eye Gets Its Own Real Artwork — All 3 Amulets Now Complete",
+      ptBR: "Olho do Guardião Ganha Arte Própria Real — Os 3 Amuletos Agora Estão Completos",
+    },
+    description: {
+      en: "Warden's Eye now shows its own real picture instead of the generic Amulet icon: an ornate relic built around a supernatural eye, set in dark engraved metal with an elaborate chain — the most striking of the three amulets, fitting its Legendary rarity. With this, all 3 confirmed amulets (Mosswood Charm, Hollow Sigil, Warden's Eye) now have a fully distinct visual identity everywhere they appear: Inventory, tooltip, item details, and the Marketplace.",
+      ptBR: "O Olho do Guardião agora mostra sua própria imagem real em vez do ícone genérico de Amuleto: um relicário ornamentado construído em torno de um olho sobrenatural, cravado em metal escuro gravado com uma corrente elaborada — o mais impressionante dos três amuletos, à altura de sua raridade Lendária. Com isso, os 3 amuletos confirmados (Amuleto do Bosque Musgoso, Sigilo Oco, Olho do Guardião) agora têm identidade visual totalmente própria em todo lugar onde aparecem: Inventário, tooltip, detalhes do item e Marketplace.",
+    },
+    highlights: [
+      {
+        en: "Third and final confirmed amulet to use the per-item art pipeline — no new code was needed, just the artwork itself.",
+        ptBR: "Terceiro e último amuleto confirmado a usar o pipeline de arte por item — não foi preciso nenhum código novo, só a arte em si.",
+      },
+      {
+        en: "Rarity presentation (the colored border and glow) is still applied by the interface around the artwork, never baked into the picture itself.",
+        ptBR: "A apresentação de raridade (borda e brilho coloridos) continua sendo aplicada pela interface ao redor da arte, nunca embutida na própria imagem.",
+      },
+      {
+        en: "The game's single Mythic item, Crown of the Hollow King, is the next one still using a generic icon while its own artwork is prepared — nothing about its rarity, effects, or how it works has changed.",
+        ptBR: "O único item Mítico do jogo, a Coroa do Rei Oco, é o próximo ainda usando um ícone genérico enquanto sua própria arte é preparada — nada sobre sua raridade, efeitos ou funcionamento mudou.",
+      },
+    ],
+  },
+  {
     id: "v18",
     dateIso: "2026-09-16",
     category: "ITEMS",

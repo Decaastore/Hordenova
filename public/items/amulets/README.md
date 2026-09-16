@@ -1,12 +1,10 @@
 # Item art — amulets
 
-This folder holds the amulets' real artwork. `mosswood_charm.png` and
-`hollow_sigil.png` are real, user-supplied art already wired up (see
-`src/config/itemAssets.ts`); `wardens_eye.png` is still the empty,
-ready-to-receive slot the code already points at — no image-generation
-tool is available in the development environment this was built in, so
-that file has **not** been generated, and is not a placeholder standing in
-as real art.
+This folder holds the amulets' real artwork. All 3 confirmed amulets —
+`mosswood_charm.png`, `hollow_sigil.png`, and `wardens_eye.png` — are real,
+user-supplied art already wired up (see `src/config/itemAssets.ts`). The
+next item still needing its own art is the MYTHIC item, Crown of the
+Hollow King — see `public/items/artifacts/README.md`.
 
 Drop each file here with **exactly** this name, then set the matching
 `imageSrc` in `src/config/itemAssets.ts` (e.g.
