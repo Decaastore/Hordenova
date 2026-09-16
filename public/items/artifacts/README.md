@@ -1,13 +1,14 @@
 # Item art — artifacts
 
-This folder is where `crown_of_the_hollow_king`'s real artwork goes once it
-exists. No image-generation tool is available in the development
-environment this was built in, so this file has **not** been generated —
-this is the empty, ready-to-receive slot the code already points at (see
-`src/config/itemAssets.ts`), not a placeholder standing in as real art.
+This folder holds `crown_of_the_hollow_king.png` — real, user-supplied art
+already wired up (see `src/config/itemAssets.ts`). It was the last of the
+game's 4 fully-art'd items (the 3 confirmed amulets plus this MYTHIC one);
+only `warden_fragment` (MATERIAL) and `ancient_core` (RUNE) still fall back
+to a generic icon.
 
-Drop the file here as `crown_of_the_hollow_king.png`, then set
-`imageSrc: "/items/artifacts/crown_of_the_hollow_king.png"` on its entry in
+If a future artifact needs its own art, drop the file here with its own
+`<visualAssetId>.png` name, then set
+`imageSrc: "/items/artifacts/<visualAssetId>.png"` on its entry in
 `src/config/itemAssets.ts` — that one line is the only code change needed;
 `ItemGlyph` picks it up everywhere the item is shown (Inventory, tooltip,
 item modal, boss-drop banner, tower equipment, every Marketplace surface)

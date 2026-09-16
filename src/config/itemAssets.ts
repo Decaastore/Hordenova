@@ -50,17 +50,17 @@ export interface ItemVisualAsset {
 
 export const ITEM_VISUAL_ASSETS: Record<string, ItemVisualAsset> = {
   warden_fragment: {},
-  // AMULETOS — IDENTIDADE VISUAL DEFINITIVA. All 3 confirmed amulets now
-  // have their own real artwork, supplied by the user and matted to a
-  // transparent background (the source renders had an opaque near-black
-  // backdrop baked in, not real alpha) before landing here. The MYTHIC item
-  // (crown_of_the_hollow_king) still needs its own — see
-  // public/items/artifacts/README.md for its brief.
+  // AMULETOS + MÍTICO — IDENTIDADE VISUAL DEFINITIVA. All 3 confirmed
+  // amulets and the game's single MYTHIC item now have their own real
+  // artwork, supplied by the user and matted to a transparent background
+  // (every source render had an opaque near-black backdrop baked in, not
+  // real alpha) before landing here. Only ancient_core (a RUNE) and
+  // warden_fragment (a MATERIAL) still fall back to the generic icon.
   mosswood_charm: { imageSrc: "/items/amulets/mosswood_charm.png" },
   ancient_core: {},
   hollow_sigil: { imageSrc: "/items/amulets/hollow_sigil.png" },
   wardens_eye: { imageSrc: "/items/amulets/wardens_eye.png" },
-  crown_of_the_hollow_king: {},
+  crown_of_the_hollow_king: { imageSrc: "/items/artifacts/crown_of_the_hollow_king.png" },
 };
 
 export function getItemVisualAsset(visualAssetId: string): ItemVisualAsset {

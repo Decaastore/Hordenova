@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v20",
+    dateIso: "2026-09-16",
+    category: "ITEMS",
+    title: {
+      en: "Crown of the Hollow King Gets Its Own Real Artwork",
+      ptBR: "Coroa do Rei Oco Ganha Arte Própria Real",
+    },
+    description: {
+      en: "The game's single Mythic item, Crown of the Hollow King, now shows its own real picture instead of the generic Amulet icon: a corrupted royal crown of dark, gothic spikes and ornamental filigree, cracked open at its front — the most elaborate item in the game, fitting the rarest drop in the game (0.10% drop weight). With this, every one of Hordenova's 4 fully-identified items (Mosswood Charm, Hollow Sigil, Warden's Eye, and now Crown of the Hollow King) has its own distinct visual identity everywhere it can appear: Inventory, tooltip, item details, and the Marketplace.",
+      ptBR: "O único item Mítico do jogo, a Coroa do Rei Oco, agora mostra sua própria imagem real em vez do ícone genérico de Amuleto: uma coroa real corrompida, com espinhos góticos escuros e filigrana ornamental, rachada na frente — o item mais elaborado do jogo, à altura do drop mais raro do jogo (peso de 0.10% na drop table). Com isso, todos os 4 itens de HORDENOVA com identidade totalmente definida (Amuleto do Bosque Musgoso, Sigilo Oco, Olho do Guardião e agora a Coroa do Rei Oco) têm identidade visual própria em todo lugar onde podem aparecer: Inventário, tooltip, detalhes do item e Marketplace.",
+    },
+    highlights: [
+      {
+        en: "Fourth and final item, for now, to use the per-item art pipeline — no new code was needed, just the artwork itself.",
+        ptBR: "Quarto e último item, por enquanto, a usar o pipeline de arte por item — não foi preciso nenhum código novo, só a arte em si.",
+      },
+      {
+        en: "Rarity presentation (the colored border and glow) is still applied by the interface around the artwork, never baked into the picture itself.",
+        ptBR: "A apresentação de raridade (borda e brilho coloridos) continua sendo aplicada pela interface ao redor da arte, nunca embutida na própria imagem.",
+      },
+      {
+        en: "Nothing about the item's rarity, effect, drop chance, or tradability changed — purely a visual upgrade.",
+        ptBR: "Nada sobre a raridade, efeito, chance de drop ou negociabilidade do item mudou — puramente uma melhoria visual.",
+      },
+    ],
+  },
+  {
     id: "v19",
     dateIso: "2026-09-16",
     category: "ITEMS",
