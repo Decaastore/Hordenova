@@ -52,7 +52,31 @@ export interface BiomePalette {
   vignette: string;
 }
 
-export type AtmosphereKind = "MIST" | "EMBERS" | "SNOW" | "SANDSTORM" | "SPORES";
+/**
+ * The 5 original values (MIST/EMBERS/SNOW/SANDSTORM/SPORES) drive the
+ * ORIGINAL, unchanged drawAmbientParticles/drawFog formula in MapRenderer.ts
+ * — no visual regression for the 6 existing biomes. The 10 new values below
+ * (10-biome expansion) each get their own genuinely distinct particle
+ * motion (see MapRenderer.ts's ATMOSPHERE_MOTION table) instead of sharing
+ * one recolored shape — this is what makes `atmosphere` a real, read field
+ * instead of the write-only one it used to be.
+ */
+export type AtmosphereKind =
+  | "MIST"
+  | "EMBERS"
+  | "SNOW"
+  | "SANDSTORM"
+  | "SPORES"
+  | "STEAM"
+  | "SETTLING_DUST"
+  | "HIGH_WIND"
+  | "SUNDUST"
+  | "MINERAL_GLINT"
+  | "DEEP_FOG"
+  | "ASH"
+  | "LUMINOUS_SPORES"
+  | "INCENSE_SMOKE"
+  | "SEA_SPRAY";
 
 export interface BiomeDefinition {
   id: string;

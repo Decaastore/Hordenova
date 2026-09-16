@@ -125,6 +125,124 @@ export const MAIN_BOSSES: Record<string, BossDefinition> = {
     abilityIntervalMs: 6000,
     resistance: 0.2,
   }),
+
+  // -------------------------------------------------------------------
+  // 10-biome expansion (waves 131-330) — one main boss per new phase,
+  // each the "elder/ascended" form of that biome's own mini-boss creature
+  // (see MINI_BOSSES below and rendering/biomeCreatures for the single
+  // shared bespoke body each pair renders through). Continues the exact
+  // same hpMultiplierVsBrute/goldReward growth trend the 6 boss above
+  // already establish — no new mechanic, no core formula touched.
+  // -------------------------------------------------------------------
+  "iron-burrower-sovereign": boss({
+    id: "iron-burrower-sovereign",
+    i18nKey: "IRON_BURROWER_SOVEREIGN",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 25.5,
+    speed: 25,
+    goldReward: 950,
+    ability: "SHIELD",
+    abilityIntervalMs: 8000,
+    resistance: 0.15,
+  }),
+  "ancestral-colossus": boss({
+    id: "ancestral-colossus",
+    i18nKey: "ANCESTRAL_COLOSSUS",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 27,
+    speed: 30,
+    goldReward: 1100,
+    ability: "BERSERKER",
+    abilityIntervalMs: 6000,
+    resistance: 0.1,
+  }),
+  "aether-drake-elder": boss({
+    id: "aether-drake-elder",
+    i18nKey: "AETHER_DRAKE_ELDER",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 28.5,
+    speed: 34,
+    goldReward: 1280,
+    ability: "SUMMON",
+    abilityIntervalMs: 7000,
+    resistance: 0.1,
+  }),
+  "raithar-ascendant": boss({
+    id: "raithar-ascendant",
+    i18nKey: "RAITHAR_ASCENDANT",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 30,
+    speed: 26,
+    goldReward: 1480,
+    ability: "REGEN",
+    regenPercentPerSecond: 0.015,
+    resistance: 0.15,
+  }),
+  "crystal-behemoth-prime": boss({
+    id: "crystal-behemoth-prime",
+    i18nKey: "CRYSTAL_BEHEMOTH_PRIME",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 31.5,
+    speed: 27,
+    goldReward: 1700,
+    ability: "DISABLE",
+    abilityIntervalMs: 6500,
+    resistance: 0.15,
+  }),
+  "abyssal-warden-eternal": boss({
+    id: "abyssal-warden-eternal",
+    i18nKey: "ABYSSAL_WARDEN_ETERNAL",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 33,
+    speed: 24,
+    goldReward: 1950,
+    ability: "NONE",
+    resistance: 0.25,
+  }),
+  "ashen-colossus-forsaken": boss({
+    id: "ashen-colossus-forsaken",
+    i18nKey: "ASHEN_COLOSSUS_FORSAKEN",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 34.5,
+    speed: 27,
+    goldReward: 2230,
+    ability: "DISABLE",
+    abilityIntervalMs: 6000,
+    resistance: 0.15,
+  }),
+  "moonroot-matriarch-elder": boss({
+    id: "moonroot-matriarch-elder",
+    i18nKey: "MOONROOT_MATRIARCH_ELDER",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 36,
+    speed: 26,
+    goldReward: 2550,
+    ability: "SUMMON",
+    abilityIntervalMs: 5500,
+    resistance: 0.1,
+  }),
+  "cathedral-abomination-apex": boss({
+    id: "cathedral-abomination-apex",
+    i18nKey: "CATHEDRAL_ABOMINATION_APEX",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 37.5,
+    speed: 28,
+    goldReward: 2900,
+    ability: "BERSERKER",
+    abilityIntervalMs: 6000,
+    resistance: 0.2,
+  }),
+  "leviathan-elder": boss({
+    id: "leviathan-elder",
+    i18nKey: "LEVIATHAN_ELDER",
+    isMainBoss: true,
+    hpMultiplierVsBrute: 39,
+    speed: 30,
+    goldReward: 3300,
+    ability: "REGEN",
+    regenPercentPerSecond: 0.018,
+    resistance: 0.15,
+  }),
 };
 
 export const DEFAULT_MAIN_BOSS_ID = "hollow-warden";
@@ -204,6 +322,121 @@ export const MINI_BOSSES: Record<string, BossDefinition> = {
     abilityIntervalMs: 6000,
     resistance: 0.15,
   }),
+
+  // -------------------------------------------------------------------
+  // 10-biome expansion — one mini-boss per new phase, pinned to its own
+  // phase via PhaseDefinition.miniBossId (see getMiniBossIdForWave) so it
+  // always belongs to its own biome instead of the global roster rotation.
+  // -------------------------------------------------------------------
+  "iron-burrower": boss({
+    id: "iron-burrower",
+    i18nKey: "IRON_BURROWER",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 6.5,
+    speed: 28,
+    goldReward: 80,
+    ability: "SHIELD",
+    abilityIntervalMs: 6500,
+    resistance: 0.15,
+  }),
+  "colossus-spawn": boss({
+    id: "colossus-spawn",
+    i18nKey: "COLOSSUS_SPAWN",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 7,
+    speed: 38,
+    goldReward: 85,
+    ability: "BERSERKER",
+    abilityIntervalMs: 6000,
+    resistance: 0.15,
+  }),
+  "aether-drake": boss({
+    id: "aether-drake",
+    i18nKey: "AETHER_DRAKE",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 7.5,
+    speed: 42,
+    goldReward: 90,
+    ability: "SUMMON",
+    abilityIntervalMs: 5500,
+    resistance: 0.15,
+  }),
+  raithar: boss({
+    id: "raithar",
+    i18nKey: "RAITHAR",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 8,
+    speed: 30,
+    goldReward: 95,
+    ability: "REGEN",
+    regenPercentPerSecond: 0.02,
+    resistance: 0.15,
+  }),
+  "crystal-behemoth": boss({
+    id: "crystal-behemoth",
+    i18nKey: "CRYSTAL_BEHEMOTH",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 8.5,
+    speed: 26,
+    goldReward: 100,
+    ability: "DISABLE",
+    abilityIntervalMs: 5000,
+    resistance: 0.15,
+  }),
+  "abyssal-warden": boss({
+    id: "abyssal-warden",
+    i18nKey: "ABYSSAL_WARDEN",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 9,
+    speed: 24,
+    goldReward: 105,
+    ability: "NONE",
+    resistance: 0.15,
+  }),
+  "ashen-colossus": boss({
+    id: "ashen-colossus",
+    i18nKey: "ASHEN_COLOSSUS",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 9.5,
+    speed: 30,
+    goldReward: 110,
+    ability: "DISABLE",
+    abilityIntervalMs: 5200,
+    resistance: 0.15,
+  }),
+  "moonroot-matriarch": boss({
+    id: "moonroot-matriarch",
+    i18nKey: "MOONROOT_MATRIARCH",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 10,
+    speed: 28,
+    goldReward: 115,
+    ability: "SUMMON",
+    abilityIntervalMs: 5000,
+    resistance: 0.15,
+  }),
+  "cathedral-abomination": boss({
+    id: "cathedral-abomination",
+    i18nKey: "CATHEDRAL_ABOMINATION",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 10.5,
+    speed: 32,
+    goldReward: 120,
+    ability: "BERSERKER",
+    abilityIntervalMs: 5800,
+    resistance: 0.15,
+  }),
+  "leviathan-spawn": boss({
+    id: "leviathan-spawn",
+    i18nKey: "LEVIATHAN_SPAWN",
+    isMainBoss: false,
+    hpMultiplierVsBrute: 11,
+    speed: 28,
+    goldReward: 125,
+    ability: "REGEN",
+    regenPercentPerSecond: 0.022,
+    resistance: 0.15,
+  }),
 };
 
 /** Deterministic rotation — no RNG, matches this codebase's existing seeded/deterministic wave-composition style. */
@@ -216,7 +449,16 @@ const MINI_BOSS_ROSTER: readonly string[] = [
   "ferocious-berserker",
 ];
 
+/**
+ * 10-biome expansion: a phase can pin its own mini-boss (PhaseDefinition
+ * .miniBossId) so the biome's own creature shows up instead of whichever
+ * unrelated archetype the global rotation lands on. Every hand-authored
+ * phase before this expansion, and the endgame rotation, leave miniBossId
+ * unset — they keep the exact original global-rotation result.
+ */
 export function getMiniBossIdForWave(waveNumber: number): string {
+  const pinned = getPhaseForWave(waveNumber).miniBossId;
+  if (pinned) return pinned;
   return MINI_BOSS_ROSTER[waveNumber % MINI_BOSS_ROSTER.length]!;
 }
 

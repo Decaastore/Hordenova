@@ -7,6 +7,7 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
+import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
 
 /** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
 const TOWER_MAX_GROWTH = 0.35;
@@ -1602,11 +1603,22 @@ export function drawEnemy(
 
   ctx.save();
   ctx.rotate(angle);
+  // 10-biome expansion — a bossId registered in BOSS_CREATURE_RENDERERS
+  // (rendering/biomeCreatures/) gets its own bespoke shared mini/main body
+  // instead of the universal Colossus; any bossId NOT registered there
+  // (every one of the original 6 biomes) falls straight through to the
+  // exact original drawMainBossColossus/drawMiniBossColossus calls below —
+  // zero visual change for existing content.
+  const customBossCreature = enemy.boss ? BOSS_CREATURE_RENDERERS[enemy.boss.bossId] : undefined;
   if (enemy.boss?.isMainBoss) {
     // CHEFE MAIOR — "Void Colossus" identity replaces the old scaled-up
     // Brute body for every MAIN boss. Colored per biome/boss via
     // `bossColor` rather than ENEMY_THEME's fixed BRUTE palette.
-    drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+    if (customBossCreature) {
+      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MAIN");
+    } else {
+      drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+    }
   } else if (enemy.boss) {
     // MINI CHEFE — "Void Colossus, Jr." (see drawMiniBossColossus's own doc
     // comment): a deliberately simplified/smaller build of the EXACT SAME
@@ -1614,37 +1626,46 @@ export function drawEnemy(
     // this replaces was a completely unrelated humanoid-with-a-shield —
     // the "mini boss doesn't even look related to the main boss" bug this
     // fixes). Same per-biome `bossColor`, same real enrage/hp reads.
-    drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+    if (customBossCreature) {
+      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MINI");
+    } else {
+      drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
+    }
   } else {
-    switch (enemy.type) {
-      case "CRAWLER":
-        drawCrawler(ctx, theme, timeMs, hitFlashMs);
-        break;
-      case "RUNNER":
-        drawRunner(ctx, theme, timeMs);
-        break;
-      case "BRUTE":
-        drawBrute(ctx, theme, timeMs);
-        break;
-      case "SHIELDBEARER":
-        drawShieldbearer(ctx, theme, timeMs);
-        break;
-      // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
-      // Progression archetype now has its own bespoke silhouette (see their
-      // draw* functions' own doc comments) instead of reusing one of the
-      // original 4 shapes with just a different theme color/scale.
-      case "SWARMLING":
-        drawSwarmling(ctx, theme, timeMs);
-        break;
-      case "REGENERATOR":
-        drawRegenerator(ctx, theme, timeMs);
-        break;
-      case "IRONCLAD":
-        drawIronclad(ctx, theme);
-        break;
-      case "DISABLER":
-        drawDisabler(ctx, theme, timeMs);
-        break;
+    const customEnemy = NEW_ENEMY_RENDERERS[enemy.type];
+    if (customEnemy) {
+      customEnemy(ctx, theme, timeMs, hitFlashMs);
+    } else {
+      switch (enemy.type) {
+        case "CRAWLER":
+          drawCrawler(ctx, theme, timeMs, hitFlashMs);
+          break;
+        case "RUNNER":
+          drawRunner(ctx, theme, timeMs);
+          break;
+        case "BRUTE":
+          drawBrute(ctx, theme, timeMs);
+          break;
+        case "SHIELDBEARER":
+          drawShieldbearer(ctx, theme, timeMs);
+          break;
+        // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
+        // Progression archetype now has its own bespoke silhouette (see their
+        // draw* functions' own doc comments) instead of reusing one of the
+        // original 4 shapes with just a different theme color/scale.
+        case "SWARMLING":
+          drawSwarmling(ctx, theme, timeMs);
+          break;
+        case "REGENERATOR":
+          drawRegenerator(ctx, theme, timeMs);
+          break;
+        case "IRONCLAD":
+          drawIronclad(ctx, theme);
+          break;
+        case "DISABLER":
+          drawDisabler(ctx, theme, timeMs);
+          break;
+      }
     }
   }
   ctx.restore();

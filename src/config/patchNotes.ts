@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v22",
+    dateIso: "2026-09-16",
+    category: "CONTENT",
+    title: {
+      en: "10 New Worlds — Dwarven Undercity, Floating Isles, Leviathan Coast, and More",
+      ptBR: "10 Novos Mundos — Cidade Subterrânea dos Anões, Ilhas Flutuantes, Península dos Leviatãs e Mais",
+    },
+    description: {
+      en: "The journey now keeps going well past the Abyss: 10 brand-new biomes (waves 131-330), each with its own scenery, lighting, and atmosphere, and each home to its own exclusive cast of creatures that never show up anywhere else — an abandoned dwarven mining city, a graveyard of ancient colossi, floating sky islands, a buried sun temple, a sea of giant crystal, a fortress built inside a bottomless chasm, an ash-covered wasteland, a nocturnal moonlit garden, a shattered gothic cathedral, and a rocky coast littered with leviathan bones. Every one of the 30 new creatures and 10 new mini-boss/boss pairs is a genuinely original design (new anatomy, new silhouette, new materials) — nothing here is a recolored or resized version of an existing enemy.",
+      ptBR: "A jornada agora continua bem além do Abismo: 10 biomas totalmente novos (ondas 131-330), cada um com cenário, iluminação e atmosfera próprios, e cada um com seu próprio elenco exclusivo de criaturas que não aparecem em nenhum outro lugar — uma cidade mineradora anã abandonada, um cemitério de colossos antigos, ilhas celestes flutuantes, um templo solar soterrado, um mar de cristal gigante, uma fortaleza erguida dentro de um abismo sem fundo, um deserto de cinzas, um jardim noturno sob a lua, uma catedral gótica em ruínas e uma costa rochosa coberta de ossos de leviatãs. Cada uma das 30 novas criaturas e dos 10 novos pares de mini-chefe/chefe é um design genuinamente original (nova anatomia, nova silhueta, novos materiais) — nada aqui é uma versão recolorida ou redimensionada de um inimigo já existente.",
+    },
+    highlights: [
+      {
+        en: "10 new biomes with their own palette, lighting, and ambient particle effects (steam, ash, sea spray, luminous spores, and more), each with a distinct decoration set.",
+        ptBR: "10 novos biomas com paleta, iluminação e efeitos de partículas ambientais próprios (vapor, cinzas, respingos do mar, esporos luminosos e mais), cada um com um conjunto de decorações distinto.",
+      },
+      {
+        en: "30 new exclusive creatures (3 per biome) with hand-built anatomy and movement — including several true fliers with their own altitude bob and ground shadow.",
+        ptBR: "30 novas criaturas exclusivas (3 por bioma) com anatomia e movimento próprios — incluindo diversos voadores de verdade, com seu próprio balanço de altitude e sombra no chão.",
+      },
+      {
+        en: "10 new mini-bosses (Iron Burrower, Colossus Spawn, Aether Drake, Raithar, Crystal Behemoth, Abyssal Warden, Ashen Colossus, Moonroot Matriarch, Cathedral Abomination, Leviathan Spawn) and 10 matching main bosses — each biome's mini-boss and boss now share their own bespoke body instead of the generic Colossus look.",
+        ptBR: "10 novos mini-chefes (Perfurador de Ferro, Cria do Colosso, Dragão do Éter, Raithar, Behemoth de Cristal, Guardião Abissal, Colosso Cinzento, Matriarca Raiz-da-Lua, Abominação da Catedral, Cria do Leviatã) e 10 chefes principais correspondentes — o mini-chefe e o chefe de cada bioma agora compartilham um corpo próprio, em vez do visual genérico do Colosso.",
+      },
+      {
+        en: "Every new biome's mini-boss now always belongs to its own biome instead of the old global mini-boss rotation.",
+        ptBR: "O mini-chefe de cada novo bioma agora sempre pertence ao seu próprio bioma, em vez da antiga rotação global de mini-chefes.",
+      },
+      {
+        en: "No change to Gold, Gems, Prestige, Mastery, Specialization, or tower balance — this is new scenery and new enemies only.",
+        ptBR: "Nenhuma mudança em Gold, Gemas, Prestígio, Maestria, Especialização ou balanceamento de torres — isto é apenas cenário e inimigos novos.",
+      },
+    ],
+  },
+  {
     id: "v21",
     dateIso: "2026-09-16",
     category: "SYSTEMS",

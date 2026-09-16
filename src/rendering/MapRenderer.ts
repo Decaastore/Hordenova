@@ -5,7 +5,7 @@ import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
 import { drawEnergyCrack, drawFloatingMotes } from "./lighting";
-import type { BiomeDefinition } from "./biomes";
+import type { AtmosphereKind, BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration, type DecorationKind } from "./mapDecorations";
 
 /**
@@ -1464,14 +1464,24 @@ export function drawDistantSilhouettes(ctx: CanvasRenderingContext2D, timeMs: nu
   ctx.restore();
 }
 
+/**
+ * 10-biome expansion — DEEP_FOG (Fortaleza Abissal) gets bigger, darker,
+ * slower-rolling blobs instead of the original 3-blob drift; every other
+ * atmosphere (the 5 original values + the other 9 new ones) keeps the exact
+ * original fog formula unchanged, since fog itself is a background-wash
+ * effect that doesn't need per-atmosphere variety the way foreground
+ * particles do (see drawAmbientParticles below for the real per-biome
+ * distinction).
+ */
 export function drawFog(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
+  const deep = biome.atmosphere === "DEEP_FOG";
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   for (let i = 0; i < 3; i++) {
-    const t = timeMs / 22000 + i * 3.1;
+    const t = timeMs / (deep ? 34000 : 22000) + i * 3.1;
     const x = (Math.sin(t) * 0.5 + 0.5) * WORLD_SIZE.width;
     const y = 100 + i * 170 + Math.cos(t * 0.7) * 40;
-    const radius = 240;
+    const radius = deep ? 340 : 240;
     const gradient = ctx.createRadialGradient(x, y, 0, x, y, radius);
     gradient.addColorStop(0, biome.palette.fogColor);
     gradient.addColorStop(1, "rgba(0,0,0,0)");
@@ -1491,16 +1501,119 @@ const ambientMoteSeeds = Array.from({ length: AMBIENT_MOTE_COUNT }, (_, i) => ({
   phase: i,
 }));
 
+interface MoteFrame {
+  x: number;
+  y: number;
+  alpha: number;
+  size: number;
+  /** True to draw a short streak (a line, for wind/spray) instead of a dot. */
+  streak?: boolean;
+}
+
+type MoteSeed = (typeof ambientMoteSeeds)[number];
+
+/** The ORIGINAL, unmodified formula — every one of the 5 original AtmosphereKind values (and any future one not listed in ATMOSPHERE_MOTION below) still resolves here, so the 6 existing biomes render byte-for-byte as before. */
+function defaultMoteFrame(mote: MoteSeed, timeMs: number): MoteFrame {
+  const y = (mote.baseY - (timeMs / 1000) * mote.speed) % WORLD_SIZE.height;
+  const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
+  const x = mote.baseX + Math.sin(timeMs / 2000 + mote.phase) * 12;
+  const alpha = 0.18 + 0.18 * Math.sin(timeMs / 1500 + mote.phase * 2);
+  return { x, y: wrappedY, alpha: Math.max(alpha, 0.05), size: 1.4 };
+}
+
+/** Downward drift with side-to-side sway — shared shape for snow-like/ash-like/dust-like "falling" atmospheres. */
+function fallingMoteFrame(mote: MoteSeed, timeMs: number, swayPx: number, alphaBase: number, alphaAmp: number, size: number): MoteFrame {
+  const y = (mote.baseY + (timeMs / 1000) * mote.speed) % WORLD_SIZE.height;
+  const x = mote.baseX + Math.sin(timeMs / 1800 + mote.phase) * swayPx;
+  const alpha = alphaBase + alphaAmp * Math.sin(timeMs / 1200 + mote.phase * 1.7);
+  return { x, y, alpha: Math.max(alpha, 0.03), size };
+}
+
+/**
+ * 10-biome expansion — ONE genuinely distinct motion per new atmosphere,
+ * built from the SAME fixed mote-seed array (still AMBIENT_MOTE_COUNT=22,
+ * still zero per-frame allocation) — reads as a different weather/particle
+ * identity per biome instead of the same recolored mote for everything.
+ */
+const ATMOSPHERE_MOTION: Partial<Record<AtmosphereKind, (mote: MoteSeed, timeMs: number) => MoteFrame>> = {
+  // CIDADE SUBTERRÂNEA — rising steam puffs from forges, with the occasional
+  // brighter spark riding on top (every 7th mote reads as a spark instead).
+  STEAM: (mote, timeMs) => {
+    const y = (mote.baseY - (timeMs / 1000) * (mote.speed * 1.4)) % WORLD_SIZE.height;
+    const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
+    const x = mote.baseX + Math.sin(timeMs / 900 + mote.phase) * 6;
+    const isSpark = mote.phase % 7 === 0;
+    const alpha = isSpark ? 0.35 + 0.35 * Math.sin(timeMs / 300 + mote.phase) : 0.12 + 0.14 * Math.sin(timeMs / 2200 + mote.phase);
+    return { x, y: wrappedY, alpha: Math.max(alpha, 0.04), size: isSpark ? 1 : 2.6 };
+  },
+  // CEMITÉRIO DOS COLOSSOS — heavy, slow-settling bone dust; barely drifts.
+  SETTLING_DUST: (mote, timeMs) => fallingMoteFrame(mote, timeMs * 0.35, 5, 0.08, 0.06, 1.6),
+  // ILHAS FLUTUANTES — fast diagonal wind streaks (drawn as short lines, not dots).
+  HIGH_WIND: (mote, timeMs) => {
+    const t = timeMs / 1000;
+    const x = (mote.baseX + t * (mote.speed * 9)) % WORLD_SIZE.width;
+    const y = (mote.baseY + t * (mote.speed * 3)) % WORLD_SIZE.height;
+    return { x, y, alpha: 0.14 + 0.1 * Math.sin(timeMs / 900 + mote.phase), size: 10, streak: true };
+  },
+  // TEMPLO SOLAR PERDIDO — slow-falling motes lit warm, catching light.
+  SUNDUST: (mote, timeMs) => fallingMoteFrame(mote, timeMs, 10, 0.1, 0.16, 1.3),
+  // MAR DE CRISTAL — near-static twinkling facets; brief flash-alpha spikes.
+  MINERAL_GLINT: (mote, timeMs) => {
+    const flash = Math.pow(Math.max(0, Math.sin(timeMs / 700 + mote.phase * 2.3)), 6);
+    return { x: mote.baseX, y: mote.baseY, alpha: 0.08 + flash * 0.7, size: 1.1 + flash * 1.4 };
+  },
+  // FORTALEZA ABISSAL — sparse, dim motes (the real atmosphere work here is drawFog's DEEP_FOG branch).
+  DEEP_FOG: (mote, timeMs) => ({
+    x: mote.baseX + Math.sin(timeMs / 3000 + mote.phase) * 8,
+    y: (mote.baseY - (timeMs / 1000) * (mote.speed * 0.3)) % WORLD_SIZE.height,
+    alpha: 0.06 + 0.05 * Math.sin(timeMs / 2600 + mote.phase),
+    size: 1.2,
+  }),
+  // VALE DAS CINZAS MORTAS — irregular gray ash flakes falling, more sway than snow.
+  ASH: (mote, timeMs) => fallingMoteFrame(mote, timeMs, 16, 0.12, 0.1, 1.8),
+  // JARDINS DA LUA — gentle upward-floating luminous motes, slow strong pulse.
+  LUMINOUS_SPORES: (mote, timeMs) => {
+    const y = (mote.baseY - (timeMs / 1000) * (mote.speed * 0.5)) % WORLD_SIZE.height;
+    const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
+    const x = mote.baseX + Math.sin(timeMs / 2400 + mote.phase) * 14;
+    const alpha = 0.15 + 0.25 * (0.5 + 0.5 * Math.sin(timeMs / 1100 + mote.phase * 1.3));
+    return { x, y: wrappedY, alpha, size: 1.6 };
+  },
+  // CATEDRAL PROFANADA — thin upward smoke wisps swaying through broken light shafts.
+  INCENSE_SMOKE: (mote, timeMs) => {
+    const y = (mote.baseY - (timeMs / 1000) * (mote.speed * 0.8)) % WORLD_SIZE.height;
+    const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
+    const x = mote.baseX + Math.sin(timeMs / 1500 + mote.phase) * 20;
+    return { x, y: wrappedY, alpha: 0.1 + 0.08 * Math.sin(timeMs / 1900 + mote.phase), size: 2.2 };
+  },
+  // PENÍNSULA DOS LEVIATÃS — parabolic spray arcs (up then down) instead of a straight drift.
+  SEA_SPRAY: (mote, timeMs) => {
+    const cycle = ((timeMs / 1000) * (mote.speed * 0.6) + mote.phase * 13) % 100;
+    const arcT = cycle / 100;
+    const x = mote.baseX + arcT * 40 - 20;
+    const y = mote.baseY - Math.sin(arcT * Math.PI) * 30;
+    const alpha = 0.12 + 0.22 * Math.sin(arcT * Math.PI);
+    return { x, y, alpha: Math.max(alpha, 0.03), size: 1.5 };
+  },
+};
+
 export function drawAmbientParticles(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, timeMs: number): void {
+  const motion = ATMOSPHERE_MOTION[biome.atmosphere] ?? defaultMoteFrame;
   ctx.save();
   for (const mote of ambientMoteSeeds) {
-    const y = (mote.baseY - (timeMs / 1000) * mote.speed) % WORLD_SIZE.height;
-    const wrappedY = y < 0 ? y + WORLD_SIZE.height : y;
-    const x = mote.baseX + Math.sin(timeMs / 2000 + mote.phase) * 12;
-    const alpha = 0.18 + 0.18 * Math.sin(timeMs / 1500 + mote.phase * 2);
-    ctx.fillStyle = hexToRgba(biome.palette.vegetationHighlight, Math.max(alpha, 0.05));
+    const frame = motion(mote, timeMs);
+    ctx.fillStyle = hexToRgba(biome.palette.vegetationHighlight, frame.alpha);
+    if (frame.streak) {
+      ctx.strokeStyle = hexToRgba(biome.palette.vegetationHighlight, frame.alpha);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(frame.x - frame.size, frame.y - frame.size * 0.35);
+      ctx.lineTo(frame.x, frame.y);
+      ctx.stroke();
+      continue;
+    }
     ctx.beginPath();
-    ctx.arc(x, wrappedY, 1.4, 0, Math.PI * 2);
+    ctx.arc(frame.x, frame.y, frame.size, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

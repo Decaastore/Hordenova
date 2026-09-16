@@ -45,10 +45,72 @@ function tierWeightsForWave(waveNumber: number): EnemyWeights {
   };
 }
 
+/** The 8 archetypes `tierWeightsForWave` actually knows about — every hand-authored phase (1-130) and the endgame rotation reuse this exact roster (FULL_POOL in phaseConfig.ts). */
+const ORIGINAL_ROSTER = new Set<EnemyType>([
+  "CRAWLER",
+  "RUNNER",
+  "BRUTE",
+  "SHIELDBEARER",
+  "SWARMLING",
+  "REGENERATOR",
+  "IRONCLAD",
+  "DISABLER",
+]);
+
+/**
+ * 10-biome expansion — each new phase's enemyPool is EXCLUSIVELY 3 brand
+ * new archetypes with no overlap with ORIGINAL_ROSTER at all, so
+ * `tierWeightsForWave` (which only ever assigns weight to the original 8
+ * names) always restricts down to an empty set for these phases. Without
+ * this function that would silently hit the old safety net and spawn
+ * nothing but CRAWLER for the entire phase — the new creatures would be
+ * registered, drawn, and balanced, but structurally unreachable in real
+ * play. This builds an equivalent escalating-ramp weighting directly from
+ * the phase's OWN pool (index 0 = lightest/most common archetype, higher
+ * indices = heavier), the same "start narrow, widen as the phase
+ * progresses" shape `tierWeightsForWave` uses for the original 8, without
+ * hardcoding any archetype name.
+ */
+function weightsForExclusivePool(pool: readonly EnemyType[], waveNumber: number, phaseStartWave: number, tag: ReturnType<typeof getWaveTag>): EnemyWeights {
+  if (tag === "SWARM") {
+    // No SWARMLING equivalent exists per new biome — a Swarm wave here is
+    // instead a heavy concentration of the pool's lightest archetype
+    // (index 0) with a thin backbone of the rest, the same "mostly one
+    // cheap type" shape the original SWARM branch uses.
+    const weights: EnemyWeights = { [pool[0]!]: 3 };
+    for (let i = 1; i < pool.length; i++) weights[pool[i]!] = 0.3;
+    return weights;
+  }
+
+  const progress = Math.min(1, Math.max(0, waveNumber - phaseStartWave) / 19);
+  const weights: EnemyWeights = {};
+  for (let i = 0; i < pool.length; i++) {
+    const unlockPoint = i / pool.length; // archetype i "unlocks" at this fraction of the 20-wave phase
+    if (progress < unlockPoint) continue;
+    weights[pool[i]!] = 0.4 + i * 0.3 + progress * 0.3; // heavier archetypes grow in share as the phase progresses
+  }
+  if (Object.keys(weights).length === 0) weights[pool[0]!] = 1; // safety net — never return an empty pool
+  // generateWaveSpawns picks via `roll <= cumulative` with roll in [0,1) —
+  // every weight table it consumes must sum to (about) 1, exactly like
+  // tierWeightsForWave's own hand-tuned bands do, or entries past that
+  // point in cumulative order become mathematically unreachable (a real
+  // bug this normalization fixes — see waveConfig.test.ts's regression
+  // contract for the exact failure it caught).
+  const total = Object.values(weights).reduce((sum, w) => sum + (w ?? 0), 0);
+  for (const type of Object.keys(weights) as EnemyType[]) weights[type] = weights[type]! / total;
+  return weights;
+}
+
 /** Restricts + renormalizes tier weights to whatever archetypes the current phase's pool allows. */
 function weightsForWave(waveNumber: number): EnemyWeights {
-  const pool = new Set(getPhaseForWave(waveNumber).enemyPool);
+  const phase = getPhaseForWave(waveNumber);
   const tag = getWaveTag(waveNumber);
+
+  if (!phase.enemyPool.some((type) => ORIGINAL_ROSTER.has(type))) {
+    return weightsForExclusivePool(phase.enemyPool, waveNumber, phase.startWave, tag);
+  }
+
+  const pool = new Set(phase.enemyPool);
 
   if (tag === "SWARM" && pool.has("SWARMLING")) {
     // A Swarm wave is mostly Swarmlings with a thin backbone of whatever

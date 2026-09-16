@@ -25,6 +25,16 @@ export interface PhaseDefinition {
   /** The phase's last wave — also its main-boss wave. */
   endWave: number;
   mainBossId: string;
+  /**
+   * 10-biome expansion — when set, every mini-boss wave in THIS phase spawns
+   * this specific mini-boss id instead of the global MINI_BOSS_ROSTER
+   * rotation (config/bossConfig.ts's getMiniBossIdForWave) — lets a new
+   * biome's mini-boss actually belong to its own biome instead of showing
+   * up in whichever unrelated phase the global rotation happens to land on.
+   * Undefined (every hand-authored phase before this expansion, and the
+   * endgame rotation) keeps the exact original global-rotation behavior.
+   */
+  miniBossId?: string;
   /** Absolute wave numbers (within this phase) that spawn a mini-boss. */
   miniBossWaves: readonly number[];
   /** Absolute wave numbers tagged for a special composition. */
@@ -35,6 +45,24 @@ export interface PhaseDefinition {
 
 const CORE_POOL: readonly EnemyType[] = ["CRAWLER", "RUNNER", "BRUTE", "SHIELDBEARER"];
 const FULL_POOL: readonly EnemyType[] = [...CORE_POOL, "SWARMLING", "REGENERATOR", "IRONCLAD", "DISABLER"];
+
+/**
+ * 10-biome expansion — each new phase's enemyPool is EXCLUSIVELY that
+ * biome's own 3 archetypes (not mixed into FULL_POOL) so each world reads
+ * as its own distinct ecosystem, per the expansion's explicit "cada bioma
+ * deve parecer um ambiente completamente diferente" requirement — never a
+ * reskin of the original 8 archetypes wandering into a new backdrop.
+ */
+const DWARVEN_UNDERCITY_POOL: readonly EnemyType[] = ["FORGECRAWLER", "DEEPDELVER", "MAGMAJAW"];
+const COLOSSUS_GRAVEYARD_POOL: readonly EnemyType[] = ["BONE_STALKER", "RIBCRAWLER", "GRAVEWING"];
+const FLOATING_ISLES_POOL: readonly EnemyType[] = ["CLOUDFANG", "SKY_MANTA", "STORM_TALON"];
+const LOST_SUN_TEMPLE_POOL: readonly EnemyType[] = ["SUNSCARAB", "TEMPLE_GUARDIAN", "SOLAR_SERPENT"];
+const CRYSTAL_SEA_POOL: readonly EnemyType[] = ["SHARDCRAWLER", "CRYSTAL_MAW", "PRISM_WRAITH"];
+const ABYSSAL_FORTRESS_POOL: readonly EnemyType[] = ["ABYSS_CRAWLER", "CHAINBOUND", "VOID_BAT"];
+const ASHEN_VALLEY_POOL: readonly EnemyType[] = ["ASH_HOUND", "PETRIFIED_STALKER", "CINDERWING"];
+const MOON_GARDENS_POOL: readonly EnemyType[] = ["MOONFANG", "BLOOM_HORROR", "LUNAMOTH"];
+const DEFILED_CATHEDRAL_POOL: readonly EnemyType[] = ["GRAVE_KNIGHT", "GARGOYLE_BEAST", "BELL_WRAITH"];
+const LEVIATHAN_COAST_POOL: readonly EnemyType[] = ["TIDE_RIPPER", "DEEPMAW", "BONEFIN"];
 
 /**
  * PHASES — the first real slice of content. Ancient Forest (1-30) is the
@@ -117,6 +145,136 @@ export const PHASES: readonly PhaseDefinition[] = [
     miniBossWaves: [118, 125],
     waveTags: { 122: "SWARM", 128: "ELITE" },
     enemyPool: FULL_POOL,
+  },
+
+  // -------------------------------------------------------------------
+  // 10-biome expansion (waves 131-330) — ten fully realized new worlds,
+  // each with its own biome (rendering/biomes/), its own exclusive
+  // creature roster (config/enemyStats.ts), and its own mini-boss/main
+  // boss pair (config/bossConfig.ts) rendered through a bespoke shared
+  // creature body (rendering/biomeCreatures/) instead of the shared
+  // Colossus. Same +7/+14 mini-boss and +11 SWARM/+17 ELITE rhythm every
+  // hand-authored phase above already uses — not a new pattern.
+  // -------------------------------------------------------------------
+  {
+    id: "DWARVEN_UNDERCITY",
+    i18nKey: "DWARVEN_UNDERCITY",
+    biomeId: "DWARVEN_UNDERCITY",
+    startWave: 131,
+    endWave: 150,
+    mainBossId: "iron-burrower-sovereign",
+    miniBossId: "iron-burrower",
+    miniBossWaves: [138, 145],
+    waveTags: { 142: "SWARM", 148: "ELITE" },
+    enemyPool: DWARVEN_UNDERCITY_POOL,
+  },
+  {
+    id: "COLOSSUS_GRAVEYARD",
+    i18nKey: "COLOSSUS_GRAVEYARD",
+    biomeId: "COLOSSUS_GRAVEYARD",
+    startWave: 151,
+    endWave: 170,
+    mainBossId: "ancestral-colossus",
+    miniBossId: "colossus-spawn",
+    miniBossWaves: [158, 165],
+    waveTags: { 162: "SWARM", 168: "ELITE" },
+    enemyPool: COLOSSUS_GRAVEYARD_POOL,
+  },
+  {
+    id: "FLOATING_ISLES",
+    i18nKey: "FLOATING_ISLES",
+    biomeId: "FLOATING_ISLES",
+    startWave: 171,
+    endWave: 190,
+    mainBossId: "aether-drake-elder",
+    miniBossId: "aether-drake",
+    miniBossWaves: [178, 185],
+    waveTags: { 182: "SWARM", 188: "ELITE" },
+    enemyPool: FLOATING_ISLES_POOL,
+  },
+  {
+    id: "LOST_SUN_TEMPLE",
+    i18nKey: "LOST_SUN_TEMPLE",
+    biomeId: "LOST_SUN_TEMPLE",
+    startWave: 191,
+    endWave: 210,
+    mainBossId: "raithar-ascendant",
+    miniBossId: "raithar",
+    miniBossWaves: [198, 205],
+    waveTags: { 202: "SWARM", 208: "ELITE" },
+    enemyPool: LOST_SUN_TEMPLE_POOL,
+  },
+  {
+    id: "CRYSTAL_SEA",
+    i18nKey: "CRYSTAL_SEA",
+    biomeId: "CRYSTAL_SEA",
+    startWave: 211,
+    endWave: 230,
+    mainBossId: "crystal-behemoth-prime",
+    miniBossId: "crystal-behemoth",
+    miniBossWaves: [218, 225],
+    waveTags: { 222: "SWARM", 228: "ELITE" },
+    enemyPool: CRYSTAL_SEA_POOL,
+  },
+  {
+    id: "ABYSSAL_FORTRESS",
+    i18nKey: "ABYSSAL_FORTRESS",
+    biomeId: "ABYSSAL_FORTRESS",
+    startWave: 231,
+    endWave: 250,
+    mainBossId: "abyssal-warden-eternal",
+    miniBossId: "abyssal-warden",
+    miniBossWaves: [238, 245],
+    waveTags: { 242: "SWARM", 248: "ELITE" },
+    enemyPool: ABYSSAL_FORTRESS_POOL,
+  },
+  {
+    id: "ASHEN_VALLEY",
+    i18nKey: "ASHEN_VALLEY",
+    biomeId: "ASHEN_VALLEY",
+    startWave: 251,
+    endWave: 270,
+    mainBossId: "ashen-colossus-forsaken",
+    miniBossId: "ashen-colossus",
+    miniBossWaves: [258, 265],
+    waveTags: { 262: "SWARM", 268: "ELITE" },
+    enemyPool: ASHEN_VALLEY_POOL,
+  },
+  {
+    id: "MOON_GARDENS",
+    i18nKey: "MOON_GARDENS",
+    biomeId: "MOON_GARDENS",
+    startWave: 271,
+    endWave: 290,
+    mainBossId: "moonroot-matriarch-elder",
+    miniBossId: "moonroot-matriarch",
+    miniBossWaves: [278, 285],
+    waveTags: { 282: "SWARM", 288: "ELITE" },
+    enemyPool: MOON_GARDENS_POOL,
+  },
+  {
+    id: "DEFILED_CATHEDRAL",
+    i18nKey: "DEFILED_CATHEDRAL",
+    biomeId: "DEFILED_CATHEDRAL",
+    startWave: 291,
+    endWave: 310,
+    mainBossId: "cathedral-abomination-apex",
+    miniBossId: "cathedral-abomination",
+    miniBossWaves: [298, 305],
+    waveTags: { 302: "SWARM", 308: "ELITE" },
+    enemyPool: DEFILED_CATHEDRAL_POOL,
+  },
+  {
+    id: "LEVIATHAN_COAST",
+    i18nKey: "LEVIATHAN_COAST",
+    biomeId: "LEVIATHAN_COAST",
+    startWave: 311,
+    endWave: 330,
+    mainBossId: "leviathan-elder",
+    miniBossId: "leviathan-spawn",
+    miniBossWaves: [318, 325],
+    waveTags: { 322: "SWARM", 328: "ELITE" },
+    enemyPool: LEVIATHAN_COAST_POOL,
   },
 ];
 

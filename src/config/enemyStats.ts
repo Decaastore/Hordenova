@@ -29,7 +29,41 @@ export type EnemyType =
   | "SWARMLING"
   | "REGENERATOR"
   | "IRONCLAD"
-  | "DISABLER";
+  | "DISABLER"
+  // 10-biome expansion (waves 131-330) — 3 exclusive archetypes per biome,
+  // each mapping its described anatomy/identity onto the SAME mechanical
+  // levers above (no new mechanic type invented). See config/phaseConfig.ts
+  // PHASES for which biome/phase spawns which of these.
+  | "FORGECRAWLER"
+  | "DEEPDELVER"
+  | "MAGMAJAW"
+  | "BONE_STALKER"
+  | "RIBCRAWLER"
+  | "GRAVEWING"
+  | "CLOUDFANG"
+  | "SKY_MANTA"
+  | "STORM_TALON"
+  | "SUNSCARAB"
+  | "TEMPLE_GUARDIAN"
+  | "SOLAR_SERPENT"
+  | "SHARDCRAWLER"
+  | "CRYSTAL_MAW"
+  | "PRISM_WRAITH"
+  | "ABYSS_CRAWLER"
+  | "CHAINBOUND"
+  | "VOID_BAT"
+  | "ASH_HOUND"
+  | "PETRIFIED_STALKER"
+  | "CINDERWING"
+  | "MOONFANG"
+  | "BLOOM_HORROR"
+  | "LUNAMOTH"
+  | "GRAVE_KNIGHT"
+  | "GARGOYLE_BEAST"
+  | "BELL_WRAITH"
+  | "TIDE_RIPPER"
+  | "DEEPMAW"
+  | "BONEFIN";
 
 export const ENEMY_TYPES: readonly EnemyType[] = [
   "CRAWLER",
@@ -40,6 +74,36 @@ export const ENEMY_TYPES: readonly EnemyType[] = [
   "REGENERATOR",
   "IRONCLAD",
   "DISABLER",
+  "FORGECRAWLER",
+  "DEEPDELVER",
+  "MAGMAJAW",
+  "BONE_STALKER",
+  "RIBCRAWLER",
+  "GRAVEWING",
+  "CLOUDFANG",
+  "SKY_MANTA",
+  "STORM_TALON",
+  "SUNSCARAB",
+  "TEMPLE_GUARDIAN",
+  "SOLAR_SERPENT",
+  "SHARDCRAWLER",
+  "CRYSTAL_MAW",
+  "PRISM_WRAITH",
+  "ABYSS_CRAWLER",
+  "CHAINBOUND",
+  "VOID_BAT",
+  "ASH_HOUND",
+  "PETRIFIED_STALKER",
+  "CINDERWING",
+  "MOONFANG",
+  "BLOOM_HORROR",
+  "LUNAMOTH",
+  "GRAVE_KNIGHT",
+  "GARGOYLE_BEAST",
+  "BELL_WRAITH",
+  "TIDE_RIPPER",
+  "DEEPMAW",
+  "BONEFIN",
 ];
 
 export interface EnemyDefinition {
@@ -147,6 +211,342 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
     disablerIntervalMs: 4000,
     disablerDurationMs: 1500,
     disablerRadius: 260,
+  },
+
+  // -------------------------------------------------------------------
+  // 10-biome expansion. Each biome's 3 archetypes reuse the exact same
+  // mechanical levers above (hp/speed/dr/regen/disabler) — no new field,
+  // no new combat mechanic — mapped onto that creature's described
+  // anatomy/behavior so it still demands a genuinely different response.
+  // -------------------------------------------------------------------
+
+  // Cidade Subterrânea dos Anões (waves 131-150).
+  FORGECRAWLER: {
+    type: "FORGECRAWLER",
+    name: "Forgecrawler",
+    role: "Armored quadruped skirmisher, mineral-plated shell. Fast for its armor class.",
+    baseHp: 65,
+    baseSpeed: 85,
+    goldReward: 9,
+    damageReduction: 0.15,
+    regenPercentPerSecond: 0,
+  },
+  DEEPDELVER: {
+    type: "DEEPDELVER",
+    name: "Deepdelver",
+    role: "Deformed miner hauling a heavy pickmace. Mid-tank bruiser.",
+    baseHp: 140,
+    baseSpeed: 38,
+    goldReward: 13,
+    damageReduction: 0.2,
+    regenPercentPerSecond: 0,
+  },
+  MAGMAJAW: {
+    type: "MAGMAJAW",
+    name: "Magmajaw",
+    role: "Heavy subterranean reptile with a crushing jaw and stone plating. Slow, very tanky.",
+    baseHp: 260,
+    baseSpeed: 26,
+    goldReward: 16,
+    damageReduction: 0.4,
+    regenPercentPerSecond: 0,
+  },
+
+  // Cemitério dos Colossos (waves 151-170).
+  BONE_STALKER: {
+    type: "BONE_STALKER",
+    name: "Bone Stalker",
+    role: "Quadruped predator of exposed bone. Fast, unarmored pursuit hunter.",
+    baseHp: 75,
+    baseSpeed: 95,
+    goldReward: 10,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+  RIBCRAWLER: {
+    type: "RIBCRAWLER",
+    name: "Ribcrawler",
+    role: "Crawls low behind a shell of scavenged ribcages. Armored ambusher.",
+    baseHp: 130,
+    baseSpeed: 50,
+    goldReward: 12,
+    damageReduction: 0.25,
+    regenPercentPerSecond: 0,
+  },
+  GRAVEWING: {
+    type: "GRAVEWING",
+    name: "Gravewing",
+    role: "Flies on membrane stretched over a bone frame. Aerial harasser.",
+    baseHp: 55,
+    baseSpeed: 80,
+    goldReward: 11,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+
+  // Ilhas Flutuantes (waves 171-190) — an entirely aerial roster.
+  CLOUDFANG: {
+    type: "CLOUDFANG",
+    name: "Cloudfang",
+    role: "Feline-reptilian sky predator. Very fast aerial striker.",
+    baseHp: 70,
+    baseSpeed: 100,
+    goldReward: 11,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+  SKY_MANTA: {
+    type: "SKY_MANTA",
+    name: "Sky Manta",
+    role: "Broad manta-like glider riding the high air currents. Tanky, self-sustaining.",
+    baseHp: 150,
+    baseSpeed: 55,
+    goldReward: 14,
+    damageReduction: 0,
+    regenPercentPerSecond: 0.02,
+  },
+  STORM_TALON: {
+    type: "STORM_TALON",
+    name: "Storm Talon",
+    role: "Predatory sky-bird crackling with static discharge. Periodically jams the nearest tower.",
+    baseHp: 60,
+    baseSpeed: 90,
+    goldReward: 12,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+    disablerIntervalMs: 4500,
+    disablerDurationMs: 1400,
+    disablerRadius: 240,
+  },
+
+  // Templo Solar Perdido (waves 191-210).
+  SUNSCARAB: {
+    type: "SUNSCARAB",
+    name: "Sunscarab",
+    role: "Giant armored insect with an aged golden carapace. Armored skirmisher.",
+    baseHp: 150,
+    baseSpeed: 45,
+    goldReward: 15,
+    damageReduction: 0.3,
+    regenPercentPerSecond: 0,
+  },
+  TEMPLE_GUARDIAN: {
+    type: "TEMPLE_GUARDIAN",
+    name: "Temple Guardian",
+    role: "Stone-and-metal construct built to guard the temple's inner sanctum. Heaviest tank in this roster.",
+    baseHp: 280,
+    baseSpeed: 24,
+    goldReward: 18,
+    damageReduction: 0.35,
+    regenPercentPerSecond: 0,
+  },
+  SOLAR_SERPENT: {
+    type: "SOLAR_SERPENT",
+    name: "Solar Serpent",
+    role: "Giant pale-scaled serpent lit faintly from within. Fast, self-mending.",
+    baseHp: 100,
+    baseSpeed: 70,
+    goldReward: 14,
+    damageReduction: 0,
+    regenPercentPerSecond: 0.02,
+  },
+
+  // Mar de Cristal (waves 211-230).
+  SHARDCRAWLER: {
+    type: "SHARDCRAWLER",
+    name: "Shardcrawler",
+    role: "Arachnid with crystal growths along its back. Fast, lightly armored.",
+    baseHp: 80,
+    baseSpeed: 90,
+    goldReward: 12,
+    damageReduction: 0.15,
+    regenPercentPerSecond: 0,
+  },
+  CRYSTAL_MAW: {
+    type: "CRYSTAL_MAW",
+    name: "Crystal Maw",
+    role: "Quadruped with a crushing jaw sheathed in natural crystal armor. Heavy tank.",
+    baseHp: 240,
+    baseSpeed: 28,
+    goldReward: 17,
+    damageReduction: 0.4,
+    regenPercentPerSecond: 0,
+  },
+  PRISM_WRAITH: {
+    type: "PRISM_WRAITH",
+    name: "Prism Wraith",
+    role: "Partially incorporeal, its body a drifting cluster of mineral fragments. Bends light to jam the nearest tower.",
+    baseHp: 65,
+    baseSpeed: 60,
+    goldReward: 13,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+    disablerIntervalMs: 5000,
+    disablerDurationMs: 1200,
+    disablerRadius: 220,
+  },
+
+  // Fortaleza Abissal (waves 231-250).
+  ABYSS_CRAWLER: {
+    type: "ABYSS_CRAWLER",
+    name: "Abyss Crawler",
+    role: "Many-limbed climber adapted to sheer cliff walls. Fast, unarmored.",
+    baseHp: 85,
+    baseSpeed: 80,
+    goldReward: 12,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+  CHAINBOUND: {
+    type: "CHAINBOUND",
+    name: "Chainbound",
+    role: "A heavy, deformed captive dragging ancient rusted chains. Slow, extremely armored.",
+    baseHp: 220,
+    baseSpeed: 30,
+    goldReward: 16,
+    damageReduction: 0.45,
+    regenPercentPerSecond: 0,
+  },
+  VOID_BAT: {
+    type: "VOID_BAT",
+    name: "Void Bat",
+    role: "Huge-winged cave flier. Erratic, fast, fragile.",
+    baseHp: 45,
+    baseSpeed: 110,
+    goldReward: 10,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+
+  // Vale das Cinzas Mortas (waves 251-270) — an ancient-catastrophe wasteland, not a volcanic biome.
+  ASH_HOUND: {
+    type: "ASH_HOUND",
+    name: "Ash Hound",
+    role: "Quadruped predator, hide partially charred from a catastrophe long past. Fast pursuit hunter.",
+    baseHp: 70,
+    baseSpeed: 95,
+    goldReward: 11,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+  PETRIFIED_STALKER: {
+    type: "PETRIFIED_STALKER",
+    name: "Petrified Stalker",
+    role: "Deer-like stalker with parts of its body turned to stone. Armored by its own petrification.",
+    baseHp: 165,
+    baseSpeed: 48,
+    goldReward: 15,
+    damageReduction: 0.3,
+    regenPercentPerSecond: 0,
+  },
+  CINDERWING: {
+    type: "CINDERWING",
+    name: "Cinderwing",
+    role: "Flies on damaged, ash-shedding wings. Erratic, fast, fragile.",
+    baseHp: 48,
+    baseSpeed: 88,
+    goldReward: 10,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+
+  // Jardins da Lua (waves 271-290) — nocturnal, supernatural, deliberately not childish.
+  MOONFANG: {
+    type: "MOONFANG",
+    name: "Moonfang",
+    role: "Dark-silver-furred quadruped predator, eyes faintly luminous. Fast, moon-blessed vitality.",
+    baseHp: 75,
+    baseSpeed: 92,
+    goldReward: 12,
+    damageReduction: 0,
+    regenPercentPerSecond: 0.01,
+  },
+  BLOOM_HORROR: {
+    type: "BLOOM_HORROR",
+    name: "Bloom Horror",
+    role: "Carnivorous plant creature, flowers and roots grown into its own anatomy. Slow, root-armored ambusher.",
+    baseHp: 190,
+    baseSpeed: 34,
+    goldReward: 16,
+    damageReduction: 0.35,
+    regenPercentPerSecond: 0,
+  },
+  LUNAMOTH: {
+    type: "LUNAMOTH",
+    name: "Lunamoth",
+    role: "Large-winged moth with luminous natural patterns. Fast, evasive flier.",
+    baseHp: 55,
+    baseSpeed: 85,
+    goldReward: 11,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+
+  // Catedral Profanada (waves 291-310).
+  GRAVE_KNIGHT: {
+    type: "GRAVE_KNIGHT",
+    name: "Grave Knight",
+    role: "Monstrous, non-human-proportioned figure in ancient armor. Heavy armored bruiser.",
+    baseHp: 200,
+    baseSpeed: 36,
+    goldReward: 17,
+    damageReduction: 0.4,
+    regenPercentPerSecond: 0,
+  },
+  GARGOYLE_BEAST: {
+    type: "GARGOYLE_BEAST",
+    name: "Gargoyle Beast",
+    role: "Quadruped fusion of stone and flesh. Armored, slowly self-mending.",
+    baseHp: 170,
+    baseSpeed: 40,
+    goldReward: 15,
+    damageReduction: 0.25,
+    regenPercentPerSecond: 0.015,
+  },
+  BELL_WRAITH: {
+    type: "BELL_WRAITH",
+    name: "Bell Wraith",
+    role: "A floating, mist-wrapped entity bound to the cathedral's own bells. Its toll jams the nearest tower.",
+    baseHp: 60,
+    baseSpeed: 70,
+    goldReward: 13,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+    disablerIntervalMs: 4200,
+    disablerDurationMs: 1600,
+    disablerRadius: 280,
+  },
+
+  // Península dos Leviatãs (waves 311-330).
+  TIDE_RIPPER: {
+    type: "TIDE_RIPPER",
+    name: "Tide Ripper",
+    role: "Low, muscular amphibious predator, built to claw through surf and sand alike. Fast attacker.",
+    baseHp: 90,
+    baseSpeed: 85,
+    goldReward: 13,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
+  },
+  DEEPMAW: {
+    type: "DEEPMAW",
+    name: "Deepmaw",
+    role: "An abyssal-predator marine creature able to haul itself onto land. Heavy tank, crushing jaw.",
+    baseHp: 250,
+    baseSpeed: 30,
+    goldReward: 18,
+    damageReduction: 0.35,
+    regenPercentPerSecond: 0,
+  },
+  BONEFIN: {
+    type: "BONEFIN",
+    name: "Bonefin",
+    role: "Fast, partially bony fish-predator hybrid. Fragile but very quick.",
+    baseHp: 55,
+    baseSpeed: 110,
+    goldReward: 12,
+    damageReduction: 0,
+    regenPercentPerSecond: 0,
   },
 };
 

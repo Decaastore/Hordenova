@@ -5,6 +5,16 @@ import { FROZEN_TUNDRA } from "./frozenTundra";
 import { CURSED_DESERT } from "./cursedDesert";
 import { DARK_RUINS } from "./darkRuins";
 import { ABYSS } from "./abyss";
+import { DWARVEN_UNDERCITY } from "./dwarvenUndercity";
+import { COLOSSUS_GRAVEYARD } from "./colossusGraveyard";
+import { FLOATING_ISLES } from "./floatingIsles";
+import { LOST_SUN_TEMPLE } from "./lostSunTemple";
+import { CRYSTAL_SEA } from "./crystalSea";
+import { ABYSSAL_FORTRESS } from "./abyssalFortress";
+import { ASHEN_VALLEY } from "./ashenValley";
+import { MOON_GARDENS } from "./moonGardens";
+import { DEFILED_CATHEDRAL } from "./defiledCathedral";
+import { LEVIATHAN_COAST } from "./leviathanCoast";
 
 export type { BiomeDefinition, BiomePalette, AtmosphereKind } from "./types";
 
@@ -21,6 +31,17 @@ export const BIOMES: Record<string, BiomeDefinition> = {
   CURSED_DESERT,
   DARK_RUINS,
   ABYSS,
+  // 10-biome expansion (waves 131-330).
+  DWARVEN_UNDERCITY,
+  COLOSSUS_GRAVEYARD,
+  FLOATING_ISLES,
+  LOST_SUN_TEMPLE,
+  CRYSTAL_SEA,
+  ABYSSAL_FORTRESS,
+  ASHEN_VALLEY,
+  MOON_GARDENS,
+  DEFILED_CATHEDRAL,
+  LEVIATHAN_COAST,
 };
 
 /** Looks up a biome by id, falling back to Ancient Forest if the id is somehow unknown (should never happen — every PhaseDefinition.biomeId has a matching entry above). */
