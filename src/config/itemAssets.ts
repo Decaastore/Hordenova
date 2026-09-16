@@ -50,14 +50,14 @@ export interface ItemVisualAsset {
 
 export const ITEM_VISUAL_ASSETS: Record<string, ItemVisualAsset> = {
   warden_fragment: {},
-  // AMULETOS — IDENTIDADE VISUAL DEFINITIVA. mosswood_charm's real artwork
-  // was supplied by the user and matted to a transparent background (the
-  // source render had an opaque near-black backdrop baked in, not real
-  // alpha) before landing here — see public/items/amulets/README.md for
-  // the brief the remaining two (hollow_sigil, wardens_eye) still need.
+  // AMULETOS — IDENTIDADE VISUAL DEFINITIVA. Both of these were supplied by
+  // the user and matted to a transparent background (the source renders had
+  // an opaque near-black backdrop baked in, not real alpha) before landing
+  // here — see public/items/amulets/README.md for the brief wardens_eye
+  // still needs, and public/items/artifacts/README.md for the MYTHIC item.
   mosswood_charm: { imageSrc: "/items/amulets/mosswood_charm.png" },
   ancient_core: {},
-  hollow_sigil: {},
+  hollow_sigil: { imageSrc: "/items/amulets/hollow_sigil.png" },
   wardens_eye: {},
   crown_of_the_hollow_king: {},
 };

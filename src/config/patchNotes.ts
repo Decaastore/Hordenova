@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v18",
+    dateIso: "2026-09-16",
+    category: "ITEMS",
+    title: {
+      en: "Hollow Sigil Gets Its Own Real Artwork",
+      ptBR: "Sigilo Oco Ganha Arte Própria Real",
+    },
+    description: {
+      en: "Hollow Sigil now shows its own real picture instead of the generic Amulet icon: an aged black metal ring with a hollowed-out, vacant center and engraved ancient markings — visually distinct from Mosswood Charm's pendant, exactly as its sinister, hollow theme describes. The same picture now appears everywhere the item shows up: Inventory, its tooltip, the item details view, and the Marketplace.",
+      ptBR: "O Sigilo Oco agora mostra sua própria imagem real em vez do ícone genérico de Amuleto: um anel de metal negro envelhecido com um centro vazio e oco, e marcações antigas gravadas — visualmente bem diferente do pingente do Amuleto do Bosque Musgoso, exatamente como seu tema sombrio e vazio sempre sugeriu. A mesma imagem agora aparece em todo lugar onde o item aparece: Inventário, tooltip, tela de detalhes do item e Marketplace.",
+    },
+    highlights: [
+      {
+        en: "Second item to use the per-item art pipeline introduced for Mosswood Charm — no new code was needed, just the artwork itself.",
+        ptBR: "Segundo item a usar o pipeline de arte por item introduzido com o Amuleto do Bosque Musgoso — não foi preciso nenhum código novo, só a arte em si.",
+      },
+      {
+        en: "Rarity presentation (the colored border and glow) is still applied by the interface around the artwork, never baked into the picture itself.",
+        ptBR: "A apresentação de raridade (borda e brilho coloridos) continua sendo aplicada pela interface ao redor da arte, nunca embutida na própria imagem.",
+      },
+      {
+        en: "Warden's Eye still uses the generic Amulet icon for now, until its own artwork is ready — nothing about its rarity, effects, or how it works has changed.",
+        ptBR: "Olho do Guardião ainda usa o ícone genérico de Amuleto por enquanto, até que sua própria arte fique pronta — nada sobre sua raridade, efeitos ou funcionamento mudou.",
+      },
+    ],
+  },
+  {
     id: "v17",
     dateIso: "2026-09-16",
     category: "ITEMS",
