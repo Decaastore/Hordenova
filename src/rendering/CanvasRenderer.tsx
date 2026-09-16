@@ -6,7 +6,7 @@ import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getTowerStats } from "@/entities/Tower";
-import { PALETTE, TOWER_THEME, ENEMY_THEME } from "./theme";
+import { PALETTE, TOWER_THEME, ENEMY_THEME, ARCHETYPE_VISUAL_SCALE } from "./theme";
 import { getBiome } from "./biomes";
 import {
   drawAmbientParticles,
@@ -295,7 +295,7 @@ export function CanvasRenderer({
         const bossColor = enemy.boss ? biome.palette.accentGlow : undefined;
         if (enemy.boss) drawBossAura(ctx, enemy, timestamp, bossColor);
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
-        const archetypeScale = enemy.type === "SWARMLING" ? 0.65 : enemy.type === "IRONCLAD" ? 1.15 : 1;
+        const archetypeScale = ARCHETYPE_VISUAL_SCALE[enemy.type] ?? 1;
         const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
         // INIMIGOS 3D — the only skip in this whole loop. Boss/elite aura
         // above and the separate HP-bar pass below are untouched for every

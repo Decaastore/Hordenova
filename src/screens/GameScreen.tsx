@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { isWebGLAvailable } from "@/rendering3d/webglSupport";
 import { Enemy3DErrorBoundary } from "@/rendering3d/Enemy3DErrorBoundary";
@@ -42,6 +42,17 @@ interface GameScreenProps {
 export function GameScreen({ onExitToMenu }: GameScreenProps) {
   const { engine, hud } = useGameEngine();
   useGameAudio(engine);
+  // Stable callback identities for the dismissible banners below: `engine`
+  // itself never changes across renders (see useGameEngine), but passing a
+  // fresh inline arrow on every render defeats EnemyDiscoveryBanner's
+  // auto-dismiss useEffect (its `onAcknowledge` dependency changes every
+  // frame, so the timer keeps getting reset and never actually fires) —
+  // these give each acknowledge handler one identity for the engine's
+  // lifetime instead.
+  const acknowledgeEndgameWallReport = useCallback(() => engine.acknowledgeEndgameWallReport(), [engine]);
+  const acknowledgeDiscovery = useCallback(() => engine.acknowledgeDiscovery(), [engine]);
+  const acknowledgeItemReward = useCallback(() => engine.acknowledgeItemReward(), [engine]);
+  const acknowledgeRouletteResult = useCallback(() => engine.acknowledgeRouletteResult(), [engine]);
   const [pendingTowerType, setPendingTowerType] = useState<TowerType | null>(null);
   // The diagnostic report can be dismissed to let the player upgrade towers
   // on the map without retrying yet — engine phase itself doesn't change
@@ -224,20 +235,20 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         <BossBanner hud={hud} />
         <PhaseBanner phaseId={hud.phaseId} phaseI18nKey={hud.phaseI18nKey} />
         {engine.getEndgameWallReport() && (
-          <EndgameWallBanner report={engine.getEndgameWallReport()!} onDismiss={() => engine.acknowledgeEndgameWallReport()} />
+          <EndgameWallBanner report={engine.getEndgameWallReport()!} onDismiss={acknowledgeEndgameWallReport} />
         )}
         {hud.pendingDiscoveryType && (
-          <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={() => engine.acknowledgeDiscovery()} />
+          <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={acknowledgeDiscovery} />
         )}
         {hud.pendingItemReward && (
           <ItemRewardBanner
             itemDefinitionId={hud.pendingItemReward.itemDefinitionId}
-            onAcknowledge={() => engine.acknowledgeItemReward()}
+            onAcknowledge={acknowledgeItemReward}
             onOpenInventory={() => setInventoryOpen(true)}
           />
         )}
         {hud.pendingRouletteResult && (
-          <RouletteBanner result={hud.pendingRouletteResult} onAcknowledge={() => engine.acknowledgeRouletteResult()} />
+          <RouletteBanner result={hud.pendingRouletteResult} onAcknowledge={acknowledgeRouletteResult} />
         )}
         {/* AUDITORIA E CORREÇÃO GERAL spec sections 2-3, 11 — shown whenever a milestone is unlocked but not yet spun (persists across F5). Hidden while a just-resolved result is still being revealed, so the two never overlap in the same bottom-center slot; a second pending wave (e.g. Offline Defense crossing both 20 and 30) shows here again the instant the current reveal is acknowledged. */}
         {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && (

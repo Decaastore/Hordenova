@@ -1,34 +1,40 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { drawFlightShadow, flightLift, glowBlob, polygonPath } from "./helpers";
+import { breathe, drawFlightShadow, flightLift, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
  * Fortaleza Abissal (waves 231-250) — a fortress built inside a giant
  * abyss. Abyssal Warden is explicitly its OWN design (not a Brute reskin,
  * not another shared Colossus): a low, wide, heavily natural-armored
- * guardian silhouette, distinct from every other boss in this pack.
+ * guardian silhouette. FASE 2: real chain-link geometry for Chainbound
+ * (not a stroked squiggle), a genuinely flat splayed climbing stance for
+ * Abyss Crawler, and volumetric legs throughout.
  */
 
-// Abyss Crawler — many-limbed, wall/cliff-adapted climber; a wide, flat, splayed stance.
+// Abyss Crawler — many-limbed, wall/cliff-adapted climber; a wide, flat,
+// splayed stance with real jointed limbs on both sides.
 const drawAbyssCrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 11, 4, 0.34);
   const legPhase = timeMs / 110;
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.5;
+  drawContactShadow(ctx, 11, 4, 0.34);
+
   for (let i = 0; i < 4; i++) {
     const wig = Math.sin(legPhase + i * 1.9) * 3;
     for (const side of [1, -1] as const) {
       const x = -7 + i * 4.6;
-      ctx.beginPath();
-      ctx.moveTo(x, side * 2);
-      ctx.lineTo(x + wig, side * (5 + Math.abs(wig) * 0.6));
-      ctx.lineTo(x + wig * 1.3, side * (8 + Math.abs(wig) * 0.4));
-      ctx.stroke();
+      const kneeX = x + wig * 0.6;
+      const kneeY = side * 4;
+      const footX = x + wig;
+      const footY = side * 8;
+      const legGrad = materialFill(ctx, "CHITIN", x, side, footX, footY, theme.accent, theme.body, theme.dark);
+      limbSegment(ctx, x, side * 1.5, kneeX, kneeY, 1.2, 0.8, legGrad);
+      limbSegment(ctx, kneeX, kneeY, footX, footY, 0.8, 0.4, theme.dark);
+      jointBulge(ctx, kneeX, kneeY, 0.7, theme.dark);
     }
   }
-  const bodyGrad = ctx.createLinearGradient(0, -3, 0, 3);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 0, 1000, 0.02));
+  const bodyGrad = materialFill(ctx, "CHITIN", -10, -3.4, 11, 3.4, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-10, 0],
@@ -47,24 +53,23 @@ const drawAbyssCrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
+  ctx.restore();
 };
 
-// Chainbound — a heavy, deformed captive dragging rusted chains, hunched low.
+// Chainbound — a heavy, deformed captive dragging REAL rusted chain links
+// (overlapping ellipse pairs, not a stroked squiggle), hunched low.
 const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 11, 5, 0.4);
   const drag = Math.sin(timeMs / 400);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(-4, 3);
-  ctx.lineTo(-5 - drag, 10);
-  ctx.moveTo(4, 3);
-  ctx.lineTo(5 + drag, 10);
-  ctx.stroke();
-  const bodyGrad = ctx.createLinearGradient(0, -9, 0, 4);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+  drawContactShadow(ctx, 11, 5, 0.4);
+
+  const legGradL = materialFill(ctx, "HIDE", -4, 3, -5 - drag, 10, theme.accent, theme.body, theme.dark);
+  limbSegment(ctx, -4, 3, -5 - drag, 10, 2, 1.6, legGradL);
+  const legGradR = materialFill(ctx, "HIDE", 4, 3, 5 + drag, 10, theme.accent, theme.body, theme.dark);
+  limbSegment(ctx, 4, 3, 5 + drag, 10, 2, 1.6, legGradR);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 1, 1200, 0.02));
+  const bodyGrad = materialFill(ctx, "HIDE", -7, -9, 8, 4, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-7, -1],
@@ -75,29 +80,22 @@ const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-6, 4],
   ]);
   ctx.fill();
-  // dragging chain trailing behind, swinging with the gait
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1;
-  ctx.globalAlpha = 0.75;
-  ctx.beginPath();
-  ctx.moveTo(-6, -2);
+
+  // real chain links trailing behind, each an overlapping ellipse pair.
+  ctx.strokeStyle = materialFill(ctx, "METAL", -6, -2, -18, 4, "#c8bc9e", "#8a7e68", "#2a251e");
+  ctx.lineWidth = 1.4;
+  let cx = -6;
+  let cy = -2;
   for (let i = 0; i < 4; i++) {
-    const x = -6 - i * 3;
-    const y = -2 + Math.sin(timeMs / 260 + i) * 2 + i * 1.5;
-    ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  for (let i = 0; i < 4; i++) {
-    const x = -6 - i * 3;
-    const y = -2 + Math.sin(timeMs / 260 + i) * 2 + i * 1.5;
-    ctx.strokeStyle = theme.accent;
-    ctx.lineWidth = 0.8;
+    const nx = cx - 3 - Math.sin(timeMs / 260 + i) * 0.6;
+    const ny = cy + 1.4 + i * 0.3;
     ctx.beginPath();
-    ctx.ellipse(x, y, 1.3, 0.9, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, cy, 1.6, 1, i % 2 === 0 ? 0.5 : -0.5, 0, Math.PI * 2);
     ctx.stroke();
+    cx = nx;
+    cy = ny;
   }
-  // slumped, bound head
+
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
     [3, -9],
@@ -106,6 +104,7 @@ const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs) => {
     [3, -5.5],
   ]);
   ctx.fill();
+  ctx.restore();
 };
 
 // Void Bat — huge-winged cave flier, small body, erratic flapping.
@@ -118,7 +117,7 @@ const drawVoidBat: EnemyDrawFn = (ctx, theme, timeMs) => {
   for (const side of [1, -1] as const) {
     ctx.save();
     ctx.scale(side, 1);
-    ctx.fillStyle = theme.body;
+    ctx.fillStyle = materialFill(ctx, "HIDE", 0, 0, 12, -1 - flap * 3, theme.accent, theme.body, theme.dark);
     ctx.globalAlpha = 0.82;
     polygonPath(ctx, [
       [0, 0],
@@ -158,37 +157,35 @@ registerEnemyRenderers({
   VOID_BAT: drawVoidBat,
 });
 
-// Abyssal Warden — a colossal, LOW and WIDE ancient guardian, thick
-// natural (organic hide, not mechanical/crystal) armor plating fused
-// along its back, four short braced legs. Deliberately not a Brute
-// silhouette and not a repaint of any other boss in this pack — reads
-// as an immovable, silent wall rather than a limb-swinging aggressor.
+/**
+ * Abyssal Warden — a colossal, LOW and WIDE ancient guardian, thick
+ * natural (organic hide, not mechanical/crystal) armor plating fused
+ * along its back, four short braced volumetric legs. Deliberately not a
+ * Brute silhouette and not a repaint of any other boss in this pack —
+ * reads as an immovable, silent wall. The main boss adds a heavier
+ * double-plate ridge and thicker leg bracing, not a scaled copy.
+ */
 const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const damageIntensity = Math.max(0, 1 - hpPercent);
-  const breathe = 1 + Math.sin(timeMs / 1100) * 0.02;
+  const breatheScale = breathe(timeMs, 4, 1100, 0.015);
 
   drawContactShadow(ctx, 22 * scale, 8 * scale, 0.5);
   ctx.save();
-  ctx.scale(scale, scale * breathe);
+  ctx.scale(scale, scale);
 
-  // Four short, braced legs — planted, not striding.
-  ctx.fillStyle = "#22282c";
   for (const lx of [-14, -6, 6, 14]) {
-    polygonPath(ctx, [
-      [lx - 2.6, 5],
-      [lx + 2.6, 5],
-      [lx + 3.4, 11],
-      [lx - 3.4, 11],
-    ]);
-    ctx.fill();
+    const legGrad = materialFill(ctx, "HIDE", lx, 3, lx, 11, "#4a5458", "#22282c", "#0e1012");
+    limbSegment(ctx, lx, 3, lx, 7, 2.8, 2.6, legGrad);
+    limbSegment(ctx, lx, 7, lx, 11, 2.6, 3.4, "#0e1012");
+    jointBulge(ctx, lx, 7, 2.2, "#181c1e");
   }
 
-  // Broad, low, heavily plated back — the "wall" silhouette.
-  const bodyGrad = ctx.createLinearGradient(0, -13, 0, 6);
-  bodyGrad.addColorStop(0, "#4a5458");
-  bodyGrad.addColorStop(1, "#181c1e");
+  ctx.save();
+  ctx.scale(1, breatheScale);
+
+  const bodyGrad = materialFill(ctx, "HIDE", -19, -12, 19, 8, "#4a5458", "#22282c", "#0e1012");
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-19, 5],
@@ -205,12 +202,8 @@ const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPe
   ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // Overlapping organic armor plates (not mechanical rivets, not crystal facets).
   for (const px of [-11, -4, 3, 10]) {
-    const plateGrad = ctx.createLinearGradient(px, -11, px, -3);
-    plateGrad.addColorStop(0, "#5c666a");
-    plateGrad.addColorStop(1, "#2a3134");
-    ctx.fillStyle = plateGrad;
+    ctx.fillStyle = materialFill(ctx, "STONE", px, -11, px, -2, "#5c666a", "#3a4144", "#0e1012");
     polygonPath(ctx, [
       [px - 3.4, -10],
       [px + 3.4, -10],
@@ -225,7 +218,6 @@ const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPe
 
   drawEnergyCrack(ctx, -6, -4, -2, -8, 3, -4, color, 0.4 + damageIntensity * 0.45 + (enraged ? 0.2 : 0));
 
-  // Low, wide head sunk between the shoulder plates — a single steady glow, no eyes.
   ctx.fillStyle = "#22282c";
   polygonPath(ctx, [
     [15, -6],
@@ -237,8 +229,7 @@ const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPe
   glowBlob(ctx, 20, -3, isMain ? 3.8 : 2.6, color);
 
   if (isMain) {
-    // Main-boss-only: a heavier double-plate ridge — the "eternal" reading.
-    ctx.fillStyle = "#3a4144";
+    ctx.fillStyle = materialFill(ctx, "STONE", -8, -16, 8, -10, "#5c666a", "#3a4144", "#0e1012");
     polygonPath(ctx, [
       [-8, -12],
       [8, -12],
@@ -247,6 +238,7 @@ const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPe
     ]);
     ctx.fill();
   }
+  ctx.restore();
   ctx.restore();
 };
 

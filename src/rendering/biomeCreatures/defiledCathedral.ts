@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { drawFlightShadow, flightLift, glowBlob, polygonPath } from "./helpers";
+import { breathe, drawEye, drawFlightShadow, flightLift, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -8,26 +8,25 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
  * explicitly NOT "just a giant humanoid": its silhouette fuses broken
  * architectural elements (a jagged arch-shaped torso, column-like limbs)
  * with flesh and armor, asymmetric rather than a mirrored humanoid body.
+ * FASE 2: Grave Knight's armor (METAL) and exposed flesh (HIDE) are two
+ * distinct materials on the same body; Gargoyle Beast fuses STONE wings
+ * with a HIDE underbelly.
  */
 
 // Grave Knight — a monstrous, NON-human-proportioned figure in ancient
 // armor: elongated limbs, a hunched oversized torso, a small sunken head.
 const drawGraveKnight: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 9, 4, 0.36);
   const stride = Math.sin(timeMs / 260);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.6;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(-3, 1);
-  ctx.lineTo(-5 - stride * 3, 11);
-  ctx.moveTo(3, 1);
-  ctx.lineTo(5 + stride * 3, 11);
-  ctx.stroke();
-  // oversized hunched torso, disproportionately wide for its short legs
-  const bodyGrad = ctx.createLinearGradient(0, -11, 0, 2);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+  drawContactShadow(ctx, 9, 4, 0.36);
+
+  const legGradL = materialFill(ctx, "METAL", -3, 1, -5 - stride * 3, 11, "#8a8290", theme.body, theme.dark);
+  limbSegment(ctx, -3, 1, -5 - stride * 3, 11, 1.6, 1.2, legGradL);
+  const legGradR = materialFill(ctx, "METAL", 3, 1, 5 + stride * 3, 11, "#8a8290", theme.body, theme.dark);
+  limbSegment(ctx, 3, 1, 5 + stride * 3, 11, 1.6, 1.2, legGradR);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 0, 1300, 0.012));
+  const bodyGrad = materialFill(ctx, "METAL", -9, -12, 9, 2, "#8a8290", theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-8, 0],
@@ -42,45 +41,52 @@ const drawGraveKnight: EnemyDrawFn = (ctx, theme, timeMs) => {
   ctx.strokeStyle = "rgba(0,0,0,0.5)";
   ctx.lineWidth = 1;
   ctx.stroke();
-  // one long, elongated arm dragging low
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(7, -6);
-  ctx.lineTo(13 + Math.sin(timeMs / 300) * 2, 6);
-  ctx.stroke();
-  // tiny sunken head
-  ctx.fillStyle = theme.dark;
+
+  // exposed flesh at the joints — a second material on the same body.
+  ctx.fillStyle = materialFill(ctx, "HIDE", -2, -4, 2, 0, theme.accent, theme.dark, theme.dark);
+  polygonPath(ctx, [
+    [-2, -4],
+    [2, -4],
+    [1.6, 0],
+    [-1.6, 0],
+  ]);
+  ctx.fill();
+
+  // one long, elongated flesh arm dragging low.
+  const armGrad = materialFill(ctx, "HIDE", 7, -6, 13 + Math.sin(timeMs / 300) * 2, 6, theme.accent, theme.dark, theme.dark);
+  limbSegment(ctx, 7, -6, 13 + Math.sin(timeMs / 300) * 2, 6, 1.6, 1, armGrad);
+
+  ctx.fillStyle = materialFill(ctx, "METAL", -3, -15, 3, -11, "#8a8290", theme.body, theme.dark);
   ctx.beginPath();
   ctx.arc(0, -13, 2.6, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.7 + 0.3 * Math.sin(timeMs / 300);
-  ctx.beginPath();
-  ctx.arc(0.8, -13, 0.7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  drawEye(ctx, 0.8, -13, 0.6, theme.accent, true);
+  ctx.restore();
 };
 
-// Gargoyle Beast — quadruped fusion of stone and flesh, small folded stone wings.
+// Gargoyle Beast — quadruped fusion of stone and flesh: STONE folded
+// wings on the back, a HIDE underbelly, volumetric legs.
 const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 11, 5, 0.38);
   const lumber = Math.sin(timeMs / 320);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.6;
-  ctx.lineCap = "round";
+  drawContactShadow(ctx, 11, 5, 0.38);
+
   for (const [lx, sign] of [
     [-6, 1],
     [6, -1],
   ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(lx, 2);
-    ctx.lineTo(lx + lumber * sign * 2, 8);
-    ctx.stroke();
+    const kneeX = lx + lumber * sign * 1;
+    const kneeY = 4.5;
+    const footX = lx + lumber * sign * 2;
+    const footY = 8;
+    const legGrad = materialFill(ctx, "STONE", lx, 2, footX, footY, theme.accent, theme.body, theme.dark);
+    limbSegment(ctx, lx, 2, kneeX, kneeY, 2, 1.6, legGrad);
+    limbSegment(ctx, kneeX, kneeY, footX, footY, 1.6, 1.8, theme.dark);
+    jointBulge(ctx, kneeX, kneeY, 1.2, theme.dark);
   }
-  const bodyGrad = ctx.createLinearGradient(0, -7, 0, 4);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 1, 1200, 0.018));
+  const bodyGrad = materialFill(ctx, "HIDE", -10, -6, 11, 4, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-10, 0],
@@ -91,9 +97,9 @@ const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-9, 4],
   ]);
   ctx.fill();
-  // folded stone wings on the back
+
   for (const s of [1, -1] as const) {
-    ctx.fillStyle = theme.dark;
+    ctx.fillStyle = materialFill(ctx, "STONE", s * 1, -10, s * 7, -3, "#8a8890", theme.dark, theme.dark);
     polygonPath(ctx, [
       [s * 1, -6],
       [s * 7, -10],
@@ -101,6 +107,9 @@ const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs) => {
       [s * 1, -3],
     ]);
     ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
   }
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
@@ -110,12 +119,8 @@ const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs) => {
     [8, 1.5],
   ]);
   ctx.fill();
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.6;
-  ctx.beginPath();
-  ctx.arc(12, -0.5, 0.7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
+  drawEye(ctx, 12, -0.5, 0.6, theme.accent, false);
+  ctx.restore();
 };
 
 // Bell Wraith — a floating mist-wrapped entity, bell-shaped body, no limbs.
@@ -125,9 +130,7 @@ const drawBellWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
   ctx.save();
   ctx.translate(0, -lift);
   ctx.globalAlpha = 0.75;
-  const bellGrad = ctx.createLinearGradient(0, -8, 0, 4);
-  bellGrad.addColorStop(0, theme.dark);
-  bellGrad.addColorStop(1, theme.body);
+  const bellGrad = materialFill(ctx, "METAL", 0, -8, 0, 4, "#c8c4d8", theme.body, theme.dark);
   ctx.fillStyle = bellGrad;
   polygonPath(ctx, [
     [0, -8],
@@ -138,7 +141,6 @@ const drawBellWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
   ]);
   ctx.fill();
   ctx.globalAlpha = 1;
-  // swaying mist tendrils beneath
   for (let i = 0; i < 3; i++) {
     const sway = Math.sin(timeMs / 450 + i * 2) * 2.5;
     ctx.globalAlpha = 0.3;
@@ -149,7 +151,6 @@ const drawBellWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
   }
   ctx.globalAlpha = 1;
   glowBlob(ctx, 0, -4, 2.4, theme.accent);
-  // bell toll ripple
   if (Math.sin(timeMs / 800) > 0.85) {
     ctx.strokeStyle = theme.accent;
     ctx.globalAlpha = 0.4;
@@ -171,9 +172,11 @@ registerEnemyRenderers({
 /**
  * Cathedral Abomination — an asymmetric fusion of broken cathedral
  * architecture with flesh and armor: a jagged arch-shaped torso (echoing
- * a gothic window frame), one column-like rigid limb and one fleshy
- * clawed limb, a cracked rose-window "eye" instead of a head. Explicitly
- * NOT a mirrored humanoid silhouette.
+ * a gothic window frame), one column-like rigid limb (STONE) and one
+ * fleshy clawed limb (HIDE), a cracked rose-window "eye" instead of a
+ * head. Explicitly NOT a mirrored humanoid silhouette. The main boss adds
+ * a broken flying buttress AND a second armored spire on the opposite
+ * shoulder — real architectural growth, not a bigger copy.
  */
 const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
   const isMain = variant === "MAIN";
@@ -186,8 +189,7 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
   ctx.save();
   ctx.scale(scale, scale);
 
-  // Rigid stone column-limb (left) — architecture, not a leg.
-  ctx.fillStyle = "#544c56";
+  ctx.fillStyle = materialFill(ctx, "STONE", -12, -2, -5, 13, "#6a6470", "#3a3440", "#161418");
   polygonPath(ctx, [
     [-11, -2],
     [-6, -3],
@@ -199,14 +201,8 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
   ctx.lineWidth = 0.8;
   for (let i = 0; i < 3; i++) ctx.strokeRect(-11, 0 + i * 4, 6, 3.4);
 
-  // Fleshy clawed limb (right) — asymmetric counterpart, twitching.
-  ctx.strokeStyle = "#3a2c34";
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(7, -1);
-  ctx.lineTo(12 + twitch, 12);
-  ctx.stroke();
+  const clawGrad = materialFill(ctx, "HIDE", 7, -1, 12 + twitch, 12, "#7a3a4a", "#3a2c34", "#160f13");
+  limbSegment(ctx, 7, -1, 12 + twitch, 12, 2.2, 1.6, clawGrad);
   ctx.fillStyle = "#241a20";
   for (const cx of [-2, 0, 2]) {
     polygonPath(ctx, [
@@ -217,11 +213,7 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
     ctx.fill();
   }
 
-  // Jagged arch-shaped torso — a gothic window frame come alive, the
-  // silhouette's core identity, deliberately not a rounded chest.
-  const bodyGrad = ctx.createLinearGradient(0, -20, 0, 4);
-  bodyGrad.addColorStop(0, "#463a48");
-  bodyGrad.addColorStop(1, "#1a1418");
+  const bodyGrad = materialFill(ctx, "STONE", -9, -20, 9, 4, "#5a5460", "#241f28", "#100d10");
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [0, -20],
@@ -239,8 +231,7 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
 
   drawEnergyCrack(ctx, -6, -2, -2, -10, 3, -4, color, 0.45 + damageIntensity * 0.4 + (enraged ? 0.2 : 0));
 
-  // Armor plate fragments fused unevenly across the torso.
-  ctx.fillStyle = "#5a5058";
+  ctx.fillStyle = materialFill(ctx, "METAL", -8, -12, -2, -5, "#c8c4d8", "#5a5460", "#241f28");
   polygonPath(ctx, [
     [-8, -10],
     [-2, -12],
@@ -249,7 +240,6 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
   ]);
   ctx.fill();
 
-  // Cracked rose-window "eye" in place of a head, centered high on the arch.
   glowBlob(ctx, 0, -14, (5 + damageIntensity * 3) * (enraged ? 1.25 : 1), color);
   ctx.strokeStyle = color;
   ctx.globalAlpha = 0.7 + 0.3 * pulse;
@@ -264,13 +254,20 @@ const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enrage
   ctx.globalAlpha = 1;
 
   if (isMain) {
-    // Main-boss-only: a broken flying buttress jutting from the back — the fuller "apex" ruin silhouette.
-    ctx.fillStyle = "#3a323c";
+    ctx.fillStyle = materialFill(ctx, "STONE", -16, -8, -9, 2, "#5a5460", "#241f28", "#100d10");
     polygonPath(ctx, [
       [-9, -8],
       [-16, -2],
       [-14, 2],
       [-9, -3],
+    ]);
+    ctx.fill();
+    ctx.fillStyle = materialFill(ctx, "METAL", 4, -18, 9, -10, "#c8c4d8", "#5a5460", "#241f28");
+    polygonPath(ctx, [
+      [4, -14],
+      [7, -19],
+      [9, -12],
+      [5, -10],
     ]);
     ctx.fill();
   }

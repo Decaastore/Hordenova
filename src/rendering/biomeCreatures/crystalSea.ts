@@ -1,78 +1,92 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { glowBlob, polygonPath } from "./helpers";
+import { breathe, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
  * Mar de Cristal (waves 211-230) — giant mineral crystal formations.
  * Deliberately NOT all-neon: crystal facets read as cold, hard, real
- * mineral (sharp faceted polygons, a two-tone gradient, not a flat glow),
- * with color used only as a sparing inner accent. Prism Wraith uses a
- * genuinely different movement read (drifting fragment cluster, no legs)
- * per the biome brief's "movimento diferenciado".
+ * mineral (sharp faceted polygons, a two-tone/CRYSTAL-material gradient,
+ * not a flat glow), with color used only as a sparing inner accent.
+ * Prism Wraith uses a genuinely different movement read (a drifting
+ * fragment cluster orbiting a hovering core, no legs at all).
  */
 
-// Shardcrawler — eight-legged arachnid with a cluster of crystal shards grown from its back.
+// Shardcrawler — eight-legged arachnid, volumetric jointed legs, a real
+// multi-facet crystal cluster grown from its back (not two flat triangles).
 const drawShardcrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 9, 4, 0.32);
   const legPhase = timeMs / 120;
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.2;
+  drawContactShadow(ctx, 9, 4, 0.32);
+
   for (let i = 0; i < 4; i++) {
     const wig = Math.sin(legPhase + i * 1.4) * 2.6;
     for (const side of [1, -1] as const) {
       const x = -6 + i * 4;
-      ctx.beginPath();
-      ctx.moveTo(x, side * 2);
-      ctx.lineTo(x + wig * 0.5, side * (6 + Math.abs(wig)));
-      ctx.stroke();
+      const kneeX = x + wig * 0.5;
+      const kneeY = side * 3.5;
+      const footX = x + wig;
+      const footY = side * 7;
+      const legGrad = materialFill(ctx, "CHITIN", x, side * 1, footX, footY, theme.accent, theme.body, theme.dark);
+      limbSegment(ctx, x, side * 1, kneeX, kneeY, 1, 0.6, legGrad);
+      limbSegment(ctx, kneeX, kneeY, footX, footY, 0.6, 0.3, theme.dark);
     }
   }
-  ctx.fillStyle = theme.body;
+
+  ctx.save();
+  ctx.scale(breathe(timeMs, 0, 1000, 0.015), 1);
+  ctx.fillStyle = materialFill(ctx, "CHITIN", -7, -4, 7, 4, theme.accent, theme.body, theme.dark);
   ctx.beginPath();
   ctx.ellipse(0, 0, 7, 4.4, 0, 0, Math.PI * 2);
   ctx.fill();
-  // crystal shard cluster on the back
-  for (const [sx, sy, ang, len] of [
-    [-2, -3, -0.3, 5],
-    [1, -4, 0.2, 6.4],
-    [3, -2.5, 0.7, 4],
+
+  // multi-facet crystal cluster on the back — several overlapping shards, not two flat triangles.
+  for (const [sx, sy, ang, len, w] of [
+    [-2, -3, -0.3, 5, 1.3],
+    [1, -4.4, 0.15, 6.8, 1.6],
+    [3, -2.6, 0.7, 4.2, 1.2],
+    [-0.5, -3.6, -0.9, 3.6, 1],
   ] as const) {
     ctx.save();
     ctx.translate(sx, sy);
     ctx.rotate(ang);
-    const shard = ctx.createLinearGradient(0, 0, 0, -len);
-    shard.addColorStop(0, theme.dark);
-    shard.addColorStop(1, theme.accent);
-    ctx.fillStyle = shard;
+    ctx.fillStyle = materialFill(ctx, "CRYSTAL", 0, 0, 0, -len, "#eaf6ff", theme.dark, theme.accent);
     polygonPath(ctx, [
-      [-1.4, 0],
-      [1.4, 0],
-      [0, -len],
+      [-w, 0],
+      [w, 0],
+      [w * 0.4, -len],
+      [-w * 0.4, -len],
     ]);
     ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)";
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
     ctx.restore();
   }
+  ctx.restore();
 };
 
-// Crystal Maw — quadruped with a crushing crystalline jaw and natural crystal armor plates.
+// Crystal Maw — quadruped with a crushing crystalline jaw and faceted
+// crystal armor plates fused directly into its hide.
 const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 12, 5, 0.4);
   const lumber = Math.sin(timeMs / 340);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.8;
-  ctx.lineCap = "round";
+  drawContactShadow(ctx, 12, 5, 0.4);
+
   for (const [lx, sign] of [
     [-7, 1],
     [6, -1],
   ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(lx, 2);
-    ctx.lineTo(lx + lumber * sign * 2, 8);
-    ctx.stroke();
+    const kneeX = lx + lumber * sign * 1;
+    const kneeY = 5;
+    const footX = lx + lumber * sign * 2;
+    const footY = 8;
+    const legGrad = materialFill(ctx, "STONE", lx, 2, footX, footY, theme.accent, theme.body, theme.dark);
+    limbSegment(ctx, lx, 2, kneeX, kneeY, 2.2, 1.8, legGrad);
+    limbSegment(ctx, kneeX, kneeY, footX, footY, 1.8, 1.6, theme.dark);
+    jointBulge(ctx, kneeX, kneeY, 1.4, theme.dark);
   }
-  const bodyGrad = ctx.createLinearGradient(0, -7, 0, 5);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 1, 1100, 0.016));
+  const bodyGrad = materialFill(ctx, "STONE", -11, -7, 12, 4, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-11, 1],
@@ -83,12 +97,9 @@ const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-9, 5],
   ]);
   ctx.fill();
-  // faceted crystal armor plates along the spine
+
   for (const px of [-5, 0, 5]) {
-    const facet = ctx.createLinearGradient(px, -7, px, -3);
-    facet.addColorStop(0, theme.accent);
-    facet.addColorStop(1, theme.dark);
-    ctx.fillStyle = facet;
+    ctx.fillStyle = materialFill(ctx, "CRYSTAL", px - 2, -7, px + 2, -2, "#eaf6ff", theme.accent, theme.dark);
     polygonPath(ctx, [
       [px - 2, -6],
       [px + 2, -6],
@@ -96,8 +107,11 @@ const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
       [px - 1, -2],
     ]);
     ctx.fill();
+    ctx.strokeStyle = "rgba(255,255,255,0.3)";
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
   }
-  // crystalline lower jaw
+
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
     [11, -1],
@@ -107,10 +121,11 @@ const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
   ]);
   ctx.fill();
   glowBlob(ctx, 13, 1, 2.6, theme.accent);
+  ctx.restore();
 };
 
 // Prism Wraith — a hovering, partially incorporeal cluster of drifting
-// mineral fragments orbiting a faint core; no legs, no ground contact.
+// crystal fragments orbiting a faint core; no legs, no ground contact.
 const drawPrismWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
   const hover = Math.sin(timeMs / 900) * 2;
   ctx.save();
@@ -118,7 +133,7 @@ const drawPrismWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
   ctx.globalAlpha = 0.5;
   drawContactShadow(ctx, 7, 3, 0.2);
   ctx.globalAlpha = 1;
-  glowBlob(ctx, 0, 0, 6, theme.accent);
+  glowBlob(ctx, 0, 0, 6 * breathe(timeMs, 0, 700, 0.08), theme.accent);
   for (let i = 0; i < 6; i++) {
     const a = timeMs / 1000 + (i / 6) * Math.PI * 2;
     const r = 6 + (i % 2) * 3;
@@ -128,10 +143,7 @@ const drawPrismWraith: EnemyDrawFn = (ctx, theme, timeMs) => {
     ctx.translate(fx, fy);
     ctx.rotate(a * 1.5);
     ctx.globalAlpha = 0.55 + 0.25 * Math.sin(timeMs / 400 + i);
-    const grad = ctx.createLinearGradient(0, -2.4, 0, 2.4);
-    grad.addColorStop(0, theme.accent);
-    grad.addColorStop(1, theme.body);
-    ctx.fillStyle = grad;
+    ctx.fillStyle = materialFill(ctx, "CRYSTAL", 0, -2.4, 0, 2.4, "#eaf6ff", theme.accent, theme.body);
     polygonPath(ctx, [
       [0, -2.4],
       [1.6, 0],
@@ -152,33 +164,30 @@ registerEnemyRenderers({
 });
 
 // Crystal Behemoth — a hulking quadruped completely overtaken by organic
-// crystal growth; reads as a breathing, pulsing LIVING creature (a slow
-// scale-breathing cycle), not an inert statue.
+// crystal growth; reads as a breathing, pulsing LIVING creature, not an
+// inert statue. Volumetric limbs, real crystal-facet material shading.
 const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
-  const breathe = 1 + Math.sin(timeMs / 900) * 0.03;
+  const breatheScale = breathe(timeMs, 3, 900, 0.03);
   const damageIntensity = Math.max(0, 1 - hpPercent);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 240 : 560));
 
   drawContactShadow(ctx, 20 * scale, 8.5 * scale, 0.46);
   ctx.save();
-  ctx.scale(scale * breathe, scale);
+  ctx.scale(scale, scale);
 
-  ctx.strokeStyle = "#2a3844";
-  ctx.lineWidth = 4.4;
-  ctx.lineCap = "round";
   for (const lx of [-9, -3, 3, 9]) {
-    ctx.beginPath();
-    ctx.moveTo(lx, 4);
-    ctx.lineTo(lx, 12);
-    ctx.stroke();
+    const legGrad = materialFill(ctx, "STONE", lx, 4, lx, 12, "#5a7a86", "#2e4854", "#111c22");
+    limbSegment(ctx, lx, 4, lx, 8, 2.4, 2, legGrad);
+    limbSegment(ctx, lx, 8, lx, 12, 2, 2.2, "#111c22");
+    jointBulge(ctx, lx, 8, 1.8, "#1a2a30");
   }
 
-  const bodyGrad = ctx.createRadialGradient(-3, -6, 2, 0, -2, 18);
-  bodyGrad.addColorStop(0, "#5a7a86");
-  bodyGrad.addColorStop(0.6, "#2e4854");
-  bodyGrad.addColorStop(1, "#111c22");
+  ctx.save();
+  ctx.scale(breatheScale, 1);
+
+  const bodyGrad = materialFill(ctx, "STONE", -16, -12, 17, 7, "#5a7a86", "#2e4854", "#111c22");
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-16, 4],
@@ -193,8 +202,7 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
 
   drawEnergyCrack(ctx, -8, -1, -3, -6, 2, -2, color, 0.5 + damageIntensity * 0.4 + (enraged ? 0.25 : 0));
 
-  // organic crystal growths jutting at irregular angles across the back
-  const shardSpots: Array<[number, number, number, number]> = [
+  const shardSpots: ReadonlyArray<readonly [number, number, number, number]> = [
     [-9, -8, -2.4, 8],
     [-2, -11, -1.7, 10],
     [5, -10, -1.1, 8.5],
@@ -202,12 +210,9 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
   ];
   for (const [sx, sy, ang, len] of shardSpots) {
     ctx.save();
-    ctx.translate(sx, sy);
+    ctx.translate(sx, sy + idleSway(timeMs, sx, 1400, 0.4));
     ctx.rotate(ang);
-    const shard = ctx.createLinearGradient(0, 0, 0, -len);
-    shard.addColorStop(0, "#3a5864");
-    shard.addColorStop(1, color);
-    ctx.fillStyle = shard;
+    ctx.fillStyle = materialFill(ctx, "CRYSTAL", 0, 0, 0, -len, "#eaf6ff", "#3a5864", color);
     ctx.globalAlpha = 0.85 + 0.15 * pulse;
     polygonPath(ctx, [
       [-2.2, 0],
@@ -219,11 +224,9 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
     ctx.restore();
   }
 
-  // pulsing core visible through a crystalline chest facet
   glowBlob(ctx, 1, -2, (5 + damageIntensity * 4) * (enraged ? 1.3 : 1), color);
 
   if (isMain) {
-    // Main-boss-only: a crown of larger crystal spires — the "prime" reading.
     for (const [sx, sy, ang] of [
       [-1, -13, -1.9],
       [4, -13, -1.3],
@@ -231,10 +234,7 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
       ctx.save();
       ctx.translate(sx, sy);
       ctx.rotate(ang);
-      const shard = ctx.createLinearGradient(0, 0, 0, -13);
-      shard.addColorStop(0, "#4a6874");
-      shard.addColorStop(1, color);
-      ctx.fillStyle = shard;
+      ctx.fillStyle = materialFill(ctx, "CRYSTAL", 0, 0, 0, -13, "#eaf6ff", "#4a6874", color);
       polygonPath(ctx, [
         [-2.4, 0],
         [2.4, 0],
@@ -244,6 +244,7 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
       ctx.restore();
     }
   }
+  ctx.restore();
   ctx.restore();
 };
 

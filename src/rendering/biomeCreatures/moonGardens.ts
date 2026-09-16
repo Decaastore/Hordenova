@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { drawFlightShadow, flightLift, glowBlob, polygonPath } from "./helpers";
+import { breathe, drawEye, drawFlightShadow, flightLift, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -7,27 +7,33 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
  * realm. Deliberately mysterious/elegant/dark rather than a bright
  * childish garden: dark silver-blue fur, deep foliage, cold luminous
  * accents used sparingly (eyes, wing patterns, bloom cores) against
- * near-black bodies, never a saturated cartoon palette.
+ * near-black bodies. FASE 2: Bloom Horror's limbs use the PLANT material
+ * recipe (matte, non-reflective, organic) so its vine anatomy reads
+ * distinctly from Moonfang's HIDE fur.
  */
 
-// Moonfang — quadruped predator, dark silver-blue fur, faintly luminous eyes.
+// Moonfang — quadruped predator, dark silver-blue fur, one subtle
+// luminous eye pair (restrained — not an "excesso de olhos brilhantes").
 const drawMoonfang: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 10, 4, 0.32);
   const stride = timeMs / 160;
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2;
-  ctx.lineCap = "round";
+  drawContactShadow(ctx, 10, 4, 0.32);
+
   for (let i = 0; i < 4; i++) {
     const phase = i % 2 === 0 ? Math.sin(stride) : -Math.sin(stride);
     const baseX = i < 2 ? -6 : 6;
-    ctx.beginPath();
-    ctx.moveTo(baseX, 1);
-    ctx.lineTo(baseX + phase * 2.6, 7);
-    ctx.stroke();
+    const kneeX = baseX + phase * 1.3;
+    const kneeY = 3.5;
+    const footX = baseX + phase * 2.6;
+    const footY = 7;
+    const legGrad = materialFill(ctx, "HIDE", baseX, 0, footX, footY, theme.accent, theme.body, theme.dark);
+    limbSegment(ctx, baseX, 0, kneeX, kneeY, 1.4, 1, legGrad);
+    limbSegment(ctx, kneeX, kneeY, footX, footY, 1, 0.6, theme.dark);
+    jointBulge(ctx, kneeX, kneeY, 0.8, theme.dark);
   }
-  const bodyGrad = ctx.createLinearGradient(0, -5, 0, 3);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 0, 1000, 0.018));
+  const bodyGrad = materialFill(ctx, "HIDE", -9, -5.5, 10, 3, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-9, 0],
@@ -39,8 +45,8 @@ const drawMoonfang: EnemyDrawFn = (ctx, theme, timeMs) => {
   ]);
   ctx.fill();
   ctx.strokeStyle = theme.accent;
-  ctx.globalAlpha = 0.3;
-  ctx.lineWidth = 0.6;
+  ctx.globalAlpha = 0.28;
+  ctx.lineWidth = 0.5;
   ctx.beginPath();
   ctx.moveTo(-5, -2);
   ctx.lineTo(3, -3);
@@ -54,26 +60,25 @@ const drawMoonfang: EnemyDrawFn = (ctx, theme, timeMs) => {
     [9, 1.5],
   ]);
   ctx.fill();
-  glowBlob(ctx, 12, -1, 1.6, theme.accent);
+  drawEye(ctx, 12, -1, 0.85, theme.accent, true);
+  ctx.restore();
 };
 
-// Bloom Horror — a hunched carnivorous plant creature: flowers and roots
-// grown into its own anatomy, a flytrap-like maw, slow swaying gait.
+// Bloom Horror — a hunched carnivorous plant creature: PLANT-material vine
+// limbs, a woven root-and-flower torso, a flytrap-like maw.
 const drawBloomHorror: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 10, 4.5, 0.36);
   const sway = Math.sin(timeMs / 500);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.4;
-  ctx.lineCap = "round";
+  drawContactShadow(ctx, 10, 4.5, 0.36);
+
   for (const rx of [-5, 5]) {
-    ctx.beginPath();
-    ctx.moveTo(rx, 2);
-    ctx.quadraticCurveTo(rx + sway * 2, 6, rx + sway, 9);
-    ctx.stroke();
+    const rootGrad = materialFill(ctx, "PLANT", rx, 2, rx + sway * 2, 9, theme.accent, theme.body, theme.dark);
+    limbSegment(ctx, rx, 2, rx + sway, 6, 1.6, 1.2, rootGrad);
+    limbSegment(ctx, rx + sway, 6, rx + sway * 2, 9, 1.2, 0.8, theme.dark);
   }
-  const bodyGrad = ctx.createLinearGradient(0, -8, 0, 3);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 1, 1300, 0.02));
+  const bodyGrad = materialFill(ctx, "PLANT", -7, -8, 8, 3, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-7, 0],
@@ -84,8 +89,8 @@ const drawBloomHorror: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-6, 3],
   ]);
   ctx.fill();
-  // vine limbs
-  ctx.strokeStyle = theme.dark;
+
+  ctx.strokeStyle = materialFill(ctx, "PLANT", -9, -1, 9, 2, theme.accent, theme.body, theme.dark);
   ctx.lineWidth = 1.2;
   for (const s of [1, -1] as const) {
     ctx.beginPath();
@@ -93,7 +98,7 @@ const drawBloomHorror: EnemyDrawFn = (ctx, theme, timeMs) => {
     ctx.quadraticCurveTo(s * 9 + sway * 2, -1, s * 8, 2);
     ctx.stroke();
   }
-  // flytrap-like maw, opening/closing slowly
+
   const open = 1.5 + Math.max(0, Math.sin(timeMs / 700)) * 2.5;
   ctx.fillStyle = theme.accent;
   ctx.globalAlpha = 0.85;
@@ -108,9 +113,10 @@ const drawBloomHorror: EnemyDrawFn = (ctx, theme, timeMs) => {
   ctx.strokeStyle = theme.dark;
   ctx.lineWidth = 0.6;
   ctx.stroke();
+  ctx.restore();
 };
 
-// Lunamoth — large-winged moth, luminous natural wing patterns.
+// Lunamoth — large-winged moth, luminous natural wing venation.
 const drawLunamoth: EnemyDrawFn = (ctx, theme, timeMs) => {
   const lift = flightLift(timeMs, 3.9, 6, 2000);
   drawFlightShadow(ctx, lift, 6, 9, 3.6);
@@ -120,9 +126,7 @@ const drawLunamoth: EnemyDrawFn = (ctx, theme, timeMs) => {
   for (const side of [1, -1] as const) {
     ctx.save();
     ctx.scale(side, 1);
-    const wingGrad = ctx.createLinearGradient(0, 0, 10, -8 - flap * 3);
-    wingGrad.addColorStop(0, theme.dark);
-    wingGrad.addColorStop(1, theme.body);
+    const wingGrad = materialFill(ctx, "HIDE", 0, 0, 12, -7 - flap * 3, theme.dark, theme.body, theme.dark);
     ctx.fillStyle = wingGrad;
     ctx.globalAlpha = 0.85;
     polygonPath(ctx, [
@@ -134,10 +138,15 @@ const drawLunamoth: EnemyDrawFn = (ctx, theme, timeMs) => {
     ]);
     ctx.fill();
     ctx.globalAlpha = 1;
-    // luminous wing-pattern ring
     ctx.strokeStyle = theme.accent;
-    ctx.globalAlpha = 0.6 + 0.3 * Math.sin(timeMs / 400);
-    ctx.lineWidth = 0.8;
+    ctx.globalAlpha = 0.5 + 0.3 * Math.sin(timeMs / 400);
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(1, -0.5);
+    ctx.lineTo(8, -5 - flap * 2);
+    ctx.moveTo(2, 1);
+    ctx.lineTo(9, -1 - flap);
+    ctx.stroke();
     ctx.beginPath();
     ctx.arc(6, -3 - flap * 2, 2, 0, Math.PI * 2);
     ctx.stroke();
@@ -157,9 +166,9 @@ registerEnemyRenderers({
   LUNAMOTH: drawLunamoth,
 });
 
-// Moonroot Matriarch — a giant animal/plant hybrid: root-limbs, a broad
-// blooming crown of giant flowers, elegant posture but a threatening
-// bladed-petal maw — the "elegant AND threatening" brief.
+// Moonroot Matriarch — a giant animal/plant hybrid: PLANT-material
+// root-limbs, a broad blooming crown of giant flowers, elegant posture
+// but a threatening bladed-petal maw.
 const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
@@ -171,24 +180,19 @@ const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, 
   ctx.save();
   ctx.scale(scale, scale);
 
-  // Gnarled root-limbs, planted wide.
-  ctx.strokeStyle = "#241c30";
-  ctx.lineWidth = 4;
-  ctx.lineCap = "round";
   for (const [rx, sign] of [
     [-9, -1],
     [9, 1],
   ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(rx, 4);
-    ctx.quadraticCurveTo(rx + sign * 3 + sway, 9, rx + sign * 5, 13);
-    ctx.stroke();
+    const rootGrad = materialFill(ctx, "PLANT", rx, 4, rx + sign * 5, 13, "#5a3a70", "#2c2440", "#100c18");
+    limbSegment(ctx, rx, 4, rx + sign * 3 + sway, 9, 3, 2.2, rootGrad);
+    limbSegment(ctx, rx + sign * 3 + sway, 9, rx + sign * 5, 13, 2.2, 2.6, "#100c18");
   }
 
-  // Elegant elongated torso, dark foliage gradient.
-  const bodyGrad = ctx.createLinearGradient(0, -18, 0, 5);
-  bodyGrad.addColorStop(0, "#40365a");
-  bodyGrad.addColorStop(1, "#161022");
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 3, 1100, 0.014));
+
+  const bodyGrad = materialFill(ctx, "PLANT", -8, -18, 8, 5, "#40365a", "#241c34", "#0e0a16");
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [0, -18],
@@ -203,12 +207,11 @@ const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, 
 
   drawEnergyCrack(ctx, -5, -6, -2, -10, 2, -6, color, 0.4 + damageIntensity * 0.4 + (enraged ? 0.2 : 0));
 
-  // Trailing thin root-tendrils, swaying.
   for (const [tx, phase] of [
     [-6, 0],
     [6, 1.4],
   ] as const) {
-    ctx.strokeStyle = "#2c2440";
+    ctx.strokeStyle = materialFill(ctx, "PLANT", tx, -2, tx, 9, "#2c2440", "#1c1730", "#0e0a16");
     ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(tx, -2);
@@ -216,18 +219,14 @@ const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, 
     ctx.stroke();
   }
 
-  // Giant blooming flower-crown, petals fanned like a threatening collar.
   const petalCount = isMain ? 7 : 5;
   for (let i = 0; i < petalCount; i++) {
     const a = -Math.PI / 2 + (i / (petalCount - 1) - 0.5) * 2.6;
     const len = 11 + (isMain ? 3 : 0);
     ctx.save();
     ctx.translate(0, -16);
-    ctx.rotate(a);
-    const petalGrad = ctx.createLinearGradient(0, 0, 0, -len);
-    petalGrad.addColorStop(0, "#5a3a70");
-    petalGrad.addColorStop(1, color);
-    ctx.fillStyle = petalGrad;
+    ctx.rotate(a + idleSway(timeMs, i, 1600, 0.04));
+    ctx.fillStyle = materialFill(ctx, "PLANT", 0, 0, 0, -len, "#5a3a70", "#3a2a54", color);
     ctx.globalAlpha = 0.85 + 0.15 * pulse;
     polygonPath(ctx, [
       [-2.6, 0],
@@ -241,13 +240,12 @@ const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, 
   glowBlob(ctx, 0, -16, (5 + damageIntensity * 3) * (enraged ? 1.25 : 1), color);
 
   if (isMain) {
-    // Main-boss-only: a second, lower ring of smaller petals — fuller elder bloom.
     for (let i = 0; i < 5; i++) {
       const a = -Math.PI / 2 + (i / 4 - 0.5) * 3.4;
       ctx.save();
       ctx.translate(0, -12);
       ctx.rotate(a);
-      ctx.fillStyle = "#7a5a94";
+      ctx.fillStyle = materialFill(ctx, "PLANT", 0, 0, 0, -6, "#7a5a94", "#4a3868", "#100c18");
       polygonPath(ctx, [
         [-1.8, 0],
         [1.8, 0],
@@ -257,6 +255,7 @@ const drawMoonrootMatriarch: BossCreatureDrawFn = (ctx, color, timeMs, enraged, 
       ctx.restore();
     }
   }
+  ctx.restore();
   ctx.restore();
 };
 

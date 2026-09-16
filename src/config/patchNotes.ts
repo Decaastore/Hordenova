@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v23",
+    dateIso: "2026-09-16",
+    category: "CONTENT",
+    title: {
+      en: "Premium Creature Art Pass — All 10 New Biomes Redrawn",
+      ptBR: "Nova Arte Premium das Criaturas — Os 10 Novos Biomas Redesenhados",
+    },
+    description: {
+      en: "The 30 creatures and 20 mini-boss/boss bodies added with the last 10 biomes have all been redrawn from scratch with real anatomy instead of simple shapes: layered materials (bone, stone, metal, crystal, hide, chitin, charred flesh, plant matter) that actually look different from each other, volumetric jointed limbs with visible knees and feet instead of straight lines, subtle idle breathing and swaying so nothing stands frozen, and a proper ground/flight presence (contact shadows for walkers, altitude bob and cast shadows for fliers). Every boss now clearly outgrows its own mini-boss with extra armor, horns, or growths — not just a bigger copy of the same drawing — and every creature was checked to still read correctly as a silhouette alone, so you can tell species apart by shape, not just color.",
+      ptBR: "As 30 criaturas e os 20 corpos de mini-chefe/chefe adicionados com os últimos 10 biomas foram totalmente redesenhados com anatomia de verdade em vez de formas simples: materiais em camadas (osso, pedra, metal, cristal, pele, quitina, carne carbonizada, matéria vegetal) que realmente parecem diferentes entre si, membros articulados e volumétricos com joelhos e pés visíveis em vez de linhas retas, respiração e balanço sutis no estado parado para nada ficar congelado, e presença correta no chão ou no ar (sombra de contato para quem anda, oscilação de altitude e sombra projetada para quem voa). Todo chefe agora claramente supera seu próprio mini-chefe com armadura, chifres ou crescimentos extras — não é só uma cópia maior do mesmo desenho — e cada criatura foi conferida para continuar reconhecível só pela silhueta, então dá pra diferenciar as espécies pela forma, não só pela cor.",
+    },
+    highlights: [
+      {
+        en: "All 30 regular creatures across the 10 new biomes redrawn with real body parts (head, jaw, limbs, joints, tail, wings, plates, claws) matched to their biome's materials.",
+        ptBR: "As 30 criaturas comuns dos 10 novos biomas foram redesenhadas com partes do corpo de verdade (cabeça, mandíbula, membros, articulações, cauda, asas, placas, garras) combinando com os materiais do seu bioma.",
+      },
+      {
+        en: "All 10 mini-bosses and their matching main bosses got a second pass of extra anatomy, armor, or growths on the main boss so it visibly outranks its mini-boss instead of just being scaled up.",
+        ptBR: "Os 10 mini-chefes e seus chefes principais correspondentes ganharam uma segunda camada de anatomia, armadura ou crescimentos extras no chefe principal, para que ele claramente supere seu mini-chefe em vez de ser apenas uma versão ampliada.",
+      },
+      {
+        en: "Flying creatures (Gravewing, Storm Talon, Void Bat, Cinderwing, Lunamoth, Bell Wraith, and the flying bosses) now bob with altitude and cast a proper flight shadow.",
+        ptBR: "Criaturas voadoras (Asa-Sepulcral, Garra-da-Tempestade, Morcego do Vazio, Asa-de-Cinzas, Traça-Lunar, Espectro do Sino e os chefes voadores) agora oscilam com a altitude e projetam uma sombra de voo de verdade.",
+      },
+      {
+        en: "Fixed a bug where the 'New Enemy' discovery banner never actually auto-dismissed after its intended few seconds, so it could sit indefinitely over the enemy spawn point.",
+        ptBR: "Corrigido um bug em que o banner de descoberta de 'Novo Inimigo' nunca fechava sozinho após os segundos previstos, podendo ficar indefinidamente sobre o ponto de surgimento dos inimigos.",
+      },
+      {
+        en: "Purely visual work — no change to HP, damage, speed, drops, waves, Gold, Gems, Prestige, Mastery, or Specialization.",
+        ptBR: "Trabalho puramente visual — nenhuma mudança em HP, dano, velocidade, drops, ondas, Gold, Gemas, Prestígio, Maestria ou Especialização.",
+      },
+    ],
+  },
+  {
     id: "v22",
     dateIso: "2026-09-16",
     category: "CONTENT",

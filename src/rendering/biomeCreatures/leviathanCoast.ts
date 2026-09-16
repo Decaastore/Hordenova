@@ -1,40 +1,45 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { glowBlob, polygonPath } from "./helpers";
+import { breathe, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
  * Península dos Leviatãs (waves 311-330) — a rocky coast where giant sea
  * creatures died eons ago. Deliberately coastal/leviathan-remains rather
  * than a beach: slick amphibious hides, bioluminescent abyssal accents,
- * bony fin structures — never a bright tropical read.
+ * bony fin structures. FASE 2: Bonefin mixes HIDE (living fish-flesh) and
+ * BONE (exposed skeletal ridge) on the same small body — the concrete
+ * "partially bony" read the name promises.
  */
 
-// Tide Ripper — low, muscular amphibious predator, built to claw through surf and sand.
+// Tide Ripper — low, muscular amphibious predator, volumetric clawed legs.
 const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 10, 4, 0.34);
   const crawl = Math.sin(timeMs / 180);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.6;
-  ctx.lineCap = "round";
+  drawContactShadow(ctx, 10, 4, 0.34);
+
   for (const [lx, sign] of [
     [-6, 1],
     [6, -1],
   ] as const) {
+    const kneeX = lx + crawl * sign * 1.4;
+    const kneeY = 3;
+    const footX = lx + crawl * sign * 3;
+    const footY = 6.5;
+    const legGrad = materialFill(ctx, "HIDE", lx, 0, footX, footY, theme.accent, theme.body, theme.dark);
+    limbSegment(ctx, lx, 0, kneeX, kneeY, 1.8, 1.4, legGrad);
+    limbSegment(ctx, kneeX, kneeY, footX, footY, 1.4, 0.8, theme.dark);
+    ctx.strokeStyle = theme.dark;
+    ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.moveTo(lx, 1);
-    ctx.lineTo(lx + crawl * sign * 3, 6);
-    ctx.stroke();
-    // claw
-    ctx.beginPath();
-    ctx.moveTo(lx + crawl * sign * 3, 6);
-    ctx.lineTo(lx + crawl * sign * 3 - 2, 8);
-    ctx.moveTo(lx + crawl * sign * 3, 6);
-    ctx.lineTo(lx + crawl * sign * 3 + 2, 8);
+    ctx.moveTo(footX, footY);
+    ctx.lineTo(footX - 2, footY + 2);
+    ctx.moveTo(footX, footY);
+    ctx.lineTo(footX + 2, footY + 2);
     ctx.stroke();
   }
-  const bodyGrad = ctx.createLinearGradient(0, -4, 0, 3);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 0, 900, 0.02));
+  const bodyGrad = materialFill(ctx, "HIDE", -10, -4, 11, 3, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-10, 0],
@@ -61,24 +66,23 @@ const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs) => {
     [8, 1],
   ]);
   ctx.fill();
+  ctx.restore();
 };
 
-// Deepmaw — an abyssal-predator marine creature hauling itself onto land, huge jaw.
+// Deepmaw — an abyssal-predator marine creature hauling itself onto land,
+// bioluminescent dots along the spine, a huge hinged jaw.
 const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 13, 5.5, 0.42);
   const drag = Math.sin(timeMs / 340);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(-5, 3);
-  ctx.lineTo(-8 + drag * 2, 9);
-  ctx.moveTo(5, 3);
-  ctx.lineTo(8 - drag * 2, 9);
-  ctx.stroke();
-  const bodyGrad = ctx.createLinearGradient(0, -7, 0, 5);
-  bodyGrad.addColorStop(0, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+  drawContactShadow(ctx, 13, 5.5, 0.42);
+
+  const legGradL = materialFill(ctx, "HIDE", -5, 3, -8 + drag * 2, 9, theme.accent, theme.body, theme.dark);
+  limbSegment(ctx, -5, 3, -8 + drag * 2, 9, 2.2, 1.8, legGradL);
+  const legGradR = materialFill(ctx, "HIDE", 5, 3, 8 - drag * 2, 9, theme.accent, theme.body, theme.dark);
+  limbSegment(ctx, 5, 3, 8 - drag * 2, 9, 2.2, 1.8, legGradR);
+
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 1, 1000, 0.016));
+  const bodyGrad = materialFill(ctx, "HIDE", -12, -7, 12, 5, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-12, 1],
@@ -89,7 +93,6 @@ const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-10, 5],
   ]);
   ctx.fill();
-  // bioluminescent dots along the spine
   for (let i = 0; i < 4; i++) {
     const x = -7 + i * 4.5;
     ctx.fillStyle = theme.accent;
@@ -99,7 +102,6 @@ const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  // huge hinged jaw
   const jawOpen = 1 + Math.max(0, Math.sin(timeMs / 500)) * 2;
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
@@ -110,14 +112,17 @@ const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
   ]);
   ctx.fill();
   glowBlob(ctx, 14, 0.5 + jawOpen * 0.5, 2.6, theme.accent);
+  ctx.restore();
 };
 
-// Bonefin — fast, partially bony fish-predator hybrid, low profile.
+// Bonefin — fast, partially bony fish-predator hybrid: living HIDE flesh
+// fused with an exposed BONE dorsal ridge — two materials, one small body.
 const drawBonefin: EnemyDrawFn = (ctx, theme, timeMs) => {
-  drawContactShadow(ctx, 8, 3.4, 0.3);
   const dash = Math.sin(timeMs / 130);
+  drawContactShadow(ctx, 8, 3.4, 0.3);
+
   ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 1.2;
   ctx.lineCap = "round";
   for (const s of [1, -1] as const) {
     ctx.beginPath();
@@ -125,10 +130,8 @@ const drawBonefin: EnemyDrawFn = (ctx, theme, timeMs) => {
     ctx.lineTo(s * 5 + dash * s, 6);
     ctx.stroke();
   }
-  const bodyGrad = ctx.createLinearGradient(-9, 0, 9, 0);
-  bodyGrad.addColorStop(0, theme.dark);
-  bodyGrad.addColorStop(0.5, theme.body);
-  bodyGrad.addColorStop(1, theme.dark);
+
+  const bodyGrad = materialFill(ctx, "HIDE", -9, -1, 9, 1, theme.dark, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-9, 0],
@@ -139,16 +142,18 @@ const drawBonefin: EnemyDrawFn = (ctx, theme, timeMs) => {
     [-3, 3],
   ]);
   ctx.fill();
-  // exposed bone ridge along the back
-  ctx.strokeStyle = "#d8d0c0";
-  ctx.lineWidth = 0.9;
-  ctx.globalAlpha = 0.7;
-  ctx.beginPath();
-  ctx.moveTo(-6, -1.5);
-  ctx.lineTo(4, -1.2);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  // dorsal fin
+
+  // exposed bone ridge along the back — a real second material, not a highlight line.
+  ctx.fillStyle = materialFill(ctx, "BONE", -6, -3.6, 4, -1, "#e8e0cc", "#c8c0a8", "#8a8270");
+  polygonPath(ctx, [
+    [-6, -1.6],
+    [-2, -3.6],
+    [2, -3.2],
+    [4, -1.4],
+    [-2, -1],
+  ]);
+  ctx.fill();
+
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
     [-2, -3],
@@ -156,7 +161,6 @@ const drawBonefin: EnemyDrawFn = (ctx, theme, timeMs) => {
     [3, -2],
   ]);
   ctx.fill();
-  // tail fin flicking
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
     [-9, 0],
@@ -174,7 +178,8 @@ registerEnemyRenderers({
 
 // Leviathan Spawn — a giant, partially terrestrial marine creature, its
 // bony plating echoing the scattered leviathan remains along the coast;
-// hauls itself forward on stubby flipper-limbs.
+// hauls itself forward on volumetric stubby flippers. The main boss adds
+// a full crest of larger fused bone spikes — a genuinely elder anatomy.
 const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
@@ -187,23 +192,17 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
   ctx.scale(scale, scale);
   ctx.translate(0, undulate * 1.2);
 
-  // Stubby flipper-limbs.
-  ctx.fillStyle = "#1c3038";
   for (const fx of [-11, 11]) {
-    polygonPath(ctx, [
-      [fx - 4, 4],
-      [fx + 4, 4],
-      [fx + 2, 11],
-      [fx - 2, 11],
-    ]);
-    ctx.fill();
+    const flipperGrad = materialFill(ctx, "HIDE", fx, 2, fx, 11, "#264e58", "#1c3038", "#0a1518");
+    limbSegment(ctx, fx, 2, fx, 7, 4, 3.2, flipperGrad);
+    limbSegment(ctx, fx, 7, fx, 11, 3.2, 4, "#0a1518");
+    jointBulge(ctx, fx, 7, 2.4, "#12232a");
   }
 
-  // Long undulating body, slick abyssal hide.
-  const bodyGrad = ctx.createLinearGradient(-18, 0, 18, 0);
-  bodyGrad.addColorStop(0, "#0e2228");
-  bodyGrad.addColorStop(0.5, "#264a52");
-  bodyGrad.addColorStop(1, "#0e2228");
+  ctx.save();
+  ctx.scale(1, breathe(timeMs, 2, 1100, 0.015));
+
+  const bodyGrad = materialFill(ctx, "HIDE", -18, -10, 18, 6, "#264e58", "#0e2228", "#050d10");
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
     [-18, 2],
@@ -221,10 +220,9 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
 
   drawEnergyCrack(ctx, -8, -2, -3, -6, 3, -3, color, 0.4 + damageIntensity * 0.4 + (enraged ? 0.2 : 0));
 
-  // Bony dorsal plates echoing the leviathan bones scattered along the coast.
   for (const px of [-9, -2, 5, 12]) {
-    ctx.fillStyle = "#d8d2c0";
-    ctx.globalAlpha = 0.85;
+    ctx.fillStyle = materialFill(ctx, "BONE", px, -12, px, -6, "#e8e0cc", "#c8c0a8", "#8a8270");
+    ctx.globalAlpha = 0.9;
     polygonPath(ctx, [
       [px - 2.2, -6],
       [px + 2.2, -6],
@@ -234,7 +232,6 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
     ctx.globalAlpha = 1;
   }
 
-  // Bioluminescent throat glow, huge jaw.
   glowBlob(ctx, 15, 0, (4 + damageIntensity * 3) * (enraged ? 1.25 : 1), color);
   ctx.fillStyle = "#0e2228";
   polygonPath(ctx, [
@@ -252,7 +249,6 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
   ctx.globalAlpha = 1;
 
   if (isMain) {
-    // Main-boss-only: a larger crest of fused ancestral bone spikes — the "elder" reading.
     for (const [sx, sy, ang] of [
       [-4, -10, -2.2],
       [3, -11, -0.9],
@@ -260,7 +256,7 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
       ctx.save();
       ctx.translate(sx, sy);
       ctx.rotate(ang);
-      ctx.fillStyle = "#e8e2d0";
+      ctx.fillStyle = materialFill(ctx, "BONE", 0, 0, 0, -9, "#e8e0cc", "#c8c0a8", "#8a8270");
       polygonPath(ctx, [
         [-2, 0],
         [2, 0],
@@ -270,6 +266,7 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
       ctx.restore();
     }
   }
+  ctx.restore();
   ctx.restore();
 };
 

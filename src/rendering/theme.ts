@@ -106,6 +106,63 @@ export const ENEMY_THEME: Record<EnemyType, EnemyTheme> = {
 };
 
 /**
+ * FASE 2 (creature art pass) — per-archetype visual scale, purely cosmetic
+ * (CanvasRenderer's own `archetypeScale` multiplier, never touching
+ * baseHp/baseSpeed/hitbox/targeting in enemyStats.ts or CombatSystem.ts).
+ * Reinforces the "Common < Elite < Mini-Boss < Boss" hierarchy the user
+ * asked for by also separating heavy/tanky archetypes from small/fast ones
+ * WITHIN the Common tier, so silhouette bulk already hints at role before
+ * a player ever reads a stat. SWARMLING (0.65) and IRONCLAD (1.15) are the
+ * two pre-existing entries this table already had; every other key here is
+ * new (10-biome expansion roster). Anything absent defaults to 1 exactly
+ * like before.
+ */
+export const ARCHETYPE_VISUAL_SCALE: Partial<Record<EnemyType, number>> = {
+  SWARMLING: 0.65,
+  IRONCLAD: 1.15,
+  // Cidade Subterrânea dos Anões.
+  FORGECRAWLER: 0.8,
+  DEEPDELVER: 0.95,
+  MAGMAJAW: 1.25,
+  // Cemitério dos Colossos.
+  BONE_STALKER: 0.85,
+  RIBCRAWLER: 0.9,
+  GRAVEWING: 0.75,
+  // Ilhas Flutuantes.
+  CLOUDFANG: 0.8,
+  SKY_MANTA: 1.05,
+  STORM_TALON: 0.8,
+  // Templo Solar Perdido.
+  SUNSCARAB: 0.95,
+  TEMPLE_GUARDIAN: 1.3,
+  SOLAR_SERPENT: 1.0,
+  // Mar de Cristal.
+  SHARDCRAWLER: 0.8,
+  CRYSTAL_MAW: 1.2,
+  PRISM_WRAITH: 0.75,
+  // Fortaleza Abissal.
+  ABYSS_CRAWLER: 0.85,
+  CHAINBOUND: 1.15,
+  VOID_BAT: 0.65,
+  // Vale das Cinzas Mortas.
+  ASH_HOUND: 0.85,
+  PETRIFIED_STALKER: 1.0,
+  CINDERWING: 0.7,
+  // Jardins da Lua.
+  MOONFANG: 0.85,
+  BLOOM_HORROR: 1.15,
+  LUNAMOTH: 0.75,
+  // Catedral Profanada.
+  GRAVE_KNIGHT: 1.15,
+  GARGOYLE_BEAST: 1.05,
+  BELL_WRAITH: 0.85,
+  // Península dos Leviatãs.
+  TIDE_RIPPER: 0.9,
+  DEEPMAW: 1.25,
+  BONEFIN: 0.7,
+};
+
+/**
  * Visual Design System — status colors used ONLY for state readouts (HP,
  * effects, readiness), never reused as a decorative body/material color.
  * Keeping them exclusive is what lets a player read "wounded" or "ready to
