@@ -50,11 +50,12 @@ export interface ItemVisualAsset {
 
 export const ITEM_VISUAL_ASSETS: Record<string, ItemVisualAsset> = {
   warden_fragment: {},
-  // AMULETOS — IDENTIDADE VISUAL DEFINITIVA: real art requested (dark-fantasy,
-  // premium, physically distinct per item) but no image-generation tool is
-  // available in this environment. See the delivery report for the exact
-  // brief to commission/generate for each of these three `imageSrc` paths.
-  mosswood_charm: {},
+  // AMULETOS — IDENTIDADE VISUAL DEFINITIVA. mosswood_charm's real artwork
+  // was supplied by the user and matted to a transparent background (the
+  // source render had an opaque near-black backdrop baked in, not real
+  // alpha) before landing here — see public/items/amulets/README.md for
+  // the brief the remaining two (hollow_sigil, wardens_eye) still need.
+  mosswood_charm: { imageSrc: "/items/amulets/mosswood_charm.png" },
   ancient_core: {},
   hollow_sigil: {},
   wardens_eye: {},

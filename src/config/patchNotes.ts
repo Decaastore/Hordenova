@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v17",
+    dateIso: "2026-09-16",
+    category: "ITEMS",
+    title: {
+      en: "Mosswood Charm Gets Its Own Real Artwork",
+      ptBR: "Amuleto do Bosque Musgoso Ganha Arte Própria Real",
+    },
+    description: {
+      en: "Mosswood Charm is the first item in Hordenova to show a real, hand-crafted picture of itself instead of a generic category icon — an aged bronze pendant wrapped in moss around a glowing green core, exactly as its lore describes. The same picture now appears everywhere the item shows up: Inventory, its tooltip, the item details view, and the Marketplace.",
+      ptBR: "O Amuleto do Bosque Musgoso é o primeiro item de HORDENOVA a mostrar uma imagem real e única de si mesmo, em vez de um ícone genérico de categoria — um pingente de bronze envelhecido, envolto em musgo, com um núcleo verde brilhante no centro, exatamente como sua descrição sempre disse. A mesma imagem agora aparece em todo lugar onde o item aparece: Inventário, tooltip, tela de detalhes do item e Marketplace.",
+    },
+    highlights: [
+      {
+        en: "New per-item art pipeline: each item can now carry its own unique picture, resolved through a single registry so it shows up correctly everywhere at once — no more separate wiring per screen.",
+        ptBR: "Novo pipeline de arte por item: cada item agora pode ter sua própria imagem única, resolvida por um único registro, de forma que ela apareça corretamente em todo lugar de uma vez — sem precisar conectar tela por tela.",
+      },
+      {
+        en: "Rarity presentation (the colored border and glow) is still applied by the interface around the artwork, never baked into the picture itself — so the same image reads correctly at every rarity treatment.",
+        ptBR: "A apresentação de raridade (borda e brilho coloridos) continua sendo aplicada pela interface ao redor da arte, nunca embutida na própria imagem — então a mesma imagem funciona corretamente em qualquer tratamento de raridade.",
+      },
+      {
+        en: "Hollow Sigil and Warden's Eye still use the generic Amulet icon for now, until their own artwork is ready — nothing about their rarity, effects, or how they work has changed.",
+        ptBR: "Sigilo Oco e Olho do Guardião ainda usam o ícone genérico de Amuleto por enquanto, até que suas próprias artes fiquem prontas — nada sobre a raridade, efeitos ou funcionamento deles mudou.",
+      },
+    ],
+  },
+  {
     id: "v16",
     dateIso: "2026-09-15",
     category: "ITEMS",

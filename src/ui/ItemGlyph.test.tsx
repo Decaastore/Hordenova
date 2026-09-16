@@ -23,21 +23,25 @@ function render(itemDefinitionId: string, size?: number): { container: HTMLDivEl
  * contract: real art from the registry wins when supplied, and a generic
  * hand-drawn category icon is the graceful fallback when it isn't (or the
  * file fails to load) — nothing ever renders broken or blank.
+ *
+ * mosswood_charm has real supplied artwork registered by default (see
+ * itemAssets.ts); hollow_sigil is still honestly empty, so the
+ * manually-injected-registry scenarios below use it to stay independent of
+ * whether any given item currently has real art.
  */
 describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
   afterEach(() => {
     // Never leak a test-only imageSrc into another test — the registry is a shared module singleton.
-    delete ITEM_VISUAL_ASSETS.mosswood_charm.imageSrc;
+    delete ITEM_VISUAL_ASSETS.hollow_sigil!.imageSrc;
   });
 
-  it("renders the fallback hand-drawn icon (no <img>) when no real art is registered — true today for every item", () => {
-    const { container } = render("mosswood_charm");
+  it("renders the fallback hand-drawn icon (no <img>) for an item with no real art registered", () => {
+    const { container } = render("hollow_sigil");
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).not.toBeNull();
   });
 
-  it("renders the real artwork via <img> once one is registered for that item's visualAssetId", () => {
-    ITEM_VISUAL_ASSETS.mosswood_charm.imageSrc = "/items/amulets/mosswood_charm.png";
+  it("renders mosswood_charm's real supplied artwork via <img>, not the fallback icon", () => {
     const { container } = render("mosswood_charm");
     const img = container.querySelector("img");
     expect(img).not.toBeNull();
@@ -45,9 +49,18 @@ describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
     expect(container.querySelector("svg")).toBeNull();
   });
 
+  it("renders real artwork via <img> once one is registered for any item's visualAssetId", () => {
+    ITEM_VISUAL_ASSETS.hollow_sigil!.imageSrc = "/items/amulets/hollow_sigil.png";
+    const { container } = render("hollow_sigil");
+    const img = container.querySelector("img");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe("/items/amulets/hollow_sigil.png");
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
   it("falls back to the hand-drawn icon if the registered image fails to load (404), never leaving a broken image", () => {
-    ITEM_VISUAL_ASSETS.mosswood_charm.imageSrc = "/items/amulets/does-not-exist.png";
-    const { container } = render("mosswood_charm");
+    ITEM_VISUAL_ASSETS.hollow_sigil!.imageSrc = "/items/amulets/does-not-exist.png";
+    const { container } = render("hollow_sigil");
     const img = container.querySelector("img")!;
     act(() => img.dispatchEvent(new Event("error")));
     expect(container.querySelector("img")).toBeNull();
@@ -64,10 +77,9 @@ describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
     const wrapperNoArt = withoutArt.container.firstElementChild as HTMLElement;
     const borderNoArt = wrapperNoArt.style.border;
 
-    ITEM_VISUAL_ASSETS.hollow_sigil.imageSrc = "/items/amulets/hollow_sigil.png";
+    ITEM_VISUAL_ASSETS.hollow_sigil!.imageSrc = "/items/amulets/hollow_sigil.png";
     const withArt = render("hollow_sigil", 48);
     const wrapperWithArt = withArt.container.firstElementChild as HTMLElement;
     expect(wrapperWithArt.style.border).toBe(borderNoArt);
-    delete ITEM_VISUAL_ASSETS.hollow_sigil.imageSrc;
   });
 });

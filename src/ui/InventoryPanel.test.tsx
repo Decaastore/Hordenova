@@ -236,8 +236,14 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
     expect(container.textContent).toContain("Mosswood Charm");
     expect(container.textContent).toContain("Hollow Sigil");
     expect(container.textContent).toContain("Warden's Eye");
-    // Each tile renders its item as an SVG glyph inside a bordered tile, not a plain text row.
-    expect(container.querySelectorAll(".hordenova-item-tile svg").length).toBeGreaterThanOrEqual(3);
+    // Each tile renders its item as a real ItemGlyph (real artwork <img> where
+    // registered — mosswood_charm today — or the fallback SVG icon otherwise)
+    // inside a bordered tile, never a plain text row.
+    const tiles = container.querySelectorAll(".hordenova-item-tile");
+    expect(tiles.length).toBe(4);
+    for (const tile of tiles) {
+      expect(tile.querySelector("svg, img")).not.toBeNull();
+    }
   });
 
   it("hovering an amulet tile reveals its tooltip with name, AMULET tag, and its real effect", () => {

@@ -4,11 +4,12 @@ import { ITEM_DEFINITIONS } from "./itemDefinitions";
 
 /**
  * IDENTIDADE VISUAL DEFINITIVA — the item -> real-art registry ItemGlyph
- * reads from. No real image-generation tool exists in this environment
- * (confirmed before building this feature), so every entry below is
- * honestly empty rather than faking a placeholder as "real art" — see this
- * file's own header and the feature's delivery report for the exact art
- * brief still needed per item.
+ * reads from. No image-generation tool exists in this environment, so no
+ * entry is ever faked as "real art" — mosswood_charm's imageSrc below is
+ * real artwork the user supplied directly (matted to transparency, see
+ * itemAssets.ts's own comment); the still-empty entries are honestly
+ * empty, not placeholders. See public/items/amulets/README.md for the
+ * exact brief the remaining amulets need.
  */
 describe("itemAssets — ITEM_VISUAL_ASSETS registry", () => {
   it("has a registry entry for every real item in the catalog", () => {
@@ -25,9 +26,9 @@ describe("itemAssets — ITEM_VISUAL_ASSETS registry", () => {
     expect(getItemVisualAsset("mosswood_charm")).toBe(ITEM_VISUAL_ASSETS.mosswood_charm);
   });
 
-  it("no entry fakes a real image today — none of the 3 amulets has an imageSrc yet (no image-generation tool available)", () => {
-    for (const id of ["mosswood_charm", "hollow_sigil", "wardens_eye"]) {
-      expect(getItemVisualAsset(id).imageSrc).toBeUndefined();
-    }
+  it("mosswood_charm has real supplied artwork; hollow_sigil and wardens_eye are still honestly empty (no image-generation tool available for those)", () => {
+    expect(getItemVisualAsset("mosswood_charm").imageSrc).toBe("/items/amulets/mosswood_charm.png");
+    expect(getItemVisualAsset("hollow_sigil").imageSrc).toBeUndefined();
+    expect(getItemVisualAsset("wardens_eye").imageSrc).toBeUndefined();
   });
 });
