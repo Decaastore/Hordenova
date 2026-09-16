@@ -19,6 +19,7 @@ import {
 import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
 import { getTowerSpecialAtLevel, type TowerSpecial, type TowerType } from "@/config/towerStats";
 import { applySpecializationToSpecial } from "@/config/specializations";
+import { applyMasteryToSpecial } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { windowedBossDamageBump } from "@/config/bossPowerBudget";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
@@ -196,10 +197,13 @@ function resolveNormalAttack(
   if (!target) return;
 
   resetTowerCooldown(tower);
-  const special = applySpecializationToSpecial(
-    getTowerSpecialAtLevel(tower.type, tower.level),
-    tower.specializationId,
-    tower.specializationLevel,
+  const special = applyMasteryToSpecial(
+    applySpecializationToSpecial(
+      getTowerSpecialAtLevel(tower.type, tower.level),
+      tower.specializationId,
+      tower.specializationLevel,
+    ),
+    tower.masteryLevel,
   );
 
   {

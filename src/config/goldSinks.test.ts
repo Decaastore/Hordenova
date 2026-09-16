@@ -3,15 +3,16 @@ import { GOLD_SINKS, hasUncappedGoldSink } from "./goldSinks";
 import { hasUncappedGemSink } from "./gemSinks";
 
 /**
- * INFINITE BALANCE OVERHAUL — Mastery's per-LEVEL cost moved back to Gold
- * (registered here as "mastery"), mirroring Specialization's shape exactly:
- * a one-time Gems unlock (gemSinks.ts's "tower_mastery", now uncapped:false)
- * followed by an uncapped Gold track whose combat effect keeps growing
- * forever with diminishing returns (see towerMastery.ts's masteryEffectScale)
- * instead of stopping at a hard cap.
+ * FASE 6 (currency division) — Mastery is registered here as "mastery" and
+ * is entirely Gold-funded now, its one-time unlock included (see
+ * config/towerMastery.ts's getMasteryUnlockGoldCost) — it no longer has any
+ * Gems-funded step at all, unlike Specialization, which still keeps a
+ * Gems-funded path unlock/change (config/specializations.ts). Mastery's
+ * per-level effect keeps growing forever with diminishing returns (see
+ * towerMastery.ts's masteryEffectScale) instead of stopping at a hard cap.
  */
-describe("goldSinks (Master Implementation Pass spec section 6/45, CORREÇÃO DE REQUISITOS)", () => {
-  it("Mastery IS a Gold sink — its per-level cost, not its one-time Gems unlock", () => {
+describe("goldSinks (Master Implementation Pass spec section 6/45, FASE 6)", () => {
+  it("Mastery IS a Gold sink — unlock AND every level", () => {
     expect(GOLD_SINKS.find((s) => s.id === "mastery")?.uncapped).toBe(true);
   });
 

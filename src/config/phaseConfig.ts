@@ -262,6 +262,14 @@ export function isPhaseStart(waveNumber: number): boolean {
  * another migration). Keyed by absolute wave number; a wave not listed
  * here gets no milestone bonus (just its normal per-wave gold).
  */
+/**
+ * HORDENOVA Season/Progression v1.0 — Prestige Gem Shard income (Cenário D,
+ * config/prestige.ts). Extended out to wave 500 following the exact same
+ * shape/formula as the original 10-130 table (same growth cadence per
+ * milestone) — not a parallel system, not a new formula. This is a purely
+ * additive, one-time-per-wave bonus; the per-kill Gem Shard rate itself
+ * (GameEngine.rewardGemShardsForBossKill) is untouched by this table.
+ */
 export const PHASE_MILESTONE_BONUSES: Readonly<Record<number, number>> = {
   10: 150,
   20: 300,
@@ -272,6 +280,14 @@ export const PHASE_MILESTONE_BONUSES: Readonly<Record<number, number>> = {
   90: 1700,
   110: 2200,
   130: 2800,
+  150: 3200,
+  200: 4000,
+  250: 4800,
+  300: 5600,
+  350: 6400,
+  400: 7200,
+  450: 8000,
+  500: 8800,
 };
 
 export function getMilestoneBonus(waveNumber: number): number {

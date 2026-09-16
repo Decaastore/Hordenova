@@ -27,22 +27,43 @@ export function canUnlockPrestige(bestWave: number): boolean {
   return bestWave >= PRESTIGE_MIN_BEST_WAVE;
 }
 
-const PRESTIGE_BASE_COST_GEMS = 150;
-const PRESTIGE_GROWTH_FACTOR = 1.1;
+/**
+ * FASE 6 (Currency division: "Gold compra/evolui poder. Gems compram
+ * acesso/decisões específicas e Prestige permanente.") — retuned cost curve,
+ * same compound-cap + linear-tail architecture Mastery/Specialization
+ * already use, so Prestige gets the same overflow-proof shape instead of a
+ * bare, ever-steeper exponential. Approved via real-engine Gem Shard income
+ * simulation (Cenário D: 2 Gem Shards per boss/mini-boss kill + milestone
+ * bonuses extended to wave 500, see config/phaseConfig.ts) against an
+ * explicit pacing target (P1 = days, P10 = weeks-months, P25 = months,
+ * P50 = 1-2 years, P75 = 2-3 years, P100 = 3-5 years of real dedicated
+ * play) — replaces the earlier flat 150 * 1.10^n curve, which produced
+ * P75/P100 timelines of decades and was explicitly rejected.
+ *
+ * The player only ever pays THIS function's return value (the cost of the
+ * single next level) — never a cumulative sum. See getPrestigeUpgradeCost's
+ * own callers (GameEngine.upgradePrestige, ui/EconomyStatsPanel.tsx).
+ */
+const PRESTIGE_BASE_COST_GEMS = 5;
+const PRESTIGE_COST_GROWTH_FACTOR = 1.07;
+const PRESTIGE_COST_COMPOUND_LEVEL_CAP = 50;
+const PRESTIGE_COST_LINEAR_TAIL_GROWTH = Math.log(PRESTIGE_COST_GROWTH_FACTOR);
 
 /**
  * Gem cost to go from `currentLevel` to `currentLevel + 1`. No max level —
- * exact formula approved for HORDENOVA Season/Progression v1.0, no
- * compounding-cap/linear-tail safety net (unlike Mastery/Specialization's
- * cost curves): 1.10^n only approaches double-precision overflow around
- * n≈7,440, a Prestige level so far beyond any realistic Gems budget (level
- * 50 alone already costs ~193,000 Gems) that the safety net every other
- * uncapped cost curve in this codebase needs would never actually matter
- * here — adding one would be complexity with no real effect.
+ * compounds up to PRESTIGE_COST_COMPOUND_LEVEL_CAP, then continues as a
+ * purely linear tail (continuous slope at the cap, no price cliff, no
+ * Math.pow overflow at extreme levels) — the exact same shape as
+ * config/towerMastery.ts's getMasteryUpgradeCost and
+ * config/specializations.ts's getSpecializationUpgradeCost.
  */
 export function getPrestigeUpgradeCost(currentLevel: number): number {
   const targetLevel = currentLevel + 1;
-  return Math.round(PRESTIGE_BASE_COST_GEMS * Math.pow(PRESTIGE_GROWTH_FACTOR, targetLevel)) + targetLevel;
+  const cappedLevel = Math.min(targetLevel, PRESTIGE_COST_COMPOUND_LEVEL_CAP);
+  const compound = Math.pow(PRESTIGE_COST_GROWTH_FACTOR, cappedLevel);
+  const tailLevels = Math.max(0, targetLevel - PRESTIGE_COST_COMPOUND_LEVEL_CAP);
+  const linearTail = 1 + tailLevels * PRESTIGE_COST_LINEAR_TAIL_GROWTH;
+  return Math.round(PRESTIGE_BASE_COST_GEMS * compound * linearTail) + targetLevel;
 }
 
 /** Every 10 levels is a new cosmetic tier — i18n key: prestige.tiers.<name> */
@@ -114,4 +135,49 @@ export function getPrestigeBonuses(prestigeLevel: number): PrestigeBonuses {
     goldMultiplier: 1 + Math.min(PRESTIGE_GOLD_BONUS_CAP, level * PRESTIGE_GOLD_BONUS_PER_LEVEL),
     gemShardMultiplier: 1 + Math.min(PRESTIGE_GEM_SHARD_BONUS_CAP, level * PRESTIGE_GEM_SHARD_BONUS_PER_LEVEL),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Prestige milestone rewards — FASE 6. A small, deliberately sparse set of
+// cosmetic/status rewards ("poucas recompensas cosméticas realmente
+// especiais para preservar o valor das skins pagas" — never a mass grant).
+// PROFILE_FRAME/TITLE are purely derived from prestigeLevel (no separate
+// grant/state needed — Prestige never decreases, so "prestigeLevel >= 30"
+// is itself a permanent, idempotent unlock check). TOWER_SKIN/CASTLE_SKIN
+// reuse the existing ownedTowerSkinIds/unlockedCastleSkinIds architecture —
+// see config/towerSkins.ts's PRESTIGE_TOWER_SKINS, config/castleSkins.ts's
+// PRESTIGE_CASTLE_SKIN_ID, and GameEngine.grantPrestigeMilestoneRewards.
+// ---------------------------------------------------------------------------
+
+export type PrestigeRewardType = "PROFILE_FRAME" | "TITLE" | "TOWER_SKIN" | "CASTLE_SKIN";
+
+export interface PrestigeMilestoneReward {
+  level: number;
+  type: PrestigeRewardType;
+  /** i18n key suffix — full key is `prestige.rewards.<id>.name` / `.description`. */
+  id: string;
+}
+
+export const PRESTIGE_MILESTONE_REWARDS: readonly PrestigeMilestoneReward[] = [
+  { level: 10, type: "PROFILE_FRAME", id: "bronzeFrame" },
+  { level: 20, type: "PROFILE_FRAME", id: "silverFrame" },
+  { level: 30, type: "TITLE", id: "ascendantTitle" },
+  { level: 50, type: "TOWER_SKIN", id: "prestigeTowerSkin" },
+  { level: 75, type: "PROFILE_FRAME", id: "radiantEffect" },
+  { level: 100, type: "CASTLE_SKIN", id: "prestigeCastleSkin" },
+];
+
+/** The milestone reward defined for exactly this level, or null if this level grants no reward. */
+export function getPrestigeMilestoneReward(level: number): PrestigeMilestoneReward | null {
+  return PRESTIGE_MILESTONE_REWARDS.find((r) => r.level === level) ?? null;
+}
+
+/** Every milestone reward already earned (permanently) at `prestigeLevel` — used to render frame/title/skin status in UI. */
+export function getEarnedPrestigeMilestoneRewards(prestigeLevel: number): readonly PrestigeMilestoneReward[] {
+  return PRESTIGE_MILESTONE_REWARDS.filter((r) => r.level <= prestigeLevel);
+}
+
+/** The next not-yet-reached milestone reward past `prestigeLevel`, or null once every reward is earned. */
+export function getNextPrestigeMilestoneReward(prestigeLevel: number): PrestigeMilestoneReward | null {
+  return PRESTIGE_MILESTONE_REWARDS.find((r) => r.level > prestigeLevel) ?? null;
 }

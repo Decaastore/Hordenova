@@ -27,12 +27,12 @@ import type { TowerLoadoutEntry } from "@/entities/Tower";
  * completely separate buckets exist:
  *
  *   PERMANENT (never touched by a Season boundary): gems, Mastery ownership
- *   (SaveData.masteryUnlocked — the one-time 400 Gems purchase per tower
- *   TYPE), Specialization ownership (SaveData.unlockedSpecializationIds —
+ *   (SaveData.masteryUnlocked — the one-time Gold purchase per tower TYPE,
+ *   FASE 6), Specialization ownership (SaveData.unlockedSpecializationIds —
  *   the one-time 500 Gems purchase per path), owned/equipped Tower Skins
- *   (ownedTowerSkinIds/equippedTowerSkinByType — also Gems-only), Profile
- *   Prestige, items/inventory, collection, ascensionHistory/records,
- *   bestWave (the account's all-time record).
+ *   (ownedTowerSkinIds/equippedTowerSkinByType — Gems-only, except a Prestige
+ *   milestone grant), Profile Prestige, items/inventory, collection,
+ *   ascensionHistory/records, bestWave (the account's all-time record).
  *
  *   SEASONAL (reset to a fresh state at every Season boundary, by
  *   syncSeasonIfNeeded below): tower LEVEL, Mastery LEVEL

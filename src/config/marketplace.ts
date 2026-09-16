@@ -6,10 +6,11 @@ import type { Rarity } from "./rarity";
  * invented in isolation (spec: "analisar a economia atual antes de
  * finalizar valores definitivos"):
  *   - Real one-time Gem purchases today: SPECIALIZATION_UNLOCK_GEM_COST=500,
- *     MASTERY_UNLOCK_GEM_COST=400, SPECIALIZATION_CHANGE_GEM_COST=200,
- *     REPOSITION_GEM_COST=200, item slot unlocks 250/500 (towerItemSlots.ts).
+ *     SPECIALIZATION_CHANGE_GEM_COST=200, REPOSITION_GEM_COST=200, item slot
+ *     unlocks 250/500 (towerItemSlots.ts). FASE 6: Tower Mastery moved off
+ *     Gems entirely (unlock included, now Gold — see towerMastery.ts).
  *   - Real cosmetic Gem purchases: Tower/Castle Skins at 120/350/800 Gems
- *     (towerSkins.ts), Prestige starting at 150 Gems and climbing (prestige.ts).
+ *     (towerSkins.ts), Prestige starting at 5 Gems and climbing (prestige.ts).
  * A single MYTHIC drop (the rarest real item in the game, 0.1% drop weight)
  * sits near the top of that existing spending band (~1000 Gems) as its
  * auction ENTRY DOOR — never its "value". The market (bidding) decides the

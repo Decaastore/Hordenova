@@ -49,7 +49,7 @@ export interface TowerInstance {
   equippedSkinId: string | null;
   /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. HORDENOVA Season/Progression v1.0: this is now purely the SEASON-scoped level (resets to 0 every Season) — see `masteryUnlocked` below for the permanent ownership half. See config/towerMastery.ts for the bonus/cost formulas. */
   masteryLevel: number;
-  /** HORDENOVA Season/Progression v1.0 — permanent, account-wide-by-type Mastery OWNERSHIP (the one-time 400 Gems purchase), denormalized onto each tower instance exactly like `masteryLevel` is, kept in sync by GameEngine whenever it changes. Gates whether `masteryLevel` can be raised with Gold at all — see `canUpgradeMastery`. Never reset by a Season boundary. */
+  /** HORDENOVA Season/Progression v1.0 — permanent, account-wide-by-type Mastery OWNERSHIP (the one-time Gold purchase, FASE 6 — see config/towerMastery.ts's getMasteryUnlockGoldCost), denormalized onto each tower instance exactly like `masteryLevel` is, kept in sync by GameEngine whenever it changes. Gates whether `masteryLevel` can be raised with Gold at all — see `canUpgradeMastery`. Never reset by a Season boundary. */
   masteryUnlocked: boolean;
 
   // -------------------------------------------------------------------
@@ -263,7 +263,7 @@ export function canUpgradeMastery(tower: TowerInstance): boolean {
   return tower.masteryUnlocked === true;
 }
 
-/** GOLD cost for the selected tower's NEXT mastery level. Only meaningful once unlocked (masteryLevel >= 1) — the 0 -> 1 step uses the flat MASTERY_UNLOCK_GEM_COST instead. */
+/** GOLD cost for the selected tower's NEXT mastery level. Only meaningful once unlocked (masteryLevel >= 1) — the 0 -> 1 step uses getMasteryUnlockGoldCost (also Gold, FASE 6) instead. */
 export function getMasteryUpgradeCostFor(tower: TowerInstance): number {
   return getMasteryUpgradeCost(tower.type, tower.masteryLevel);
 }

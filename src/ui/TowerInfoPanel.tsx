@@ -9,7 +9,7 @@ import {
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
-import { getMasteryCosmeticTier, getNextMasteryCosmeticTier, MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
+import { getMasteryCosmeticTier, getMasteryUnlockGoldCost, getNextMasteryCosmeticTier } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
@@ -25,7 +25,7 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getSkinsForTower } from "@/config/towerSkins";
+import { getPrestigeSkinsForTower, getSkinsForTower } from "@/config/towerSkins";
 import { REPOSITION_GEM_COST } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
@@ -208,7 +208,6 @@ export function TowerInfoPanel({
       <MasterySection
         tower={tower}
         gold={gold}
-        gems={gems}
         theme={theme}
         t={t}
         onUnlock={onUnlockMastery}
@@ -513,7 +512,6 @@ function RepositionSection({
 function MasterySection({
   tower,
   gold,
-  gems,
   theme,
   t,
   onUnlock,
@@ -521,7 +519,6 @@ function MasterySection({
 }: {
   tower: TowerInstance;
   gold: number;
-  gems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
   onUnlock: () => void;
@@ -531,7 +528,8 @@ function MasterySection({
   const nextTier = getNextMasteryCosmeticTier(tower.masteryLevel);
 
   if (!tower.masteryUnlocked) {
-    const affordable = gems >= MASTERY_UNLOCK_GEM_COST;
+    const unlockCost = getMasteryUnlockGoldCost(tower.type);
+    const affordable = gold >= unlockCost;
     return (
       <>
         <div style={dividerStyle} />
@@ -545,7 +543,7 @@ function MasterySection({
           <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
             {t("towerInfo.masteryUnlock")}
             <span style={{ opacity: 0.6 }}>·</span>
-            {t("towerInfo.cost")} <GemIcon size={11} color={PALETTE.gem} /> {MASTERY_UNLOCK_GEM_COST}
+            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {unlockCost}
           </span>
         </button>
       </>
@@ -804,7 +802,11 @@ function SkinSection({
   onPurchase: (skinId: string) => void;
   isSkinOwned: (skinId: string) => boolean;
 }) {
-  const skins = getSkinsForTower(tower.type);
+  // FASE 6 — Prestige-exclusive skins (never sold, see towerSkins.ts's
+  // PRESTIGE_TOWER_SKINS doc comment) only ever join the list once actually
+  // owned (granted at Prestige level 50), so an unreached one never shows up
+  // as a permanently-locked commercial card.
+  const skins = [...getSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
   if (skins.length === 0) return null;
 
   return (

@@ -5,6 +5,8 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getGlobalEconomyStats, type LocalEconomySummary } from "@/engine/EconomyStats";
 import {
   canUnlockPrestige,
+  getEarnedPrestigeMilestoneRewards,
+  getNextPrestigeMilestoneReward,
   getPrestigeBonuses,
   getPrestigeTier,
   getPrestigeUpgradeCost,
@@ -114,6 +116,17 @@ function PrestigeUnlockedView({
         <div style={nextCostRowStyle}>
           <GemIcon size={11} color={PALETTE.gem} /> {t("prestige.cost", { cost: nextCost })}
         </div>
+        <div style={currentGemsRowStyle}>
+          {t("prestige.currentGemsLabel")}: <GemIcon size={10} color={PALETTE.gem} /> {gems}
+        </div>
+        <div style={progressBarTrackStyle}>
+          <div
+            style={{
+              ...progressBarFillStyle,
+              width: `${Math.round(Math.min(1, gems / Math.max(1, nextCost)) * 100)}%`,
+            }}
+          />
+        </div>
         {nextHasEconomicBonus ? (
           <BenefitLines goldMultiplier={1 + nextGoldGain} gemShardMultiplier={1 + nextGemShardGain} />
         ) : (
@@ -127,6 +140,8 @@ function PrestigeUnlockedView({
 
       <p style={permanentHintStyle}>{t("prestige.permanentHint")}</p>
       <p style={permanentHintStyle}>{t("prestige.capNote", { cap: PRESTIGE_FUNCTIONAL_CAP_LEVEL })}</p>
+
+      <PrestigeRewardsSection prestigeLevel={prestigeLevel} />
 
       <div style={{ ...sectionSubtitleStyle, marginTop: 14 }}>{t("prestige.progressionTitle")}</div>
       <div style={progressionListStyle}>
@@ -153,6 +168,33 @@ function PrestigeUnlockedView({
             </div>
           );
         })}
+      </div>
+    </>
+  );
+}
+
+/** FASE 6 — shows already-earned milestone rewards (permanent — reuses ownedTowerSkinIds/unlockedCastleSkinIds/the tier badge architecture) and the next one still ahead. */
+function PrestigeRewardsSection({ prestigeLevel }: { prestigeLevel: number }) {
+  const { t } = useLanguage();
+  const earned = getEarnedPrestigeMilestoneRewards(prestigeLevel);
+  const next = getNextPrestigeMilestoneReward(prestigeLevel);
+
+  return (
+    <>
+      <div style={{ ...sectionSubtitleStyle, marginTop: 14 }}>{t("prestige.rewardsTitle")}</div>
+      <div style={rowsStyle}>
+        {earned.map((reward) => (
+          <div key={reward.id} style={rewardRowStyle}>
+            <span style={labelStyle}>{t(`prestige.rewards.${reward.id}.name` as TranslationKey)}</span>
+            <span style={rewardEarnedTagStyle}>{t("prestige.rewardEarned", { level: reward.level })}</span>
+          </div>
+        ))}
+        {next && (
+          <div style={{ ...rewardRowStyle, opacity: 0.6 }}>
+            <span style={labelStyle}>{t(`prestige.rewards.${next.id}.name` as TranslationKey)}</span>
+            <span style={rewardNextTagStyle}>{t("prestige.rewardNext", { level: next.level })}</span>
+          </div>
+        )}
       </div>
     </>
   );
@@ -370,6 +412,52 @@ const progressionNoGainStyle: CSSProperties = {
   fontStyle: "italic",
   color: PALETTE.uiTextDim,
   marginTop: 2,
+};
+
+const currentGemsRowStyle: CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 4,
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+  marginTop: 4,
+};
+
+const progressBarTrackStyle: CSSProperties = {
+  width: "100%",
+  height: 5,
+  borderRadius: 3,
+  background: "rgba(255,255,255,0.08)",
+  overflow: "hidden",
+  marginTop: 5,
+};
+
+const progressBarFillStyle: CSSProperties = {
+  height: "100%",
+  background: PALETTE.gem,
+  borderRadius: 3,
+};
+
+const rewardRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  padding: "6px 10px",
+  borderRadius: 6,
+  background: "rgba(0,0,0,0.25)",
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+};
+
+const rewardEarnedTagStyle: CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  color: PALETTE.success,
+};
+
+const rewardNextTagStyle: CSSProperties = {
+  fontSize: 9.5,
+  fontWeight: 700,
+  color: PALETTE.uiTextDim,
 };
 
 const unavailableStyle: CSSProperties = {

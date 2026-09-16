@@ -28,13 +28,19 @@ export interface TowerSkinPaletteOverride {
  * price points (see TOWER_SKIN_TIER_PRICES). Purely a pricing classification
  * — never read by combat code, never affects catalog/ownership/equip logic.
  */
-export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM";
+export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE";
 
-/** The three approved commercial price points, in Gems. Every skin's `gemCost` must equal its tier's price here — see towerSkins.test.ts. */
+/**
+ * The three approved commercial price points, in Gems, plus PRESTIGE (0 —
+ * never sold, see PRESTIGE_TOWER_SKINS below). Every COMMERCIAL skin's
+ * `gemCost` must equal its tier's price here — see towerSkins.test.ts, which
+ * only ever iterates TOWER_SKINS, never PRESTIGE_TOWER_SKINS.
+ */
 export const TOWER_SKIN_TIER_PRICES: Record<TowerSkinTier, number> = {
   ENTRY: 120,
   INTERMEDIATE: 350,
   PREMIUM: 800,
+  PRESTIGE: 0,
 };
 
 export interface TowerSkinDefinition {
@@ -102,7 +108,61 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
   },
 ];
 
-const SKINS_BY_ID = new Map(TOWER_SKINS.map((s) => [s.id, s]));
+/**
+ * FASE 6 — Prestige P50 reward (config/prestige.ts's PRESTIGE_MILESTONE_REWARDS,
+ * "prestigeTowerSkin"). Deliberately NOT in TOWER_SKINS: it is never sold
+ * (gemCost 0, unlockLevel unreachable so canPurchaseSkin/the commercial shop
+ * flow can never surface or sell it) and is instead granted directly into
+ * ownedTowerSkinIds by GameEngine.grantEarnedPrestigeMilestoneRewards the
+ * moment prestigeLevel reaches 50 — reusing the exact ownership architecture
+ * every other skin uses, just skipping the Gems-purchase step entirely. One
+ * per tower type, all granted together (Prestige is account-wide, not
+ * per-tower), so a P50 player can equip it on whichever tower they like.
+ */
+export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
+  {
+    id: "IRONWOOD_PRESTIGE_ASCENDANT",
+    towerType: "IRONWOOD",
+    i18nKey: "IRONWOOD_PRESTIGE_ASCENDANT",
+    paletteOverride: { primary: "#2a2410", secondary: "#100d04", accent: "#ffd257", glow: "rgba(255,210,87,0.6)" },
+    ornament: "ancient",
+    unlockLevel: Number.POSITIVE_INFINITY,
+    tier: "PRESTIGE",
+    gemCost: 0,
+  },
+  {
+    id: "INFERNO_PRESTIGE_ASCENDANT",
+    towerType: "INFERNO",
+    i18nKey: "INFERNO_PRESTIGE_ASCENDANT",
+    paletteOverride: { primary: "#2a2410", secondary: "#100d04", accent: "#ffd257", glow: "rgba(255,210,87,0.6)" },
+    ornament: "ancient",
+    unlockLevel: Number.POSITIVE_INFINITY,
+    tier: "PRESTIGE",
+    gemCost: 0,
+  },
+  {
+    id: "FROSTBORN_PRESTIGE_ASCENDANT",
+    towerType: "FROSTBORN",
+    i18nKey: "FROSTBORN_PRESTIGE_ASCENDANT",
+    paletteOverride: { primary: "#2a2410", secondary: "#100d04", accent: "#ffd257", glow: "rgba(255,210,87,0.6)" },
+    ornament: "ancient",
+    unlockLevel: Number.POSITIVE_INFINITY,
+    tier: "PRESTIGE",
+    gemCost: 0,
+  },
+  {
+    id: "STORMCALLER_PRESTIGE_ASCENDANT",
+    towerType: "STORMCALLER",
+    i18nKey: "STORMCALLER_PRESTIGE_ASCENDANT",
+    paletteOverride: { primary: "#2a2410", secondary: "#100d04", accent: "#ffd257", glow: "rgba(255,210,87,0.6)" },
+    ornament: "ancient",
+    unlockLevel: Number.POSITIVE_INFINITY,
+    tier: "PRESTIGE",
+    gemCost: 0,
+  },
+];
+
+const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS].map((s) => [s.id, s]));
 
 export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
   return SKINS_BY_ID.get(id) ?? null;
@@ -110,4 +170,9 @@ export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
 
 export function getSkinsForTower(type: TowerType): readonly TowerSkinDefinition[] {
   return TOWER_SKINS.filter((s) => s.towerType === type);
+}
+
+/** Prestige-exclusive skins for this tower type — never purchasable, only ever granted (see PRESTIGE_TOWER_SKINS's own doc comment). */
+export function getPrestigeSkinsForTower(type: TowerType): readonly TowerSkinDefinition[] {
+  return PRESTIGE_TOWER_SKINS.filter((s) => s.towerType === type);
 }

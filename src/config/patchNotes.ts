@@ -70,6 +70,45 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v21",
+    dateIso: "2026-09-16",
+    category: "SYSTEMS",
+    title: {
+      en: "Mastery Is Now Bought With Gold, Not Gems — Plus a Reworked Prestige",
+      ptBR: "Maestria Agora é Comprada com Gold, Não Gemas — Além de um Prestígio Reformulado",
+    },
+    description: {
+      en: "A clearer split for what each currency is for: Gold now buys and grows every bit of a tower's power, while Gems are reserved for access decisions and permanent Prestige. Tower Mastery — unlock included — is entirely Gold-funded now, and each tower's Mastery investment flavors its own signature strength a little (Ironwood leans harder into crit, Inferno into AoE and burn, Frostborn into slow and freeze, Stormcaller into chain lightning and armor penetration) instead of only ever adding flat damage. Prestige got a full pass too: its Gems cost curve is friendlier early on, Gem Shard income from boss and mini-boss kills is up, wave milestones now extend all the way to wave 500, and a handful of real milestone rewards (profile frames, a title, an exclusive tower skin, an exclusive castle skin) are now waiting at Prestige 10/20/30/50/75/100.",
+      ptBR: "Uma divisão mais clara do papel de cada moeda: Gold agora compra e evolui todo o poder de uma torre, enquanto Gemas ficam reservadas para decisões de acesso e o Prestígio permanente. A Maestria de Torre — incluindo o desbloqueio — agora é totalmente financiada com Gold, e o investimento em Maestria de cada torre passa a reforçar um pouco a força de identidade dela (Ironwood aposta mais em crítico, Inferno em área e queimadura, Frostborn em lentidão e congelamento, Stormcaller em corrente elétrica e penetração de armadura) em vez de só somar dano puro. O Prestígio também recebeu uma revisão completa: a curva de custo em Gemas ficou mais amigável no início, o ganho de Gem Shards por chefes e mini-chefes aumentou, os marcos de onda agora vão até a onda 500, e um punhado de recompensas reais de marco (molduras de perfil, um título, uma skin de torre exclusiva, uma skin de castelo exclusiva) esperam agora no Prestígio 10/20/30/50/75/100.",
+    },
+    highlights: [
+      {
+        en: "Tower Mastery's one-time unlock is now Gold (no Gems spent anywhere in Mastery, ever); every level after that stays Gold too, exactly as before.",
+        ptBR: "O desbloqueio único da Maestria de Torre agora é em Gold (nenhuma Gema é gasta em Maestria, em nenhum momento); todo nível seguinte continua em Gold, como antes.",
+      },
+      {
+        en: "Specialization is untouched: path unlock still costs 500 Gems, switching paths still costs 200 Gems, and every level within a path stays Gold-funded.",
+        ptBR: "Especialização não mudou: desbloquear um caminho ainda custa 500 Gemas, trocar de caminho ainda custa 200 Gemas, e todo nível dentro de um caminho continua sendo pago em Gold.",
+      },
+      {
+        en: "Gem Shards from boss and mini-boss kills are up from 1 to 2 each, and the one-time wave-milestone bonus now extends out to wave 500 instead of stopping at 130.",
+        ptBR: "Gem Shards de chefes e mini-chefes subiram de 1 para 2 cada, e o bônus único de marco de onda agora se estende até a onda 500 em vez de parar na 130.",
+      },
+      {
+        en: "Prestige's next-level cost curve is gentler at low levels (Prestige 10 now costs 20 Gems instead of ~400) while staying a genuine long-term goal at high levels.",
+        ptBR: "A curva de custo do próximo nível de Prestígio ficou mais suave nos níveis baixos (Prestígio 10 agora custa 20 Gemas em vez de ~400), mantendo-se uma meta real de longo prazo nos níveis altos.",
+      },
+      {
+        en: "New permanent Prestige rewards: bronze/silver profile frames at 10/20, a title at 30, an exclusive Tower Skin at 50, a special effect at 75, and an exclusive Castle Skin plus the top title at 100.",
+        ptBR: "Novas recompensas permanentes de Prestígio: molduras de perfil bronze/prata em 10/20, um título em 30, uma Skin de Torre exclusiva em 50, um efeito especial em 75, e uma Skin de Castelo exclusiva mais o título máximo em 100.",
+      },
+      {
+        en: "The Prestige panel now also shows your current Gems, a progress bar toward the next level, and every milestone reward you've earned or are working toward.",
+        ptBR: "O painel de Prestígio agora também mostra suas Gemas atuais, uma barra de progresso até o próximo nível, e cada recompensa de marco já conquistada ou em andamento.",
+      },
+    ],
+  },
+  {
     id: "v20",
     dateIso: "2026-09-16",
     category: "ITEMS",

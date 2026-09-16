@@ -16,15 +16,14 @@
  * reserved, honestly marked `implemented: false` below, not silently
  * pretended into existence.
  *
- * INFINITE BALANCE OVERHAUL — `tower_mastery` here is ONLY the one-time,
- * flat unlock (MASTERY_UNLOCK_GEM_COST in config/towerMastery.ts) — the
- * same shape as `specialization_unlock` right above it: a single Gems
- * purchase that opens a track, never a recurring one. Mastery DOES now
- * grant real (small, diminishing-returns) combat effects — see
- * config/towerMastery.ts's getMasteryBonuses — but every LEVEL of it is
- * bought with Gold, never Gems, exactly like Specialization. The NEVER-P2W
- * CONTRACT above still holds: Gems buy access, Gold buys power, and a free
- * player reaches the same access through ordinary Gem Shard income.
+ * FASE 6 (currency division: "Gold compra/evolui poder. Gems compram
+ * acesso/decisões específicas e Prestige permanente.") — `tower_mastery`
+ * has been REMOVED from this registry entirely. Mastery no longer spends
+ * any Gems anywhere, unlock included (see config/towerMastery.ts's
+ * getMasteryUnlockGoldCost) — it is now a pure Gold sink, registered as
+ * "mastery" in goldSinks.ts instead. This keeps Gems reserved for exactly
+ * three things: Prestige, Specialization path unlock, and Specialization
+ * path change — never Mastery.
  */
 
 export type GemSinkCategory = "CONVENIENCE" | "COSMETIC_PRESTIGE";
@@ -45,9 +44,6 @@ export const GEM_SINKS: readonly GemSinkDefinition[] = [
   { id: "inventory_expansion", category: "CONVENIENCE", i18nKey: "INVENTORY_EXPANSION", uncapped: false, implemented: false },
   { id: "profile_prestige", category: "COSMETIC_PRESTIGE", i18nKey: "PROFILE_PRESTIGE", uncapped: true, implemented: true },
   { id: "tower_skin", category: "COSMETIC_PRESTIGE", i18nKey: "TOWER_SKIN", uncapped: false, implemented: true },
-  // uncapped: false — this is only the one-time unlock (MASTERY_UNLOCK_GEM_COST);
-  // every level after that is a Gold sink, registered as "mastery" in goldSinks.ts.
-  { id: "tower_mastery", category: "CONVENIENCE", i18nKey: "TOWER_MASTERY", uncapped: false, implemented: true },
 ];
 
 /** Spec section 46's Gem Economy Invariant, made checkable: true as long as at least one UNCAPPED, IMPLEMENTED sink exists. */

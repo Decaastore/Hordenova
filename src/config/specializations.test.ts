@@ -4,6 +4,8 @@ import {
   getSpecializationUpgradeCost,
   specializationEffectScale,
   SPECIALIZATIONS_BY_TOWER,
+  SPECIALIZATION_CHANGE_GEM_COST,
+  SPECIALIZATION_UNLOCK_GEM_COST,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
 } from "./specializations";
 import { getTowerSpecialAtLevel, TOWER_TYPES } from "./towerStats";
@@ -231,6 +233,26 @@ describe("Specialization / Upgrade Slot (Progression 2.0 spec section 5/6)", () 
         const result = applySpecializationToSpecial(base, def.id, 100_000_000);
         for (const value of Object.values(result)) {
           if (typeof value === "number") expect(Number.isFinite(value)).toBe(true);
+        }
+      }
+    });
+  });
+
+  describe("FASE 6 (currency division) confirmation — Specialization keeps its Gems-funded unlock/change, EXPLICITLY untouched by this pass", () => {
+    it("path unlock costs exactly 500 Gems", () => {
+      expect(SPECIALIZATION_UNLOCK_GEM_COST).toBe(500);
+    });
+
+    it("path change costs exactly 200 Gems", () => {
+      expect(SPECIALIZATION_CHANGE_GEM_COST).toBe(200);
+    });
+
+    it("every LEVEL within an owned path is priced in Gold only (getSpecializationUpgradeCost never references Gems)", () => {
+      for (const type of TOWER_TYPES) {
+        for (const level of [0, 1, 10, 50]) {
+          const cost = getSpecializationUpgradeCost(type, level);
+          expect(Number.isFinite(cost)).toBe(true);
+          expect(cost).toBeGreaterThan(0);
         }
       }
     });

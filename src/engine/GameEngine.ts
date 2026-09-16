@@ -21,8 +21,14 @@ import {
   ROULETTE_MILESTONE_INTERVAL,
   type RouletteRewardType,
 } from "@/config/roulette";
-import { CASTLE_SKINS } from "@/config/castleSkins";
-import { canUnlockPrestige, getPrestigeBonuses, getPrestigeUpgradeCost, type PrestigeBonuses } from "@/config/prestige";
+import { CASTLE_SKINS, PRESTIGE_CASTLE_SKIN_ID } from "@/config/castleSkins";
+import {
+  canUnlockPrestige,
+  getPrestigeBonuses,
+  getPrestigeUpgradeCost,
+  PRESTIGE_MILESTONE_REWARDS,
+  type PrestigeBonuses,
+} from "@/config/prestige";
 import type { EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
@@ -66,8 +72,8 @@ import {
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
 import { getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
-import { MASTERY_UNLOCK_GEM_COST } from "@/config/towerMastery";
-import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
+import { getTowerSkinDefinition, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
 import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
 import { REPOSITION_GEM_COST } from "@/config/repositioning";
 import { getCurrentDayIndex } from "./DailyClock";
@@ -341,7 +347,7 @@ export class GameEngine {
   // placed tower of a type shares its type's Mastery level/ownership and
   // equipped skin). See SaveData's doc comment for the full split.
   private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
-  /** Permanent per-TYPE Mastery ownership (the one-time 400 Gems purchase) — never reset by a Season boundary. */
+  /** Permanent per-TYPE Mastery ownership (the one-time Gold purchase, FASE 6) — never reset by a Season boundary. */
   private masteryUnlocked: Partial<Record<TowerType, boolean>> = {};
   /** SISTEMA DE SLOTS DE EQUIPAMENTO — permanent per-TYPE slot ownership (mirrors masteryUnlocked exactly, but an array per type instead of a single boolean). A one-time, per-slot Gems purchase — never reset by a Season boundary, never re-locked by removing/swapping an equipped item. */
   private unlockedItemSlots: Partial<Record<TowerType, boolean[]>> = {};
@@ -469,6 +475,11 @@ export class GameEngine {
     this.castleHpBonus = save.castleHpBonus;
     this.unlockedCastleSkinIds = save.unlockedCastleSkinIds;
     this.prestigeLevel = save.prestigeLevel;
+    // Retroactive safety net — see grantEarnedPrestigeMilestoneRewards's own
+    // doc comment: a save that already met a milestone threshold before
+    // this system existed is granted it here, once, on load, rather than
+    // only on its next future upgradePrestige() call.
+    this.grantEarnedPrestigeMilestoneRewards();
     this.pendingRouletteSpinWaves = [...save.pendingRouletteSpinWaves];
     this.lastFreeRepositionDayIndex = save.lastFreeRepositionDayIndex;
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
@@ -754,30 +765,33 @@ export class GameEngine {
    *
    * Ownership (`this.masteryUnlocked`, permanent per TYPE) and progression
    * (`this.towerMasteryLevels`, SEASON-scoped per TYPE) are fully separate:
-   * a one-time MASTERY_UNLOCK_GEM_COST Gems purchase (handled by
+   * a one-time GOLD purchase (getMasteryUnlockGoldCost, handled by
    * unlockSelectedTowerMastery below) grants ownership FOREVER — it does
    * NOT touch the level at all, including on the very first purchase. Every
-   * level, in every Season including the first, is bought with Gold via
-   * upgradeSelectedTowerMastery, which requires ownership but reads from
+   * level, in every Season including the first, is also bought with Gold
+   * via upgradeSelectedTowerMastery, which requires ownership but reads from
    * whatever the CURRENT (Season-scoped) level happens to be — 0 at the
-   * start of every Season, owned or not. It also grants real, small,
-   * bounded-weighted combat effects — see config/towerMastery.ts's
-   * getMasteryBonuses doc comment for why this is still not "Gems buy
-   * power": Gems only ever buy the one-time access, forever, never a level.
+   * start of every Season, owned or not. FASE 6 (currency division): Mastery
+   * is entirely Gold-funded now, unlock included — Gems never buy any part
+   * of it, and are reserved for Prestige and Specialization path
+   * unlock/change instead. See config/towerMastery.ts's getMasteryBonuses
+   * doc comment for why this is still not "Gold buys unlimited power":
+   * every effect is routed through masteryEffectScale's diminishing returns.
    */
   canUnlockSelectedTowerMastery(): boolean {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     return !!tower && this.masteryUnlocked[tower.type] !== true;
   }
 
-  /** Pays the one-time, permanent MASTERY_UNLOCK_GEM_COST Gems to grant the selected tower's TYPE Mastery ownership forever. Never re-charged for this type again, in any future Season. Does NOT touch the current (Season-scoped) Mastery level. */
+  /** Pays the one-time, permanent Gold cost (getMasteryUnlockGoldCost) to grant the selected tower's TYPE Mastery ownership forever. Never re-charged for this type again, in any future Season. Does NOT touch the current (Season-scoped) Mastery level. */
   unlockSelectedTowerMastery(): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || this.masteryUnlocked[tower.type] === true) return false;
-    if (!this.canAffordGems(MASTERY_UNLOCK_GEM_COST)) return false;
+    const cost = getMasteryUnlockGoldCost(tower.type);
+    if (this.gold < cost) return false;
 
-    this.spendGems(MASTERY_UNLOCK_GEM_COST, `tower_mastery:${tower.type}`);
+    this.gold -= cost;
     this.masteryUnlocked[tower.type] = true;
     for (const other of this.towers) {
       if (other.type === tower.type) other.masteryUnlocked = true;
@@ -1292,9 +1306,38 @@ export class GameEngine {
     const cost = getPrestigeUpgradeCost(this.prestigeLevel);
     if (!this.spendGems(cost, "profile_prestige")) return false;
     this.prestigeLevel += 1;
+    this.grantEarnedPrestigeMilestoneRewards();
     this.persist();
     this.notify();
     return true;
+  }
+
+  /**
+   * FASE 6 — grants every milestone reward (config/prestige.ts's
+   * PRESTIGE_MILESTONE_REWARDS) this.prestigeLevel has ever reached but not
+   * yet actually been granted. PROFILE_FRAME/TITLE rewards need no grant at
+   * all — prestigeLevel itself is permanent and only ever increases, so
+   * "prestigeLevel >= milestone.level" IS the permanent unlock check (see
+   * config/prestige.ts's getEarnedPrestigeMilestoneRewards, used by the UI).
+   * TOWER_SKIN/CASTLE_SKIN reuse the existing ownedTowerSkinIds/
+   * unlockedCastleSkinIds architecture and are idempotent by construction
+   * (re-adding an already-owned id is a no-op) — safe to call on every
+   * upgrade AND once on load, so a save that already met a threshold before
+   * this system existed is granted retroactively instead of only on its
+   * NEXT future upgrade.
+   */
+  private grantEarnedPrestigeMilestoneRewards(): void {
+    for (const reward of PRESTIGE_MILESTONE_REWARDS) {
+      if (this.prestigeLevel < reward.level) continue;
+      if (reward.type === "TOWER_SKIN") {
+        for (const skin of PRESTIGE_TOWER_SKINS) this.ownedTowerSkinIds.add(skin.id);
+      } else if (reward.type === "CASTLE_SKIN") {
+        if (!this.unlockedCastleSkinIds.includes(PRESTIGE_CASTLE_SKIN_ID)) {
+          this.unlockedCastleSkinIds = [...this.unlockedCastleSkinIds, PRESTIGE_CASTLE_SKIN_ID];
+        }
+      }
+      // PROFILE_FRAME / TITLE: nothing to grant, see doc comment above.
+    }
   }
 
   // -------------------------------------------------------------------
@@ -1779,7 +1822,14 @@ export class GameEngine {
     // many hours. Prestige's small, permanently bounded Gem Shard bonus
     // (config/prestige.ts's getPrestigeBonuses) still applies on top, per
     // its own unchanged formula.
-    const baseShards = boss.isMainBoss ? 1 : 1;
+    // FASE 6 (Cenário D, approved): uniform 2 Gem Shards per boss/mini-boss
+    // kill — a deliberately small, non-inflationary bump from the previous
+    // 1/1 rate. Mini-bosses vastly outnumber main-boss kills in real play
+    // (measured ~19:1), so weighting toward the rarer main-boss kill instead
+    // (tested and rejected) barely moves total income; uniform 2x was the
+    // real winner. See config/phaseConfig.ts's PHASE_MILESTONE_BONUSES for
+    // the other (one-time, per-wave-milestone) half of Prestige's income.
+    const baseShards = 2;
     const shards = Math.round(baseShards * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
     this.addGemShards(shards, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
 

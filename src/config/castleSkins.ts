@@ -41,12 +41,20 @@ export interface CastleSkinDefinition {
   paletteOverride: CastleSkinPaletteOverride;
 }
 
+/** FASE 6 — the Prestige P100 reward's id (config/prestige.ts's PRESTIGE_MILESTONE_REWARDS, "prestigeCastleSkin"). Granted directly into SaveData.unlockedCastleSkinIds by GameEngine.grantEarnedPrestigeMilestoneRewards, the exact same idiom the Roulette CASTLE_SKIN outcome already uses — never sold, never spun for. */
+export const PRESTIGE_CASTLE_SKIN_ID = "PRESTIGE_ETERNAL_BASTION";
+
 /** One proof skin, matching towerSkins.ts's "one real skin ships the architecture" precedent — more are just another entry here, nothing else changes. */
 export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
   {
     id: "OBSIDIAN_BASTION",
     i18nKey: "OBSIDIAN_BASTION",
     paletteOverride: { rock: "#2e2734", rockDark: "#130f18" },
+  },
+  {
+    id: PRESTIGE_CASTLE_SKIN_ID,
+    i18nKey: PRESTIGE_CASTLE_SKIN_ID,
+    paletteOverride: { rock: "#4a3f14", rockDark: "#1c1808" },
   },
 ];
 

@@ -196,6 +196,10 @@ export const en = {
     INFERNO_ASHEN_TYRANT: { name: "Ashen Tyrant", description: "A charred, ember-red furnace wreathed in deeper flame. Purely cosmetic." },
     FROSTBORN_ANCIENT_GUARDIAN: { name: "Ancient Guardian", description: "Weathered stone and pale crystal, older than the frost itself. Purely cosmetic." },
     STORMCALLER_VOID: { name: "Void", description: "A black structure channeling void-purple energy instead of arcane light. Purely cosmetic." },
+    IRONWOOD_PRESTIGE_ASCENDANT: { name: "Ascendant (Prestige)", description: "A radiant gold-and-ember finish, exclusive to Prestige 50 — never sold. Purely cosmetic." },
+    INFERNO_PRESTIGE_ASCENDANT: { name: "Ascendant (Prestige)", description: "A radiant gold-and-ember finish, exclusive to Prestige 50 — never sold. Purely cosmetic." },
+    FROSTBORN_PRESTIGE_ASCENDANT: { name: "Ascendant (Prestige)", description: "A radiant gold-and-ember finish, exclusive to Prestige 50 — never sold. Purely cosmetic." },
+    STORMCALLER_PRESTIGE_ASCENDANT: { name: "Ascendant (Prestige)", description: "A radiant gold-and-ember finish, exclusive to Prestige 50 — never sold. Purely cosmetic." },
   },
   defeat: {
     title: "FORTRESS FALLEN",
@@ -588,6 +592,18 @@ export const en = {
     insufficientGems: "{amount} more Gems needed",
     permanentHint: "Prestige is permanent — it never resets with a Season, and every level you buy is kept forever.",
     capNote: "Past level {cap}, Prestige keeps climbing forever as pure status/ranking progression — no further economic bonus is granted.",
+    currentGemsLabel: "Your Gems",
+    rewardsTitle: "Milestone Rewards",
+    rewardEarned: "Earned at Prestige {level}",
+    rewardNext: "Next reward: Prestige {level}",
+    rewards: {
+      bronzeFrame: { name: "Bronze Frame", description: "A bronze profile frame — permanent from Prestige 10 on." },
+      silverFrame: { name: "Silver Frame", description: "A silver profile frame — permanent from Prestige 20 on." },
+      ascendantTitle: { name: "Ascendant Title", description: "A special title — permanent from Prestige 30 on." },
+      prestigeTowerSkin: { name: "Prestige Tower Skin", description: "An exclusive Tower Skin for every tower type — permanent from Prestige 50 on." },
+      radiantEffect: { name: "Radiant Effect", description: "A special profile effect — permanent from Prestige 75 on." },
+      prestigeCastleSkin: { name: "Prestige Castle Skin", description: "An exclusive Castle Skin and your highest title — permanent from Prestige 100 on." },
+    },
     locked: {
       title: "Prestige Locked",
       requirement: "Reach wave {required} to unlock it — your current record is wave {bestWave}.",
@@ -608,6 +624,7 @@ export const en = {
   },
   castleSkins: {
     OBSIDIAN_BASTION: { name: "Obsidian Bastion", description: "Dark volcanic stone replaces the fortress's usual masonry. Purely cosmetic — never HP, damage, or resistance." },
+    PRESTIGE_ETERNAL_BASTION: { name: "Eternal Bastion", description: "Gilded, radiant stonework exclusive to Prestige 100 — never sold, never spun for. Purely cosmetic — never HP, damage, or resistance." },
   },
   goldSinks: {
     TOWER_LEVEL: { name: "Tower Level", description: "Levels a single tower up to Level 60 — damage, attack speed and range all grow with each level. Resets every Season." },
@@ -685,7 +702,7 @@ export const en = {
     tradable: "Tradable",
     notTradable: "Soulbound",
     masteryTitle: "Tower Mastery",
-    masteryHint: "A one-time 400 Gems unlock per tower type, permanent across Seasons. Its numeric level resets each Season and grants small combat bonuses plus cosmetic-only visual tiers.",
+    masteryHint: "A one-time Gold unlock per tower type, permanent across Seasons. Its numeric level resets each Season and is raised entirely with Gold — grants small combat bonuses, a tower-specific identity bonus, plus cosmetic-only visual tiers.",
     masteryCosmeticTier: "Cosmetic tier",
     masteryCosmeticNone: "None yet",
     masteryCosmeticTiersTitle: "Mastery Cosmetic Tiers",

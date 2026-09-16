@@ -134,4 +134,32 @@ describe("phaseConfig", () => {
     expect(getMilestoneBonus(30)).toBeGreaterThan(0);
     expect(getMilestoneBonus(31)).toBe(0);
   });
+
+  describe("FASE 6 — milestones extended to wave 500 (Cenário D, same table shape/formula as 10-130)", () => {
+    it("every extended milestone wave (150-500, every 50) grants a positive, strictly increasing bonus", () => {
+      const waves = [150, 200, 250, 300, 350, 400, 450, 500];
+      let previous = getMilestoneBonus(130);
+      for (const wave of waves) {
+        const bonus = getMilestoneBonus(wave);
+        expect(bonus).toBeGreaterThan(previous);
+        previous = bonus;
+      }
+    });
+
+    it("matches the exact approved values", () => {
+      expect(getMilestoneBonus(150)).toBe(3200);
+      expect(getMilestoneBonus(200)).toBe(4000);
+      expect(getMilestoneBonus(250)).toBe(4800);
+      expect(getMilestoneBonus(300)).toBe(5600);
+      expect(getMilestoneBonus(350)).toBe(6400);
+      expect(getMilestoneBonus(400)).toBe(7200);
+      expect(getMilestoneBonus(450)).toBe(8000);
+      expect(getMilestoneBonus(500)).toBe(8800);
+    });
+
+    it("still nothing past wave 500 — no accidental further extension", () => {
+      expect(getMilestoneBonus(501)).toBe(0);
+      expect(getMilestoneBonus(1000)).toBe(0);
+    });
+  });
 });

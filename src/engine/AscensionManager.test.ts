@@ -123,8 +123,8 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
 
     const main = loadSave();
     // HORDENOVA Season/Progression v1.0 — "Season resets progression, not
-    // ownership": the one-time 400 Gems unlock (funded by Gems, never Gold —
-    // see GameEngineProgression2.test.ts's own dedicated coverage) is never
+    // ownership": the one-time Gold unlock (FASE 6 — see
+    // GameEngineProgression2.test.ts's own dedicated coverage) is never
     // re-charged and survives every Season boundary...
     expect(main.masteryUnlocked.IRONWOOD).toBe(true);
     // ...but the numeric level it gates access to is Season-scoped, exactly

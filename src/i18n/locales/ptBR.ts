@@ -197,6 +197,10 @@ export const ptBR: TranslationSchema = {
     INFERNO_ASHEN_TYRANT: { name: "Tirano Cinzento", description: "Uma fornalha carbonizada, vermelho-brasa, envolta em chamas mais profundas. Puramente cosmético." },
     FROSTBORN_ANCIENT_GUARDIAN: { name: "Guardião Ancestral", description: "Pedra desgastada e cristal pálido, mais antigos que a própria geada. Puramente cosmético." },
     STORMCALLER_VOID: { name: "Vazio", description: "Uma estrutura negra canalizando energia roxa do vazio em vez de luz arcana. Puramente cosmético." },
+    IRONWOOD_PRESTIGE_ASCENDANT: { name: "Ascendente (Prestígio)", description: "Um acabamento radiante em dourado e brasa, exclusivo do Prestígio 50 — nunca vendido. Puramente cosmético." },
+    INFERNO_PRESTIGE_ASCENDANT: { name: "Ascendente (Prestígio)", description: "Um acabamento radiante em dourado e brasa, exclusivo do Prestígio 50 — nunca vendido. Puramente cosmético." },
+    FROSTBORN_PRESTIGE_ASCENDANT: { name: "Ascendente (Prestígio)", description: "Um acabamento radiante em dourado e brasa, exclusivo do Prestígio 50 — nunca vendido. Puramente cosmético." },
+    STORMCALLER_PRESTIGE_ASCENDANT: { name: "Ascendente (Prestígio)", description: "Um acabamento radiante em dourado e brasa, exclusivo do Prestígio 50 — nunca vendido. Puramente cosmético." },
   },
   defeat: {
     title: "FORTALEZA CAÍDA",
@@ -589,6 +593,18 @@ export const ptBR: TranslationSchema = {
     insufficientGems: "Faltam {amount} Gemas",
     permanentHint: "Prestígio é permanente — nunca reseta com a Season, e cada nível comprado fica para sempre.",
     capNote: "A partir do nível {cap}, o Prestígio continua subindo para sempre como progressão de status/ranking — sem novos bônus econômicos.",
+    currentGemsLabel: "Suas Gemas",
+    rewardsTitle: "Recompensas de Marco",
+    rewardEarned: "Conquistada no Prestígio {level}",
+    rewardNext: "Próxima recompensa: Prestígio {level}",
+    rewards: {
+      bronzeFrame: { name: "Moldura de Bronze", description: "Uma moldura de perfil em bronze — permanente a partir do Prestígio 10." },
+      silverFrame: { name: "Moldura de Prata", description: "Uma moldura de perfil em prata — permanente a partir do Prestígio 20." },
+      ascendantTitle: { name: "Título Ascendente", description: "Um título especial — permanente a partir do Prestígio 30." },
+      prestigeTowerSkin: { name: "Skin de Torre de Prestígio", description: "Uma skin de torre exclusiva para cada tipo de torre — permanente a partir do Prestígio 50." },
+      radiantEffect: { name: "Efeito Radiante", description: "Um efeito de perfil especial — permanente a partir do Prestígio 75." },
+      prestigeCastleSkin: { name: "Skin de Castelo de Prestígio", description: "Uma skin de castelo exclusiva e seu maior título — permanente a partir do Prestígio 100." },
+    },
     locked: {
       title: "Prestígio Bloqueado",
       requirement: "Alcance a wave {required} para desbloquear — seu recorde atual é a wave {bestWave}.",
@@ -609,6 +625,7 @@ export const ptBR: TranslationSchema = {
   },
   castleSkins: {
     OBSIDIAN_BASTION: { name: "Bastião de Obsidiana", description: "Pedra vulcânica escura substitui a alvenaria padrão da fortaleza. Puramente cosmético — nunca altera HP, dano ou resistência." },
+    PRESTIGE_ETERNAL_BASTION: { name: "Bastião Eterno", description: "Alvenaria dourada e radiante, exclusiva do Prestígio 100 — nunca vendida, nunca sorteada. Puramente cosmético — nunca altera HP, dano ou resistência." },
   },
   goldSinks: {
     TOWER_LEVEL: { name: "Nível da Torre", description: "Eleva uma torre até o Nível 60 — dano, velocidade de ataque e alcance crescem a cada nível. Reinicia a cada Season." },
@@ -686,7 +703,7 @@ export const ptBR: TranslationSchema = {
     tradable: "Negociável",
     notTradable: "Vinculado à Alma",
     masteryTitle: "Maestria da Torre",
-    masteryHint: "Um desbloqueio único de 400 Gemas por tipo de torre, permanente entre Seasons. Seu nível numérico reinicia a cada Season e concede pequenos bônus de combate além de tiers visuais puramente cosméticos.",
+    masteryHint: "Um desbloqueio único em Gold por tipo de torre, permanente entre Seasons. Seu nível numérico reinicia a cada Season e é elevado inteiramente com Gold — concede pequenos bônus de combate, um bônus de identidade específico da torre, além de tiers visuais puramente cosméticos.",
     masteryCosmeticTier: "Faixa cosmética",
     masteryCosmeticNone: "Nenhuma ainda",
     masteryCosmeticTiersTitle: "Faixas Cosméticas de Maestria",

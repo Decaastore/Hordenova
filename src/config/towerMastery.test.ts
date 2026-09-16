@@ -1,18 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyMasteryToSpecial,
   getMasteryBonuses,
   getMasteryCosmeticTier,
+  getMasteryUnlockGoldCost,
   getMasteryUpgradeCost,
   getNextMasteryCosmeticTier,
   masteryEffectScale,
   MASTERY_COSMETIC_TIERS,
   MASTERY_EFFECT_EXPONENT,
-  MASTERY_UNLOCK_GEM_COST,
 } from "./towerMastery";
-import { TOWER_DEFINITIONS, TOWER_TYPES } from "./towerStats";
-import { SPECIALIZATION_UNLOCK_GEM_COST } from "./specializations";
+import { getTowerSpecialAtLevel, TOWER_DEFINITIONS, TOWER_TYPES } from "./towerStats";
 
-describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE BALANCE OVERHAUL — Gems-once, Gold-forever)", () => {
+describe("towerMastery (Master Implementation Pass spec sections 3-6, FASE 6 — Gold-only unlock and levels)", () => {
   it("GOLD upgrade costs strictly increase with mastery level FOREVER — never a bargain to keep buying, never capped", () => {
     for (const type of TOWER_TYPES) {
       let previous = 0;
@@ -24,13 +24,18 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE B
     }
   });
 
-  it("the one-time unlock cost is comparable in scale to Specialization's own one-time unlock (both premium Gems purchases), not a trivial spend nor a wall", () => {
-    expect(MASTERY_UNLOCK_GEM_COST).toBeGreaterThan(SPECIALIZATION_UNLOCK_GEM_COST * 0.3);
-    expect(MASTERY_UNLOCK_GEM_COST).toBeLessThan(SPECIALIZATION_UNLOCK_GEM_COST * 5);
+  it("FASE 6 currency division: the one-time unlock is GOLD, never Gems — anchored to each tower type's own upgradeCostBase, not an arbitrary flat number", () => {
+    for (const type of TOWER_TYPES) {
+      expect(getMasteryUnlockGoldCost(type)).toBe(TOWER_DEFINITIONS[type].upgradeCostBase * 300);
+    }
   });
 
-  it("HORDENOVA Season/Progression v1.0 contract: the one-time Mastery ownership unlock costs exactly 400 Gems", () => {
-    expect(MASTERY_UNLOCK_GEM_COST).toBe(400);
+  it("the one-time Gold unlock cost is a considerable but real amount — same order of magnitude as leveling a tower to 10 (Specialization's own unlock milestone), never a trivial tax nor an impossible wall", () => {
+    for (const type of TOWER_TYPES) {
+      const cost = getMasteryUnlockGoldCost(type);
+      expect(cost).toBeGreaterThan(5000);
+      expect(cost).toBeLessThan(25000);
+    }
   });
 
   it("HORDENOVA Season/Progression v1.0 contract: MASTERY_EFFECT_EXPONENT stays frozen at 0.45", () => {
@@ -127,5 +132,84 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, INFINITE B
     expect(getNextMasteryCosmeticTier(0)?.id).toBe(MASTERY_COSMETIC_TIERS[0]!.id);
     const highestTier = MASTERY_COSMETIC_TIERS[MASTERY_COSMETIC_TIERS.length - 1]!;
     expect(getNextMasteryCosmeticTier(highestTier.level)).toBeNull();
+  });
+
+  describe("applyMasteryToSpecial — FASE 6 identity axis", () => {
+    it("masteryLevel 0 (or below) never changes the base special", () => {
+      for (const type of TOWER_TYPES) {
+        const base = getTowerSpecialAtLevel(type, 15);
+        expect(applyMasteryToSpecial(base, 0)).toEqual(base);
+        expect(applyMasteryToSpecial(base, -5)).toEqual(base);
+      }
+    });
+
+    it("Ironwood: crit chance and crit multiplier strictly increase with mastery level, never exceeding sane bounds", () => {
+      const base = getTowerSpecialAtLevel("IRONWOOD", 15);
+      let previousChance = (base as Extract<typeof base, { type: "IRONWOOD" }>).critChance;
+      let previousMult = (base as Extract<typeof base, { type: "IRONWOOD" }>).critMultiplier;
+      for (const level of [1, 20, 30, 60, 100, 200, 400]) {
+        const result = applyMasteryToSpecial(base, level) as Extract<typeof base, { type: "IRONWOOD" }>;
+        expect(result.critChance).toBeGreaterThan(previousChance);
+        expect(result.critChance).toBeLessThanOrEqual(0.9);
+        expect(result.critMultiplier).toBeGreaterThan(previousMult);
+        previousChance = result.critChance;
+        previousMult = result.critMultiplier;
+      }
+    });
+
+    it("Inferno: AoE radius and burn damage strictly increase (proportionally) with mastery level", () => {
+      const base = getTowerSpecialAtLevel("INFERNO", 15) as Extract<ReturnType<typeof getTowerSpecialAtLevel>, { type: "INFERNO" }>;
+      let previousRadius = base.aoeRadius;
+      let previousBurn = base.burnDamagePerSecond;
+      for (const level of [1, 20, 30, 60, 100, 200, 400]) {
+        const result = applyMasteryToSpecial(base, level) as typeof base;
+        expect(result.aoeRadius).toBeGreaterThan(previousRadius);
+        expect(result.burnDamagePerSecond).toBeGreaterThan(previousBurn);
+        previousRadius = result.aoeRadius;
+        previousBurn = result.burnDamagePerSecond;
+      }
+    });
+
+    it("Frostborn: slow potency and freeze chance strictly increase, never exceeding sane bounds", () => {
+      const base = getTowerSpecialAtLevel("FROSTBORN", 15) as Extract<ReturnType<typeof getTowerSpecialAtLevel>, { type: "FROSTBORN" }>;
+      let previousSlow = base.slowPercent;
+      let previousFreeze = base.freezeChance;
+      for (const level of [1, 20, 30, 60, 100, 200, 400]) {
+        const result = applyMasteryToSpecial(base, level) as typeof base;
+        expect(result.slowPercent).toBeGreaterThan(previousSlow);
+        expect(result.slowPercent).toBeLessThanOrEqual(0.95);
+        expect(result.freezeChance).toBeGreaterThan(previousFreeze);
+        expect(result.freezeChance).toBeLessThanOrEqual(0.85);
+        previousSlow = result.slowPercent;
+        previousFreeze = result.freezeChance;
+      }
+    });
+
+    it("Stormcaller: chain falloff strictly decreases (stronger chain) and armor penetration strictly increases, never exceeding sane bounds", () => {
+      const base = getTowerSpecialAtLevel("STORMCALLER", 15) as Extract<ReturnType<typeof getTowerSpecialAtLevel>, { type: "STORMCALLER" }>;
+      let previousFalloff = base.chainFalloff;
+      let previousPen = base.armorPenetration;
+      for (const level of [1, 20, 30, 60, 100, 200, 400]) {
+        const result = applyMasteryToSpecial(base, level) as typeof base;
+        expect(result.chainFalloff).toBeLessThan(previousFalloff);
+        expect(result.chainFalloff).toBeGreaterThanOrEqual(0.05);
+        expect(result.armorPenetration).toBeGreaterThan(previousPen);
+        expect(result.armorPenetration).toBeLessThanOrEqual(0.95);
+        previousFalloff = result.chainFalloff;
+        previousPen = result.armorPenetration;
+      }
+    });
+
+    it("never returns Infinity/NaN at extreme mastery levels", () => {
+      for (const type of TOWER_TYPES) {
+        const base = getTowerSpecialAtLevel(type, 15);
+        for (const level of [1000, 100_000, 1_000_000]) {
+          const result = applyMasteryToSpecial(base, level);
+          for (const value of Object.values(result)) {
+            if (typeof value === "number") expect(Number.isFinite(value)).toBe(true);
+          }
+        }
+      }
+    });
   });
 });

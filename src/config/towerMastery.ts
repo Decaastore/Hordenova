@@ -1,4 +1,4 @@
-import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
+import { TOWER_DEFINITIONS, type TowerSpecial, type TowerType } from "./towerStats";
 
 /**
  * TOWER MASTERY — the account-wide, per-TOWER-TYPE progression track that
@@ -31,11 +31,14 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  * is called starting from currentMasteryLevel=0 every single Season, not
  * just the first time a type is ever unlocked.
  *
- * IS THIS "GEMS BUY POWER"? No, in exactly the same sense Specialization
- * isn't: Gems buy ACCESS to a track (a one-time unlock a free player reaches
- * from ordinary Gem Shard income), and Gold — the purely earned,
- * Season-scoped currency — buys every point of power in it, every single
- * Season. A larger Gem stockpile buys the unlock earlier, never higher.
+ * FASE 6 (currency division: "Gold compra/evolui poder. Gems compram
+ * acesso/decisões específicas e Prestige permanente.") — Mastery is pure
+ * tower POWER (generic stats via getMasteryBonuses below, plus each tower's
+ * own identity axis via applyMasteryToSpecial), so it no longer touches Gems
+ * anywhere, including its own one-time unlock: that unlock is now a
+ * considerable but real, Gold-derived cost (see getMasteryUnlockGoldCost),
+ * not a Gems purchase. Gems remain reserved for Prestige and Specialization
+ * path unlock/change (config/specializations.ts) — never for Mastery.
  *
  * The Specialization Respec Token system that used to live in this file has
  * been removed entirely — switching specializations is now the flat,
@@ -45,13 +48,23 @@ import { TOWER_DEFINITIONS, type TowerType } from "./towerStats";
  */
 
 /**
- * One-time Gems price to unlock the Mastery track for a tower TYPE,
+ * One-time GOLD price to unlock the Mastery track for a tower TYPE,
  * permanently — never charged again for that type, on this account, in any
- * future Season. Flat (not scaled by type/level) for the same reason
- * SPECIALIZATION_UNLOCK_GEM_COST is flat: it is one clear premium decision,
- * not a second Gold-shaped curve denominated in Gems.
+ * future Season. Anchored to a real, already-existing Gold milestone rather
+ * than an arbitrary number: it equals the real cumulative Gold cost of
+ * leveling that same tower type from 0 to level 10 (getUpgradeCost in
+ * towerStats.ts) at a ~1x multiplier — the same magnitude Specialization
+ * itself uses to gate its own unlock (SPECIALIZATION_UNLOCK_TOWER_LEVEL=10)
+ * — so unlocking Mastery costs roughly "one more tower's worth of levels",
+ * not a trivial tax nor a wall. Scaled per type via upgradeCostBase, exactly
+ * like every other Gold cost in this codebase, so the four tower types stay
+ * proportionally consistent with each other.
  */
-export const MASTERY_UNLOCK_GEM_COST = 400;
+const MASTERY_UNLOCK_GOLD_MULTIPLIER = 300;
+
+export function getMasteryUnlockGoldCost(type: TowerType): number {
+  return TOWER_DEFINITIONS[type].upgradeCostBase * MASTERY_UNLOCK_GOLD_MULTIPLIER;
+}
 
 export interface MasteryCosmeticTier {
   /** Stable id — used as a rendering key, never shown raw to the player. */
@@ -156,7 +169,12 @@ export interface MasteryBonuses {
  * multiplicative stats are unbounded and keep growing forever, so no mastery
  * level is ever a dead purchase.
  */
-const MASTERY_DAMAGE_PER_POINT = 0.0025;
+// FASE 6 — reduced from 0.0025: part of the generic-damage weight now moves
+// to each tower's own identity axis (applyMasteryToSpecial below) instead of
+// flat damage, so a Mastery point buys a tower-specific behavior (crit,
+// AoE/burn, slow/freeze, chain/armor-pen) as well as a smaller flat-damage
+// bump, rather than only ever flat damage.
+const MASTERY_DAMAGE_PER_POINT = 0.0015;
 const MASTERY_ATTACK_SPEED_PER_POINT = 0.0045;
 const MASTERY_RANGE_PER_POINT = 0.006;
 const MASTERY_GOLD_DISCOUNT_PER_POINT = 0.005;
@@ -217,4 +235,69 @@ export function getMasteryUpgradeCost(type: TowerType, currentMasteryLevel: numb
   const tailLevels = Math.max(0, targetLevel - MASTERY_COST_COMPOUND_LEVEL_CAP);
   const linearTail = 1 + tailLevels * MASTERY_COST_LINEAR_TAIL_GROWTH;
   return Math.round(base * compound * linearTail) + targetLevel;
+}
+
+// ---------------------------------------------------------------------------
+// Mastery identity axis — FASE 6. Each tower's Mastery investment now also
+// flavors ITS OWN signature stat pair (crit, AoE/burn, slow/freeze,
+// chain/armor-pen), on top of the generic getMasteryBonuses above, mirroring
+// exactly how config/specializations.ts's applySpecializationToSpecial
+// layers onto the same TowerSpecial pipeline (see CombatSystem.ts's
+// resolveNormalAttack, the single point both functions are composed at).
+//
+// Rates below are FINAL, approved values (real-engine-validated at Mastery
+// levels 0/20/30/60/100/200/400 against the previous, already-shipped,
+// already-tested uniform-damage scheme — see towerMastery.test.ts) — not to
+// be re-derived or re-weighted in a future pass without a new audit.
+// Each is a per-point-of-masteryEffectScale rate, so it grows with the exact
+// same diminishing-returns curve as every other Mastery/Specialization
+// effect in the game — never flat, never a step function.
+// ---------------------------------------------------------------------------
+
+const MASTERY_IRONWOOD_CRIT_CHANCE_PER_POINT = 0.0007;
+const MASTERY_IRONWOOD_CRIT_MULTIPLIER_PER_POINT = 0.00058;
+const MASTERY_INFERNO_AOE_RADIUS_PER_POINT = 0.00034;
+const MASTERY_INFERNO_BURN_DAMAGE_PER_POINT = 0.00034;
+const MASTERY_FROSTBORN_SLOW_PER_POINT = 0.001;
+const MASTERY_FROSTBORN_FREEZE_CHANCE_PER_POINT = 0.00043;
+const MASTERY_STORMCALLER_CHAIN_FALLOFF_REDUCTION_PER_POINT = 0.00031;
+const MASTERY_STORMCALLER_ARMOR_PENETRATION_PER_POINT = 0.00072;
+
+/**
+ * Layers this tower TYPE's Mastery level onto its identity-axis special
+ * stats. Safety caps below only guard the [0,1] chance/fraction meaning of
+ * each stat at extreme levels (e.g. Mastery 5000+) — they are not part of
+ * the approved rate tuning itself, which stays well under them across every
+ * validated level (see towerMastery.test.ts).
+ */
+export function applyMasteryToSpecial(base: TowerSpecial, masteryLevel: number): TowerSpecial {
+  if (masteryLevel <= 0) return base;
+  const lvl = masteryEffectScale(masteryLevel);
+
+  switch (base.type) {
+    case "IRONWOOD":
+      return {
+        ...base,
+        critChance: Math.min(0.9, base.critChance + lvl * MASTERY_IRONWOOD_CRIT_CHANCE_PER_POINT),
+        critMultiplier: base.critMultiplier + lvl * MASTERY_IRONWOOD_CRIT_MULTIPLIER_PER_POINT,
+      };
+    case "INFERNO":
+      return {
+        ...base,
+        aoeRadius: base.aoeRadius * (1 + lvl * MASTERY_INFERNO_AOE_RADIUS_PER_POINT),
+        burnDamagePerSecond: base.burnDamagePerSecond * (1 + lvl * MASTERY_INFERNO_BURN_DAMAGE_PER_POINT),
+      };
+    case "FROSTBORN":
+      return {
+        ...base,
+        slowPercent: Math.min(0.95, base.slowPercent + lvl * MASTERY_FROSTBORN_SLOW_PER_POINT),
+        freezeChance: Math.min(0.85, base.freezeChance + lvl * MASTERY_FROSTBORN_FREEZE_CHANCE_PER_POINT),
+      };
+    case "STORMCALLER":
+      return {
+        ...base,
+        chainFalloff: Math.max(0.05, base.chainFalloff - lvl * MASTERY_STORMCALLER_CHAIN_FALLOFF_REDUCTION_PER_POINT),
+        armorPenetration: Math.min(0.95, base.armorPenetration + lvl * MASTERY_STORMCALLER_ARMOR_PENETRATION_PER_POINT),
+      };
+  }
 }

@@ -6,6 +6,7 @@ import { applySpecializationToSpecial, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from 
 import { getTowerSpecialAtLevel } from "@/config/towerStats";
 import { getSpecializationUpgradeCostFor } from "@/entities/Tower";
 import { DEFAULT_INVENTORY_CAPACITY } from "./InventoryManager";
+import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
 
 describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory Capacity", () => {
   beforeEach(() => {
@@ -181,16 +182,16 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(reloaded.getRenderSnapshot().towers[0]!.equippedSkinId).toBe("IRONWOOD_WARDEN_OF_THE_ABYSS");
   });
 
-  describe("Tower Mastery — one-time Gems unlock, then Gold forever (INFINITE BALANCE OVERHAUL)", () => {
-    it("unlocking Mastery spends Gems, never Gold, grants ownership only (never a free level), and ownership persists permanently across a reload", () => {
+  describe("Tower Mastery — entirely Gold-funded, unlock included (FASE 6 currency division)", () => {
+    it("unlocking Mastery spends Gold, never Gems, grants ownership only (never a free level), and ownership persists permanently across a reload", () => {
       const engine = startWithOneMaxedTower();
       const goldBefore = engine.getHudSnapshot().gold;
       const gemsBefore = engine.getHudSnapshot().gems;
 
       expect(engine.canUnlockSelectedTowerMastery()).toBe(true);
       expect(engine.unlockSelectedTowerMastery()).toBe(true);
-      expect(engine.getHudSnapshot().gold).toBe(goldBefore); // Gold untouched
-      expect(engine.getHudSnapshot().gems).toBeLessThan(gemsBefore); // Gems spent
+      expect(engine.getHudSnapshot().gold).toBeLessThan(goldBefore); // Gold spent
+      expect(engine.getHudSnapshot().gems).toBe(gemsBefore); // Gems untouched
       expect(engine.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0); // ownership grants no free level
       expect(engine.canUnlockSelectedTowerMastery()).toBe(false); // one-time only
@@ -200,7 +201,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(reloaded.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
     });
 
-    it("every level AFTER the unlock spends Gold, never Gems", () => {
+    it("every level AFTER the unlock also spends Gold, never Gems", () => {
       const engine = startWithOneMaxedTower();
       expect(engine.unlockSelectedTowerMastery()).toBe(true);
       const gemsAfterUnlock = engine.getHudSnapshot().gems;
@@ -212,10 +213,10 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(1);
     });
 
-    it("unlock fails without enough Gems even when Gold is abundant", () => {
+    it("unlock fails without enough Gold even when Gems are abundant", () => {
       updateSave({
-        gold: 999_999,
-        gems: 0,
+        gold: 0,
+        gems: 999_999,
         towerLoadout: [{ slotId: TOWER_SLOTS[0]!.id, type: "IRONWOOD", level: 1 }],
       });
       const engine = new GameEngine();
@@ -234,16 +235,18 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
 
     // Mastery grants real but modest combat bonuses now (see
     // entities/Tower.test.ts's own dedicated coverage) — this suite proves
-    // Mastery ownership (400 Gems, permanent, never re-charged) is wired
-    // correctly end-to-end through GameEngine, deterministically.
-    it("unlockSelectedTowerMastery charges the 400 Gems ownership cost exactly once, ever, and a reload never re-charges it", () => {
+    // Mastery ownership (Gold, permanent, never re-charged, see
+    // config/towerMastery.ts's getMasteryUnlockGoldCost) is wired correctly
+    // end-to-end through GameEngine, deterministically.
+    it("unlockSelectedTowerMastery charges the exact Gold ownership cost exactly once, ever, and a reload never re-charges it", () => {
       const engine = startWithOneMaxedTower();
       const tower = engine.getRenderSnapshot().towers[0]!;
-      const gemsBefore = engine.getHudSnapshot().gems;
+      const goldBefore = engine.getHudSnapshot().gold;
+      const unlockCost = getMasteryUnlockGoldCost(tower.type);
 
       expect(engine.canUnlockSelectedTowerMastery()).toBe(true);
       expect(engine.unlockSelectedTowerMastery()).toBe(true);
-      expect(engine.getHudSnapshot().gems).toBe(gemsBefore - 400);
+      expect(engine.getHudSnapshot().gold).toBe(goldBefore - unlockCost);
       expect(engine.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
       // Ownership is granted for free — the level is untouched.
       expect(engine.getRenderSnapshot().towers[0]!.masteryLevel).toBe(0);
@@ -251,7 +254,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       // Already owned — never re-charged, on this engine or a fresh reload.
       expect(engine.canUnlockSelectedTowerMastery()).toBe(false);
       expect(engine.unlockSelectedTowerMastery()).toBe(false);
-      expect(engine.getHudSnapshot().gems).toBe(gemsBefore - 400);
+      expect(engine.getHudSnapshot().gold).toBe(goldBefore - unlockCost);
 
       const reloaded = new GameEngine();
       reloaded.startRun();
@@ -259,7 +262,15 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(reloaded.getRenderSnapshot().towers[0]!.masteryUnlocked).toBe(true);
       expect(reloaded.canUnlockSelectedTowerMastery()).toBe(false);
       expect(reloaded.unlockSelectedTowerMastery()).toBe(false);
-      expect(reloaded.getHudSnapshot().gems).toBe(gemsBefore - 400);
+      expect(reloaded.getHudSnapshot().gold).toBe(goldBefore - unlockCost);
+    });
+
+    it("Mastery unlock never touches Gems — FASE 6 currency division invariant", () => {
+      const engine = startWithOneMaxedTower();
+      const gemsBefore = engine.getHudSnapshot().gems;
+      expect(engine.unlockSelectedTowerMastery()).toBe(true);
+      expect(engine.upgradeSelectedTowerMastery()).toBe(true);
+      expect(engine.getHudSnapshot().gems).toBe(gemsBefore);
     });
   });
 
@@ -426,7 +437,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     expect(engine.getGemShardBalance()).toBeGreaterThan(0);
   });
 
-  it("HORDENOVA balance correction: a Main Boss kill grants exactly 1 Gem Shard, a Mini-Boss kill exactly 1, at Prestige level 0", () => {
+  it("FASE 6 (Cenário D, approved): a Main Boss kill grants exactly 2 Gem Shards, a Mini-Boss kill exactly 2, at Prestige level 0", () => {
     // bestWave preset well past both test waves so that the wave advancing
     // past the kill never ALSO crosses a fresh wave-milestone bonus (a
     // separate Gem Shard source, see GameEngine.advanceBestWave) in the same
@@ -446,7 +457,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     const shardsBeforeKill = engine.getGemShardBalance();
     mainBoss!.hp = 0;
     engine.update(50);
-    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(1);
+    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2);
 
     updateSave({ currentWave: 21, bestWave: 999, gold: 999_999, towerLoadout: [] }); // a mini-boss wave, no main boss
     const engine2 = new GameEngine();
@@ -460,7 +471,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     const shardsBeforeMiniKill = engine2.getGemShardBalance();
     miniBoss!.hp = 0;
     engine2.update(50);
-    expect(engine2.getGemShardBalance() - shardsBeforeMiniKill).toBe(1);
+    expect(engine2.getGemShardBalance() - shardsBeforeMiniKill).toBe(2);
   });
 
   it("gem shard conversion only fires at the fixed rate and never leaves a partial remainder unconverted-but-lost", () => {
@@ -598,7 +609,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       expect(reloaded.getPrestigeLevel()).toBe(2);
     });
 
-    it("at level 40 (the functional cap), the +20% Gem Shard multiplier still applies to the base rate — with a base of 1, Math.round keeps it at 1 (rounding, not a lost bonus: the multiplier is still wired, see prestige.test.ts for its own +20% contract)", () => {
+    it("at level 40 (the functional cap), the +20% Gem Shard multiplier still applies to the base rate — with FASE 6's base of 2, round(2 * 1.2) = 2 (the multiplier is still wired, see prestige.test.ts for its own +20% contract)", () => {
       updateSave({ currentWave: 30, gold: 999_999, gems: 0, prestigeLevel: 40, bestWave: 100, towerLoadout: [] });
       const engine = new GameEngine();
       engine.startRun();
@@ -614,7 +625,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       const shardsBeforeKill = engine.getGemShardBalance();
       mainBoss!.hp = 0;
       engine.update(50);
-      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(1);
+      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2);
     });
   });
 });

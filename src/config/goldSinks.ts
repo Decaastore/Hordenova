@@ -49,8 +49,10 @@ export interface GoldSinkDefinition {
 export const GOLD_SINKS: readonly GoldSinkDefinition[] = [
   { id: "tower_level", category: "TOWER_LEVEL", i18nKey: "TOWER_LEVEL", uncapped: false },
   { id: "specialization", category: "SPECIALIZATION", i18nKey: "SPECIALIZATION", uncapped: true },
-  // INFINITE BALANCE OVERHAUL — Mastery leveling (not its one-time Gems
-  // unlock, see gemSinks.ts) moved to Gold, uncapped, mirroring Specialization.
+  // FASE 6 (currency division) — Mastery is entirely Gold now, its one-time
+  // unlock included (see config/towerMastery.ts's getMasteryUnlockGoldCost;
+  // it used to be a Gems purchase registered in gemSinks.ts, now removed
+  // from there). Leveling stays uncapped, mirroring Specialization.
   { id: "mastery", category: "MASTERY", i18nKey: "MASTERY", uncapped: true },
 ];
 

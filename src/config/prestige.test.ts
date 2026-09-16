@@ -1,12 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
   canUnlockPrestige,
+  getEarnedPrestigeMilestoneRewards,
+  getNextPrestigeMilestoneReward,
   getPrestigeBonuses,
+  getPrestigeMilestoneReward,
   getPrestigeTier,
   getPrestigeUpgradeCost,
   PRESTIGE_FUNCTIONAL_CAP_LEVEL,
+  PRESTIGE_MILESTONE_REWARDS,
   PRESTIGE_MIN_BEST_WAVE,
 } from "./prestige";
+
+function cumulativePrestigeCost(targetLevel: number): number {
+  let sum = 0;
+  for (let level = 1; level <= targetLevel; level++) sum += getPrestigeUpgradeCost(level - 1);
+  return sum;
+}
 
 describe("prestige (HORDENOVA Season/Progression v1.0 — final recalibration)", () => {
   describe("requirement gate", () => {
@@ -23,15 +33,29 @@ describe("prestige (HORDENOVA Season/Progression v1.0 — final recalibration)",
     });
   });
 
-  describe("cost curve — round(150 * 1.10^(level+1)) + (level+1)", () => {
-    it("matches the exact approved values at levels 1, 5, 10, 20, 30, 40, 50", () => {
-      expect(getPrestigeUpgradeCost(0)).toBe(166); // -> level 1
-      expect(getPrestigeUpgradeCost(4)).toBe(247); // -> level 5
-      expect(getPrestigeUpgradeCost(9)).toBe(399); // -> level 10
-      expect(getPrestigeUpgradeCost(19)).toBe(1029); // -> level 20
-      expect(getPrestigeUpgradeCost(29)).toBe(2647); // -> level 30
-      expect(getPrestigeUpgradeCost(39)).toBe(6829); // -> level 40
-      expect(getPrestigeUpgradeCost(49)).toBe(17_659); // -> level 50
+  describe("cost curve — FASE 6, Cenário D + Curva E2 (base=5, growth=1.07, compound cap=50)", () => {
+    it("matches the exact approved next-level-cost table at P1/P5/P10/P20/P25/P30/P50/P75/P100", () => {
+      expect(getPrestigeUpgradeCost(0)).toBe(6); // -> P1
+      expect(getPrestigeUpgradeCost(4)).toBe(12); // -> P5
+      expect(getPrestigeUpgradeCost(9)).toBe(20); // -> P10
+      expect(getPrestigeUpgradeCost(19)).toBe(39); // -> P20
+      expect(getPrestigeUpgradeCost(24)).toBe(52); // -> P25
+      expect(getPrestigeUpgradeCost(29)).toBe(68); // -> P30
+      expect(getPrestigeUpgradeCost(49)).toBe(197); // -> P50
+      expect(getPrestigeUpgradeCost(74)).toBe(471); // -> P75
+      expect(getPrestigeUpgradeCost(99)).toBe(746); // -> P100
+    });
+
+    it("matches the exact approved CUMULATIVE Gems table (informational only — the player only ever pays the single next-level cost above, never this sum at once)", () => {
+      expect(cumulativePrestigeCost(1)).toBe(6);
+      expect(cumulativePrestigeCost(5)).toBe(46);
+      expect(cumulativePrestigeCost(10)).toBe(130);
+      expect(cumulativePrestigeCost(20)).toBe(431);
+      expect(cumulativePrestigeCost(25)).toBe(665);
+      expect(cumulativePrestigeCost(30)).toBe(972);
+      expect(cumulativePrestigeCost(50)).toBe(3452);
+      expect(cumulativePrestigeCost(75)).toBe(11_949);
+      expect(cumulativePrestigeCost(100)).toBe(27_299);
     });
 
     it("cost strictly increases with level", () => {
@@ -49,6 +73,37 @@ describe("prestige (HORDENOVA Season/Progression v1.0 — final recalibration)",
         expect(Number.isFinite(cost)).toBe(true);
         expect(cost).toBeGreaterThan(0);
       }
+    });
+  });
+
+  describe("milestone rewards (FASE 6) — sparse, one-time, permanent", () => {
+    it("the exact approved reward table exists at P10/P20/P30/P50/P75/P100, nowhere else", () => {
+      expect(PRESTIGE_MILESTONE_REWARDS.map((r) => r.level)).toEqual([10, 20, 30, 50, 75, 100]);
+      expect(getPrestigeMilestoneReward(10)?.type).toBe("PROFILE_FRAME");
+      expect(getPrestigeMilestoneReward(20)?.type).toBe("PROFILE_FRAME");
+      expect(getPrestigeMilestoneReward(30)?.type).toBe("TITLE");
+      expect(getPrestigeMilestoneReward(50)?.type).toBe("TOWER_SKIN");
+      expect(getPrestigeMilestoneReward(75)?.type).toBe("PROFILE_FRAME");
+      expect(getPrestigeMilestoneReward(100)?.type).toBe("CASTLE_SKIN");
+      expect(getPrestigeMilestoneReward(11)).toBeNull();
+      expect(getPrestigeMilestoneReward(0)).toBeNull();
+    });
+
+    it("getEarnedPrestigeMilestoneRewards only ever includes rewards at or below the current level, in level order", () => {
+      expect(getEarnedPrestigeMilestoneRewards(0)).toEqual([]);
+      expect(getEarnedPrestigeMilestoneRewards(9)).toEqual([]);
+      expect(getEarnedPrestigeMilestoneRewards(10).map((r) => r.level)).toEqual([10]);
+      expect(getEarnedPrestigeMilestoneRewards(49).map((r) => r.level)).toEqual([10, 20, 30]);
+      expect(getEarnedPrestigeMilestoneRewards(100).map((r) => r.level)).toEqual([10, 20, 30, 50, 75, 100]);
+      expect(getEarnedPrestigeMilestoneRewards(1000).map((r) => r.level)).toEqual([10, 20, 30, 50, 75, 100]);
+    });
+
+    it("getNextPrestigeMilestoneReward points at the next unearned milestone, and null once every reward is earned", () => {
+      expect(getNextPrestigeMilestoneReward(0)?.level).toBe(10);
+      expect(getNextPrestigeMilestoneReward(10)?.level).toBe(20);
+      expect(getNextPrestigeMilestoneReward(99)?.level).toBe(100);
+      expect(getNextPrestigeMilestoneReward(100)).toBeNull();
+      expect(getNextPrestigeMilestoneReward(1000)).toBeNull();
     });
   });
 
