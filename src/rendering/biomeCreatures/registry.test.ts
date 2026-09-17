@@ -82,12 +82,23 @@ describe("biomeCreatures registry", () => {
       "DWARVEN_UNDERCITY", "COLOSSUS_GRAVEYARD", "FLOATING_ISLES", "LOST_SUN_TEMPLE", "CRYSTAL_SEA",
       "ABYSSAL_FORTRESS", "ASHEN_VALLEY", "MOON_GARDENS", "DEFILED_CATHEDRAL", "LEVIATHAN_COAST",
     ];
+    // Boss Identity Pass (Full Scene Visual Audit P0 #1) — Ashen Valley's
+    // mini-boss was deliberately split into its OWN renderer (a low
+    // quadruped prowler, distinct from the main boss's bipedal-hunched
+    // dragging-arm silhouette) per the explicit "não transforme o mini-boss
+    // em uma cópia menor" requirement, instead of the shared
+    // Colossus/Colossus-Jr pattern every other expansion phase still uses.
+    const sharedRendererExceptions = new Set(["ASHEN_VALLEY"]);
     for (const id of expansionPhaseIds) {
       const phase = PHASES.find((p) => p.id === id)!;
       expect(BOSS_CREATURE_RENDERERS[phase.mainBossId], phase.mainBossId).toBeTypeOf("function");
       expect(BOSS_CREATURE_RENDERERS[phase.miniBossId!], phase.miniBossId).toBeTypeOf("function");
-      // Same shared creature renders both roles (mirrors the existing Colossus/Colossus-Jr relationship).
-      expect(BOSS_CREATURE_RENDERERS[phase.mainBossId]).toBe(BOSS_CREATURE_RENDERERS[phase.miniBossId!]);
+      if (sharedRendererExceptions.has(id)) {
+        expect(BOSS_CREATURE_RENDERERS[phase.mainBossId]).not.toBe(BOSS_CREATURE_RENDERERS[phase.miniBossId!]);
+      } else {
+        // Same shared creature renders both roles (mirrors the existing Colossus/Colossus-Jr relationship).
+        expect(BOSS_CREATURE_RENDERERS[phase.mainBossId]).toBe(BOSS_CREATURE_RENDERERS[phase.miniBossId!]);
+      }
     }
   });
 

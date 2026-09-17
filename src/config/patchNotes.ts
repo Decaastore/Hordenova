@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v28",
+    dateIso: "2026-09-17",
+    category: "BOSSES",
+    title: {
+      en: "The Ashen Colossus — All-New Body, Not a Bigger Brute",
+      ptBR: "O Ashen Colossus — Corpo Totalmente Novo, Não um Brute Maior",
+    },
+    description: {
+      en: "A full visual audit of the game found its single biggest problem: the Ashen Valley's boss, The Ashen Colossus, Forsaken, technically had its own name, aura, and entrance — but its actual body was still just a scaled-up, slightly recolored version of the same shape a regular enemy uses, so at a glance it barely read as a boss at all. It's been rebuilt from scratch with its own anatomy: a hunched, asymmetric frame with one massive dragging forelimb, a broken row of stone spine plates, a low fused head with one intact horn and one snapped off, and a torn-open chest cavity its molten core visibly escapes from instead of a dot painted on its chest. Every light-facing edge now catches a real highlight, so the silhouette reads clearly even against this biome's dark ash palette — the exact problem that made it blend into the background before. Its walk now visibly compresses under its own weight with each step, kicking up a small puff of ash where it lands. The mini-boss version of the same boss is no longer a smaller copy: it's a distinct, low prowling quadruped that shares the family's material and glowing core but has its own build entirely, so the two no longer look like the same monster at two sizes.",
+      ptBR: "Uma auditoria visual completa do jogo encontrou seu maior problema isolado: o chefe do Vale das Cinzas, The Ashen Colossus, Forsaken, tecnicamente já tinha nome, aura e entrada próprios — mas seu corpo de verdade ainda era só uma versão aumentada e ligeiramente recolorida da mesma forma usada por um inimigo comum, então, num olhar rápido, quase não parecia um chefe. Ele foi reconstruído do zero com anatomia própria: um corpo curvado e assimétrico com um braço dianteiro enorme sendo arrastado, uma fileira quebrada de placas de pedra na espinha, uma cabeça baixa fundida ao corpo com um chifre intacto e outro quebrado, e uma cavidade no peito rasgada de onde seu núcleo em brasa escapa visivelmente, em vez de um pontinho pintado no peito. Toda borda voltada para a luz agora recebe um brilho de contorno real, então a silhueta se destaca com clareza mesmo contra a paleta escura desse bioma — exatamente o problema que antes o fazia se misturar com o fundo. Sua caminhada agora comprime visivelmente sob o próprio peso a cada passo, levantando um pequeno borrifo de cinzas onde pisa. A versão mini-chefe do mesmo chefe deixou de ser uma cópia menor: agora é um quadrúpede baixo e rondador, com identidade própria, que compartilha o material e o núcleo brilhante da família mas tem uma estrutura corporal totalmente distinta — os dois deixaram de parecer o mesmo monstro em dois tamanhos.",
+    },
+    highlights: [
+      {
+        en: "The Ashen Colossus (main boss, Ashen Valley) has an all-new bespoke silhouette — asymmetric hunched frame, one massive dragging forelimb, broken spine plates, a fused low head with an intact horn and a broken stub, and a torn chest cavity its core visibly sits inside and escapes from.",
+        ptBR: "The Ashen Colossus (chefe principal, Vale das Cinzas) tem uma silhueta totalmente nova e própria — corpo assimétrico e curvado, um braço dianteiro enorme sendo arrastado, placas de espinha quebradas, cabeça baixa fundida com um chifre intacto e um quebrado, e uma cavidade no peito rasgada de onde o núcleo visivelmente escapa.",
+      },
+      {
+        en: "Added real material contrast (warm rim highlights on every light-facing edge) so the boss's silhouette reads clearly against Ashen Valley's dark palette instead of blending into the background.",
+        ptBR: "Adicionado contraste real de material (brilhos de contorno quentes em toda borda voltada para a luz) para a silhueta do chefe se destacar com clareza contra a paleta escura do Vale das Cinzas, em vez de se misturar com o fundo.",
+      },
+      {
+        en: "Its walk now visibly compresses under its own weight each step and kicks up a small puff of ash where it lands, instead of a flat sideways sway.",
+        ptBR: "Sua caminhada agora comprime visivelmente sob o próprio peso a cada passo e levanta um pequeno borrifo de cinzas onde pisa, em vez de um simples balanço lateral.",
+      },
+      {
+        en: "The mini-boss (Ashen Colossus, Spawn) is now a distinct low prowling quadruped — its own build, not the main boss scaled down — while still sharing the family's charred material and glowing core.",
+        ptBR: "O mini-chefe (Ashen Colossus, Spawn) agora é um quadrúpede baixo e rondador com identidade própria — estrutura própria, não o chefe principal em escala reduzida — mas ainda compartilhando o material carbonizado e o núcleo brilhante da família.",
+      },
+      {
+        en: "Purely visual — same HP, damage, abilities, enrage, and rewards as before; the regular Brute enemy and every other boss/mini-boss are unchanged.",
+        ptBR: "Puramente visual — mesmo HP, dano, habilidades, fúria e recompensas de antes; o inimigo Brute comum e todo outro chefe/mini-chefe permanecem inalterados.",
+      },
+    ],
+  },
+  {
     id: "v27",
     dateIso: "2026-09-17",
     category: "FIXES",
