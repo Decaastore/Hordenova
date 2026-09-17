@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v25",
+    dateIso: "2026-09-17",
+    category: "CONTENT",
+    title: {
+      en: "Creature Impact Overhaul — Every Hit and Death Now Reacts to What It's Made Of",
+      ptBR: "Reformulação do Impacto das Criaturas — Todo Acerto e Morte Agora Reage ao Material da Criatura",
+    },
+    description: {
+      en: "Getting hit, dying, and just walking now looks different depending on what a creature actually is. Crystal creatures spark and shatter into sharp shards; armored/stone creatures kick up dust and heavier debris; plant creatures disperse into drifting petals; charred creatures crumble into embers and ash; aquatic creatures burst into droplets with a ring of displaced water; everything else reacts with a softer, organic burst. Heavier creatures now leave a real footstep behind them as they walk — nothing for the lightest creatures, a noticeable ground impact for the heaviest and for mini-bosses and bosses — synced to their real walking speed the same way their animation already is. Bosses also get a small, controlled ground impact the instant they enter the map. None of this touches HP, damage, drops, or any other real game value — it's purely about making a hit and a kill feel like they actually happened to that specific creature.",
+      ptBR: "Tomar um golpe, morrer e simplesmente andar agora parecem diferentes dependendo do que a criatura realmente é. Criaturas de cristal faíscam e se estilhaçam em fragmentos afiados; criaturas blindadas/de pedra levantam poeira e detritos mais pesados; criaturas vegetais se dispersam em pétalas flutuantes; criaturas carbonizadas desmoronam em brasas e cinzas; criaturas aquáticas explodem em gotas com um anel de água deslocada; todo o resto reage com um impacto orgânico mais suave. Criaturas mais pesadas agora deixam uma pegada real ao caminhar — quase nada para as criaturas mais leves, um impacto perceptível no chão para as mais pesadas e para mini-chefes e chefes, sincronizado com a velocidade real de caminhada do mesmo jeito que a animação já é. Chefes também ganham um pequeno impacto controlado no chão no instante em que entram no mapa. Nada disso toca em HP, dano, drops ou qualquer outro valor real do jogo — é puramente sobre fazer um acerto e uma morte parecerem que realmente aconteceram com aquela criatura específica.",
+    },
+    highlights: [
+      {
+        en: "Every creature and boss/mini-boss now has its own material identity (crystal, armored, plant, charred, organic, or aquatic) driving a distinct hit-impact and death particle effect — no more one shared burst recolored for everyone.",
+        ptBR: "Toda criatura e mini-chefe/chefe agora tem sua própria identidade de material (cristal, blindado, vegetal, carbonizado, orgânico ou aquático) guiando um efeito distinto de impacto e morte — não é mais um único efeito compartilhado apenas recolorido para todos.",
+      },
+      {
+        en: "New weight-based footstep system: light creatures leave almost no trace, heavier creatures kick up real dust (or a water ripple for aquatic ones), scaling up clearly for mini-bosses and bosses.",
+        ptBR: "Novo sistema de pegadas baseado em peso: criaturas leves quase não deixam rastro, criaturas mais pesadas levantam poeira de verdade (ou uma ondulação na água para as aquáticas), aumentando claramente para mini-chefes e chefes.",
+      },
+      {
+        en: "Critical hits now amplify the same material effect (more particles, a brief bright flash) instead of a separate, unrelated crit effect.",
+        ptBR: "Acertos críticos agora amplificam o mesmo efeito do material (mais partículas, um breve clarão) em vez de um efeito de crítico separado e sem relação.",
+      },
+      {
+        en: "Bosses get a small, controlled ground-impact burst at the instant they enter the map, alongside the existing entrance shake.",
+        ptBR: "Chefes ganham um pequeno impacto controlado no chão no instante em que entram no mapa, junto com o tremor de entrada já existente.",
+      },
+      {
+        en: "Purely visual work — no change to HP, damage, drops, Gold, Gems, waves, or any other gameplay value.",
+        ptBR: "Trabalho puramente visual — nenhuma mudança em HP, dano, drops, Gold, Gemas, ondas ou qualquer outro valor de gameplay.",
+      },
+    ],
+  },
+  {
     id: "v24",
     dateIso: "2026-09-17",
     category: "CONTENT",

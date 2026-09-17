@@ -7,7 +7,8 @@ import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getTowerStats } from "@/entities/Tower";
-import { PALETTE, TOWER_THEME, ENEMY_THEME, ARCHETYPE_VISUAL_SCALE } from "./theme";
+import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE } from "./theme";
+import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
 import {
   drawAmbientParticles,
@@ -20,7 +21,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower } from "./EntityRenderer";
+import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower, getEnemyVfxProfile } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
@@ -520,8 +521,16 @@ export function detectVfxEvents(
 ): void {
   // Boss entrance — the moment BOSS_INTRO begins (once, not every frame
   // spent in it) is the one big scripted beat camera shake is meant for.
+  // CREATURE VFX & IMPACT PASS spec section 11 pairs this with a small,
+  // material-tinted ground impact at the boss's own entry point when it's
+  // already present in the snapshot (falls back to skipping the impact,
+  // never the shake, if the boss hasn't spawned into the world yet).
   if (phase === "BOSS_INTRO" && prevPhase !== null && prevPhase !== "BOSS_INTRO") {
     vfx.triggerShake(BOSS_INTRO_SHAKE_MAGNITUDE, BOSS_INTRO_SHAKE_DURATION_MS);
+    const enteringBoss = snapshot.enemies.find((e) => e.boss?.isMainBoss);
+    if (enteringBoss) {
+      vfx.spawnBossEntranceImpact(enteringBoss.position, getEnemyVfxProfile(enteringBoss).family);
+    }
   }
 
   // Floating Damage Numbers rewrite: numbers are born ONLY from
@@ -535,13 +544,16 @@ export function detectVfxEvents(
   const enemyById = new Map(snapshot.enemies.map((e) => [e.id, e]));
   for (const event of combatVfxEvents) {
     vfx.reportEnemyDamage(event.enemyId, event.position, event.amount, event.isCrit, event.kind);
-    // The Crawler proof piece's premium white-hot impact burst (spec:
-    // "impacto" + "partículas") stays tied to each real HIT, same as
-    // before — it's a particle effect, not a number, so it isn't subject
-    // to the number-aggregation rules above.
-    if (event.kind === "HIT" && enemyById.get(event.enemyId)?.type === "CRAWLER") {
-      const enemy = enemyById.get(event.enemyId)!;
-      vfx.spawnHitImpact(event.position, ENEMY_THEME.CRAWLER.accent, enemy.direction);
+    // CREATURE VFX & IMPACT PASS spec sections 3/5/7 — every real HIT (not
+    // just the old Crawler proof piece) gets a material-specific particle
+    // burst, `isCrit` amplifying the SAME family shape rather than a
+    // separate effect. It's a particle effect, not a number, so it isn't
+    // subject to the floating-text aggregation rules above.
+    if (event.kind === "HIT") {
+      const enemy = enemyById.get(event.enemyId);
+      if (enemy) {
+        vfx.spawnCreatureHit(event.position, getEnemyVfxProfile(enemy).family, event.isCrit, enemy.direction);
+      }
     }
   }
 
@@ -566,8 +578,12 @@ export function detectVfxEvents(
   for (const [id, prev] of prevEnemies) {
     if (currentIds.has(id)) continue;
     if (prev.hp <= 0.01) {
-      const premium = prev.type === "CRAWLER" || prev.isBoss;
-      vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
+      // CREATURE VFX & IMPACT PASS spec section 13 — the death burst is now
+      // material-specific (crystal shatters, plant disperses as petals,
+      // aquatic bursts into droplets, ...) instead of one generic burst
+      // recolored per enemy, scaled up by weight class for mini-bosses/bosses.
+      const profile = prev.lastSeen ? getEnemyVfxProfile(prev.lastSeen) : getCreatureVfxProfile(prev.type);
+      vfx.spawnCreatureDeath(prev.position, profile.family, profile.weight, prev.direction);
       // FASE 3 — death-collapse (spec section 11): reuses the enemy's own
       // last-seen-alive instance (frozen mid-body-pose) under a collapse
       // transform CanvasRenderer's draw loop applies — see DeathAnimation's

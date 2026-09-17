@@ -8,6 +8,7 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
+import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
 import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
 import type { LocomotionState } from "./biomeCreatures/helpers";
 import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
@@ -1587,6 +1588,88 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
   ctx.restore();
 }
 
+/**
+ * CREATURE VFX & IMPACT PASS — universal, weight-driven footstep VFX (spec
+ * section 9): unlike drawMovementVfx above (which only fires for the 8
+ * archetypes explicitly flagged in config/movementVfx.ts), this applies to
+ * EVERY ground creature via its CreatureVfxProfile, because "peso" is a
+ * property every creature has, not a special-case identity a few archetypes
+ * opt into. LIGHT creatures get none at all (spec: "leve: quase nenhum
+ * efeito"); flying creatures never touch the ground so they're skipped
+ * outright (their existing flight shadow already carries that read). Two
+ * puffs alternate per stride, phased from the SAME `distanceTraveled` the
+ * locomotion toolkit already uses — so footsteps are automatically
+ * speed-correct and settle to nothing when the creature is stopped, exactly
+ * like every other FASE 3 gait signal. AQUATIC creatures get a small
+ * expanding ripple instead of a dust puff — water displaced, not dust
+ * kicked up. Purely computed per-frame from existing state (no stored
+ * particle objects, no pooling needed) — the cheapest possible way to
+ * satisfy spec section 17's "não criar centenas de objetos" for an effect
+ * that plays on every single creature every frame.
+ */
+const FOOTSTEP_PARAMS: Partial<Record<CreatureWeightClass, { radius: number; alpha: number; strideLength: number }>> = {
+  MEDIUM: { radius: 2.2, alpha: 0.26, strideLength: 14 },
+  HEAVY: { radius: 3.6, alpha: 0.36, strideLength: 20 },
+  MINIBOSS: { radius: 5.5, alpha: 0.42, strideLength: 26 },
+  BOSS: { radius: 8, alpha: 0.46, strideLength: 32 },
+};
+const FOOTSTEP_TINT: Record<CreatureVfxProfile["family"], string> = {
+  ORGANIC: "#8f8172",
+  CRYSTAL: "#8fa0ac",
+  ARMORED: "#7c7568",
+  PLANT: "#6f7a52",
+  CHARRED: "#5c4a3c",
+  AQUATIC: "#5c98ad",
+};
+
+function drawFootstepVfx(
+  ctx: CanvasRenderingContext2D,
+  profile: CreatureVfxProfile,
+  locomotion: LocomotionState,
+): void {
+  if (profile.flying) return;
+  const params = FOOTSTEP_PARAMS[profile.weight];
+  if (!params) return; // LIGHT creatures: no footstep VFX by design.
+
+  const phase = gaitPhase(locomotion.distance, params.strideLength);
+  const tint = FOOTSTEP_TINT[profile.family];
+
+  if (profile.family === "AQUATIC") {
+    // Water displacement — a small ripple expanding at each footfall instead of a dust puff.
+    for (let i = 0; i < 2; i++) {
+      const bump = Math.abs(Math.sin(phase + (i === 0 ? 0 : Math.PI))) * locomotion.speedRatio;
+      if (bump <= 0.03) continue;
+      ctx.save();
+      ctx.globalAlpha = params.alpha * (1 - bump);
+      ctx.strokeStyle = tint;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 6, params.radius * (0.6 + bump), params.radius * 0.35 * (0.6 + bump), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+    return;
+  }
+
+  for (let i = 0; i < 2; i++) {
+    const localPhase = (phase / (Math.PI * 2) + (i === 0 ? 0 : 0.5)) % 1;
+    const puffRadius = params.radius * (1 - localPhase);
+    if (puffRadius <= 0.15 || locomotion.speedRatio <= 0.02) continue;
+    ctx.save();
+    ctx.globalAlpha = params.alpha * (1 - localPhase) * locomotion.speedRatio;
+    ctx.fillStyle = tint;
+    ctx.beginPath();
+    ctx.arc((i === 0 ? -1 : 1) * params.radius * 0.6, 5 + localPhase * 2, puffRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+/** Boss/mini-boss profile from its bossId; regular creature profile from its EnemyType — the one branch point both drawEnemy's footstep call and CanvasRenderer's hit/death VFX share. */
+export function getEnemyVfxProfile(enemy: EnemyInstance): CreatureVfxProfile {
+  return enemy.boss ? getBossVfxProfile(enemy.boss.bossId, enemy.boss.isMainBoss) : getCreatureVfxProfile(enemy.type);
+}
+
 export function drawEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: EnemyInstance,
@@ -1631,6 +1714,9 @@ export function drawEnemy(
   // accumulate: it's recomputed fresh every frame straight from the
   // enemy's REAL current position, so it can never drift out of sync with it.
   drawMovementVfx(ctx, enemy, angle, timeMs);
+  // CREATURE VFX & IMPACT PASS — weight/material footstep VFX (spec section
+  // 9), same local space/ordering as drawMovementVfx above (behind the body).
+  drawFootstepVfx(ctx, getEnemyVfxProfile(enemy), locomotion);
 
   ctx.save();
   ctx.rotate(angle);

@@ -1,6 +1,7 @@
 import type { Vector2 } from "@/utils/geometry";
 import { drawMagicCore } from "./lighting";
 import type { CastleHpTier } from "@/config/castleConfig";
+import type { CreatureVfxFamily, CreatureWeightClass } from "@/config/creatureVfxProfile";
 
 /**
  * Purely cosmetic "game feel" layer (Phase 2 spec section 10): damage
@@ -58,7 +59,16 @@ interface Ring {
 }
 
 const MAX_FLOATING_TEXTS = 24;
-const MAX_BURSTS = 16;
+// CREATURE VFX & IMPACT PASS — bumped from 16: material hits/deaths now fire
+// for every creature (not just the Crawler proof piece), so a busy 30-50
+// enemy scene needs a bit more headroom. Still a hard, small cap — combined
+// with each burst's own short (200-520ms) lifetime, this is the whole
+// performance strategy (spec section 17): bounded pool + short-lived
+// entries, no per-frame allocation growth regardless of run length. Oldest
+// entries are evicted first (pushBurst below), which in practice means the
+// newest, most relevant impacts (spec section 18's priority order) are what
+// stays on screen when many creatures are hit in the same frame.
+const MAX_BURSTS = 22;
 const MAX_RINGS = 8;
 
 /**
@@ -82,6 +92,55 @@ interface PendingDamage {
   isCrit: boolean;
   remainingMs: number;
 }
+
+interface BurstStyle {
+  color: string;
+  count: number;
+  speed: number;
+  speedJitter: number;
+  /** Radians — how straight (small) vs curved (large) the particle's flight arcs, see Burst.particles' curve field. Rigid materials (crystal, armored) stay low; soft/organic materials curve more. */
+  curve: number;
+  spread: number;
+  durationMs: number;
+  hotCore?: boolean;
+}
+
+/**
+ * CREATURE VFX & IMPACT PASS — one HIT burst recipe per material family
+ * (spec section 3/5), kept deliberately restrained (short duration, few
+ * particles, no neon) so a hit reads as "this landed" without dominating the
+ * creature underneath it (spec section 5: "o impacto deve durar pouco").
+ */
+const HIT_STYLE: Record<CreatureVfxFamily, BurstStyle> = {
+  ORGANIC: { color: "#c97a5c", count: 5, speed: 32, speedJitter: 14, curve: 1.1, spread: Math.PI * 0.7, durationMs: 200 },
+  CRYSTAL: { color: "#bdeaff", count: 6, speed: 48, speedJitter: 16, curve: 0.5, spread: Math.PI * 0.6, durationMs: 220, hotCore: true },
+  ARMORED: { color: "#c7ccd2", count: 5, speed: 30, speedJitter: 12, curve: 0.6, spread: Math.PI * 0.65, durationMs: 210 },
+  PLANT: { color: "#8fd48a", count: 5, speed: 24, speedJitter: 10, curve: 1.4, spread: Math.PI * 0.8, durationMs: 230 },
+  CHARRED: { color: "#e0925a", count: 5, speed: 26, speedJitter: 12, curve: 1.0, spread: Math.PI * 0.7, durationMs: 240 },
+  AQUATIC: { color: "#6ec7e0", count: 6, speed: 34, speedJitter: 14, curve: 0.9, spread: Math.PI * 0.75, durationMs: 220 },
+};
+
+/**
+ * CREATURE VFX & IMPACT PASS — one DEATH burst recipe per material family
+ * (spec section 13). `ring` adds a brief expanding ring alongside the
+ * particle burst (crystal's crack-flash read, aquatic's water displacement).
+ */
+const DEATH_STYLE: Record<CreatureVfxFamily, BurstStyle & { ring?: boolean }> = {
+  ORGANIC: { color: "#b06a4e", count: 9, speed: 36, speedJitter: 20, curve: 1.3, spread: Math.PI * 0.9, durationMs: 420 },
+  CRYSTAL: { color: "#bdeaff", count: 11, speed: 58, speedJitter: 24, curve: 0.35, spread: Math.PI * 2, durationMs: 460, hotCore: true, ring: true },
+  ARMORED: { color: "#9aa0a8", count: 10, speed: 34, speedJitter: 18, curve: 0.7, spread: Math.PI * 2, durationMs: 480 },
+  PLANT: { color: "#7fc47a", count: 9, speed: 20, speedJitter: 10, curve: 1.6, spread: Math.PI * 2, durationMs: 520 },
+  CHARRED: { color: "#c97a45", count: 10, speed: 22, speedJitter: 12, curve: 1.2, spread: Math.PI * 2, durationMs: 520 },
+  AQUATIC: { color: "#5cb3d4", count: 10, speed: 38, speedJitter: 18, curve: 0.8, spread: Math.PI * 2, durationMs: 440, ring: true },
+};
+
+const DEATH_WEIGHT_SCALE: Record<CreatureWeightClass, { countMul: number; speedMul: number; durationMul: number }> = {
+  LIGHT: { countMul: 0.7, speedMul: 0.85, durationMul: 0.85 },
+  MEDIUM: { countMul: 1, speedMul: 1, durationMul: 1 },
+  HEAVY: { countMul: 1.3, speedMul: 1.1, durationMul: 1.15 },
+  MINIBOSS: { countMul: 1.7, speedMul: 1.2, durationMul: 1.35 },
+  BOSS: { countMul: 2.2, speedMul: 1.35, durationMul: 1.6 },
+};
 
 export class VfxManager {
   private floatingTexts: FloatingText[] = [];
@@ -353,6 +412,105 @@ export class VfxManager {
         angle: (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.25,
         speed: 55 + Math.random() * 30,
         curve: (Math.random() - 0.5) * 0.6, // straighter, sharper flight than a rounded death burst — reads as rigid shards, not smoke
+      })),
+    });
+  }
+
+  /**
+   * CREATURE VFX & IMPACT PASS — material-specific hit reaction (spec
+   * sections 3/5/7): the concrete answer to "não usar a mesma explosão em
+   * todos os hits". Each family gets its own particle count/speed/curve/
+   * color instead of one shared burst config, and `isCrit` amplifies the
+   * SAME family shape (more particles, a brief hot core) rather than
+   * switching to a different, unrelated crit effect — spec section 7's "o
+   * crítico ainda precisa pertencer ao universo visual" requirement. Reuses
+   * the existing bounded burst pool (pushBurst/MAX_BURSTS) — no new
+   * particle system, no per-frame allocation beyond one short-lived entry.
+   */
+  spawnCreatureHit(position: Vector2, family: CreatureVfxFamily, isCrit: boolean, incomingDirection?: Vector2): void {
+    const style = HIT_STYLE[family];
+    const backAngle = incomingDirection
+      ? Math.atan2(-incomingDirection.y, -incomingDirection.x)
+      : Math.random() * Math.PI * 2;
+    const count = style.count + (isCrit ? 3 : 0);
+    const spread = style.spread;
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: style.color,
+      remainingMs: style.durationMs,
+      totalMs: style.durationMs,
+      hotCore: isCrit || style.hotCore,
+      particles: Array.from({ length: count }, (_, i) => ({
+        angle: backAngle + (i / count - 0.5) * spread + (Math.random() - 0.5) * 0.25,
+        speed: style.speed * (isCrit ? 1.25 : 1) + Math.random() * style.speedJitter,
+        curve: (Math.random() - 0.5) * style.curve,
+      })),
+    });
+  }
+
+  /**
+   * CREATURE VFX & IMPACT PASS — material-specific death sequence (spec
+   * section 13): organic collapses with soft fragments, crystal shatters
+   * into sharp rigid shards, armored/heavy kicks up a wider dust cloud,
+   * plant disperses as drifting petals, charred crumbles into embers/ash,
+   * aquatic bursts into droplets plus a brief expanding water ring. `weight`
+   * scales scale/count/duration on top of the family shape so a boss death
+   * reads as a bigger event than the same family's regular creature without
+   * needing a second, duplicate system.
+   */
+  spawnCreatureDeath(position: Vector2, family: CreatureVfxFamily, weight: CreatureWeightClass, travelDirection?: Vector2): void {
+    const style = DEATH_STYLE[family];
+    const weightMul = DEATH_WEIGHT_SCALE[weight];
+    const baseAngle = travelDirection ? Math.atan2(travelDirection.y, travelDirection.x) + Math.PI : 0;
+    const spread = travelDirection ? style.spread : Math.PI * 2;
+    const count = Math.round(style.count * weightMul.countMul);
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: style.color,
+      remainingMs: style.durationMs * weightMul.durationMul,
+      totalMs: style.durationMs * weightMul.durationMul,
+      hotCore: style.hotCore,
+      particles: Array.from({ length: count }, (_, i) => ({
+        angle: baseAngle + (i / count - 0.5) * spread + (Math.random() - 0.5) * 0.3,
+        speed: (style.speed + Math.random() * style.speedJitter) * weightMul.speedMul,
+        curve: (Math.random() - 0.5) * style.curve,
+      })),
+    });
+    if (style.ring) {
+      this.pushRing({
+        x: position.x,
+        y: position.y,
+        color: style.color,
+        remainingMs: 340 * weightMul.durationMul,
+        totalMs: 340 * weightMul.durationMul,
+        maxRadius: 16 * weightMul.countMul,
+      });
+    }
+  }
+
+  /**
+   * Boss entrance impact (spec section 11): a small, controlled ground hit
+   * at the boss's own entry point the instant BOSS_INTRO begins, tinted by
+   * its material family — paired with the existing camera shake (spec
+   * section 11: "impacto no terreno" + "VFX de entrada"), never a second,
+   * louder effect competing with it.
+   */
+  spawnBossEntranceImpact(position: Vector2, family: CreatureVfxFamily): void {
+    const style = HIT_STYLE[family];
+    const count = 10;
+    this.pushBurst({
+      x: position.x,
+      y: position.y,
+      color: style.color,
+      remainingMs: 420,
+      totalMs: 420,
+      hotCore: true,
+      particles: Array.from({ length: count }, (_, i) => ({
+        angle: (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3,
+        speed: 30 + Math.random() * 22,
+        curve: (Math.random() - 0.5) * style.curve,
       })),
     });
   }
