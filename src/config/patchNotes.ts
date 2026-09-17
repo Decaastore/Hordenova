@@ -70,6 +70,45 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v26",
+    dateIso: "2026-09-17",
+    category: "FIXES",
+    title: {
+      en: "Impact Effects Polish — Hits, Deaths, and Footsteps Now Actually Visible",
+      ptBR: "Polimento dos Efeitos de Impacto — Acertos, Mortes e Pegadas Agora Realmente Visíveis",
+    },
+    description: {
+      en: "A follow-up pass on the material-based hit/death/footstep effects: at the game's real zoomed-out scale, the particles and footstep dust were too thin and too small to actually read next to a creature's own body and the map's detail, and one footstep dust puff was being drawn in the wrong draw order and getting painted over by the creature itself. Both are fixed — particles are thicker and a bit faster, footstep dust is bigger, lighter-toned, and correctly placed behind the creature's own silhouette, and critical hits push the same effect noticeably further (more particles, longer reach) rather than just slightly bigger. Boss entrances also get a brief ground-dust ring alongside their existing impact burst, so the arrival reads as a real landing. Everything is still the same restrained, no-gore, no-neon effects from the previous pass — this is purely about making them actually visible during real gameplay, with zero change to HP, damage, drops, or any other gameplay value.",
+      ptBR: "Um polimento sobre os efeitos de acerto/morte/pegada baseados em material: na escala real e mais afastada do jogo, as partículas e a poeira das pegadas eram finas e pequenas demais para realmente aparecer perto do corpo da própria criatura e dos detalhes do mapa, e uma das pegadas estava sendo desenhada na ordem errada e ficava escondida atrás da própria criatura. Os dois problemas foram corrigidos — as partículas ficaram mais grossas e um pouco mais rápidas, a poeira das pegadas ficou maior, com um tom mais claro e posicionada corretamente atrás da silhueta da criatura, e acertos críticos agora empurram o mesmo efeito visivelmente mais longe (mais partículas, mais alcance) em vez de só um pouco maior. A entrada dos chefes também ganhou um breve anel de poeira no chão junto com o impacto que já existia, para a chegada parecer um pouso de verdade. Tudo continua com a mesma identidade contida, sem sangue e sem neon do polimento anterior — isso é puramente sobre deixar os efeitos realmente visíveis durante o jogo real, sem nenhuma mudança em HP, dano, drops ou qualquer outro valor de gameplay.",
+    },
+    highlights: [
+      {
+        en: "Material hit/death particle bursts are noticeably thicker and a bit faster across all 6 creature families — the previous pass's effects were structurally correct but too thin to read at real gameplay zoom.",
+        ptBR: "Os efeitos de partículas de acerto/morte por material ficaram visivelmente mais grossos e um pouco mais rápidos nas 6 famílias de criaturas — os efeitos do polimento anterior estavam corretos na estrutura, mas finos demais para aparecer na escala real do jogo.",
+      },
+      {
+        en: "Fixed a footstep dust puff that was being drawn behind the creature in the wrong order and getting hidden by its own (opaque) body — dust now correctly appears behind/beside the creature as it walks.",
+        ptBR: "Corrigida uma pegada de poeira que era desenhada na ordem errada atrás da criatura e ficava escondida pelo próprio corpo (opaco) dela — a poeira agora aparece corretamente atrás/ao lado da criatura enquanto ela caminha.",
+      },
+      {
+        en: "Footstep dust is bigger and lighter-toned per material, so it reads clearly against dark ground in every biome instead of blending in.",
+        ptBR: "A poeira das pegadas ficou maior e com um tom mais claro por material, para aparecer claramente contra o chão escuro em todos os biomas em vez de se misturar com ele.",
+      },
+      {
+        en: "Critical hits now visibly amplify reach and particle count on the same effect, not just a small size bump.",
+        ptBR: "Acertos críticos agora amplificam visivelmente o alcance e a quantidade de partículas do mesmo efeito, não apenas um pequeno aumento de tamanho.",
+      },
+      {
+        en: "Boss entrances add a brief ground-dust ring alongside the existing impact burst, so the arrival reads as a real landing without becoming a bigger, louder effect.",
+        ptBR: "A entrada dos chefes ganhou um breve anel de poeira no chão junto ao impacto já existente, para a chegada parecer um pouso de verdade sem se tornar um efeito maior ou mais chamativo.",
+      },
+      {
+        en: "Purely visual polish — no change to HP, damage, drops, Gold, Gems, waves, or any other gameplay value.",
+        ptBR: "Polimento puramente visual — nenhuma mudança em HP, dano, drops, Gold, Gemas, ondas ou qualquer outro valor de gameplay.",
+      },
+    ],
+  },
+  {
     id: "v25",
     dateIso: "2026-09-17",
     category: "CONTENT",

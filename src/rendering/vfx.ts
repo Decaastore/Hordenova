@@ -47,6 +47,9 @@ interface Burst {
   particles: { angle: number; speed: number; curve: number }[];
   /** Premium-tier bursts (Etapa 4) paint a white-hot core under the particles. */
   hotCore?: boolean;
+  /** VISUAL POLISH PASS — per-burst particle thickness/size, defaulting to the original 1.4/1.8 (every pre-existing spawn* call is unaffected). Material hit/death bursts opt into slightly thicker strokes/dots (see HIT_STYLE/DEATH_STYLE) because they now fire on every creature at real gameplay zoom, where the original thin proof-of-concept size read as invisible against the map's own detail. */
+  lineWidth?: number;
+  dotRadius?: number;
 }
 
 interface Ring {
@@ -103,6 +106,8 @@ interface BurstStyle {
   spread: number;
   durationMs: number;
   hotCore?: boolean;
+  lineWidth?: number;
+  dotRadius?: number;
 }
 
 /**
@@ -110,28 +115,36 @@ interface BurstStyle {
  * (spec section 3/5), kept deliberately restrained (short duration, few
  * particles, no neon) so a hit reads as "this landed" without dominating the
  * creature underneath it (spec section 5: "o impacto deve durar pouco").
+ *
+ * VISUAL POLISH PASS — speed/lineWidth/dotRadius raised from the first cut:
+ * live testing at the game's real zoom (dozens of tiny creatures on a
+ * detailed map) showed the original thin/small particles were essentially
+ * invisible next to decorations and the enemy's own HP bar, undermining the
+ * whole point of "reforçar a criatura" (spec section 1). Duration/count are
+ * UNCHANGED — this is a size/thickness correction, not a bigger effect.
  */
 const HIT_STYLE: Record<CreatureVfxFamily, BurstStyle> = {
-  ORGANIC: { color: "#c97a5c", count: 5, speed: 32, speedJitter: 14, curve: 1.1, spread: Math.PI * 0.7, durationMs: 200 },
-  CRYSTAL: { color: "#bdeaff", count: 6, speed: 48, speedJitter: 16, curve: 0.5, spread: Math.PI * 0.6, durationMs: 220, hotCore: true },
-  ARMORED: { color: "#c7ccd2", count: 5, speed: 30, speedJitter: 12, curve: 0.6, spread: Math.PI * 0.65, durationMs: 210 },
-  PLANT: { color: "#8fd48a", count: 5, speed: 24, speedJitter: 10, curve: 1.4, spread: Math.PI * 0.8, durationMs: 230 },
-  CHARRED: { color: "#e0925a", count: 5, speed: 26, speedJitter: 12, curve: 1.0, spread: Math.PI * 0.7, durationMs: 240 },
-  AQUATIC: { color: "#6ec7e0", count: 6, speed: 34, speedJitter: 14, curve: 0.9, spread: Math.PI * 0.75, durationMs: 220 },
+  ORGANIC: { color: "#c97a5c", count: 5, speed: 40, speedJitter: 16, curve: 1.1, spread: Math.PI * 0.7, durationMs: 200, lineWidth: 2, dotRadius: 2.6 },
+  CRYSTAL: { color: "#bdeaff", count: 6, speed: 58, speedJitter: 18, curve: 0.5, spread: Math.PI * 0.6, durationMs: 220, hotCore: true, lineWidth: 2.2, dotRadius: 2.8 },
+  ARMORED: { color: "#c7ccd2", count: 5, speed: 38, speedJitter: 14, curve: 0.6, spread: Math.PI * 0.65, durationMs: 210, lineWidth: 2.2, dotRadius: 2.8 },
+  PLANT: { color: "#8fd48a", count: 5, speed: 30, speedJitter: 12, curve: 1.4, spread: Math.PI * 0.8, durationMs: 230, lineWidth: 2, dotRadius: 2.6 },
+  CHARRED: { color: "#e0925a", count: 5, speed: 32, speedJitter: 14, curve: 1.0, spread: Math.PI * 0.7, durationMs: 240, lineWidth: 2, dotRadius: 2.6 },
+  AQUATIC: { color: "#6ec7e0", count: 6, speed: 42, speedJitter: 16, curve: 0.9, spread: Math.PI * 0.75, durationMs: 220, lineWidth: 2, dotRadius: 2.6 },
 };
 
 /**
  * CREATURE VFX & IMPACT PASS — one DEATH burst recipe per material family
  * (spec section 13). `ring` adds a brief expanding ring alongside the
  * particle burst (crystal's crack-flash read, aquatic's water displacement).
+ * VISUAL POLISH PASS — same size correction as HIT_STYLE above.
  */
 const DEATH_STYLE: Record<CreatureVfxFamily, BurstStyle & { ring?: boolean }> = {
-  ORGANIC: { color: "#b06a4e", count: 9, speed: 36, speedJitter: 20, curve: 1.3, spread: Math.PI * 0.9, durationMs: 420 },
-  CRYSTAL: { color: "#bdeaff", count: 11, speed: 58, speedJitter: 24, curve: 0.35, spread: Math.PI * 2, durationMs: 460, hotCore: true, ring: true },
-  ARMORED: { color: "#9aa0a8", count: 10, speed: 34, speedJitter: 18, curve: 0.7, spread: Math.PI * 2, durationMs: 480 },
-  PLANT: { color: "#7fc47a", count: 9, speed: 20, speedJitter: 10, curve: 1.6, spread: Math.PI * 2, durationMs: 520 },
-  CHARRED: { color: "#c97a45", count: 10, speed: 22, speedJitter: 12, curve: 1.2, spread: Math.PI * 2, durationMs: 520 },
-  AQUATIC: { color: "#5cb3d4", count: 10, speed: 38, speedJitter: 18, curve: 0.8, spread: Math.PI * 2, durationMs: 440, ring: true },
+  ORGANIC: { color: "#b06a4e", count: 9, speed: 44, speedJitter: 22, curve: 1.3, spread: Math.PI * 0.9, durationMs: 420, lineWidth: 2, dotRadius: 2.6 },
+  CRYSTAL: { color: "#bdeaff", count: 11, speed: 68, speedJitter: 26, curve: 0.35, spread: Math.PI * 2, durationMs: 460, hotCore: true, ring: true, lineWidth: 2.4, dotRadius: 3 },
+  ARMORED: { color: "#9aa0a8", count: 10, speed: 42, speedJitter: 20, curve: 0.7, spread: Math.PI * 2, durationMs: 480, lineWidth: 2.4, dotRadius: 3 },
+  PLANT: { color: "#7fc47a", count: 9, speed: 26, speedJitter: 12, curve: 1.6, spread: Math.PI * 2, durationMs: 520, lineWidth: 2, dotRadius: 2.6 },
+  CHARRED: { color: "#c97a45", count: 10, speed: 28, speedJitter: 14, curve: 1.2, spread: Math.PI * 2, durationMs: 520, lineWidth: 2, dotRadius: 2.8 },
+  AQUATIC: { color: "#5cb3d4", count: 10, speed: 46, speedJitter: 20, curve: 0.8, spread: Math.PI * 2, durationMs: 440, ring: true, lineWidth: 2.2, dotRadius: 2.8 },
 };
 
 const DEATH_WEIGHT_SCALE: Record<CreatureWeightClass, { countMul: number; speedMul: number; durationMul: number }> = {
@@ -432,8 +445,13 @@ export class VfxManager {
     const backAngle = incomingDirection
       ? Math.atan2(-incomingDirection.y, -incomingDirection.x)
       : Math.random() * Math.PI * 2;
-    const count = style.count + (isCrit ? 3 : 0);
+    // VISUAL POLISH PASS spec section 4 — crit amplifies the SAME family
+    // shape (more particles, faster/farther travel, a visibly bigger core
+    // and dots) rather than switching to a different effect; readable at a
+    // glance without a second color language or neon.
+    const count = style.count + (isCrit ? 4 : 0);
     const spread = style.spread;
+    const critMul = isCrit ? 1.4 : 1;
     this.pushBurst({
       x: position.x,
       y: position.y,
@@ -441,9 +459,11 @@ export class VfxManager {
       remainingMs: style.durationMs,
       totalMs: style.durationMs,
       hotCore: isCrit || style.hotCore,
+      lineWidth: (style.lineWidth ?? 1.4) * (isCrit ? 1.2 : 1),
+      dotRadius: (style.dotRadius ?? 1.8) * (isCrit ? 1.3 : 1),
       particles: Array.from({ length: count }, (_, i) => ({
         angle: backAngle + (i / count - 0.5) * spread + (Math.random() - 0.5) * 0.25,
-        speed: style.speed * (isCrit ? 1.25 : 1) + Math.random() * style.speedJitter,
+        speed: style.speed * critMul + Math.random() * style.speedJitter,
         curve: (Math.random() - 0.5) * style.curve,
       })),
     });
@@ -472,6 +492,8 @@ export class VfxManager {
       remainingMs: style.durationMs * weightMul.durationMul,
       totalMs: style.durationMs * weightMul.durationMul,
       hotCore: style.hotCore,
+      lineWidth: style.lineWidth,
+      dotRadius: (style.dotRadius ?? 1.8) * Math.min(1.6, weightMul.countMul),
       particles: Array.from({ length: count }, (_, i) => ({
         angle: baseAngle + (i / count - 0.5) * spread + (Math.random() - 0.5) * 0.3,
         speed: (style.speed + Math.random() * style.speedJitter) * weightMul.speedMul,
@@ -499,19 +521,32 @@ export class VfxManager {
    */
   spawnBossEntranceImpact(position: Vector2, family: CreatureVfxFamily): void {
     const style = HIT_STYLE[family];
-    const count = 10;
+    const count = 12;
     this.pushBurst({
       x: position.x,
       y: position.y,
       color: style.color,
-      remainingMs: 420,
-      totalMs: 420,
+      remainingMs: 460,
+      totalMs: 460,
       hotCore: true,
+      lineWidth: 2.4,
+      dotRadius: 3.2,
       particles: Array.from({ length: count }, (_, i) => ({
         angle: (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.3,
-        speed: 30 + Math.random() * 22,
+        speed: 34 + Math.random() * 26,
         curve: (Math.random() - 0.5) * style.curve,
       })),
+    });
+    // VISUAL POLISH PASS spec section 7 — a wide, slow ground-dust ring
+    // alongside the particle burst so the entrance reads as "impacto no
+    // terreno" (the ground itself responding), not just sparks in the air.
+    this.pushRing({
+      x: position.x,
+      y: position.y,
+      color: style.color,
+      remainingMs: 520,
+      totalMs: 520,
+      maxRadius: 26,
     });
   }
 
@@ -601,7 +636,7 @@ export class VfxManager {
         const midY = burst.y + dirY * midDist + perpY * (p.curve * midDist * 0.35);
 
         ctx.strokeStyle = burst.color;
-        ctx.lineWidth = 1.4;
+        ctx.lineWidth = burst.lineWidth ?? 1.4;
         ctx.beginPath();
         ctx.moveTo(burst.x, burst.y);
         ctx.quadraticCurveTo(midX, midY, px, py);
@@ -609,7 +644,7 @@ export class VfxManager {
 
         ctx.fillStyle = burst.hotCore ? "#fff6dd" : burst.color;
         ctx.beginPath();
-        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.arc(px, py, burst.dotRadius ?? 1.8, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();

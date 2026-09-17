@@ -1607,25 +1607,38 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
  * satisfy spec section 17's "não criar centenas de objetos" for an effect
  * that plays on every single creature every frame.
  */
+// VISUAL POLISH PASS — radii raised well past the first cut's 2.2-8: at the
+// game's real zoomed-out scale (dozens of small creatures on a detailed
+// map), those original puffs were smaller than the creature's own existing
+// contact shadow (radius ~9-11, see drawContactShadow) and simply never
+// read on screen — the concrete cause of the "sprites deslizando" complaint
+// this pass exists to fix. Alpha raised alongside so the bigger puff still
+// looks like soft dust, not a hard-edged decal.
 const FOOTSTEP_PARAMS: Partial<Record<CreatureWeightClass, { radius: number; alpha: number; strideLength: number }>> = {
-  MEDIUM: { radius: 2.2, alpha: 0.26, strideLength: 14 },
-  HEAVY: { radius: 3.6, alpha: 0.36, strideLength: 20 },
-  MINIBOSS: { radius: 5.5, alpha: 0.42, strideLength: 26 },
-  BOSS: { radius: 8, alpha: 0.46, strideLength: 32 },
+  MEDIUM: { radius: 5.5, alpha: 0.5, strideLength: 14 },
+  HEAVY: { radius: 8.5, alpha: 0.6, strideLength: 20 },
+  MINIBOSS: { radius: 13, alpha: 0.66, strideLength: 26 },
+  BOSS: { radius: 18, alpha: 0.7, strideLength: 32 },
 };
+// VISUAL POLISH PASS — lightened from the first cut's darker, muddier tones
+// (e.g. CHARRED #5c4a3c), which sat at nearly the same luminance as most
+// biomes' own dark ground and read as invisible regardless of size. Real
+// dust/ash kicked into the air is lighter than the ground it came from, not
+// darker — these read as a pale, dusty puff against a dark path in every biome.
 const FOOTSTEP_TINT: Record<CreatureVfxProfile["family"], string> = {
-  ORGANIC: "#8f8172",
-  CRYSTAL: "#8fa0ac",
-  ARMORED: "#7c7568",
-  PLANT: "#6f7a52",
-  CHARRED: "#5c4a3c",
-  AQUATIC: "#5c98ad",
+  ORGANIC: "#b8a892",
+  CRYSTAL: "#c3d6e0",
+  ARMORED: "#aca79c",
+  PLANT: "#a3b07c",
+  CHARRED: "#a08d7c",
+  AQUATIC: "#9ed4e8",
 };
 
 function drawFootstepVfx(
   ctx: CanvasRenderingContext2D,
   profile: CreatureVfxProfile,
   locomotion: LocomotionState,
+  angle: number,
 ): void {
   if (profile.flying) return;
   const params = FOOTSTEP_PARAMS[profile.weight];
@@ -1634,32 +1647,52 @@ function drawFootstepVfx(
   const phase = gaitPhase(locomotion.distance, params.strideLength);
   const tint = FOOTSTEP_TINT[profile.family];
 
+  // VISUAL POLISH PASS — same "behind the travel direction" placement
+  // drawMovementVfx already uses (both run in this same pre-rotation local
+  // space): the creature's own body is painted AFTER this call, once
+  // rotated into its facing direction, and is fully opaque — a puff placed
+  // near the origin was simply being painted over and never visible. Pushing
+  // it out along -direction clears the body silhouette every time,
+  // regardless of which way the creature is currently facing.
+  const behindX = -Math.cos(angle);
+  const behindY = -Math.sin(angle);
+  const sideX = -behindY;
+  const sideY = behindX;
+
   if (profile.family === "AQUATIC") {
     // Water displacement — a small ripple expanding at each footfall instead of a dust puff.
     for (let i = 0; i < 2; i++) {
       const bump = Math.abs(Math.sin(phase + (i === 0 ? 0 : Math.PI))) * locomotion.speedRatio;
       if (bump <= 0.03) continue;
+      const dist = params.radius * 0.7;
       ctx.save();
       ctx.globalAlpha = params.alpha * (1 - bump);
       ctx.strokeStyle = tint;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.ellipse(0, 6, params.radius * (0.6 + bump), params.radius * 0.35 * (0.6 + bump), 0, 0, Math.PI * 2);
+      ctx.ellipse(behindX * dist, behindY * dist, params.radius * (0.6 + bump), params.radius * 0.32 * (0.6 + bump), angle, 0, Math.PI * 2);
       ctx.stroke();
       ctx.restore();
     }
     return;
   }
 
+  // Two puffs alternating left/right of the travel axis, pushed behind the
+  // body far enough to clear its own silhouette — real footfalls landing on
+  // either side of the creature's stride, not a single cloud under it.
   for (let i = 0; i < 2; i++) {
     const localPhase = (phase / (Math.PI * 2) + (i === 0 ? 0 : 0.5)) % 1;
-    const puffRadius = params.radius * (1 - localPhase);
+    const puffRadius = params.radius * (1 - localPhase * 0.7);
     if (puffRadius <= 0.15 || locomotion.speedRatio <= 0.02) continue;
+    const behindDist = params.radius * (0.9 + localPhase * 0.5);
+    const sideDist = (i === 0 ? -1 : 1) * params.radius * 0.55;
+    const px = behindX * behindDist + sideX * sideDist;
+    const py = behindY * behindDist + sideY * sideDist;
     ctx.save();
     ctx.globalAlpha = params.alpha * (1 - localPhase) * locomotion.speedRatio;
     ctx.fillStyle = tint;
     ctx.beginPath();
-    ctx.arc((i === 0 ? -1 : 1) * params.radius * 0.6, 5 + localPhase * 2, puffRadius, 0, Math.PI * 2);
+    ctx.arc(px, py, puffRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -1716,7 +1749,7 @@ export function drawEnemy(
   drawMovementVfx(ctx, enemy, angle, timeMs);
   // CREATURE VFX & IMPACT PASS — weight/material footstep VFX (spec section
   // 9), same local space/ordering as drawMovementVfx above (behind the body).
-  drawFootstepVfx(ctx, getEnemyVfxProfile(enemy), locomotion);
+  drawFootstepVfx(ctx, getEnemyVfxProfile(enemy), locomotion, angle);
 
   ctx.save();
   ctx.rotate(angle);
