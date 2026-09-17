@@ -1,5 +1,5 @@
 import { drawEnergyCrack } from "../lighting";
-import { drawFlightShadow, flightLift, glowBlob, idleSway, materialFill, polygonPath } from "./helpers";
+import { bankAngle, drawFlightShadow, flightLift, glowBlob, idleSway, materialFill, polygonPath, wingBeat } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -15,12 +15,18 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 
 // Cloudfang — sleek feline-reptilian flier: tucked limbs, a whip tail, a
 // fanged head, dragon-style membrane wings sprouting from the shoulders.
-const drawCloudfang: EnemyDrawFn = (ctx, theme, timeMs) => {
+// FASE 3: banks into curves (a roll from the renderer's own smoothed turn
+// rate) and its wingbeat rate eases toward a slow hover as it nears a stop
+// instead of either freezing or flapping frantically in place — see
+// helpers.ts's wingBeat/bankAngle doc comments.
+const drawCloudfang: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 1.3, 7, 1500);
   drawFlightShadow(ctx, lift, 7, 9, 3.6);
   ctx.save();
   ctx.translate(0, -lift);
-  const flap = Math.sin(timeMs / 150);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 55, 0.5));
+  const flap = wingBeat(timeMs, 0, speedRatio, 150);
 
   for (const side of [1, -1] as const) {
     ctx.save();
@@ -99,12 +105,14 @@ const drawCloudfang: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Sky Manta — a single broad flat ray-body, no head silhouette, undulating
 // like it's riding the high air currents.
-const drawSkyManta: EnemyDrawFn = (ctx, theme, timeMs) => {
+const drawSkyManta: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 2.7, 5, 2400);
   drawFlightShadow(ctx, lift, 5, 13, 5);
   ctx.save();
   ctx.translate(0, -lift);
-  const undulate = Math.sin(timeMs / 500);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 60, 0.4));
+  const undulate = wingBeat(timeMs, 0, speedRatio, 500);
   const bodyGrad = materialFill(ctx, "HIDE", -14, -2, 14, 3, theme.dark, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
   polygonPath(ctx, [
@@ -143,12 +151,14 @@ const drawSkyManta: EnemyDrawFn = (ctx, theme, timeMs) => {
 // Storm Talon — a true bird skeleton: taloned legs hanging below in
 // flight, a hooked beak head, feather-fringe trailing the wing's edge,
 // crackling with static.
-const drawStormTalon: EnemyDrawFn = (ctx, theme, timeMs) => {
+const drawStormTalon: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 5.5, 8, 1400);
   drawFlightShadow(ctx, lift, 8, 8, 3.4);
   ctx.save();
   ctx.translate(0, -lift);
-  const flap = Math.sin(timeMs / 130);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 50, 0.55));
+  const flap = wingBeat(timeMs, 0, speedRatio, 130);
 
   for (const side of [1, -1] as const) {
     ctx.save();
@@ -242,10 +252,11 @@ registerEnemyRenderers({
 // wings, overlapping diamond scutes down the spine, a real horned head
 // with jaw and glowing eye. Fully aerial. The main boss adds a fourth
 // wing pair and a pair of curling horns — a genuinely larger anatomy.
-const drawAetherDrake: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+const drawAetherDrake: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.6;
   const maxLift = isMain ? 16 : 11;
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 0.4, maxLift, enraged ? 900 : 1700);
   const damageIntensity = Math.max(0, 1 - hpPercent);
   const wingPairs = isMain ? 4 : 2;
@@ -253,8 +264,12 @@ const drawAetherDrake: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPerc
   drawFlightShadow(ctx, lift, maxLift, 20 * scale, 8 * scale);
   ctx.save();
   ctx.translate(0, -lift);
+  // Main-boss trait: a wider, more dominant bank into curves than the
+  // mini-boss — "voo amplo e dominante" reading as heavier wing authority,
+  // not just a bigger sprite.
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, isMain ? 70 : 45, isMain ? 0.6 : 0.4));
   ctx.scale(scale, scale);
-  const flap = Math.sin(timeMs / (enraged ? 110 : 170));
+  const flap = wingBeat(timeMs, 0, speedRatio, enraged ? 110 : 170);
 
   for (let i = 0; i < wingPairs; i++) {
     const along = -8 + i * (16 / Math.max(1, wingPairs - 1));

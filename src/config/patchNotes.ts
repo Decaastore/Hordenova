@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v24",
+    dateIso: "2026-09-17",
+    category: "CONTENT",
+    title: {
+      en: "Creatures Now Really Walk, Fly, and Fight — Full Movement Overhaul",
+      ptBR: "As Criaturas Agora Realmente Andam, Voam e Lutam — Reformulação Completa do Movimento",
+    },
+    description: {
+      en: "Every creature, mini-boss, and boss across all 10 biomes has been rebuilt to move like a living thing traveling the circuit instead of a picture sliding along a line. Legs alternate and push off the ground, wings actually beat and bank into turns, tails and heads follow a step behind the body on curves, and everything speeds up or slows down its own animation to match its real, current speed — a creature slowed to a crawl now looks like it's crawling instead of running in place. Bosses got their own unique way of moving (an Iron Burrower Sovereign digs forward with a body tremor, a Crystal Behemoth Prime stomps with its crystals swaying, a Leviathan Elder hauls itself with real amphibious weight), and taking damage now causes a brief, real recoil instead of just a screen flash. Deaths are no longer instant disappearances — creatures collapse, dissolve, or topple over depending on their kind, with bigger, more dramatic reactions for mini-bosses and bosses.",
+      ptBR: "Toda criatura, mini-chefe e chefe dos 10 biomas foi reconstruída para se mover como algo vivo percorrendo o circuito, em vez de uma imagem deslizando por uma linha. As pernas se alternam e empurram o chão de verdade, as asas batem e inclinam o corpo nas curvas, a cauda e a cabeça acompanham o corpo com um leve atraso nas curvas, e a animação inteira acelera ou desacelera para bater com a velocidade real e atual da criatura — uma criatura lentificada até quase parar agora parece mesmo arrastando-se, em vez de continuar correndo no lugar. Os chefes ganharam seu próprio jeito único de se mover (o Perfurador de Ferro Soberano cava para frente com o corpo tremendo, o Behemoth de Cristal Primordial pisa pesado com os cristais balançando, o Leviatã Ancião se arrasta com peso anfíbio de verdade), e tomar dano agora causa um recuo breve e real em vez de só um clarão na tela. As mortes deixaram de ser um desaparecimento instantâneo — as criaturas caem, se dissolvem ou tombam dependendo do seu tipo, com reações maiores e mais dramáticas para mini-chefes e chefes.",
+    },
+    highlights: [
+      {
+        en: "All 30 regular creatures and every mini-boss/boss now use a real walking or flying cycle driven by their actual on-screen speed, not a fixed animation clock — curves are followed with a gradual, weighty turn instead of an instant snap.",
+        ptBR: "As 30 criaturas comuns e todos os mini-chefes/chefes agora usam um ciclo real de caminhada ou voo guiado pela sua velocidade real na tela, não por um relógio de animação fixo — curvas são acompanhadas com uma virada gradual e com peso, em vez de um giro instantâneo.",
+      },
+      {
+        en: "Flying creatures (Cloudfang, Sky Manta, Storm Talon, Void Bat, Cinderwing, Lunamoth, and the flying bosses) now bank into turns and beat their wings at a pace that matches how fast they're actually moving.",
+        ptBR: "Criaturas voadoras (Garra-de-Nuvem, Arraia-do-Céu, Garra-da-Tempestade, Morcego do Vazio, Asa-de-Cinzas, Traça-Lunar e os chefes voadores) agora inclinam o corpo nas curvas e batem as asas num ritmo que bate com sua velocidade real.",
+      },
+      {
+        en: "Every one of the 10 main bosses now has its own distinct way of moving (digging, dragging, prowling, stomping, slithering, and more) instead of reusing one generic walk animation.",
+        ptBR: "Cada um dos 10 chefes principais agora tem seu próprio jeito distinto de se mover (cavando, arrastando, rondando, pisando pesado, deslizando e mais) em vez de reaproveitar uma única animação genérica de caminhada.",
+      },
+      {
+        en: "New universal hit-reaction (recoil, compression, brief flash) plays on every creature type when it takes damage, and a proper death animation (collapse, dissolve, or topple) replaces the old instant vanish.",
+        ptBR: "Uma nova reação de impacto universal (recuo, compressão, clarão breve) acontece em todo tipo de criatura ao tomar dano, e uma animação de morte de verdade (queda, dissolução ou tombo) substitui o antigo desaparecimento instantâneo.",
+      },
+      {
+        en: "Purely visual work — no change to HP, damage, real movement speed, economy, drops, waves, or any other gameplay value.",
+        ptBR: "Trabalho puramente visual — nenhuma mudança em HP, dano, velocidade real de movimento, economia, drops, ondas ou qualquer outro valor de gameplay.",
+      },
+    ],
+  },
+  {
     id: "v23",
     dateIso: "2026-09-16",
     category: "CONTENT",

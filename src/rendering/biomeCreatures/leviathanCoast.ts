@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { breathe, gaitBounce, gaitPhase, gaitSwing, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -12,8 +12,17 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
  */
 
 // Tide Ripper — low, muscular amphibious predator, volumetric clawed legs.
-const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const crawl = Math.sin(timeMs / 180);
+// FASE 3: gait phase comes from real distance traveled (see helpers.ts's
+// gaitPhase doc comment) instead of wall-clock time, so the legs/tail only
+// ever move as fast as the creature is actually displacing on screen — at
+// 4x they scuttle visibly faster, and a full Frostborn freeze (speedRatio 0)
+// settles it into a planted, non-marching pose instead of running in place.
+const TIDE_RIPPER_STRIDE = 13;
+const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, TIDE_RIPPER_STRIDE);
+  const crawl = gaitSwing(phase, speedRatio, 1);
+  const bounce = gaitBounce(phase, speedRatio, 0.5);
   drawContactShadow(ctx, 10, 4, 0.34);
 
   for (const [lx, sign] of [
@@ -38,6 +47,7 @@ const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs) => {
   }
 
   ctx.save();
+  ctx.translate(0, -bounce);
   ctx.scale(1, breathe(timeMs, 0, 900, 0.02));
   const bodyGrad = materialFill(ctx, "HIDE", -10, -4, 11, 3, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
@@ -58,21 +68,37 @@ const drawTideRipper: EnemyDrawFn = (ctx, theme, timeMs) => {
   ctx.lineTo(4, -2.5);
   ctx.stroke();
   ctx.globalAlpha = 1;
+  // Tail fin — lags one stride phase behind the legs (a delayed swing, not
+  // an independent sine) so it visibly whips through after the body moves.
+  const tailLag = gaitSwing(phase, speedRatio, 1.6, -1.1);
+  ctx.save();
+  ctx.translate(11.5, -0.5);
+  ctx.rotate(tailLag * 0.05);
+  ctx.translate(-11.5, 0.5);
   ctx.fillStyle = theme.dark;
   polygonPath(ctx, [
     [9, -2],
-    [15, -1.5],
-    [13, 1.5],
+    [15, -1.5 + tailLag * 0.4],
+    [13, 1.5 + tailLag * 0.4],
     [8, 1],
   ]);
   ctx.fill();
   ctx.restore();
+  ctx.restore();
 };
 
 // Deepmaw — an abyssal-predator marine creature hauling itself onto land,
-// bioluminescent dots along the spine, a huge hinged jaw.
-const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const drag = Math.sin(timeMs / 340);
+// bioluminescent dots along the spine, a huge hinged jaw. FASE 3: both
+// flippers pull together (a real amphibious drag-crawl, not an alternating
+// walk) — `drag` is the distance-synced version of the same single gait
+// value, so the haul-forward motion is exactly as fast as the creature is
+// actually moving.
+const DEEPMAW_STRIDE = 16;
+const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, DEEPMAW_STRIDE);
+  const drag = gaitSwing(phase, speedRatio, 1);
+  const haulBounce = gaitBounce(phase, speedRatio, 0.7);
   drawContactShadow(ctx, 13, 5.5, 0.42);
 
   const legGradL = materialFill(ctx, "HIDE", -5, 3, -8 + drag * 2, 9, theme.accent, theme.body, theme.dark);
@@ -81,6 +107,7 @@ const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
   limbSegment(ctx, 5, 3, 8 - drag * 2, 9, 2.2, 1.8, legGradR);
 
   ctx.save();
+  ctx.translate(0, -haulBounce);
   ctx.scale(1, breathe(timeMs, 1, 1000, 0.016));
   const bodyGrad = materialFill(ctx, "HIDE", -12, -7, 12, 5, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
@@ -117,8 +144,11 @@ const drawDeepmaw: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Bonefin — fast, partially bony fish-predator hybrid: living HIDE flesh
 // fused with an exposed BONE dorsal ridge — two materials, one small body.
-const drawBonefin: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const dash = Math.sin(timeMs / 130);
+const BONEFIN_STRIDE = 9;
+const drawBonefin: EnemyDrawFn = (ctx, theme, _timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, BONEFIN_STRIDE);
+  const dash = gaitSwing(phase, speedRatio, 1);
   drawContactShadow(ctx, 8, 3.4, 0.3);
 
   ctx.strokeStyle = theme.dark;
@@ -180,11 +210,21 @@ registerEnemyRenderers({
 // bony plating echoing the scattered leviathan remains along the coast;
 // hauls itself forward on volumetric stubby flippers. The main boss adds
 // a full crest of larger fused bone spikes — a genuinely elder anatomy.
-const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: the main boss's own locomotor trait is a slower, longer, heavier
+// haul (a bigger stride length + slower flipper paddle) than its mini-boss —
+// "movimentação de criatura marinha/amphibia gigante" reading as genuinely
+// bigger and heavier, not just a scaled-up copy of the same motion.
+const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const damageIntensity = Math.max(0, 1 - hpPercent);
-  const undulate = Math.sin(timeMs / (enraged ? 350 : 650));
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, isMain ? 34 : 22);
+  // Distance-synced haul (real locomotion) plus a small enraged-only
+  // wall-clock tremor layered on top for aggression flavor — the tremor
+  // never substitutes for the real gait, it only adds a jitter while the
+  // creature IS actually moving (scaled by speedRatio too).
+  const undulate = gaitSwing(phase, speedRatio, isMain ? 1.5 : 1.1) + (enraged ? Math.sin(timeMs / 220) * 0.3 * speedRatio : 0);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 240 : 560));
 
   drawContactShadow(ctx, 22 * scale, 9 * scale, 0.48);
@@ -192,11 +232,15 @@ const drawLeviathanSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpP
   ctx.scale(scale, scale);
   ctx.translate(0, undulate * 1.2);
 
-  for (const fx of [-11, 11]) {
+  for (const [fx, phaseOffset] of [
+    [-11, 0],
+    [11, Math.PI],
+  ] as const) {
+    const paddle = gaitSwing(phase, speedRatio, 1.4, phaseOffset);
     const flipperGrad = materialFill(ctx, "HIDE", fx, 2, fx, 11, "#264e58", "#1c3038", "#0a1518");
-    limbSegment(ctx, fx, 2, fx, 7, 4, 3.2, flipperGrad);
-    limbSegment(ctx, fx, 7, fx, 11, 3.2, 4, "#0a1518");
-    jointBulge(ctx, fx, 7, 2.4, "#12232a");
+    limbSegment(ctx, fx, 2, fx + paddle, 7, 4, 3.2, flipperGrad);
+    limbSegment(ctx, fx + paddle, 7, fx + paddle * 1.4, 11, 3.2, 4, "#0a1518");
+    jointBulge(ctx, fx + paddle, 7, 2.4, "#12232a");
   }
 
   ctx.save();

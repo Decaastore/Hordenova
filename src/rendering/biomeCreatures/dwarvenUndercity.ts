@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack, rimHighlight } from "../lighting";
-import { breathe, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { breathe, gaitBounce, gaitPhase, gaitSwing, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -22,13 +22,15 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 // riveted with mineral (metal) plates, a forward mandible head with a
 // glowing sensor-slit instead of round eyes (kept deliberately alien/
 // eyeless rather than "cute").
-const drawForgecrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const bob = Math.abs(idleSway(timeMs, 0, 260, 0.55));
+const FORGECRAWLER_STRIDE = 9;
+const drawForgecrawler: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitPhase(locomotion?.distance ?? 0, FORGECRAWLER_STRIDE);
+  const bob = gaitBounce(legPhase, speedRatio, 0.55);
   drawContactShadow(ctx, 9, 3.8, 0.36);
   ctx.save();
   ctx.translate(0, -bob);
 
-  const legPhase = timeMs / 130;
   const legs: ReadonlyArray<readonly [number, number, number]> = [
     [-5, -2.5, 0],
     [-5, 2.5, Math.PI],
@@ -36,7 +38,7 @@ const drawForgecrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
     [3, 2.5, 0],
   ];
   for (const [hx, hy, offset] of legs) {
-    const swing = Math.sin(legPhase + offset);
+    const swing = gaitSwing(legPhase, speedRatio, 1, offset);
     const side = hy > 0 ? 1 : -1;
     const kneeX = hx + swing * 2.2;
     const kneeY = hy + side * 4.5 - Math.max(0, swing) * 1.6;
@@ -141,15 +143,17 @@ const drawForgecrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
 // Deepdelver — hunched, asymmetric bipedal miner: one massive corded arm
 // wielding a pickmace, one withered arm, exposed ribs under torn hide, an
 // iron mining helmet with a lantern glow (not an eye).
-const drawDeepdelver: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const stride = Math.sin(timeMs / 220);
+const DEEPDELVER_STRIDE = 11;
+const drawDeepdelver: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stridePhase = gaitPhase(locomotion?.distance ?? 0, DEEPDELVER_STRIDE);
   drawContactShadow(ctx, 8, 3.6, 0.38);
 
   for (const [hx, side] of [
     [-2, 1],
     [2, -1],
   ] as const) {
-    const phase = stride * side;
+    const phase = gaitSwing(stridePhase, speedRatio, 1, side > 0 ? 0 : Math.PI);
     const kneeX = hx + phase * 1.6;
     const kneeY = 4.5;
     const footX = hx + phase * 3.2;
@@ -245,8 +249,11 @@ const drawDeepdelver: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Magmajaw — squat, wide, heavy quadruped reptile whose massive hinged jaw
 // dominates the silhouette. Overlapping stone plate armor across the back.
-const drawMagmajaw: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const lumber = Math.sin(timeMs / 340);
+const MAGMAJAW_STRIDE = 17;
+const drawMagmajaw: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const lumberPhase = gaitPhase(locomotion?.distance ?? 0, MAGMAJAW_STRIDE);
+  const lumber = gaitSwing(lumberPhase, speedRatio, 1);
   drawContactShadow(ctx, 13, 5, 0.44);
 
   const legs: ReadonlyArray<readonly [number, number]> = [
@@ -359,26 +366,38 @@ registerEnemyRenderers({
 // splayed volumetric digging limbs. Shared body for mini-boss and main
 // boss (see registry.ts doc) — the main boss adds a full armored shoulder
 // collar and a 3-shard crystal crown, not just a bigger drill.
-const drawIronBurrower: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: its own locomotor trait is a heavy, subterranean burrowing
+// motion — the digging limbs plunge/retract in sequence (rather than a
+// normal walk-cycle) and the whole body has a low tremor synced to real
+// distance, reading as "movimento subterrâneo/pesado" rather than a
+// creature that merely slides across the surface.
+const drawIronBurrower: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const limbCount = isMain ? 4 : 3;
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 240 : 520));
   const damageIntensity = Math.max(0, 1 - hpPercent);
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const burrowPhase = gaitPhase(locomotion?.distance ?? 0, isMain ? 20 : 14);
+  const tremor = gaitBounce(burrowPhase, speedRatio, isMain ? 0.7 : 0.5);
 
   drawContactShadow(ctx, 20 * scale, 9 * scale, 0.46);
   ctx.save();
   ctx.scale(scale, scale);
+  ctx.translate(0, -tremor);
 
   // Splayed digging limbs — volumetric (upper limb + forearm), metal with a mineral claw tip.
+  // Each limb plunges/retracts on its own offset phase, like a real
+  // burrowing sequence rather than every limb moving in lockstep.
   for (let i = 0; i < limbCount; i++) {
     const a = -Math.PI / 2 + (i / (limbCount - 1)) * Math.PI * 0.9 - Math.PI * 0.45;
+    const dig = gaitSwing(burrowPhase, speedRatio, 1.6, (i / limbCount) * Math.PI * 2);
     const hipX = Math.cos(a) * 5;
     const hipY = 4 + Math.sin(a) * 2;
     const kneeX = Math.cos(a) * 11;
-    const kneeY = 6 + Math.sin(a) * 4;
+    const kneeY = 6 + Math.sin(a) * 4 + dig;
     const lx = Math.cos(a) * 16;
-    const ly = 8 + Math.sin(a) * 6;
+    const ly = 8 + Math.sin(a) * 6 + dig * 1.4;
     const limbGrad = materialFill(ctx, "METAL", hipX, hipY, lx, ly, "#9a8e78", "#5a5248", "#221e18");
     limbSegment(ctx, hipX, hipY, kneeX, kneeY, 2.6, 2, limbGrad);
     limbSegment(ctx, kneeX, kneeY, lx, ly, 2, 1.3, "#2a251e");

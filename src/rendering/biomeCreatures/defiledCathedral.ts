@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, drawEye, drawFlightShadow, flightLift, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { breathe, drawEye, drawFlightShadow, flightLift, gaitPhase, gaitSwing, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -15,8 +15,11 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 
 // Grave Knight — a monstrous, NON-human-proportioned figure in ancient
 // armor: elongated limbs, a hunched oversized torso, a small sunken head.
-const drawGraveKnight: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const stride = Math.sin(timeMs / 260);
+const GRAVE_KNIGHT_STRIDE = 13;
+const drawGraveKnight: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stridePhase = gaitPhase(locomotion?.distance ?? 0, GRAVE_KNIGHT_STRIDE);
+  const stride = gaitSwing(stridePhase, speedRatio, 1);
   drawContactShadow(ctx, 9, 4, 0.36);
 
   const legGradL = materialFill(ctx, "METAL", -3, 1, -5 - stride * 3, 11, "#8a8290", theme.body, theme.dark);
@@ -66,8 +69,11 @@ const drawGraveKnight: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Gargoyle Beast — quadruped fusion of stone and flesh: STONE folded
 // wings on the back, a HIDE underbelly, volumetric legs.
-const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const lumber = Math.sin(timeMs / 320);
+const GARGOYLE_BEAST_STRIDE = 15;
+const drawGargoyleBeast: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const lumberPhase = gaitPhase(locomotion?.distance ?? 0, GARGOYLE_BEAST_STRIDE);
+  const lumber = gaitSwing(lumberPhase, speedRatio, 1);
   drawContactShadow(ctx, 11, 5, 0.38);
 
   for (const [lx, sign] of [
@@ -178,21 +184,29 @@ registerEnemyRenderers({
  * a broken flying buttress AND a second armored spire on the opposite
  * shoulder — real architectural growth, not a bigger copy.
  */
-const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: the rigid stone column-limb plants/lifts in a real step cycle
+// synced to distance (it does not just stand fixed while the body glides),
+// and the fleshy claw's reach is likewise distance-driven instead of a
+// pure wall-clock twitch.
+const drawCathedralAbomination: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const damageIntensity = Math.max(0, 1 - hpPercent);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 240 : 560));
-  const twitch = Math.sin(timeMs / (enraged ? 200 : 420)) * 1.4;
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stepPhase = gaitPhase(locomotion?.distance ?? 0, isMain ? 19 : 13);
+  const columnStep = gaitSwing(stepPhase, speedRatio, 1.3);
+  const twitch = gaitSwing(stepPhase, speedRatio, 1.4, 1.6) + (enraged ? Math.sin(timeMs / 200) * 0.4 * speedRatio : 0);
 
   drawContactShadow(ctx, 18 * scale, 8 * scale, 0.48);
   ctx.save();
   ctx.scale(scale, scale);
+  ctx.translate(0, -Math.abs(columnStep) * 0.4);
 
   ctx.fillStyle = materialFill(ctx, "STONE", -12, -2, -5, 13, "#6a6470", "#3a3440", "#161418");
   polygonPath(ctx, [
-    [-11, -2],
-    [-6, -3],
+    [-11 + columnStep, -2],
+    [-6 + columnStep, -3],
     [-5, 13],
     [-12, 13],
   ]);

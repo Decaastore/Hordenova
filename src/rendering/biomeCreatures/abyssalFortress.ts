@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, drawFlightShadow, flightLift, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { bankAngle, breathe, drawFlightShadow, flightLift, gaitPhase, gaitSwing, glowBlob, jointBulge, limbSegment, materialFill, polygonPath, wingBeat } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -13,12 +13,14 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 
 // Abyss Crawler — many-limbed, wall/cliff-adapted climber; a wide, flat,
 // splayed stance with real jointed limbs on both sides.
-const drawAbyssCrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const legPhase = timeMs / 110;
+const ABYSS_CRAWLER_STRIDE = 9;
+const drawAbyssCrawler: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitPhase(locomotion?.distance ?? 0, ABYSS_CRAWLER_STRIDE);
   drawContactShadow(ctx, 11, 4, 0.34);
 
   for (let i = 0; i < 4; i++) {
-    const wig = Math.sin(legPhase + i * 1.9) * 3;
+    const wig = gaitSwing(legPhase, speedRatio, 3, i * 1.9);
     for (const side of [1, -1] as const) {
       const x = -7 + i * 4.6;
       const kneeX = x + wig * 0.6;
@@ -58,8 +60,11 @@ const drawAbyssCrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Chainbound — a heavy, deformed captive dragging REAL rusted chain links
 // (overlapping ellipse pairs, not a stroked squiggle), hunched low.
-const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const drag = Math.sin(timeMs / 400);
+const CHAINBOUND_STRIDE = 14;
+const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const dragPhase = gaitPhase(locomotion?.distance ?? 0, CHAINBOUND_STRIDE);
+  const drag = gaitSwing(dragPhase, speedRatio, 1);
   drawContactShadow(ctx, 11, 5, 0.4);
 
   const legGradL = materialFill(ctx, "HIDE", -4, 3, -5 - drag, 10, theme.accent, theme.body, theme.dark);
@@ -108,12 +113,14 @@ const drawChainbound: EnemyDrawFn = (ctx, theme, timeMs) => {
 };
 
 // Void Bat — huge-winged cave flier, small body, erratic flapping.
-const drawVoidBat: EnemyDrawFn = (ctx, theme, timeMs) => {
+const drawVoidBat: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 6.6, 5, 1100);
   drawFlightShadow(ctx, lift, 5, 8, 3.2);
   ctx.save();
   ctx.translate(0, -lift);
-  const flap = Math.sin(timeMs / 110);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 55, 0.55));
+  const flap = wingBeat(timeMs, 0, speedRatio, 110);
   for (const side of [1, -1] as const) {
     ctx.save();
     ctx.scale(side, 1);
@@ -165,21 +172,28 @@ registerEnemyRenderers({
  * reads as an immovable, silent wall. The main boss adds a heavier
  * double-plate ridge and thicker leg bracing, not a scaled copy.
  */
-const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: an immovable-feeling, threatening heavy tread — legs plant in a
+// slow diagonal sequence with almost no swing amplitude (it does not
+// scurry), just enough to read as genuinely bearing its own mass forward.
+const drawAbyssalWarden: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const damageIntensity = Math.max(0, 1 - hpPercent);
   const breatheScale = breathe(timeMs, 4, 1100, 0.015);
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const treadPhase = gaitPhase(locomotion?.distance ?? 0, isMain ? 26 : 18);
 
   drawContactShadow(ctx, 22 * scale, 8 * scale, 0.5);
   ctx.save();
   ctx.scale(scale, scale);
 
-  for (const lx of [-14, -6, 6, 14]) {
+  for (let i = 0; i < 4; i++) {
+    const lx = [-14, -6, 6, 14][i]!;
+    const tread = gaitSwing(treadPhase, speedRatio, 0.9, i % 2 === 0 ? 0 : Math.PI);
     const legGrad = materialFill(ctx, "HIDE", lx, 3, lx, 11, "#4a5458", "#22282c", "#0e1012");
-    limbSegment(ctx, lx, 3, lx, 7, 2.8, 2.6, legGrad);
-    limbSegment(ctx, lx, 7, lx, 11, 2.6, 3.4, "#0e1012");
-    jointBulge(ctx, lx, 7, 2.2, "#181c1e");
+    limbSegment(ctx, lx, 3, lx + tread, 7, 2.8, 2.6, legGrad);
+    limbSegment(ctx, lx + tread, 7, lx + tread * 1.2, 11, 2.6, 3.4, "#0e1012");
+    jointBulge(ctx, lx + tread, 7, 2.2, "#181c1e");
   }
 
   ctx.save();

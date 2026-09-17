@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack, rimHighlight } from "../lighting";
-import { breathe, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { breathe, gaitBounce, gaitPhase, gaitSwing, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -14,8 +14,10 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
  */
 
 // Sunscarab — domed armored beetle, aged golden carapace, six volumetric legs.
-const drawSunscarab: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const legPhase = timeMs / 140;
+const SUNSCARAB_STRIDE = 10;
+const drawSunscarab: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitPhase(locomotion?.distance ?? 0, SUNSCARAB_STRIDE);
   drawContactShadow(ctx, 9, 4, 0.34);
 
   const legs: ReadonlyArray<readonly [number, number, number]> = [
@@ -27,7 +29,7 @@ const drawSunscarab: EnemyDrawFn = (ctx, theme, timeMs) => {
     [5, 3, Math.PI],
   ];
   for (const [hx, hy, offset] of legs) {
-    const wig = Math.sin(legPhase + offset) * 2.4;
+    const wig = gaitSwing(legPhase, speedRatio, 2.4, offset);
     const side = hy > 0 ? 1 : -1;
     const legGrad = materialFill(ctx, "CHITIN", hx, hy, hx + wig, hy + side * 7, "#d8b85a", theme.body, theme.dark);
     limbSegment(ctx, hx, hy, hx + wig * 0.5, hy + side * 3.5, 1, 0.7, legGrad);
@@ -80,8 +82,11 @@ const drawSunscarab: EnemyDrawFn = (ctx, theme, timeMs) => {
 // Temple Guardian — a fully architectural construct: stacked rectangular
 // stone/metal blocks, bronze band seams, a single glowing slit "eye". No
 // organic curves anywhere in the silhouette.
-const drawTempleGuardian: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const march = Math.sin(timeMs / 380);
+const TEMPLE_GUARDIAN_STRIDE = 19;
+const drawTempleGuardian: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const marchPhase = gaitPhase(locomotion?.distance ?? 0, TEMPLE_GUARDIAN_STRIDE);
+  const march = gaitSwing(marchPhase, speedRatio, 1);
   drawContactShadow(ctx, 13, 5.5, 0.42);
   ctx.fillStyle = materialFill(ctx, "STONE", -6, 3, -6, 11, "#8a7248", theme.dark, "#1c150a");
   ctx.fillRect(-6 + march * 2, 3, 4, 8);
@@ -129,9 +134,12 @@ const drawTempleGuardian: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Solar Serpent — long sinuous body, pale scales overlapping down the
 // spine, glowing internal veins instead of a flat highlight line.
-const drawSolarSerpent: EnemyDrawFn = (ctx, theme, timeMs) => {
+const SOLAR_SERPENT_STRIDE = 11;
+const drawSolarSerpent: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const slitherPhase = gaitPhase(locomotion?.distance ?? 0, SOLAR_SERPENT_STRIDE);
   drawContactShadow(ctx, 12, 4, 0.3);
-  const wave = (t: number) => Math.sin(timeMs / 220 + t) * 4;
+  const wave = (t: number) => gaitSwing(slitherPhase, speedRatio, 4, t);
   const bodyGrad = materialFill(ctx, "CHITIN", -16, -2, 14, 2, "#f0e8c0", theme.body, theme.dark);
   ctx.strokeStyle = bodyGrad;
   ctx.lineWidth = 6;
@@ -176,20 +184,33 @@ registerEnemyRenderers({
 // sphinx pose, volumetric stone forelegs, a regal maned head, and a
 // concentrated solar core burning through cracked stone. The main boss
 // adds a full crown ridge and a second, larger core halo.
-const drawRaithar: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: a monumental predatory prowl — low, deliberate, weighty — is its
+// own locomotor trait (spec example: "passada predatória monumental"). The
+// couched forelegs extend/plant in an alternating stride rather than
+// staying rigid, and the whole body has a slow heavy settle synced to real
+// distance.
+const drawRaithar: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 260 : 600));
   const damageIntensity = Math.max(0, 1 - hpPercent);
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const prowlPhase = gaitPhase(locomotion?.distance ?? 0, isMain ? 23 : 16);
+  const settle = gaitBounce(prowlPhase, speedRatio, isMain ? 0.6 : 0.4);
 
   drawContactShadow(ctx, 21 * scale, 9 * scale, 0.48);
   ctx.save();
   ctx.scale(scale, scale);
+  ctx.translate(0, -settle);
 
-  // Sphinx-like couched forelegs, volumetric.
-  for (const fx of [-6, 6]) {
+  // Sphinx-like couched forelegs, volumetric — alternating extend/plant.
+  for (const [fx, phaseOffset] of [
+    [-6, 0],
+    [6, Math.PI],
+  ] as const) {
+    const reach = gaitSwing(prowlPhase, speedRatio, 1.6, phaseOffset);
     const pawGrad = materialFill(ctx, "STONE", fx, 4, fx, 11, "#a88c54", "#6a5636", "#2c2416");
-    limbSegment(ctx, fx, 4, fx, 11, 3, 4, pawGrad);
+    limbSegment(ctx, fx, 4, fx + reach, 11, 3, 4, pawGrad);
     jointBulge(ctx, fx, 4, 2.6, "#7a6440");
   }
 

@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { breathe, gaitBounce, gaitPhase, gaitSwing, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -13,12 +13,14 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 
 // Shardcrawler — eight-legged arachnid, volumetric jointed legs, a real
 // multi-facet crystal cluster grown from its back (not two flat triangles).
-const drawShardcrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const legPhase = timeMs / 120;
+const SHARDCRAWLER_STRIDE = 10;
+const drawShardcrawler: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitPhase(locomotion?.distance ?? 0, SHARDCRAWLER_STRIDE);
   drawContactShadow(ctx, 9, 4, 0.32);
 
   for (let i = 0; i < 4; i++) {
-    const wig = Math.sin(legPhase + i * 1.4) * 2.6;
+    const wig = gaitSwing(legPhase, speedRatio, 2.6, i * 1.4);
     for (const side of [1, -1] as const) {
       const x = -6 + i * 4;
       const kneeX = x + wig * 0.5;
@@ -66,8 +68,12 @@ const drawShardcrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Crystal Maw — quadruped with a crushing crystalline jaw and faceted
 // crystal armor plates fused directly into its hide.
-const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const lumber = Math.sin(timeMs / 340);
+const CRYSTAL_MAW_STRIDE = 15;
+const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, CRYSTAL_MAW_STRIDE);
+  const lumber = gaitSwing(phase, speedRatio, 1);
+  const stomp = gaitBounce(phase, speedRatio, 0.4);
   drawContactShadow(ctx, 12, 5, 0.4);
 
   for (const [lx, sign] of [
@@ -85,6 +91,7 @@ const drawCrystalMaw: EnemyDrawFn = (ctx, theme, timeMs) => {
   }
 
   ctx.save();
+  ctx.translate(0, -stomp);
   ctx.scale(1, breathe(timeMs, 1, 1100, 0.016));
   const bodyGrad = materialFill(ctx, "STONE", -11, -7, 12, 4, theme.accent, theme.body, theme.dark);
   ctx.fillStyle = bodyGrad;
@@ -166,25 +173,39 @@ registerEnemyRenderers({
 // Crystal Behemoth — a hulking quadruped completely overtaken by organic
 // crystal growth; reads as a breathing, pulsing LIVING creature, not an
 // inert statue. Volumetric limbs, real crystal-facet material shading.
-const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: the main boss's locomotor trait is a heavier, longer-strided
+// lumber than the mini-boss — each of its 4 legs plants at a different
+// gait phase (a real quadruped sequence, not all 4 moving in lockstep) —
+// plus its crystal growths sway a touch harder with every footfall via the
+// same phase, reading as their weight actually responding to the impact.
+const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const breatheScale = breathe(timeMs, 3, 900, 0.03);
   const damageIntensity = Math.max(0, 1 - hpPercent);
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 240 : 560));
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, isMain ? 24 : 17);
+  const stomp = gaitBounce(phase, speedRatio, isMain ? 0.5 : 0.35);
 
   drawContactShadow(ctx, 20 * scale, 8.5 * scale, 0.46);
   ctx.save();
   ctx.scale(scale, scale);
 
-  for (const lx of [-9, -3, 3, 9]) {
+  for (let i = 0; i < 4; i++) {
+    const lx = [-9, -3, 3, 9][i]!;
+    // Diagonal quadruped sequence: legs 0&3 share a phase, 1&2 share the
+    // opposite phase — a real alternating gait instead of 4 legs in lockstep.
+    const legPhaseOffset = i === 0 || i === 3 ? 0 : Math.PI;
+    const kneeSwing = gaitSwing(phase, speedRatio, 0.8, legPhaseOffset);
     const legGrad = materialFill(ctx, "STONE", lx, 4, lx, 12, "#5a7a86", "#2e4854", "#111c22");
-    limbSegment(ctx, lx, 4, lx, 8, 2.4, 2, legGrad);
-    limbSegment(ctx, lx, 8, lx, 12, 2, 2.2, "#111c22");
-    jointBulge(ctx, lx, 8, 1.8, "#1a2a30");
+    limbSegment(ctx, lx, 4, lx + kneeSwing, 8, 2.4, 2, legGrad);
+    limbSegment(ctx, lx + kneeSwing, 8, lx + kneeSwing * 1.3, 12, 2, 2.2, "#111c22");
+    jointBulge(ctx, lx + kneeSwing, 8, 1.8, "#1a2a30");
   }
 
   ctx.save();
+  ctx.translate(0, -stomp);
   ctx.scale(breatheScale, 1);
 
   const bodyGrad = materialFill(ctx, "STONE", -16, -12, 17, 7, "#5a7a86", "#2e4854", "#111c22");
@@ -210,7 +231,7 @@ const drawCrystalBehemoth: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hp
   ];
   for (const [sx, sy, ang, len] of shardSpots) {
     ctx.save();
-    ctx.translate(sx, sy + idleSway(timeMs, sx, 1400, 0.4));
+    ctx.translate(sx, sy + idleSway(timeMs, sx, 1400, 0.4) + stomp * 0.3);
     ctx.rotate(ang);
     ctx.fillStyle = materialFill(ctx, "CRYSTAL", 0, 0, 0, -len, "#eaf6ff", "#3a5864", color);
     ctx.globalAlpha = 0.85 + 0.15 * pulse;

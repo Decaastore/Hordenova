@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from "react";
 import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
+import type { EnemyInstance } from "@/entities/Enemy";
 import type { CombatVfxEvent } from "@/engine/CombatVfxEvents";
 import type { TowerType } from "@/config/towerStats";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
@@ -99,7 +100,34 @@ interface PrevEnemyState {
   isBoss: boolean;
   /** True while a FULL freeze (SlowEffect.percent === 1, see entities/Enemy.ts's Frostborn Deep Freeze) was active last frame — drives the SHATTER VFX the instant it naturally expires (spec section 11: "SHATTER quando o freeze terminar"). Purely a render-side read of gameplay state; never influences it. */
   wasFrozen: boolean;
+  /** Snapshot of the full EnemyInstance the last time it was seen alive — reused as-is by the FASE 3 death-collapse animation below so it can call the real drawEnemy with the exact body/pose the creature had at its last living frame. Optional so existing hand-built test fixtures (CanvasRenderer.detectVfxEvents.test.ts) that don't care about the death-collapse animation don't need one. */
+  lastSeen?: EnemyInstance;
 }
+
+/**
+ * FASE 3 — a short-lived, render-only "corpse" spawned the instant an enemy
+ * is detected as having died (see detectVfxEvents' existing prev.hp<=0.01
+ * branch, which already reliably tells a real kill apart from reaching the
+ * base). Reuses drawEnemy verbatim — same body, same scale, same boss
+ * color — under an outer collapse transform, so zero new per-creature art is
+ * needed for any of the 50+ creatures this applies to.
+ */
+interface DeathAnimation {
+  enemy: EnemyInstance;
+  scale: number;
+  bossColor?: string;
+  /** The `timeMs` drawEnemy is called with — frozen at the death instant so the body's own idle/gait animation stops exactly at its death pose instead of continuing to animate while it collapses. */
+  freezeTimeMs: number;
+  startTimestamp: number;
+  totalMs: number;
+  /** -1/1 — which way a regular creature tips over; irrelevant for the boss sink-in-place treatment. */
+  tipSign: number;
+}
+
+const DEATH_ANIM_MS_REGULAR = 420;
+const DEATH_ANIM_MS_MINIBOSS = 620;
+const DEATH_ANIM_MS_BOSS = 900;
+const MAX_DEATH_ANIMATIONS = 6;
 
 /**
  * Owns the <canvas>. Runs its own requestAnimationFrame draw loop reading
@@ -145,6 +173,22 @@ export function CanvasRenderer({
     const towerAttackTimestamps = new Map<string, number>();
     let prevPhase: RunPhase | null = null;
     let lastFrameTimestamp: number | null = null;
+    // FASE 3 — real curve-following heading (spec sections 3/8): the path's
+    // raw tangent changes in small discrete steps (ENEMY_PATH is a densely
+    // sampled but still piecewise-straight Catmull-Rom spline), so rotating
+    // straight to it every frame can read as a snap on a tight curve. This
+    // map holds each enemy's own smoothed facing angle, turned toward the
+    // raw tangent at a bounded max radians/ms (heavier creatures turn
+    // slower) instead of jumping to it — rebuilt fresh every frame like
+    // `prevEnemies` above so a despawned enemy's entry is simply never
+    // recreated (no manual cleanup needed).
+    let headingState = new Map<string, number>();
+    // FASE 3 — client-only death-collapse animations (spec section 11): a
+    // brief "corpo tombando" pose reusing the enemy's OWN real draw function
+    // (drawEnemy) frozen at its death instant, under a collapse transform.
+    // Purely a rendering tail after the engine has already removed the
+    // enemy — zero effect on kill timing, gold, drops, or wave state.
+    let deathAnimations: DeathAnimation[] = [];
 
     const resize = () => {
       const parent = canvas.parentElement;
@@ -179,6 +223,7 @@ export function CanvasRenderer({
       latestSnapshotRef.current = snapshot;
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
+      const biome = getBiome(snapshot.biomeId);
       // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA — Gold feedback fix): Gold
       // gain no longer spawns a world-space canvas popup here — it read as
       // "behind/near the castle" because its spawn position was always a
@@ -198,6 +243,9 @@ export function CanvasRenderer({
         prevTowerHp,
         gateHomePosition,
         engine.drainCombatVfxEvents(),
+        deathAnimations,
+        biome.palette.accentGlow,
+        timestamp,
       );
       prevPhase = hud.phase;
 
@@ -227,6 +275,7 @@ export function CanvasRenderer({
               lastHitTimestamp: hit ? timestamp : (prior?.lastHitTimestamp ?? -Infinity),
               isBoss: e.boss !== undefined,
               wasFrozen: e.slow?.percent === 1,
+              lastSeen: e,
             },
           ];
         }),
@@ -234,8 +283,6 @@ export function CanvasRenderer({
       prevTowerLevels = new Map(snapshot.towers.map((t) => [t.id, t.level]));
       prevTowerHp = new Map(snapshot.towers.map((t) => [t.id, t.hp]));
       vfx.update(frameDt);
-
-      const biome = getBiome(snapshot.biomeId);
 
       const { scale, offsetX, offsetY } = transformRef.current;
       const shake = vfx.getShakeOffset();
@@ -282,9 +329,33 @@ export function CanvasRenderer({
         }
       }
 
+      // FASE 3 — heading smoothing (spec sections 3/8): turn each enemy's
+      // facing angle TOWARD the path's raw tangent at a bounded max
+      // radians/ms instead of snapping straight to it every frame, so a
+      // curve reads as the body gradually turning. Heavier creatures (boss >
+      // mini-boss/elite > regular) get a slower max turn rate, which is also
+      // the concrete "sensação de massa/inércia" the boss curve-following
+      // rule (section 8) asks for. Rebuilt fresh each frame like
+      // `prevEnemies` — a despawned enemy's entry simply isn't recreated.
+      const nextHeadingState = new Map<string, number>();
       for (const enemy of snapshot.enemies) {
-        const hitFlashMs =
-          enemy.type === "CRAWLER" ? timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity) : Infinity;
+        const rawAngle = Math.atan2(enemy.direction.y, enemy.direction.x);
+        const prevAngle = headingState.get(enemy.id);
+        if (prevAngle === undefined) {
+          nextHeadingState.set(enemy.id, rawAngle);
+          continue;
+        }
+        let diff = rawAngle - prevAngle;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff)); // shortest signed angle, wraps at ±π
+        const turnRatePerMs = enemy.boss ? 0.0022 : enemy.elite ? 0.0055 : 0.009;
+        const maxStep = turnRatePerMs * frameDt;
+        const step = Math.max(-maxStep, Math.min(maxStep, diff));
+        nextHeadingState.set(enemy.id, prevAngle + step);
+      }
+      headingState = nextHeadingState;
+
+      for (const enemy of snapshot.enemies) {
+        const hitFlashMs = timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity);
         // CHEFE MAIOR — "Void Colossus" identity: the main boss's body/aura
         // recolor per the active terrain biome's own accent color, instead
         // of one fixed palette, the same way the castle already does. The
@@ -297,6 +368,12 @@ export function CanvasRenderer({
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = ARCHETYPE_VISUAL_SCALE[enemy.type] ?? 1;
         const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
+        const smoothedAngle = headingState.get(enemy.id);
+        const rawAngleNow = Math.atan2(enemy.direction.y, enemy.direction.x);
+        const turnRate =
+          smoothedAngle !== undefined && frameDt > 0
+            ? Math.atan2(Math.sin(rawAngleNow - smoothedAngle), Math.cos(rawAngleNow - smoothedAngle)) / frameDt
+            : 0;
         // INIMIGOS 3D — the only skip in this whole loop. Boss/elite aura
         // above and the separate HP-bar pass below are untouched for every
         // enemy either way; the slow/burn status rings ARE drawn inside
@@ -304,7 +381,7 @@ export function CanvasRenderer({
         // debuff-ring feedback in this pilot — a disclosed, known
         // limitation (see rendering3d/'s report), not an oversight.
         if (!hidden3DEnemyIds?.current?.has(enemy.id)) {
-          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor);
+          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
         }
         // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself
         // (unlike drawBossAura's glow-behind treatment), reading the same
@@ -312,6 +389,32 @@ export function CanvasRenderer({
         if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
+
+      // FASE 3 — death-collapse animations (spec section 11): drawn after
+      // live enemies/projectiles so a fresh corpse never sits underneath
+      // anything, using the EXACT same drawEnemy call every living enemy
+      // above just used, under a collapse transform. Ages and prunes here,
+      // right before drawing, so a finished collapse never renders one
+      // extra frame.
+      deathAnimations = deathAnimations.filter((d) => timestamp - d.startTimestamp < d.totalMs);
+      for (const anim of deathAnimations) {
+        const progress = Math.min(1, (timestamp - anim.startTimestamp) / anim.totalMs);
+        const eased = 1 - Math.pow(1 - progress, 2);
+        ctx.save();
+        ctx.globalAlpha = 1 - progress;
+        ctx.translate(anim.enemy.position.x, anim.enemy.position.y);
+        if (anim.enemy.boss) {
+          // Heavy creatures sink/settle in place rather than comically
+          // tipping over — a squash toward the ground plus a slight fade.
+          ctx.scale(1 + eased * 0.08, 1 - eased * 0.55);
+        } else {
+          ctx.rotate(eased * (Math.PI / 2.1) * anim.tipSign);
+          ctx.scale(1, 1 - eased * 0.35);
+        }
+        ctx.translate(-anim.enemy.position.x, -anim.enemy.position.y);
+        drawEnemy(ctx, anim.enemy, anim.freezeTimeMs, Infinity, anim.scale, anim.bossColor);
+        ctx.restore();
+      }
 
       vfx.draw(ctx);
 
@@ -410,6 +513,10 @@ export function detectVfxEvents(
   prevTowerHp: Map<string, number>,
   gatePosition: Vector2,
   combatVfxEvents: CombatVfxEvent[] = [],
+  /** FASE 3 — out-param this function pushes a fresh DeathAnimation into on every real kill it detects (never on "reached the base"). Optional so any existing direct caller (tests) that doesn't care about the death-collapse animation is unaffected. */
+  deathAnimations?: DeathAnimation[],
+  bossColor?: string,
+  timestamp = 0,
 ): void {
   // Boss entrance — the moment BOSS_INTRO begins (once, not every frame
   // spent in it) is the one big scripted beat camera shake is meant for.
@@ -461,6 +568,27 @@ export function detectVfxEvents(
     if (prev.hp <= 0.01) {
       const premium = prev.type === "CRAWLER" || prev.isBoss;
       vfx.spawnDeathBurst(prev.position, ENEMY_THEME[prev.type].accent, premium ? prev.direction : undefined, premium);
+      // FASE 3 — death-collapse (spec section 11): reuses the enemy's own
+      // last-seen-alive instance (frozen mid-body-pose) under a collapse
+      // transform CanvasRenderer's draw loop applies — see DeathAnimation's
+      // own doc comment. Capped so a sudden multi-kill (AoE, boss death
+      // alongside adds) never stacks unbounded collapsing bodies on screen.
+      if (deathAnimations && prev.lastSeen && deathAnimations.length < MAX_DEATH_ANIMATIONS) {
+        const lastSeen = prev.lastSeen;
+        const isMainBoss = lastSeen.boss?.isMainBoss === true;
+        const totalMs = lastSeen.boss ? (isMainBoss ? DEATH_ANIM_MS_BOSS : DEATH_ANIM_MS_MINIBOSS) : DEATH_ANIM_MS_REGULAR;
+        const archetypeScale = ARCHETYPE_VISUAL_SCALE[prev.type] ?? 1;
+        const scale = lastSeen.boss ? (isMainBoss ? 1.9 : 1.4) : lastSeen.elite ? 1.3 : archetypeScale;
+        deathAnimations.push({
+          enemy: lastSeen,
+          scale,
+          bossColor: lastSeen.boss ? bossColor : undefined,
+          freezeTimeMs: timestamp,
+          startTimestamp: timestamp,
+          totalMs,
+          tipSign: Math.random() < 0.5 ? -1 : 1,
+        });
+      }
     } else {
       // Castle Damage Event VFX (spec section 12/13) — the same "reached
       // the base" instant GameEngine already flags for audio, escalated by

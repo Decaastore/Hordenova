@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, drawEye, drawFlightShadow, flightLift, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { bankAngle, breathe, drawEye, drawFlightShadow, flightLift, gaitBounce, gaitPhase, gaitSwing, glowBlob, idleSway, jointBulge, limbSegment, materialFill, polygonPath, wingBeat } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -14,8 +14,10 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 // Bone Stalker — a gaunt, open bone-frame quadruped predator: thin
 // skeletal limbs with visible knuckle joints, a real ribcage (struts, not
 // a filled torso), a fanged skull with empty eye sockets faintly lit.
-const drawBoneStalker: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const stridePhase = timeMs / 150;
+const BONE_STALKER_STRIDE = 12;
+const drawBoneStalker: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stridePhase = gaitPhase(locomotion?.distance ?? 0, BONE_STALKER_STRIDE);
   drawContactShadow(ctx, 10, 3.6, 0.28);
 
   const legs: ReadonlyArray<readonly [number, number, number]> = [
@@ -25,7 +27,7 @@ const drawBoneStalker: EnemyDrawFn = (ctx, theme, timeMs) => {
     [5, 2, 0],
   ];
   for (const [hx, hy, offset] of legs) {
-    const swing = Math.sin(stridePhase + offset);
+    const swing = gaitSwing(stridePhase, speedRatio, 1, offset);
     const side = hy > 0 ? 1 : -1;
     const kneeX = hx + swing * 2.4;
     const kneeY = hy + side * 3.5;
@@ -91,13 +93,15 @@ const drawBoneStalker: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Ribcrawler — its whole body hidden beneath a low arched ribcage canopy,
 // many short crawling legs peeking out from underneath.
-const drawRibcrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const legPhase = timeMs / 110;
+const RIBCRAWLER_STRIDE = 8;
+const drawRibcrawler: EnemyDrawFn = (ctx, theme, _timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitPhase(locomotion?.distance ?? 0, RIBCRAWLER_STRIDE);
   drawContactShadow(ctx, 11, 4, 0.34);
 
   for (let i = 0; i < 6; i++) {
     const x = -8 + i * 3.2;
-    const wig = Math.sin(legPhase + i) * 1.6;
+    const wig = gaitSwing(legPhase, speedRatio, 1.6, i);
     ctx.strokeStyle = theme.dark;
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -149,12 +153,14 @@ const drawRibcrawler: EnemyDrawFn = (ctx, theme, timeMs) => {
 
 // Gravewing — flies on membrane stretched over a bone-strut wing frame; a
 // true aerial silhouette with a skull head and hooked wing-claws.
-const drawGravewing: EnemyDrawFn = (ctx, theme, timeMs) => {
+const drawGravewing: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 4.1, 6, 1600);
   drawFlightShadow(ctx, lift, 6, 10, 4);
   ctx.save();
   ctx.translate(0, -lift);
-  const flap = Math.sin(timeMs / 180);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 50, 0.5));
+  const flap = wingBeat(timeMs, 0, speedRatio, 180);
   for (const side of [1, -1] as const) {
     ctx.save();
     ctx.scale(side, 1);
@@ -212,26 +218,32 @@ registerEnemyRenderers({
 // fists on volumetric arms, a hunched aggressive charge stance. The main
 // boss adds a second bone-crest ridge and thicker fused shoulder armor —
 // a genuinely bulkier anatomy, not the same body scaled up.
-const drawColossusSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: the main boss's locomotor trait is a slower, longer, far heavier
+// stomp than the mini-boss — a genuinely bigger charging brute, not the
+// same footfall rate scaled up.
+const drawColossusSpawn: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.6;
   const rage = enraged ? 1.4 : 1;
   const damageIntensity = Math.max(0, 1 - hpPercent);
-  const stomp = Math.abs(Math.sin(timeMs / (enraged ? 260 : 480)));
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const phase = gaitPhase(locomotion?.distance ?? 0, isMain ? 22 : 15);
+  const stomp = gaitBounce(phase, speedRatio, isMain ? 1.8 : 1.3);
 
   drawContactShadow(ctx, 19 * scale, 8 * scale, 0.46);
   ctx.save();
   ctx.scale(scale, scale);
   ctx.translate(0, -stomp * 1.5);
 
-  // Thick stomping legs — volumetric.
+  // Thick stomping legs — volumetric, alternating (one plants while the other swings).
   for (const [lx, sign] of [
     [-5, -1],
     [5, 1],
   ] as const) {
-    const kneeX = lx + sign * stomp * 2;
+    const legSwing = gaitSwing(phase, speedRatio, 2, sign > 0 ? 0 : Math.PI);
+    const kneeX = lx + sign * (2 + legSwing);
     const kneeY = 10;
-    const footX = lx + sign * (2 + stomp * 2);
+    const footX = lx + sign * (2 + legSwing * 1.6);
     const footY = 15;
     const legGrad = materialFill(ctx, "HIDE", lx, 6, footX, footY, "#8a857a", "#4a463e", "#221f1a");
     limbSegment(ctx, lx, 6, kneeX, kneeY, 3, 2.4, legGrad);

@@ -189,3 +189,61 @@ export function drawEye(ctx: CanvasRenderingContext2D, x: number, y: number, r: 
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
 }
+
+// ---------------------------------------------------------------------------
+// FASE 3 — real-locomotion toolkit. The core fix for "sprite deslizando pelo
+// mapa": every gait-cycle helper below is driven by DISTANCE traveled (see
+// entities/Enemy.ts's advanceEnemy → EnemyInstance.distanceTraveled), not by
+// wall-clock time. distanceTraveled already accumulates at exactly the
+// enemy's real effective speed (post-slow, post-game-speed-multiplier — see
+// GameEngine.update's `scaledDt`), so a phase derived from it is
+// automatically speed-correct: legs cycle faster at 2x/4x, freeze solid on a
+// full Frostborn freeze, and never "run in place". `speedRatio` (effective
+// speed / base speed, 0 when fully stopped) is the second half of that fix —
+// it scales gait AMPLITUDE, so a nearly-stopped creature settles toward a
+// neutral idle pose instead of a frozen mid-stride one. Idle-only motion
+// (breathe/idleSway above) intentionally stays wall-clock-driven — a slowed
+// creature still breathes, it just doesn't march.
+// ---------------------------------------------------------------------------
+
+export interface LocomotionState {
+  /** Cumulative world-space distance traveled along the path — see file header above. Drives every gait-cycle PHASE below. */
+  distance: number;
+  /** effective speed / base speed, 0..1 (exactly 0 while fully frozen). Scales gait AMPLITUDE. */
+  speedRatio: number;
+  /** Signed smoothed heading turn rate (radians/ms) from the renderer's own frame-to-frame heading smoothing — positive = turning one way, negative the other, ~0 on straight stretches. Drives flight banking and a touch of ground-creature lean into curves. */
+  turnRate: number;
+}
+
+/** Converts distance into a repeating 0..2π gait phase — one full stride every `strideLength` world units. Smaller creatures want a shorter stride (faster-cycling legs) than larger ones. */
+export function gaitPhase(distance: number, strideLength: number): number {
+  return ((distance / strideLength) % 1) * Math.PI * 2;
+}
+
+/** A single limb/tail swing value, zero exactly when speedRatio is 0 (creature stopped) regardless of phase — the concrete fix for "não pode parecer que está correndo parado". `phaseOffset` staggers opposite limbs/a lagging tail. */
+export function gaitSwing(phase: number, speedRatio: number, amplitude: number, phaseOffset = 0): number {
+  return Math.sin(phase + phaseOffset) * amplitude * speedRatio;
+}
+
+/** A footfall/torso bounce (two bumps per stride, like a real gait) — same zero-at-stop behavior as gaitSwing. */
+export function gaitBounce(phase: number, speedRatio: number, amplitude: number): number {
+  return Math.abs(Math.sin(phase)) * amplitude * speedRatio;
+}
+
+/** Clamped bank/lean angle from a turn rate — shared by flying creatures (wing/body roll into a curve) and heavy ground creatures (a subtle inward lean). */
+export function bankAngle(turnRate: number, scale: number, maxRad: number): number {
+  return Math.max(-maxRad, Math.min(maxRad, turnRate * scale));
+}
+
+/**
+ * Wing-beat phase for flying creatures — deliberately still wall-clock
+ * driven (a real wingbeat rhythm isn't tied to ground distance the way legs
+ * are), but the RATE eases down as speedRatio drops toward 0 instead of
+ * cutting off — the concrete "desaceleração visual"/"sensação de
+ * sustentação" fix: a nearly-stopped flier settles into a slow hover-flap,
+ * it never freezes mid-beat or keeps flapping frantically in place.
+ */
+export function wingBeat(timeMs: number, seed: number, speedRatio: number, periodMs: number): number {
+  const rate = 0.35 + 0.65 * speedRatio;
+  return Math.sin((timeMs / periodMs) * rate + seed);
+}

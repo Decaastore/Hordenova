@@ -1,5 +1,5 @@
 import { drawContactShadow, drawEnergyCrack } from "../lighting";
-import { breathe, drawFlightShadow, flightLift, glowBlob, jointBulge, limbSegment, materialFill, polygonPath } from "./helpers";
+import { bankAngle, breathe, drawFlightShadow, flightLift, gaitPhase, gaitSwing, glowBlob, jointBulge, limbSegment, materialFill, polygonPath, wingBeat } from "./helpers";
 import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, type EnemyDrawFn } from "./registry";
 
 /**
@@ -14,12 +14,14 @@ import { registerBossCreature, registerEnemyRenderers, type BossCreatureDrawFn, 
 
 // Ash Hound — quadruped predator, hide partially charred (CHARRED
 // material), thin smoke wisping off its back, volumetric jointed legs.
-const drawAshHound: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const stride = timeMs / 150;
+const ASH_HOUND_STRIDE = 11;
+const drawAshHound: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stridePhase = gaitPhase(locomotion?.distance ?? 0, ASH_HOUND_STRIDE);
   drawContactShadow(ctx, 10, 4, 0.32);
 
   for (let i = 0; i < 4; i++) {
-    const phase = i % 2 === 0 ? Math.sin(stride) : -Math.sin(stride);
+    const phase = gaitSwing(stridePhase, speedRatio, 1, i % 2 === 0 ? 0 : Math.PI);
     const baseX = i < 2 ? -6 : 6;
     const kneeX = baseX + phase * 1.2;
     const kneeY = 3.5;
@@ -74,8 +76,11 @@ const drawAshHound: EnemyDrawFn = (ctx, theme, timeMs) => {
 // Petrified Stalker — a deer-like stalker whose hindquarters have already
 // turned to stone while the forequarters are still living hide — the two
 // materials meeting mid-body is the whole point of this design.
-const drawPetrifiedStalker: EnemyDrawFn = (ctx, theme, timeMs) => {
-  const stride = Math.sin(timeMs / 200);
+const PETRIFIED_STALKER_STRIDE = 13;
+const drawPetrifiedStalker: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const stridePhase = gaitPhase(locomotion?.distance ?? 0, PETRIFIED_STALKER_STRIDE);
+  const stride = gaitSwing(stridePhase, speedRatio, 1);
   drawContactShadow(ctx, 10, 4.5, 0.34);
 
   // living forelegs (hide)
@@ -154,12 +159,14 @@ const drawPetrifiedStalker: EnemyDrawFn = (ctx, theme, timeMs) => {
 };
 
 // Cinderwing — flies on damaged wings shedding ash particles, erratic path.
-const drawCinderwing: EnemyDrawFn = (ctx, theme, timeMs) => {
+const drawCinderwing: EnemyDrawFn = (ctx, theme, timeMs, _hitFlashMs, locomotion) => {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const lift = flightLift(timeMs, 8.2, 5.5, 1300);
   drawFlightShadow(ctx, lift, 5.5, 8, 3.2);
   ctx.save();
   ctx.translate(0, -lift);
-  const flap = Math.sin(timeMs / 140);
+  ctx.rotate(bankAngle(locomotion?.turnRate ?? 0, 45, 0.6));
+  const flap = wingBeat(timeMs, 0, speedRatio, 140);
   for (const side of [1, -1] as const) {
     ctx.save();
     ctx.scale(side, 1);
@@ -212,22 +219,34 @@ registerEnemyRenderers({
  * as a faint ember glow deep inside cracks — never a body-wide flame
  * silhouette, never orange skin.
  */
-const drawAshenColossus: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant) => {
+// FASE 3: a heavy, irregular, uneven gait — a genuinely petrified body
+// dragging itself forward rather than a clean walk cycle (spec example:
+// "corpo pesado e irregular, como matéria carbonizada petrificada").
+const drawAshenColossus: BossCreatureDrawFn = (ctx, color, timeMs, enraged, hpPercent, variant, locomotion) => {
   const isMain = variant === "MAIN";
   const scale = isMain ? 1 : 0.62;
   const damageIntensity = Math.max(0, 1 - hpPercent);
-  const sway = Math.sin(timeMs / 700) * 1.2;
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const lurchPhase = gaitPhase(locomotion?.distance ?? 0, isMain ? 21 : 15);
+  const sway = gaitSwing(lurchPhase, speedRatio, 1.2);
 
   drawContactShadow(ctx, 20 * scale, 8.5 * scale, 0.48);
   ctx.save();
   ctx.scale(scale, scale);
   ctx.translate(sway, 0);
 
-  for (const lx of [-6, 6]) {
+  for (const [lx, phaseOffset] of [
+    [-6, 0],
+    [6, 1.9],
+  ] as const) {
+    // Uneven phase offsets (not a clean π apart) — one leg visibly drags a
+    // beat behind the other, reading as damaged/irregular rather than a
+    // smooth quadruped trot.
+    const drag = gaitSwing(lurchPhase, speedRatio, 1.1, phaseOffset);
     const legGrad = materialFill(ctx, "CHARRED", lx, 6, lx, 14, "#5a5248", "#26221e", "#100e0b");
-    limbSegment(ctx, lx, 6, lx, 10, 2.6, 2.2, legGrad);
-    limbSegment(ctx, lx, 10, lx, 14, 2.2, 2.6, "#100e0b");
-    jointBulge(ctx, lx, 10, 1.8, "#1a1712");
+    limbSegment(ctx, lx, 6, lx + drag, 10, 2.6, 2.2, legGrad);
+    limbSegment(ctx, lx + drag, 10, lx + drag * 0.6, 14, 2.2, 2.6, "#100e0b");
+    jointBulge(ctx, lx + drag, 10, 1.8, "#1a1712");
   }
 
   ctx.save();

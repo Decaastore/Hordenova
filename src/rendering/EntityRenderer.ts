@@ -1,5 +1,6 @@
 import type { TowerInstance } from "@/entities/Tower";
 import type { EnemyInstance } from "@/entities/Enemy";
+import { getEffectiveSpeed } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
 import { getTowerVisualStage, MAX_TOWER_LEVEL } from "@/config/towerStats";
@@ -8,6 +9,24 @@ import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
+import type { LocomotionState } from "./biomeCreatures/helpers";
+import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
+
+/**
+ * FASE 3 — real hit-reaction feedback (spec section 10), applied generically
+ * to EVERY enemy (custom-registered or one of the 4 legacy switch archetypes
+ * below) from this ONE call site instead of bespoke per-creature code: a
+ * brief backward recoil + compression along the travel axis, plus a
+ * brightness flash. `hitFlashMs` is "ms since this enemy was last hit"
+ * (Infinity when it hasn't been); returns 0 outside the short reaction
+ * window so a creature that hasn't been hit recently is completely
+ * unaffected — byte-for-byte the old silhouette.
+ */
+const HIT_REACT_WINDOW_MS = 140;
+function hitReactionIntensity(hitFlashMs: number): number {
+  if (!(hitFlashMs < HIT_REACT_WINDOW_MS)) return 0;
+  return Math.pow(1 - hitFlashMs / HIT_REACT_WINDOW_MS, 1.6);
+}
 
 /** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
 const TOWER_MAX_GROWTH = 0.35;
@@ -1576,9 +1595,21 @@ export function drawEnemy(
   scale = 1,
   /** CHEFE MAIOR — the active biome's accent color, used only for the MAIN boss's "Void Colossus" body (see drawMainBossColossus) so it recolors per biome/boss instead of a fixed palette. Ignored for every other enemy. */
   bossColor?: string,
+  /**
+   * FASE 3 — a heading CanvasRenderer has already smoothed frame-to-frame
+   * (lerped toward the path's raw tangent instead of snapping to it), so a
+   * curve reads as the body gradually turning rather than instantly
+   * re-facing. Falls back to the raw path tangent when omitted (registry
+   * tests, decorative menu usage) — zero behavior change for those callers.
+   */
+  smoothedAngle?: number,
+  /** FASE 3 — signed radians/ms turn rate from that same smoothing, ~0 on straight stretches. Forwarded into LocomotionState for banking/lean. Defaults to 0 when omitted. */
+  turnRate = 0,
 ): void {
   const theme = ENEMY_THEME[enemy.type];
-  const angle = Math.atan2(enemy.direction.y, enemy.direction.x);
+  const angle = smoothedAngle ?? Math.atan2(enemy.direction.y, enemy.direction.x);
+  const speedRatio = enemy.baseSpeed > 0 ? Math.max(0, Math.min(1, getEffectiveSpeed(enemy) / enemy.baseSpeed)) : 0;
+  const locomotion: LocomotionState = { distance: enemy.distanceTraveled, speedRatio, turnRate };
 
   ctx.save();
   ctx.translate(enemy.position.x, enemy.position.y);
@@ -1603,6 +1634,24 @@ export function drawEnemy(
 
   ctx.save();
   ctx.rotate(angle);
+
+  // FASE 3 — generic hit-reaction (spec section 10), shared by every enemy
+  // regardless of which draw function below actually paints it: a brief
+  // backward recoil + compression along the travel axis, plus a brightness
+  // flash. Bosses barely budge (mass reads as resisting the knock) while
+  // regular creatures visibly flinch. Zero effect (recoilPx/squash/filter
+  // all no-ops) once hitFlashMs is outside the short reaction window, so a
+  // creature that wasn't just hit renders byte-for-byte as before.
+  const hitReact = hitReactionIntensity(hitFlashMs);
+  if (hitReact > 0) {
+    const isBossLike = enemy.boss !== undefined;
+    const recoilPx = isBossLike ? 0.45 : 1.4;
+    const squash = isBossLike ? 0.03 : 0.12;
+    ctx.translate(-recoilPx * hitReact, 0);
+    ctx.scale(1 - squash * hitReact, 1 + squash * 0.6 * hitReact);
+    ctx.filter = `brightness(${(1 + hitReact * 0.85).toFixed(2)})`;
+  }
+
   // 10-biome expansion — a bossId registered in BOSS_CREATURE_RENDERERS
   // (rendering/biomeCreatures/) gets its own bespoke shared mini/main body
   // instead of the universal Colossus; any bossId NOT registered there
@@ -1615,7 +1664,7 @@ export function drawEnemy(
     // Brute body for every MAIN boss. Colored per biome/boss via
     // `bossColor` rather than ENEMY_THEME's fixed BRUTE palette.
     if (customBossCreature) {
-      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MAIN");
+      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MAIN", locomotion);
     } else {
       drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
     }
@@ -1627,27 +1676,27 @@ export function drawEnemy(
     // the "mini boss doesn't even look related to the main boss" bug this
     // fixes). Same per-biome `bossColor`, same real enrage/hp reads.
     if (customBossCreature) {
-      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MINI");
+      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MINI", locomotion);
     } else {
       drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
     }
   } else {
     const customEnemy = NEW_ENEMY_RENDERERS[enemy.type];
     if (customEnemy) {
-      customEnemy(ctx, theme, timeMs, hitFlashMs);
+      customEnemy(ctx, theme, timeMs, hitFlashMs, locomotion);
     } else {
       switch (enemy.type) {
         case "CRAWLER":
-          drawCrawler(ctx, theme, timeMs, hitFlashMs);
+          drawCrawler(ctx, theme, timeMs, hitFlashMs, 1, locomotion);
           break;
         case "RUNNER":
-          drawRunner(ctx, theme, timeMs);
+          drawRunner(ctx, theme, timeMs, locomotion);
           break;
         case "BRUTE":
-          drawBrute(ctx, theme, timeMs);
+          drawBrute(ctx, theme, timeMs, locomotion);
           break;
         case "SHIELDBEARER":
-          drawShieldbearer(ctx, theme, timeMs);
+          drawShieldbearer(ctx, theme, timeMs, locomotion);
           break;
         // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
         // Progression archetype now has its own bespoke silhouette (see their
@@ -1668,6 +1717,7 @@ export function drawEnemy(
       }
     }
   }
+  if (hitReact > 0) ctx.filter = "none";
   ctx.restore();
 
   if (enemy.slow) {
@@ -2010,6 +2060,7 @@ function roundedRect(
  * toxic-green glow at the eyes/mandible tips/joints, so the danger reads
  * through light, not through a friendly palette.
  */
+const CRAWLER_STRIDE = 6;
 export function drawCrawler(
   ctx: CanvasRenderingContext2D,
   theme: (typeof ENEMY_THEME)["CRAWLER"],
@@ -2023,9 +2074,11 @@ export function drawCrawler(
    * copy of the draw code.
    */
   intensity = 1,
+  locomotion?: LocomotionState,
 ): void {
-  const legPhase = Math.sin(timeMs / 110);
-  const bob = Math.sin(timeMs / 220) * 0.4;
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const legPhase = gaitSwing(gaitPhase(locomotion?.distance ?? 0, CRAWLER_STRIDE), speedRatio, 1);
+  const bob = gaitBounce(gaitPhase(locomotion?.distance ?? 0, CRAWLER_STRIDE), speedRatio, 0.4);
   const mandibleTwitch = Math.sin(timeMs / (260 / intensity)) * 0.15 * intensity;
   const hitFlash = hitFlashMs < 120 ? 1 - hitFlashMs / 120 : 0;
 
@@ -2165,9 +2218,17 @@ export function drawCrawler(
  * long jointed legs in a full gallop stride, a tapering whip-tail, and a
  * distinct head with a forward jaw and a single glowing eye.
  */
-function drawRunner(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["RUNNER"], timeMs: number): void {
-  const stride = Math.sin(timeMs / 65);
-  const bob = Math.abs(Math.cos(timeMs / 65)) * 0.7;
+const RUNNER_STRIDE = 7;
+function drawRunner(
+  ctx: CanvasRenderingContext2D,
+  theme: (typeof ENEMY_THEME)["RUNNER"],
+  timeMs: number,
+  locomotion?: LocomotionState,
+): void {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const gallopPhase = gaitPhase(locomotion?.distance ?? 0, RUNNER_STRIDE);
+  const stride = gaitSwing(gallopPhase, speedRatio, 1);
+  const bob = gaitBounce(gallopPhase, speedRatio, 0.7);
 
   ctx.save();
   ctx.translate(0, -bob);
@@ -2279,9 +2340,17 @@ function drawRunner(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["
  * knuckles, and a distinct sunken head with a heavy jaw and two eyes,
  * while keeping the riveted chest plate that already read well.
  */
-function drawBrute(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["BRUTE"], timeMs: number): void {
+const BRUTE_STRIDE = 14;
+function drawBrute(
+  ctx: CanvasRenderingContext2D,
+  theme: (typeof ENEMY_THEME)["BRUTE"],
+  timeMs: number,
+  locomotion?: LocomotionState,
+): void {
+  const speedRatio = locomotion?.speedRatio ?? 1;
   const breathe = Math.sin(timeMs / 500) * 0.4;
-  const stomp = Math.sin(timeMs / 260);
+  const stompPhase = gaitPhase(locomotion?.distance ?? 0, BRUTE_STRIDE);
+  const stomp = gaitSwing(stompPhase, speedRatio, 1);
 
   ctx.save();
 
@@ -2699,9 +2768,17 @@ function drawMiniBossColossus(
  * bent arm gripping the shield from behind, and a small head peeking above
  * it — the shield reads as equipment a creature carries, not a sticker.
  */
-function drawShieldbearer(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["SHIELDBEARER"], timeMs: number): void {
+const SHIELDBEARER_STRIDE = 16;
+function drawShieldbearer(
+  ctx: CanvasRenderingContext2D,
+  theme: (typeof ENEMY_THEME)["SHIELDBEARER"],
+  timeMs: number,
+  locomotion?: LocomotionState,
+): void {
+  const speedRatio = locomotion?.speedRatio ?? 1;
+  const shufflePhase = gaitPhase(locomotion?.distance ?? 0, SHIELDBEARER_STRIDE);
   const breathe = Math.sin(timeMs / 600) * 0.3;
-  const shuffle = Math.sin(timeMs / 340) * 0.5;
+  const shuffle = gaitSwing(shufflePhase, speedRatio, 0.5);
 
   ctx.save();
 
