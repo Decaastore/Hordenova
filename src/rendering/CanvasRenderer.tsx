@@ -128,7 +128,17 @@ interface DeathAnimation {
 const DEATH_ANIM_MS_REGULAR = 420;
 const DEATH_ANIM_MS_MINIBOSS = 620;
 const DEATH_ANIM_MS_BOSS = 900;
-const MAX_DEATH_ANIMATIONS = 6;
+// CREATURE PRESENTATION PASS spec section 8 — raised from 6: a real
+// multi-kill moment (an upgraded AoE tower or several towers finishing off
+// a cluster in the same frame) could exceed 6 simultaneous deaths well
+// within this animation's own 420-900ms lifetime, and the (6+1)th kill
+// would skip the push below entirely — its body vanishing instantly on the
+// same frame its death burst/floating number appear, exactly the "corpo
+// desaparece antes do VFX" desync this pass was told to hunt down. Each
+// entry is just a short-lived reuse of the real drawEnemy call already
+// paid for every live enemy, so this stays cheap even at the 30-50
+// concurrent enemy counts this pass was validated against.
+const MAX_DEATH_ANIMATIONS = 14;
 
 /**
  * Owns the <canvas>. Runs its own requestAnimationFrame draw loop reading

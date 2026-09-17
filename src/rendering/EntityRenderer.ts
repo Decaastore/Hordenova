@@ -23,11 +23,30 @@ import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
  * window so a creature that hasn't been hit recently is completely
  * unaffected — byte-for-byte the old silhouette.
  */
-const HIT_REACT_WINDOW_MS = 140;
-function hitReactionIntensity(hitFlashMs: number): number {
-  if (!(hitFlashMs < HIT_REACT_WINDOW_MS)) return 0;
-  return Math.pow(1 - hitFlashMs / HIT_REACT_WINDOW_MS, 1.6);
+function hitReactionIntensity(hitFlashMs: number, windowMs: number): number {
+  if (!(hitFlashMs < windowMs)) return 0;
+  return Math.pow(1 - hitFlashMs / windowMs, 1.6);
 }
+
+/**
+ * CREATURE PRESENTATION PASS spec section 6 — hit-reaction used to be a
+ * single boss/not-boss boolean (every non-boss got the exact same flinch,
+ * a mini-boss got the exact same barely-there nudge as the main boss).
+ * Replaced with the same weight class the rest of the VFX pass already
+ * keys off of: LIGHT snaps back fast and far, HEAVY recoils less but takes
+ * longer to settle (reads as inertia, not just a smaller flinch), MINIBOSS
+ * hits hard but recovers quickly ("forte, mas curta"), BOSS barely moves at
+ * all so no single tower ever looks like it's shoving it around. Purely a
+ * render-side reaction to the existing hitFlashMs signal — no change to
+ * HP, damage, or combat timing.
+ */
+const HIT_REACT_PROFILE: Record<CreatureWeightClass, { windowMs: number; recoilPx: number; squash: number; brightness: number }> = {
+  LIGHT: { windowMs: 110, recoilPx: 2, squash: 0.16, brightness: 0.9 },
+  MEDIUM: { windowMs: 140, recoilPx: 1.4, squash: 0.12, brightness: 0.85 },
+  HEAVY: { windowMs: 200, recoilPx: 1, squash: 0.09, brightness: 0.7 },
+  MINIBOSS: { windowMs: 130, recoilPx: 0.9, squash: 0.06, brightness: 0.6 },
+  BOSS: { windowMs: 160, recoilPx: 0.35, squash: 0.025, brightness: 0.45 },
+};
 
 /** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
 const TOWER_MAX_GROWTH = 0.35;
@@ -1533,6 +1552,10 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
   const behindX = -Math.cos(angle);
   const behindY = -Math.sin(angle);
   const theme = ENEMY_THEME[enemy.type];
+  // CREATURE PRESENTATION PASS spec section 8 — same ambient-fade fix as
+  // drawFootstepVfx above: every ctx.globalAlpha assignment below
+  // overwrote instead of multiplying the outer death-collapse fade.
+  const ambientAlpha = ctx.globalAlpha;
 
   ctx.save();
   if (category === "DUST") {
@@ -1542,7 +1565,7 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
       const puffRadius = 3.5 * intensity * (1 - phase);
       if (puffRadius <= 0.2) continue;
       const dist = 8 + phase * 5;
-      ctx.globalAlpha = 0.35 * (1 - phase);
+      ctx.globalAlpha = ambientAlpha * 0.35 * (1 - phase);
       ctx.fillStyle = "#c9b892";
       ctx.beginPath();
       ctx.arc(behindX * dist, behindY * dist + 4, puffRadius, 0, Math.PI * 2);
@@ -1554,7 +1577,7 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
     for (let i = 0; i < segments; i++) {
       const t = i / segments;
       const dist = 6 + t * 10 * intensity;
-      ctx.globalAlpha = 0.3 * (1 - t);
+      ctx.globalAlpha = ambientAlpha * 0.3 * (1 - t);
       ctx.fillStyle = theme.accent;
       ctx.beginPath();
       ctx.arc(behindX * dist, behindY * dist, 2.4 * (1 - t * 0.5), 0, Math.PI * 2);
@@ -1566,7 +1589,7 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
       const phase = ((timeMs / 900 + i * 0.5) % 1) * intensity;
       const wx = Math.sin(timeMs / 500 + i * 3) * 6;
       const wy = 6 - phase * 14;
-      ctx.globalAlpha = 0.5 * (1 - phase);
+      ctx.globalAlpha = ambientAlpha * 0.5 * (1 - phase);
       ctx.fillStyle = theme.accent;
       ctx.beginPath();
       ctx.arc(wx, wy, 1.8, 0, Math.PI * 2);
@@ -1578,7 +1601,7 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
       const phase = (enemy.distanceTraveled / 20 + i / 3) % 1;
       const dist = 4 + phase * 10 * intensity;
       const spread = Math.sin(timeMs / 300 + i * 2) * 3;
-      ctx.globalAlpha = 0.4 * (1 - phase);
+      ctx.globalAlpha = ambientAlpha * 0.4 * (1 - phase);
       ctx.fillStyle = theme.accent;
       ctx.beginPath();
       ctx.arc(behindX * dist + behindY * spread, behindY * dist - behindX * spread, 2, 0, Math.PI * 2);
@@ -1614,6 +1637,27 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
 // read on screen — the concrete cause of the "sprites deslizando" complaint
 // this pass exists to fix. Alpha raised alongside so the bigger puff still
 // looks like soft dust, not a hard-edged decal.
+// CREATURE PRESENTATION PASS — the original 8-archetype roster (CRAWLER,
+// RUNNER, BRUTE, SHIELDBEARER, SWARMLING, REGENERATOR, IRONCLAD, DISABLER —
+// the ORIGINAL_ROSTER_SHADOW set below) only ever drew a ground shadow for
+// CRAWLER; every other one of these — including the two HEAVY archetypes —
+// rendered with no ground contact at all, the single biggest concrete cause
+// of "parece estar deslizando" for the waves most players actually spend
+// their early game in. Every 10-biome creature already draws its own
+// contact shadow inside its own draw function (see biomeCreatures/*.ts), so
+// this only needed to close the gap for this original set, weight-scaled
+// the same way the rest of the VFX pass already scales by weight class.
+const ORIGINAL_ROSTER_SHADOW: Record<string, { radiusX: number; radiusY: number; opacity: number }> = {
+  CRAWLER: { radiusX: 10, radiusY: 4.5, opacity: 0.32 },
+  RUNNER: { radiusX: 8, radiusY: 3.4, opacity: 0.26 },
+  BRUTE: { radiusX: 13, radiusY: 5.5, opacity: 0.44 },
+  SHIELDBEARER: { radiusX: 13, radiusY: 5.5, opacity: 0.44 },
+  SWARMLING: { radiusX: 7, radiusY: 3, opacity: 0.24 },
+  REGENERATOR: { radiusX: 10, radiusY: 4.3, opacity: 0.32 },
+  IRONCLAD: { radiusX: 12.5, radiusY: 5.3, opacity: 0.42 },
+  DISABLER: { radiusX: 9.5, radiusY: 4, opacity: 0.3 },
+};
+
 const FOOTSTEP_PARAMS: Partial<Record<CreatureWeightClass, { radius: number; alpha: number; strideLength: number }>> = {
   MEDIUM: { radius: 5.5, alpha: 0.5, strideLength: 14 },
   HEAVY: { radius: 8.5, alpha: 0.6, strideLength: 20 },
@@ -1646,6 +1690,16 @@ function drawFootstepVfx(
 
   const phase = gaitPhase(locomotion.distance, params.strideLength);
   const tint = FOOTSTEP_TINT[profile.family];
+  // CREATURE PRESENTATION PASS spec section 8 — the death-collapse animation
+  // (CanvasRenderer.tsx) fades the whole corpse out via an outer
+  // ctx.globalAlpha, but every `ctx.globalAlpha = ...` assignment below
+  // OVERWRITES that instead of multiplying into it, so a dying creature's
+  // last footstep puff used to hold at full opacity for its entire
+  // lifetime and then vanish in a single frame — a real "a pegada
+  // permanece" desync, not the fade the body next to it was doing.
+  // Capturing the ambient value once and folding it into every alpha below
+  // fixes that with no new state.
+  const ambientAlpha = ctx.globalAlpha;
 
   // VISUAL POLISH PASS — same "behind the travel direction" placement
   // drawMovementVfx already uses (both run in this same pre-rotation local
@@ -1666,7 +1720,7 @@ function drawFootstepVfx(
       if (bump <= 0.03) continue;
       const dist = params.radius * 0.7;
       ctx.save();
-      ctx.globalAlpha = params.alpha * (1 - bump);
+      ctx.globalAlpha = ambientAlpha * params.alpha * (1 - bump);
       ctx.strokeStyle = tint;
       ctx.lineWidth = 1.6;
       ctx.beginPath();
@@ -1689,7 +1743,7 @@ function drawFootstepVfx(
     const px = behindX * behindDist + sideX * sideDist;
     const py = behindY * behindDist + sideY * sideDist;
     ctx.save();
-    ctx.globalAlpha = params.alpha * (1 - localPhase) * locomotion.speedRatio;
+    ctx.globalAlpha = ambientAlpha * params.alpha * (1 - localPhase) * locomotion.speedRatio;
     ctx.fillStyle = tint;
     ctx.beginPath();
     ctx.arc(px, py, puffRadius, 0, Math.PI * 2);
@@ -1735,7 +1789,15 @@ export function drawEnemy(
   // face its travel direction — otherwise the shadow would swing around
   // with the enemy at every turn instead of staying anchored to the fixed
   // top-left light source.
-  if (enemy.type === "CRAWLER") drawContactShadow(ctx, 10, 4.5, 0.32);
+  // CREATURE PRESENTATION PASS — every 10-biome creature already draws its
+  // own contact shadow (see biomeCreatures/*.ts); this generic lookup
+  // closes the one real gap left, the original roster, which previously
+  // only special-cased CRAWLER and rendered every other archetype —
+  // including both HEAVY ones — with no ground shadow at all.
+  const originalRosterShadow = ORIGINAL_ROSTER_SHADOW[enemy.type];
+  if (originalRosterShadow) {
+    drawContactShadow(ctx, originalRosterShadow.radiusX, originalRosterShadow.radiusY, originalRosterShadow.opacity);
+  }
 
   // AUDITORIA E CORREÇÃO GERAL spec sections 33-38 — archetype movement VFX
   // (config/movementVfx.ts). Drawn in the same untranslated-but-unrotated
@@ -1749,7 +1811,8 @@ export function drawEnemy(
   drawMovementVfx(ctx, enemy, angle, timeMs);
   // CREATURE VFX & IMPACT PASS — weight/material footstep VFX (spec section
   // 9), same local space/ordering as drawMovementVfx above (behind the body).
-  drawFootstepVfx(ctx, getEnemyVfxProfile(enemy), locomotion, angle);
+  const vfxProfile = getEnemyVfxProfile(enemy);
+  drawFootstepVfx(ctx, vfxProfile, locomotion, angle);
 
   ctx.save();
   ctx.rotate(angle);
@@ -1761,14 +1824,12 @@ export function drawEnemy(
   // regular creatures visibly flinch. Zero effect (recoilPx/squash/filter
   // all no-ops) once hitFlashMs is outside the short reaction window, so a
   // creature that wasn't just hit renders byte-for-byte as before.
-  const hitReact = hitReactionIntensity(hitFlashMs);
+  const hitReactProfile = HIT_REACT_PROFILE[vfxProfile.weight];
+  const hitReact = hitReactionIntensity(hitFlashMs, hitReactProfile.windowMs);
   if (hitReact > 0) {
-    const isBossLike = enemy.boss !== undefined;
-    const recoilPx = isBossLike ? 0.45 : 1.4;
-    const squash = isBossLike ? 0.03 : 0.12;
-    ctx.translate(-recoilPx * hitReact, 0);
-    ctx.scale(1 - squash * hitReact, 1 + squash * 0.6 * hitReact);
-    ctx.filter = `brightness(${(1 + hitReact * 0.85).toFixed(2)})`;
+    ctx.translate(-hitReactProfile.recoilPx * hitReact, 0);
+    ctx.scale(1 - hitReactProfile.squash * hitReact, 1 + hitReactProfile.squash * 0.6 * hitReact);
+    ctx.filter = `brightness(${(1 + hitReact * hitReactProfile.brightness).toFixed(2)})`;
   }
 
   // 10-biome expansion — a bossId registered in BOSS_CREATURE_RENDERERS
@@ -2470,6 +2531,15 @@ function drawBrute(
   const breathe = Math.sin(timeMs / 500) * 0.4;
   const stompPhase = gaitPhase(locomotion?.distance ?? 0, BRUTE_STRIDE);
   const stomp = gaitSwing(stompPhase, speedRatio, 1);
+  // CREATURE PRESENTATION PASS — a heavy creature's torso should settle
+  // into each footfall (two compressions per stride, doubled phase)
+  // instead of gliding at a fixed height while only the legs animate
+  // underneath it (the concrete "parece deslizando" symptom this pass
+  // targets). Legs stay planted at their own footY below; only the
+  // torso-up body lifts/settles, so the silhouette still reads as feet
+  // making real ground contact rather than the whole creature bobbing
+  // as one rigid block.
+  const bruteSettle = gaitBounce(stompPhase, speedRatio, 0.7);
 
   ctx.save();
 
@@ -2484,6 +2554,9 @@ function drawBrute(
     ctx.lineTo(-3, footY);
     ctx.stroke();
   }
+
+  ctx.save();
+  ctx.translate(0, -bruteSettle);
 
   // Squat, hunched torso.
   ctx.fillStyle = theme.body;
@@ -2556,6 +2629,7 @@ function drawBrute(
   ctx.fill();
   ctx.globalAlpha = 1;
 
+  ctx.restore();
   ctx.restore();
 }
 
@@ -2898,6 +2972,10 @@ function drawShieldbearer(
   const shufflePhase = gaitPhase(locomotion?.distance ?? 0, SHIELDBEARER_STRIDE);
   const breathe = Math.sin(timeMs / 600) * 0.3;
   const shuffle = gaitSwing(shufflePhase, speedRatio, 0.5);
+  // CREATURE PRESENTATION PASS — same torso-settles-into-each-footfall fix
+  // as drawBrute above; legs shuffle below but the body itself never
+  // reacted to its own steps.
+  const shieldbearerSettle = gaitBounce(shufflePhase, speedRatio, 0.5);
 
   ctx.save();
 
@@ -2911,6 +2989,9 @@ function drawShieldbearer(
     ctx.lineTo(-3 + shuffle * side, side * 8.5);
     ctx.stroke();
   }
+
+  ctx.save();
+  ctx.translate(0, -shieldbearerSettle);
 
   // Torso.
   ctx.fillStyle = theme.body;
@@ -2964,6 +3045,7 @@ function drawShieldbearer(
   ctx.arc(-0.5, -7, 1, 0, Math.PI * 2);
   ctx.fill();
 
+  ctx.restore();
   ctx.restore();
 }
 

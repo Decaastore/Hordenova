@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v27",
+    dateIso: "2026-09-17",
+    category: "FIXES",
+    title: {
+      en: "Creature Presence Pass — Real Ground Contact and Weight Feedback",
+      ptBR: "Passagem de Presença das Criaturas — Contato Real com o Chão e Peso",
+    },
+    description: {
+      en: "A close look at the original creature roster (Crawler, Runner, Brute, Shieldbearer, Swarmling, Regenerator, Ironclad, Disabler — the ones players see most, from wave 1 onward) found that seven of those eight rendered with no ground shadow at all, including both heavy ones — the concrete reason they could still look like they were sliding across the map instead of standing on it despite already having footstep dust and hit reactions. Both heavy creatures now settle their torso into each footfall too, on top of their existing leg animation. Getting hit now also reacts to the creature's own weight instead of one generic flinch for everyone — light creatures snap back fast, heavy ones barely budge and settle slower, and a mini-boss's reaction is now visibly stronger (but shorter) than a full boss's controlled one, instead of both getting the exact same nudge. Finally, a real gap in the death sequence is fixed: a burst of many kills in the same moment could push a dying creature's body past its own pool of on-screen \"corpse\" slots, making it vanish instantly on the exact frame its death effect and floating damage number appeared — that pool is now large enough for the density this game actually reaches, and the lingering footstep dust/trail effects a dying creature was still carrying now fade together with its body instead of holding at full brightness and then cutting out. Purely visual — no change to HP, damage, drops, or any other gameplay value.",
+      ptBR: "Uma análise de perto do elenco original de criaturas (Crawler, Runner, Brute, Shieldbearer, Swarmling, Regenerator, Ironclad, Disabler — as que os jogadores mais veem, desde a onda 1) encontrou que sete dessas oito criaturas eram renderizadas sem nenhuma sombra no chão, incluindo as duas pesadas — a razão concreta pela qual ainda podiam parecer deslizando pelo mapa em vez de apoiadas nele, mesmo já tendo poeira de pegada e reação a acertos. As duas criaturas pesadas agora também acomodam o tronco a cada passada, além da animação de pernas que já tinham. Tomar um acerto agora também reage ao peso da própria criatura em vez de um único flinch genérico para todo mundo — criaturas leves recuam rápido, as pesadas quase não se movem e se acomodam mais devagar, e a reação de um mini-chefe agora é visivelmente mais forte (porém mais curta) que a de um chefe completo, em vez de ambos receberem exatamente o mesmo empurrão. Por fim, uma lacuna real na sequência de morte foi corrigida: uma leva de várias mortes no mesmo instante podia empurrar o corpo de uma criatura morrendo para além do próprio limite de \"cadáveres\" na tela, fazendo-o desaparecer instantaneamente no exato frame em que seu efeito de morte e o número de dano apareciam — esse limite agora é grande o suficiente para a densidade que o jogo realmente atinge, e os efeitos de poeira/rastro de pegada que uma criatura morrendo ainda carregava agora desaparecem junto com o corpo dela em vez de continuar no brilho máximo e sumir de repente. Puramente visual — nenhuma mudança em HP, dano, drops ou qualquer outro valor de gameplay.",
+    },
+    highlights: [
+      {
+        en: "Fixed a real gap: 7 of the 8 original creature archetypes (everything except Crawler) rendered with no ground shadow at all — both heavy ones (Brute, Shieldbearer) now cast one too, weighted to their size.",
+        ptBR: "Corrigida uma lacuna real: 7 dos 8 arquétipos originais de criatura (tudo menos o Crawler) eram renderizados sem nenhuma sombra no chão — as duas pesadas (Brute, Shieldbearer) agora também projetam uma, com peso proporcional ao tamanho.",
+      },
+      {
+        en: "Brute and Shieldbearer now settle their torso into each footfall instead of only animating their legs while the body glided at a fixed height.",
+        ptBR: "Brute e Shieldbearer agora acomodam o tronco a cada passada, em vez de só animar as pernas enquanto o corpo deslizava numa altura fixa.",
+      },
+      {
+        en: "Hit reactions are now weight-aware: light creatures flinch fast and far, heavy ones barely move and take longer to settle, mini-bosses hit hard but recover quickly, and bosses stay visibly composed — instead of every non-boss sharing one identical reaction.",
+        ptBR: "As reações a acerto agora consideram o peso: criaturas leves recuam rápido e longe, as pesadas quase não se mexem e demoram mais para se acomodar, mini-chefes reagem forte mas se recuperam rápido, e chefes permanecem visivelmente compostos — em vez de todo não-chefe compartilhar a mesma reação idêntica.",
+      },
+      {
+        en: "Fixed a death-sequence desync where a large burst of simultaneous kills could make a creature's body vanish instantly instead of collapsing, and where its lingering dust/trail effects didn't fade with it.",
+        ptBR: "Corrigida uma dessincronização na sequência de morte em que uma leva grande de mortes simultâneas podia fazer o corpo de uma criatura sumir instantaneamente em vez de desabar, e em que os efeitos de poeira/rastro que ainda carregava não desapareciam junto com ela.",
+      },
+      {
+        en: "Purely visual polish — no change to HP, damage, drops, Gold, Gems, waves, or any other gameplay value.",
+        ptBR: "Polimento puramente visual — nenhuma mudança em HP, dano, drops, Gold, Gemas, ondas ou qualquer outro valor de gameplay.",
+      },
+    ],
+  },
+  {
     id: "v26",
     dateIso: "2026-09-17",
     category: "FIXES",
