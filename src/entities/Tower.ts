@@ -3,7 +3,6 @@ import {
   getTowerVisualStage,
   getUpgradeCost,
   MAX_TOWER_LEVEL,
-  TOWER_MAX_GROWTH,
   TOWER_PRESENTATION_SCALE,
   type TowerLevelStats,
   type TowerType,
@@ -260,26 +259,27 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
  * directly, untouched by this function).
  */
 export function getTowerMuzzleOffset(tower: TowerInstance): Vector2 {
-  const growth = 1 + ((tower.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
-  const visualScale = growth * TOWER_PRESENTATION_SCALE;
-  const levelProgress = (tower.level - 1) / (MAX_TOWER_LEVEL - 1);
+  // TOWER REDESIGN MASTER PASS v2 — fixed at every level, matching
+  // EntityRenderer.drawTower's own `visualScale` (Regra Absoluta Nº 1: a
+  // tower's drawn body/weapon position never grows with level).
+  const visualScale = TOWER_PRESENTATION_SCALE;
 
   let localY: number;
   switch (tower.type) {
     case "IRONWOOD":
-      localY = -34 - tower.level * 0.6; // ballista mount (drawIronwood's `mountY`)
+      localY = -34; // ballista mount (drawIronwood's `mountY`)
       break;
     case "INFERNO":
       localY = -6; // furnace mouth (drawInferno's glowing opening)
       break;
     case "FROSTBORN": {
       const visualStage = getTowerVisualStage(tower.level);
-      const spireH = 20 + Math.min(visualStage, 6) * 2.6 + tower.level * 0.4;
+      const spireH = 20 + Math.min(visualStage, 6) * 2.6;
       localY = -spireH * 0.62; // frozen core (drawFrostborn's `coreY`)
       break;
     }
     case "STORMCALLER":
-      localY = -32 - levelProgress * 16; // rune orb (drawStormcaller's `orbY`)
+      localY = -32; // rune orb (drawStormcaller's `orbY`)
       break;
   }
   return { x: tower.position.x, y: tower.position.y + localY * visualScale };

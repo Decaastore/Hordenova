@@ -3,7 +3,7 @@ import type { EnemyInstance } from "@/entities/Enemy";
 import { getEffectiveSpeed } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
-import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_MAX_GROWTH, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
+import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
@@ -48,15 +48,15 @@ const HIT_REACT_PROFILE: Record<CreatureWeightClass, { windowMs: number; recoilP
   BOSS: { windowMs: 160, recoilPx: 0.35, squash: 0.025, brightness: 0.45 },
 };
 
-// TOWER PRESENTATION PASS — TOWER_MAX_GROWTH and TOWER_PRESENTATION_SCALE
-// now live in config/towerStats.ts (imported above) so entities/Tower.ts's
-// getTowerMuzzleOffset (read by the pure-gameplay CombatSystem, which must
-// never import a rendering file) can compute the exact same visual scale
-// this file uses to draw the body — see that constant's own doc comment
-// for the full reasoning. This file's drawTower is the only place that
-// still applies it (as a render-time multiplier on top of the per-level
-// `growth` factor): it does not change `stats.range`, the click
-// hit-radius, or anything CombatSystem uses to resolve an attack.
+// TOWER REDESIGN MASTER PASS v2 — TOWER_PRESENTATION_SCALE (config/
+// towerStats.ts) is now the ONLY scale a tower's body is drawn at, fixed
+// and identical at every level (Regra Absoluta Nº 1: physical size must
+// never grow with level). Lives in towerStats.ts rather than here so
+// entities/Tower.ts's getTowerMuzzleOffset (read by the pure-gameplay
+// CombatSystem, which must never import a rendering file) can share the
+// exact same number this file uses to draw the body. This file's drawTower
+// is the only place that still applies it; it does not change `stats.range`,
+// the click hit-radius, or anything CombatSystem uses to resolve an attack.
 
 /**
  * Each tower/enemy is drawn as several layered shapes with a thematic
@@ -88,12 +88,10 @@ export function drawTower(
   const skin = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId) : null;
   const theme = skin ? { ...baseTheme, ...skin.paletteOverride } : baseTheme;
   const visualStage = getTowerVisualStage(stats.level);
-  const growth = 1 + ((stats.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
-  // TOWER PRESENTATION PASS — the actual on-screen render scale (see
-  // TOWER_PRESENTATION_SCALE's own doc comment). `growth` alone stays the
-  // pure per-level curve other code may reason about; this is only ever
-  // used for drawing.
-  const visualScale = growth * TOWER_PRESENTATION_SCALE;
+  // TOWER REDESIGN MASTER PASS v2 — fixed at every level (see
+  // TOWER_PRESENTATION_SCALE's own doc comment); Regra Absoluta Nº 1
+  // forbids a tower's drawn body from growing with level at all.
+  const visualScale = TOWER_PRESENTATION_SCALE;
   const cooldownTotalMs = 1000 / stats.attackSpeed;
   const readiness = 1 - Math.max(0, Math.min(1, tower.cooldownRemainingMs / cooldownTotalMs));
 
@@ -298,8 +296,8 @@ export function drawIronwood(
   ctx.fillStyle = trunkGradient;
   ctx.beginPath();
   ctx.moveTo(-6, 2);
-  ctx.quadraticCurveTo(-10, -15, -5, -32 - level * 0.6);
-  ctx.lineTo(5, -32 - level * 0.6);
+  ctx.quadraticCurveTo(-10, -15, -5, -32);
+  ctx.lineTo(5, -32);
   ctx.quadraticCurveTo(10, -15, 6, 2);
   ctx.closePath();
   ctx.fill();
@@ -312,7 +310,7 @@ export function drawIronwood(
   for (const x of [-4.5, -1.5, 1.5, 4.5]) {
     ctx.beginPath();
     ctx.moveTo(x * 0.85, -1);
-    ctx.lineTo(x, -30 - level * 0.6);
+    ctx.lineTo(x, -30);
     ctx.stroke();
   }
 
@@ -322,12 +320,12 @@ export function drawIronwood(
   // the dark wood, not a decal painted over it. A brief brighter pulse the
   // instant the tower fires so the veins visibly carry the shot's energy.
   const veinPulse = 1 + (attackFlashMs < 200 ? (1 - attackFlashMs / 200) * 0.8 : 0);
-  drawEnergyCrack(ctx, -3, -2, -7, -14, -4, -26 - level * 0.5, theme.accent, 0.55 * veinPulse);
-  drawEnergyCrack(ctx, 2, 0, 5, -12, 3, -24 - level * 0.5, theme.accent, 0.45 * veinPulse);
-  drawEnergyCrack(ctx, -4, -26 - level * 0.5, -1, -20 - level * 0.5, 2, -24 - level * 0.5, theme.accent, 0.4 * veinPulse);
+  drawEnergyCrack(ctx, -3, -2, -7, -14, -4, -26, theme.accent, 0.55 * veinPulse);
+  drawEnergyCrack(ctx, 2, 0, 5, -12, 3, -24, theme.accent, 0.45 * veinPulse);
+  drawEnergyCrack(ctx, -4, -26, -1, -20, 2, -24, theme.accent, 0.4 * veinPulse);
 
   // Iron reinforcement bands — a visibly different material from the bark.
-  for (const bandY of [-9, -20 - level * 0.4]) {
+  for (const bandY of [-9, -20]) {
     ctx.fillStyle = "#33363a";
     ctx.fillRect(-8.5, bandY, 17, 3);
     ctx.fillStyle = "rgba(215,220,225,0.35)";
@@ -363,7 +361,12 @@ export function drawIronwood(
   // flash so the core visibly powers the shot.
   const coreFlare = attackFlashMs < 160 ? 1 - attackFlashMs / 160 : 0;
   const runeGlow = 0.3 + Math.min(level, 5) * 0.11 + 0.15 * Math.sin(timeMs / 500) + coreFlare * 0.4;
-  glowBlob(ctx, 0, -15, (9 + level * 0.6) * (1 + coreFlare * 0.3), theme.glow);
+  // TOWER REDESIGN MASTER PASS v2 — Energy/Lighting is one of the
+  // dimensions allowed to evolve with level (Regra Absoluta Nº 1 only bans
+  // the object's own geometry from growing); this soft glow's radius is
+  // bounded via Math.min instead of the old unbounded `level * 0.6`, which
+  // used to reach a 45-unit halo at level 60.
+  glowBlob(ctx, 0, -15, (9 + Math.min(level, 10) * 0.6) * (1 + coreFlare * 0.3), theme.glow);
   const knotGrad = ctx.createRadialGradient(-0.8, -16, 0, 0, -15, 4.6);
   knotGrad.addColorStop(0, "#f2ffe0");
   knotGrad.addColorStop(0.55, theme.accent);
@@ -394,7 +397,7 @@ export function drawIronwood(
   // pollen drifting slowly around the platform/mount, upward and gently
   // wandering (Forest-identity particle behavior) — continuous, not tied to
   // combat, so the structure always reads as quietly alive with magic.
-  drawFloatingMotes(ctx, 0, -30 - level * 0.6, timeMs, 11, {
+  drawFloatingMotes(ctx, 0, -30, timeMs, 11, {
     count: 5,
     spreadX: 15,
     spreadY: 26,
@@ -407,7 +410,7 @@ export function drawIronwood(
   // just below the mount — reads as "built structure carrying a weapon,"
   // not "weapon balanced on top of a tree" (spec section 10: platform +
   // support structure as identifiable parts in their own right). ---
-  const platformY = -30 - level * 0.6;
+  const platformY = -30;
   ctx.save();
   ctx.translate(0, platformY);
   ctx.strokeStyle = "#241a10";
@@ -434,8 +437,12 @@ export function drawIronwood(
   }
   ctx.restore();
 
-  // --- Ballista mount: heavy, horizontal silhouette — the tower's identity. ---
-  const mountY = -34 - level * 0.6;
+  // --- Ballista mount: heavy, horizontal silhouette — the tower's identity.
+  // TOWER REDESIGN MASTER PASS v2 — fixed at every level (Regra Absoluta
+  // Nº 1); this used to climb with `level * 0.6`, and entities/Tower.ts's
+  // getTowerMuzzleOffset MUST mirror this exact value or the projectile
+  // spawn point drifts out of sync with what's drawn here. ---
+  const mountY = -34;
   const firing = attackFlashMs < 160;
   const recoil = firing ? 1 - attackFlashMs / 160 : 0;
   const releaseFlash = attackFlashMs < 90 ? 1 - attackFlashMs / 90 : 0;
@@ -452,7 +459,11 @@ export function drawIronwood(
   ctx.save();
   ctx.translate(-recoil * 2.2, recoil * 0.4);
 
-  const armSpread = 18 + level * 0.8;
+  // TOWER REDESIGN MASTER PASS v2 — fixed weapon width at every level
+  // (Regra Absoluta Nº 1); a widening arm span used to push the silhouette
+  // toward neighboring tower slots and the enemy path. Weapon evolution now
+  // reads through the stage-gated secondary blade below, not a wider mount.
+  const armSpread = 18;
   const armCurve = 6 + drawTension * 3;
   ctx.strokeStyle = "#4a3a24";
   ctx.lineWidth = 2.8;
@@ -633,7 +644,6 @@ function drawInferno(
 ): void {
   const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
   const launchFlare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
-  const bodyScale = 1 + Math.min(visualStage - 1, 5) * 0.045; // structural growth on top of the tower's own scale — the forge itself gets more massive, not just brighter
 
   drawContactShadow(ctx, 20, 9, 0.42);
 
@@ -660,9 +670,6 @@ function drawInferno(
   ctx.moveTo(6, 10);
   ctx.lineTo(14, 7);
   ctx.stroke();
-
-  ctx.save();
-  ctx.scale(bodyScale, bodyScale);
 
   // --- Rear chimney: the one silhouette element that reads "forge" even
   // in shadow. Grows taller/thicker with visual stage. ---
@@ -756,7 +763,10 @@ function drawInferno(
   // briefly flares the mouth brighter/wider the instant the tower fires,
   // so the fireball reads as something that left the furnace, not just
   // appeared at the target.
-  glowBlob(ctx, 0, -6, (15 + level * 1.1) * (1 + launchFlare * 0.4), theme.glow);
+  // TOWER REDESIGN MASTER PASS v2 — bounded like the fix already applied to
+  // Frostborn's core glow below; the old unbounded `level * 1.1` reached a
+  // 81-unit radius at level 60, dwarfing the furnace body itself.
+  glowBlob(ctx, 0, -6, (15 + Math.min(level, 10) * 1.1) * (1 + launchFlare * 0.4), theme.glow);
   ctx.fillStyle = "#1a1310";
   ctx.beginPath();
   ctx.moveTo(-7.5, 1);
@@ -860,8 +870,6 @@ function drawInferno(
     ctx.stroke();
   }
   ctx.restore();
-
-  ctx.restore(); // end bodyScale
 
   // Rising embers — density scales with level, independent of visual stage
   // structural additions (a continuous "power" read, same as before).
@@ -982,7 +990,11 @@ function drawFrostborn(
   // ice despite being geometrically "stone"; a hue that visibly contrasts
   // against the crystal accents is what actually makes the architecture
   // read as stone with ice growing on it, not the other way around. ---
-  const spireH = 20 + Math.min(visualStage, 6) * 2.6 + level * 0.4;
+  // TOWER REDESIGN MASTER PASS v2 — the stage-bounded term (a new tier
+  // appearing at each milestone) stays; the unbounded `+ level * 0.4` on
+  // top of it is removed (Regra Absoluta Nº 1: the spire's own height must
+  // never be a function of raw level).
+  const spireH = 20 + Math.min(visualStage, 6) * 2.6;
   ctx.save();
   const sway = Math.sin(timeMs / 3000) * 0.012;
   ctx.rotate(sway);
@@ -1415,13 +1427,15 @@ function drawStormcaller(
     }
   }
 
-  // Same runaway-per-level bug as the tower's overall scale: the orb's
-  // rise and glow radius were unbounded (level * 1.4 / level * 1.3), so a
-  // maxed Stormcaller's orb drifted ~74px above its plinth with a 55px
-  // glow — high enough to visually sit on top of the enemy path. Capped to
-  // a fixed total budget across the level range instead.
+  // TOWER REDESIGN MASTER PASS v2 — Regra Absoluta Nº 1: the orb's own
+  // position must never drift with level at all, not even within a
+  // previously-capped budget (a prior pass bounded the old unbounded
+  // `level * 1.4` rise to `levelProgress * 16`, which was still 16 world
+  // units of real physical growth). The orb now sits at a single fixed
+  // height; glow radius below still evolves via `levelProgress` since
+  // Energy/Lighting is one of the dimensions allowed to change with level.
   const levelProgress = (level - 1) / (MAX_TOWER_LEVEL - 1);
-  const orbY = -32 - levelProgress * 16;
+  const orbY = -32;
   const chargeGlow = 1 + charge * 0.5 + discharge * 0.8;
   // REFINEMENT PASS — reinforced power-element glow: a wider soft halo plus
   // a tighter, brighter inner glow layered on top, so the orb reads as the

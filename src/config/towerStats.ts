@@ -357,13 +357,14 @@ function round2(value: number): number {
 }
 
 /**
- * Tower Visual Evolution (spec section 9) — how many levels each stage
- * spans. A tower's structure gains new physical parts at each boundary
- * (see rendering/EntityRenderer.ts's stage-gated draw additions), not just
- * a bigger scale. Six stages across 30 levels mirrors the spec's own
- * example brackets (1-5/6-10/11-15/16-20/21-25/26-30).
+ * Tower Visual Evolution (TOWER REDESIGN MASTER PASS v2 — "Sistema de
+ * Evolução") — how many levels each stage spans. A tower's structure gains
+ * new physical parts/detail at each boundary (see rendering/EntityRenderer.
+ * ts's stage-gated draw additions), never a bigger scale. Six stages across
+ * MAX_TOWER_LEVEL=60 gives the exact 1-10/11-20/21-30/31-40/41-50/51-60
+ * brackets the spec calls for.
  */
-const VISUAL_STAGE_LEVEL_SPAN = 5;
+const VISUAL_STAGE_LEVEL_SPAN = 10;
 export const TOWER_VISUAL_STAGE_COUNT = Math.ceil(MAX_TOWER_LEVEL / VISUAL_STAGE_LEVEL_SPAN);
 
 /** Level 1..MAX_TOWER_LEVEL -> visual stage 1..TOWER_VISUAL_STAGE_COUNT. Pure function of level, so rendering never needs anything beyond TowerInstance.level to pick a stage. */
@@ -372,18 +373,33 @@ export function getTowerVisualStage(level: number): number {
   return Math.min(TOWER_VISUAL_STAGE_COUNT, Math.ceil(clamped / VISUAL_STAGE_LEVEL_SPAN));
 }
 
-/** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. Read by both the renderer (EntityRenderer.drawTower) and the muzzle-offset math below (entities/Tower.getTowerMuzzleOffset) — the two MUST share this constant, since a muzzle offset computed at the wrong scale is exactly the "projectile doesn't come from the weapon" bug this exists to prevent. */
-export const TOWER_MAX_GROWTH = 0.35;
-
 /**
- * TOWER PRESENTATION PASS — the real render-time multiplier on top of the
- * per-level growth curve above (see EntityRenderer.ts's own doc comment on
- * TOWER_PRESENTATION_SCALE for the full reasoning: real screenshots at
- * normal gameplay camera showed every tower reading as a small, dark blob
- * indistinguishable from rock decorations). Lives here rather than in
- * EntityRenderer.ts specifically so entities/Tower.ts's muzzle-offset math
- * — needed by the pure-gameplay CombatSystem, which must never import a
- * rendering file — can read the exact same number the renderer uses,
- * instead of a second copy that could quietly drift out of sync.
+ * TOWER REDESIGN MASTER PASS v2 — Regra Absoluta Nº 1 (Tamanho Físico): a
+ * tower's on-screen body must NEVER grow with level. This used to be
+ * `growth * 1.45`, where `growth` climbed from 1.0 at level 1 to 1.35 at
+ * level 60 (TOWER_MAX_GROWTH, now removed) and 1.45 was a flat multiplier
+ * stacked on top — together a maxed tower rendered at nearly 2x a level-1
+ * tower's size, which is exactly the "towers ficaram grandes demais"
+ * regression this constant exists to prevent from ever happening again.
+ * This is now the ONLY scale applied to a tower's body, identical at every
+ * level: a single, fixed presentation multiplier (bigger than the original
+ * unscaled 1.0 that read as a small dark blob at real gameplay zoom, but
+ * nowhere near the old 1.45-1.96 range) sized to stay inside the map's own
+ * real safe envelope — MIN_TOWER_SPACING=90 (data/mapWhisperingWoods.ts)
+ * means two adjacent towers must never exceed ~45 world units of radius
+ * each, and the CLOSEST tower slots sit only 40 units from the path
+ * centerline (PATH_VISUAL_WIDTH=42, so the rendered road's own visual edge
+ * already reaches ~21-30 units out) — so a tower's drawn radius has to stay
+ * well under that, matching this file's own long-standing design comment
+ * that a tower's footprint should read as "roughly 60-80 units across at
+ * the largest" (a ~30-40 unit radius). At the ~27-unit native body radius
+ * the selection ring is drawn at, 1.15x lands at ~31 units — comfortably
+ * inside that budget. Every level's worth of "got stronger" now has to come
+ * from added components/detail (visualStage) and material/energy/animation
+ * richness, never from this number changing. Read by both the renderer
+ * (EntityRenderer.drawTower) and the muzzle-offset math below (entities/
+ * Tower.getTowerMuzzleOffset) — the two MUST share this constant, since a
+ * muzzle offset computed at the wrong scale is exactly the "projectile
+ * doesn't come from the weapon" bug a previous pass fixed.
  */
-export const TOWER_PRESENTATION_SCALE = 1.45;
+export const TOWER_PRESENTATION_SCALE = 1.15;
