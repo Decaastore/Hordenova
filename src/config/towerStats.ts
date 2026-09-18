@@ -371,3 +371,19 @@ export function getTowerVisualStage(level: number): number {
   const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
   return Math.min(TOWER_VISUAL_STAGE_COUNT, Math.ceil(clamped / VISUAL_STAGE_LEVEL_SPAN));
 }
+
+/** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. Read by both the renderer (EntityRenderer.drawTower) and the muzzle-offset math below (entities/Tower.getTowerMuzzleOffset) — the two MUST share this constant, since a muzzle offset computed at the wrong scale is exactly the "projectile doesn't come from the weapon" bug this exists to prevent. */
+export const TOWER_MAX_GROWTH = 0.35;
+
+/**
+ * TOWER PRESENTATION PASS — the real render-time multiplier on top of the
+ * per-level growth curve above (see EntityRenderer.ts's own doc comment on
+ * TOWER_PRESENTATION_SCALE for the full reasoning: real screenshots at
+ * normal gameplay camera showed every tower reading as a small, dark blob
+ * indistinguishable from rock decorations). Lives here rather than in
+ * EntityRenderer.ts specifically so entities/Tower.ts's muzzle-offset math
+ * — needed by the pure-gameplay CombatSystem, which must never import a
+ * rendering file — can read the exact same number the renderer uses,
+ * instead of a second copy that could quietly drift out of sync.
+ */
+export const TOWER_PRESENTATION_SCALE = 1.45;

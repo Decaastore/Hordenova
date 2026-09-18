@@ -1,7 +1,10 @@
 import {
   getTowerLevelStats,
+  getTowerVisualStage,
   getUpgradeCost,
   MAX_TOWER_LEVEL,
+  TOWER_MAX_GROWTH,
+  TOWER_PRESENTATION_SCALE,
   type TowerLevelStats,
   type TowerType,
 } from "@/config/towerStats";
@@ -236,6 +239,50 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
     attackSpeed: round2(levelStats.attackSpeed * bonuses.attackSpeedMultiplier),
     range: round2(levelStats.range * bonuses.rangeMultiplier),
   };
+}
+
+/**
+ * TOWER PRESENTATION PASS — attack origin. Every projectile used to spawn
+ * from `tower.position` itself (the tower's ground-level anchor point,
+ * where CombatSystem also measures range from) even though every
+ * archetype's actual drawn weapon sits well above it — Ironwood's ballista
+ * mount, Inferno's furnace mouth, Frostborn's crystal core, Stormcaller's
+ * rune orb. A player watching a shot leave the tower saw it appear at the
+ * base, not the weapon. This returns that same visual weapon point in
+ * world space, using the exact Y each archetype's own draw function in
+ * EntityRenderer.ts positions its weapon at (scaled by the same
+ * `visualScale` the renderer draws the body at, so it never drifts out of
+ * sync with what's on screen), purely so CombatSystem can hand
+ * `createProjectile` a better `from` — ProjectileInstance is explicitly
+ * documented as carrying no gameplay authority, so this only ever affects
+ * where the cosmetic projectile animation starts, never range, damage, or
+ * any other combat resolution (which all still key off `tower.position`
+ * directly, untouched by this function).
+ */
+export function getTowerMuzzleOffset(tower: TowerInstance): Vector2 {
+  const growth = 1 + ((tower.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
+  const visualScale = growth * TOWER_PRESENTATION_SCALE;
+  const levelProgress = (tower.level - 1) / (MAX_TOWER_LEVEL - 1);
+
+  let localY: number;
+  switch (tower.type) {
+    case "IRONWOOD":
+      localY = -34 - tower.level * 0.6; // ballista mount (drawIronwood's `mountY`)
+      break;
+    case "INFERNO":
+      localY = -6; // furnace mouth (drawInferno's glowing opening)
+      break;
+    case "FROSTBORN": {
+      const visualStage = getTowerVisualStage(tower.level);
+      const spireH = 20 + Math.min(visualStage, 6) * 2.6 + tower.level * 0.4;
+      localY = -spireH * 0.62; // frozen core (drawFrostborn's `coreY`)
+      break;
+    }
+    case "STORMCALLER":
+      localY = -32 - levelProgress * 16; // rune orb (drawStormcaller's `orbY`)
+      break;
+  }
+  return { x: tower.position.x, y: tower.position.y + localY * visualScale };
 }
 
 function round2(value: number): number {

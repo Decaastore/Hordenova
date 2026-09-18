@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v32",
+    dateIso: "2026-09-18",
+    category: "TOWERS",
+    title: {
+      en: "Towers Are Bigger and Their Shots Actually Come From the Weapon",
+      ptBR: "Torres Estão Maiores e os Disparos Agora Realmente Saem da Arma",
+    },
+    description: {
+      en: "Two real problems, found by comparing screenshots side by side at the actual camera zoom you play at: every tower — Ironwood's ballista, Inferno's furnace, Frostborn's frozen spire, Stormcaller's rune pillar — read as a small, dark shape barely distinguishable from a nearby rock, even though each one is built from a lot of hand-drawn detail up close. And every shot, fireball, bolt, and lightning arc was launching from the tower's base on the ground, not from the ballista, furnace mouth, crystal, or orb sitting well above it. Both are fixed: every tower now renders noticeably larger so its actual silhouette and weapon read at a glance, and every attack now visibly leaves from the real weapon position instead of the tower's feet. Selection, range, upgrades, and combat are untouched — this is purely how towers look, not how they play.",
+      ptBR: "Dois problemas reais, encontrados comparando screenshots lado a lado no mesmo zoom de câmera em que você realmente joga: toda torre — a balista do Ironwood, a fornalha do Inferno, a torre congelada do Frostborn, o pilar rúnico do Stormcaller — lia como uma forma pequena e escura, quase indistinguível de uma pedra próxima, mesmo tendo bastante detalhe desenhado à mão de perto. E todo disparo, bola de fogo, raio de gelo e arco de raio saía da base da torre, no chão, e não da balista, da boca da fornalha, do cristal ou do orbe que ficam bem acima dela. Os dois foram corrigidos: toda torre agora renderiza visivelmente maior, para que sua silhueta e sua arma sejam reconhecíveis num único olhar, e todo ataque agora visivelmente sai da posição real da arma, não dos pés da torre. Seleção, alcance, upgrades e combate permanecem intocados — isso é puramente sobre a aparência das torres, não sobre como elas jogam.",
+    },
+    highlights: [
+      {
+        en: "All 4 tower types (Ironwood, Inferno, Frostborn, Stormcaller) now render ~45% larger at every level, so their existing detail (ballista arms, furnace mouth, crystal core, rune orb) is actually legible next to enemies and terrain instead of collapsing into a small dark blob.",
+        ptBR: "Os 4 tipos de torre (Ironwood, Inferno, Frostborn, Stormcaller) agora renderizam cerca de 45% maiores em todo nível, então o detalhe que já existia (braços da balista, boca da fornalha, núcleo de cristal, orbe rúnico) finalmente é legível perto de inimigos e do terreno, em vez de virar uma mancha escura pequena.",
+      },
+      {
+        en: "Every tower's projectile (arrow, fireball, ice bolt, lightning) now visibly launches from that tower's actual weapon — the ballista mount, furnace mouth, frozen core, or rune orb — instead of from the ground at the tower's base.",
+        ptBR: "O projétil de cada torre (flecha, bola de fogo, raio de gelo, relâmpago) agora visivelmente sai da arma real daquela torre — o suporte da balista, a boca da fornalha, o núcleo congelado ou o orbe rúnico — em vez de sair do chão, na base da torre.",
+      },
+      {
+        en: "The level badge was nudged to keep clearing the bigger tower body and got a small drop shadow for legibility — it still never dominates the tower itself.",
+        ptBR: "O selo de nível foi reposicionado para continuar sem sobrepor o corpo maior da torre, e ganhou uma pequena sombra para ficar mais legível — ele continua nunca dominando a torre em si.",
+      },
+    ],
+  },
+  {
     id: "v31",
     dateIso: "2026-09-18",
     category: "BOSSES",

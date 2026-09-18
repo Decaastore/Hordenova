@@ -3,7 +3,7 @@ import type { EnemyInstance } from "@/entities/Enemy";
 import { getEffectiveSpeed } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
-import { getTowerVisualStage, MAX_TOWER_LEVEL } from "@/config/towerStats";
+import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_MAX_GROWTH, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
@@ -48,8 +48,15 @@ const HIT_REACT_PROFILE: Record<CreatureWeightClass, { windowMs: number; recoilP
   BOSS: { windowMs: 160, recoilPx: 0.35, squash: 0.025, brightness: 0.45 },
 };
 
-/** Total scale gained from Level 1 to MAX_TOWER_LEVEL — kept modest so a maxed tower still reads bigger without dwarfing the map or the base. */
-const TOWER_MAX_GROWTH = 0.35;
+// TOWER PRESENTATION PASS — TOWER_MAX_GROWTH and TOWER_PRESENTATION_SCALE
+// now live in config/towerStats.ts (imported above) so entities/Tower.ts's
+// getTowerMuzzleOffset (read by the pure-gameplay CombatSystem, which must
+// never import a rendering file) can compute the exact same visual scale
+// this file uses to draw the body — see that constant's own doc comment
+// for the full reasoning. This file's drawTower is the only place that
+// still applies it (as a render-time multiplier on top of the per-level
+// `growth` factor): it does not change `stats.range`, the click
+// hit-radius, or anything CombatSystem uses to resolve an attack.
 
 /**
  * Each tower/enemy is drawn as several layered shapes with a thematic
@@ -82,12 +89,17 @@ export function drawTower(
   const theme = skin ? { ...baseTheme, ...skin.paletteOverride } : baseTheme;
   const visualStage = getTowerVisualStage(stats.level);
   const growth = 1 + ((stats.level - 1) / (MAX_TOWER_LEVEL - 1)) * TOWER_MAX_GROWTH;
+  // TOWER PRESENTATION PASS — the actual on-screen render scale (see
+  // TOWER_PRESENTATION_SCALE's own doc comment). `growth` alone stays the
+  // pure per-level curve other code may reason about; this is only ever
+  // used for drawing.
+  const visualScale = growth * TOWER_PRESENTATION_SCALE;
   const cooldownTotalMs = 1000 / stats.attackSpeed;
   const readiness = 1 - Math.max(0, Math.min(1, tower.cooldownRemainingMs / cooldownTotalMs));
 
   ctx.save();
   ctx.translate(tower.position.x, tower.position.y);
-  ctx.scale(growth, growth);
+  ctx.scale(visualScale, visualScale);
 
   if (tower.type !== "IRONWOOD") drawPlinth(ctx);
 
@@ -114,21 +126,32 @@ export function drawTower(
     ctx.strokeStyle = "#ffe9a8";
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, 27 * growth, 0, Math.PI * 2);
+    ctx.arc(0, 0, 27 * visualScale, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
   }
 
   // Small, unobtrusive level badge — the main "it got stronger" signal is
   // the scale/glow growth above; this just gives an exact number on demand.
+  // TOWER PRESENTATION PASS — anchored off `visualScale` (not the old
+  // `growth`) so it keeps sitting just past the plinth's edge now that the
+  // body itself renders bigger, instead of drifting inward and starting to
+  // overlap the structure. A thin dark drop shadow was added so the badge
+  // stays legible against a light-colored ground tile without needing to
+  // make the badge itself any bigger — it's meant to stay secondary to the
+  // tower/weapon, never competing with them for attention.
   ctx.save();
-  ctx.translate(tower.position.x + 17 * growth, tower.position.y + 18 * growth);
+  ctx.translate(tower.position.x + 18 * visualScale, tower.position.y + 19 * visualScale);
+  ctx.beginPath();
+  ctx.arc(0.4, 0.6, 7, 0, Math.PI * 2);
+  ctx.fillStyle = "rgba(0,0,0,0.35)";
+  ctx.fill();
   ctx.beginPath();
   ctx.arc(0, 0, 7, 0, Math.PI * 2);
-  ctx.fillStyle = "rgba(43,29,18,0.88)";
+  ctx.fillStyle = "rgba(35,23,14,0.92)";
   ctx.fill();
   ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1;
+  ctx.lineWidth = 1.2;
   ctx.stroke();
   ctx.fillStyle = "#fdf6e8";
   ctx.font = "bold 9px system-ui, sans-serif";

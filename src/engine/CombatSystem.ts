@@ -1,5 +1,6 @@
 import {
   disableTower,
+  getTowerMuzzleOffset,
   getTowerStats,
   isTowerReadyForSpecial,
   isTowerReadyToAttack,
@@ -196,6 +197,11 @@ function resolveNormalAttack(
   const target = findPrimaryTarget(tower.position, stats.range, enemies);
   if (!target) return;
 
+  // TOWER PRESENTATION PASS — see getTowerMuzzleOffset's own doc comment.
+  // Purely cosmetic (the ProjectileInstance `from` point): every distance/
+  // range check above and below still uses `tower.position` directly.
+  const muzzle = getTowerMuzzleOffset(tower);
+
   resetTowerCooldown(tower);
   const special = applyMasteryToSpecial(
     applySpecializationToSpecial(
@@ -212,7 +218,7 @@ function resolveNormalAttack(
       const armorPen = special.bonusArmorPenetration ?? 0;
       const isCrit = Math.random() < special.critChance;
       dealDamage(tower, target, stats.damage * (isCrit ? special.critMultiplier : 1) * bossMult(target), armorPen, isCrit);
-      projectiles.push(createProjectile(tower.type, tower.position, target.position));
+      projectiles.push(createProjectile(tower.type, muzzle, target.position));
 
       // Extra projectiles (unlocked at level 10/20, see towerStats.ts, plus
       // an optional specialization bonus — see config/specializations.ts)
@@ -225,7 +231,7 @@ function resolveNormalAttack(
         if (!extra) break;
         const extraCrit = Math.random() < special.critChance;
         dealDamage(tower, extra, stats.damage * (extraCrit ? special.critMultiplier : 1) * bossMult(extra), armorPen, extraCrit);
-        projectiles.push(createProjectile(tower.type, tower.position, extra.position));
+        projectiles.push(createProjectile(tower.type, muzzle, extra.position));
         alreadyHit.add(extra.id);
       }
     } else if (special.type === "INFERNO") {
@@ -240,7 +246,7 @@ function resolveNormalAttack(
         dealDamage(tower, enemy, stats.damage * mult);
         applyBurn(enemy, special.burnDamagePerSecond, special.burnDurationMs, special.burnMaxStacks);
       }
-      projectiles.push(createProjectile(tower.type, tower.position, target.position));
+      projectiles.push(createProjectile(tower.type, muzzle, target.position));
     } else if (special.type === "FROSTBORN") {
       // Shatter specialization: bonus damage against a target that's
       // already fully frozen (a 100% slow) rather than the normal partial one.
@@ -256,7 +262,7 @@ function resolveNormalAttack(
       } else {
         applySlow(target, special.slowPercent, special.slowDurationMs);
       }
-      projectiles.push(createProjectile(tower.type, tower.position, target.position));
+      projectiles.push(createProjectile(tower.type, muzzle, target.position));
     } else if (special.type === "STORMCALLER") {
       const bonusFlat = special.bonusFlatDamage ?? 0;
       dealDamage(tower, target, stats.damage + bonusFlat, special.armorPenetration);
@@ -277,7 +283,7 @@ function resolveNormalAttack(
       }
 
       projectiles.push(
-        createProjectile(tower.type, tower.position, target.position, chainImpactPoints),
+        createProjectile(tower.type, muzzle, target.position, chainImpactPoints),
       );
     }
   }
@@ -306,12 +312,15 @@ function resolveSpecialAttack(
   const target = findPrimaryTarget(tower.position, stats.range, enemies);
   if (!target) return;
 
+  // TOWER PRESENTATION PASS — see getTowerMuzzleOffset's own doc comment.
+  const muzzle = getTowerMuzzleOffset(tower);
+
   resetTowerSpecialCooldown(tower);
   const ultimate = tower.type;
 
   if (ultimate === "IRONWOOD") {
     dealDamage(tower, target, stats.damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
-    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true));
   } else if (ultimate === "INFERNO") {
     const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level) as Extract<TowerSpecial, { type: "INFERNO" }>;
     const radius = infernoSpecial.aoeRadius * INFERNO_SPECIAL.radiusMultiplier;
@@ -321,7 +330,7 @@ function resolveSpecialAttack(
       dealDamage(tower, enemy, stats.damage * INFERNO_SPECIAL.damageMultiplier);
       applyBurn(enemy, infernoSpecial.burnDamagePerSecond, infernoSpecial.burnDurationMs, infernoSpecial.burnMaxStacks);
     }
-    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true));
   } else if (ultimate === "FROSTBORN") {
     // A nova centered on the TOWER itself, not the target — every enemy in
     // range is fully frozen, not just the primary target (spec: area
@@ -332,7 +341,7 @@ function resolveSpecialAttack(
       dealDamage(tower, enemy, stats.damage * FROSTBORN_SPECIAL.damageMultiplier);
       applySlow(enemy, 1, FROSTBORN_SPECIAL.freezeDurationMs);
     }
-    projectiles.push(createProjectile(tower.type, tower.position, target.position, [], true));
+    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true));
   } else if (ultimate === "STORMCALLER") {
     const stormSpecial = getTowerSpecialAtLevel("STORMCALLER", tower.level) as Extract<TowerSpecial, { type: "STORMCALLER" }>;
     let chainDamage = stats.damage * STORMCALLER_SPECIAL.damageMultiplier;
@@ -351,6 +360,6 @@ function resolveSpecialAttack(
       alreadyHit.add(next.id);
       chainOrigin = next;
     }
-    projectiles.push(createProjectile(tower.type, tower.position, target.position, chainImpactPoints, true));
+    projectiles.push(createProjectile(tower.type, muzzle, target.position, chainImpactPoints, true));
   }
 }
