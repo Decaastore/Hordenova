@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v30",
+    dateIso: "2026-09-18",
+    category: "CONTENT",
+    title: {
+      en: "Every Biome Now Scatters Its Own Scenery",
+      ptBR: "Cada Bioma Agora Espalha Seu Próprio Cenário",
+    },
+    description: {
+      en: "A visual audit comparing biomes side by side found the real reason every stage still felt like the same map with a new coat of paint: every single biome — Crystal Sea, Ashen Valley, Moon Gardens, all sixteen — was quietly rendering the exact same scenery layout (the same trees, rocks, ruins, crystals, in the same positions), each biome's own carefully authored mix of what should appear there was never actually being used. The bug is fixed: each biome now generates its own real scenery from its own mix. Ashen Valley is now a barren field of broken rock and ruined pillars with no trees, water, or crystals in sight. Crystal Sea is now dense with crystal formations and water pools and nothing else. Moon Gardens is now a quiet grove of trees, flowers, and undergrowth. Every other biome follows its own long-designed mix the same way. The road, tower slots, and everything about actual gameplay are untouched — only what grows and sits around them now genuinely differs from stage to stage.",
+      ptBR: "Uma auditoria visual comparando biomas lado a lado encontrou o motivo real pelo qual cada fase ainda parecia o mesmo mapa com uma nova cor: todo bioma — Mar de Cristal, Vale das Cinzas, Jardins da Lua, os dezesseis — estava, sem ninguém perceber, desenhando exatamente o mesmo layout de cenário (as mesmas árvores, pedras, ruínas, cristais, nas mesmas posições); a mistura própria e cuidadosamente pensada de cada bioma nunca estava realmente sendo usada. O defeito foi corrigido: cada bioma agora gera seu próprio cenário real, a partir da sua própria mistura. O Vale das Cinzas agora é um campo árido de pedras quebradas e pilares em ruínas, sem árvore, água ou cristal à vista. O Mar de Cristal agora é denso em formações de cristal e poças d'água, e nada mais. Os Jardins da Lua agora são um bosque silencioso de árvores, flores e vegetação rasteira. Todo outro bioma segue sua própria mistura, já pensada há tempos, do mesmo jeito. A estrada, as posições de torre e tudo sobre a jogabilidade em si permanecem intactos — só o que cresce e fica ao redor deles agora realmente muda de fase para fase.",
+    },
+    highlights: [
+      {
+        en: "Fixed a bug where every biome scattered the exact same fixed scenery layout regardless of which stage you were on — each biome's own decoration mix is now actually applied.",
+        ptBR: "Corrigido um defeito em que todo bioma espalhava exatamente o mesmo layout fixo de cenário, não importando a fase — a mistura própria de decoração de cada bioma agora é realmente aplicada.",
+      },
+      {
+        en: "Ashen Valley is now visibly a rock-and-ruin wasteland, Crystal Sea a field of crystal formations and water, Moon Gardens a tree-and-flower grove — every other biome follows its own long-designed mix the same way.",
+        ptBR: "O Vale das Cinzas agora é visivelmente um deserto de pedras e ruínas, o Mar de Cristal um campo de formações de cristal e água, os Jardins da Lua um bosque de árvores e flores — todo outro bioma segue sua própria mistura, já pensada há tempos, do mesmo jeito.",
+      },
+      {
+        en: "Purely visual — the road, tower slots, combat, and every gameplay system are untouched.",
+        ptBR: "Puramente visual — a estrada, as posições de torre, o combate e todos os sistemas de jogabilidade permanecem intactos.",
+      },
+    ],
+  },
+  {
     id: "v29",
     dateIso: "2026-09-18",
     category: "INTERFACE",

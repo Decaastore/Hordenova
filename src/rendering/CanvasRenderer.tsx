@@ -34,7 +34,7 @@ const TOWER_HIT_RADIUS = 20;
 /**
  * MUNDO 3D — FASE 2: while the 3D world layer is active, TREE/ROCK/RUIN
  * decorations get a real 3D counterpart (`rendering3d/world/worldVegetation.ts`,
- * built from this exact same `MAP_DECORATIONS` array) — these three kinds
+ * built from that same biome's decoration layout) — these three kinds
  * are the ones skipped here so nothing is ever drawn twice. GRASS/FLOWER/
  * WATER/TORCH/ROOT/CRYSTAL stay 2D either way.
  */

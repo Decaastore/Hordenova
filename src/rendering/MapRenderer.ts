@@ -6,7 +6,7 @@ import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
 import { drawEnergyCrack, drawFloatingMotes, rimHighlight } from "./lighting";
 import type { AtmosphereKind, BiomeDefinition } from "./biomes";
-import { MAP_DECORATIONS, type Decoration, type DecorationKind } from "./mapDecorations";
+import { getMapDecorations, type Decoration, type DecorationKind } from "./mapDecorations";
 
 /**
  * Pure drawing helpers — world-space coordinates in, pixels on screen out
@@ -112,10 +112,11 @@ export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefiniti
  * caller — the menu preview, any test — is byte-for-byte unchanged). When
  * the 3D world layer is active, `CanvasRenderer.tsx` passes TREE/ROCK/RUIN
  * here because `rendering3d/world/worldVegetation.ts` now draws a REAL 3D
- * counterpart at these exact same positions (same `MAP_DECORATIONS` array)
- * — this is what stops each of those three kinds from being drawn twice
- * (once flat in 2D, once with real height/shadow in 3D) rather than adding
- * a second, competing decoration system.
+ * counterpart at these exact same positions (same per-biome decoration
+ * layout, from `getMapDecorations(biome)`) — this is what stops each of
+ * those three kinds from being drawn twice (once flat in 2D, once with
+ * real height/shadow in 3D) rather than adding a second, competing
+ * decoration system.
  */
 export function drawDecorations(
   ctx: CanvasRenderingContext2D,
@@ -123,7 +124,7 @@ export function drawDecorations(
   timeMs: number,
   skipKinds?: ReadonlySet<DecorationKind>,
 ): void {
-  for (const deco of MAP_DECORATIONS) {
+  for (const deco of getMapDecorations(biome)) {
     if (skipKinds?.has(deco.kind)) continue;
     ctx.save();
     ctx.translate(deco.position.x, deco.position.y);

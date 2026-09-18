@@ -1,14 +1,25 @@
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
-import { ACTIVE_BIOME, type BiomeDefinition } from "./biomes";
+import type { BiomeDefinition } from "./biomes";
 
 /**
- * Purely decorative scenery for Whispering Woods — trees, rocks, roots,
- * ruins, magic crystals. Generated once with a fixed seed so the layout is
- * stable across reloads (no gameplay meaning, no engine/config dependency
+ * Purely decorative scenery — trees, rocks, roots, ruins, crystals, grass,
+ * flowers, water, torches — scattered over the one shared road/slot layout
+ * every biome plays on (no gameplay meaning, no engine/config dependency
  * beyond reading the already-approved path/slot geometry to avoid
  * decorating on top of them).
+ *
+ * BIOME IDENTITY PASS — this used to generate ONE fixed layout from a
+ * single hardcoded `ACTIVE_BIOME` (Ancient Forest) constant, so every
+ * biome's own `decorationWeights` (each biome file already authors a
+ * genuinely distinct kind/count mix — see biomes/*.ts) was dead data: every
+ * stage scattered Ancient Forest's exact tree/rock/root layout, just
+ * recolored by palette. `getMapDecorations(biome)` now generates (and
+ * memoizes) a real layout PER biome, so the composition itself — not just
+ * the color — differs stage to stage. Still deterministic per biome (a
+ * biome-specific seed, not `Math.random()`) so a reload never reshuffles
+ * the scenery underfoot.
  */
 
 export type DecorationKind =
@@ -68,8 +79,15 @@ const ALL_DECORATION_KINDS: readonly DecorationKind[] = [
   "TORCH",
 ];
 
+/** Deterministic string hash — turns a biome id into its own seed offset so two biomes never draw from the same point in the rng stream (e.g. two biomes that both skip TREE would otherwise generate byte-identical ROCK positions with the shared base seed). */
+function hashSeed(id: string): number {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) | 0;
+  return h;
+}
+
 function generate(biome: BiomeDefinition): Decoration[] {
-  const rng = mulberry32(20260831);
+  const rng = mulberry32(20260831 + hashSeed(biome.id));
   const decorations: Decoration[] = [];
 
   const counts: Record<DecorationKind, number> = Object.fromEntries(
@@ -101,4 +119,14 @@ function generate(biome: BiomeDefinition): Decoration[] {
   return decorations;
 }
 
-export const MAP_DECORATIONS: readonly Decoration[] = generate(ACTIVE_BIOME);
+const decorationCache = new Map<string, readonly Decoration[]>();
+
+/** Per-biome decoration layout, generated once per biome id and memoized (never per-frame, never per-render) — see the file header for why this replaced a single fixed `MAP_DECORATIONS` constant. */
+export function getMapDecorations(biome: BiomeDefinition): readonly Decoration[] {
+  let cached = decorationCache.get(biome.id);
+  if (!cached) {
+    cached = generate(biome);
+    decorationCache.set(biome.id, cached);
+  }
+  return cached;
+}

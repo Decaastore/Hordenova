@@ -29,7 +29,7 @@ export function WorldTerrain({ biomeId }: { biomeId: string }) {
   // RUIN sprites (CanvasRenderer skips drawing those specific kinds while
   // this layer is active — see its `skipDecorationKinds` — so each one
   // exists exactly once, never duplicated).
-  const vegetation = useMemo(() => buildVegetationMeshes(palette), [biomeId]);
+  const vegetation = useMemo(() => buildVegetationMeshes(biome), [biomeId]);
 
   const fogColor = useMemo(() => parseBiomeColor(palette.fogColor), [biomeId]);
   const skyColor = useMemo(() => parseBiomeColor(palette.skyBottom), [biomeId]);

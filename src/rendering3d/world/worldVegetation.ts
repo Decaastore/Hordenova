@@ -1,22 +1,22 @@
 import * as THREE from "three";
-import { MAP_DECORATIONS } from "@/rendering/mapDecorations";
+import { getMapDecorations, type Decoration } from "@/rendering/mapDecorations";
 import { buildTaperedTube, buildJaggedPlateShape } from "@/lab3d/geometryUtils";
 import { mulberry32 } from "@/lab3d/rng";
 import { worldToLocalGround } from "../enemyProjection";
 import { terrainElevationAt, parseBiomeColor } from "./worldTerrainGeometry";
-import type { BiomePalette } from "@/rendering/biomes";
+import type { BiomeDefinition } from "@/rendering/biomes";
 
 /**
  * MUNDO 3D — FASE 2 "midground": the 2D scenery already scatters TREE/ROCK/
  * RUIN decorations across the map (`rendering/mapDecorations.ts`'s
- * `MAP_DECORATIONS`, generated once with a fixed seed). This file builds a
- * REAL 3D counterpart for exactly those three kinds, reading the SAME
- * array — same positions, same rotation, same scale, same variant — so
- * nothing is duplicated or re-authored; `CanvasRenderer.tsx` is told to
- * stop drawing the 2D sprite for those kinds while this layer is active
- * (see its `skipDecorationKinds` param), so each decoration exists exactly
- * once, now as real geometry sitting on the actual rolling terrain height
- * (`terrainElevationAt`) instead of a flat painted icon. GRASS/FLOWER/
+ * `getMapDecorations(biome)`, generated once per biome and memoized). This
+ * file builds a REAL 3D counterpart for exactly those three kinds, reading
+ * the SAME per-biome layout — same positions, same rotation, same scale,
+ * same variant — so nothing is duplicated or re-authored; `CanvasRenderer.tsx`
+ * is told to stop drawing the 2D sprite for those kinds while this layer is
+ * active (see its `skipDecorationKinds` param), so each decoration exists
+ * exactly once, now as real geometry sitting on the actual rolling terrain
+ * height (`terrainElevationAt`) instead of a flat painted icon. GRASS/FLOWER/
  * WATER/TORCH/ROOT/CRYSTAL stay 2D (small, cheap, already read well at
  * ground level — converting them would cost more than it visually buys).
  *
@@ -100,9 +100,9 @@ interface Placement {
   variant: number;
 }
 
-function collectPlacements(kinds: ReadonlySet<string>): Placement[] {
+function collectPlacements(decorations: readonly Decoration[], kinds: ReadonlySet<string>): Placement[] {
   const placements: Placement[] = [];
-  for (const deco of MAP_DECORATIONS) {
+  for (const deco of decorations) {
     if (!kinds.has(deco.kind)) continue;
     const elevation = terrainElevationAt(deco.position.x, deco.position.y) - 1;
     const [lx, , lz] = worldToLocalGround(deco.position);
@@ -140,10 +140,12 @@ function buildInstancedMesh(
 }
 
 /** Built once per biome change — everything here is static in world space, so this is never touched again per-frame (see WorldTerrain.tsx's useMemo). */
-export function buildVegetationMeshes(palette: BiomePalette): THREE.Object3D[] {
-  const treePlacements = collectPlacements(new Set(["TREE"]));
-  const rockPlacements = collectPlacements(new Set(["ROCK"]));
-  const ruinPlacements = collectPlacements(new Set(["RUIN"]));
+export function buildVegetationMeshes(biome: BiomeDefinition): THREE.Object3D[] {
+  const palette = biome.palette;
+  const decorations = getMapDecorations(biome);
+  const treePlacements = collectPlacements(decorations, new Set(["TREE"]));
+  const rockPlacements = collectPlacements(decorations, new Set(["ROCK"]));
+  const ruinPlacements = collectPlacements(decorations, new Set(["RUIN"]));
 
   // MUNDO 3D — FASE 2: the palette's vegetation tones are AUTHORED very
   // dark (a deliberate moody-forest choice for the 2D icons, which read
