@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v33",
+    dateIso: "2026-09-18",
+    category: "TOWERS",
+    title: {
+      en: "16 New Premium Tower Skins, Plus a Full Rework of the Old Ones",
+      ptBR: "16 Novas Skins Premium de Torre, Além de um Retrabalho Completo das Antigas",
+    },
+    description: {
+      en: "The one skin each tower had before was only ever a 4-color palette swap — the same body, the same core, the same shot, just recolored, with an ornament setting that turned out to never actually be drawn. Every skin, old and new, is now rebuilt on a real visual-identity system: a skin can change the tower's material finish, replace its focal core/power-source shape, add one distinct silhouette detail near the weapon, retint and reshape its idle particles, and give its projectile and impact their own color and signature — never the damage, range, or attack speed underneath. Each tower type now has 5 commercial skins instead of 1 (the original reformulated, plus 4 brand-new concepts), and the shop shows a live preview of the actual tower with the skin equipped, with clear Owned/Equipped/Price labels and a named Cosmetic Attribute for every skin, explicitly marked as visual-only.",
+      ptBR: "A única skin que cada torre tinha antes era apenas uma troca de 4 cores — o mesmo corpo, o mesmo núcleo, o mesmo disparo, só recolorido, com uma configuração de ornamento que, na prática, nunca chegava a ser desenhada. Toda skin, antiga e nova, agora é construída sobre um sistema de identidade visual de verdade: uma skin pode mudar o acabamento do material da torre, substituir a forma do seu núcleo/fonte de poder, adicionar um detalhe de silhueta distinto perto da arma, retingir e remodelar suas partículas de espera, e dar ao seu projétil e impacto cor e assinatura próprias — nunca o dano, alcance ou velocidade de ataque por baixo. Cada tipo de torre agora tem 5 skins comerciais em vez de 1 (a original reformulada, mais 4 conceitos totalmente novos), e a loja mostra uma prévia ao vivo da torre real com a skin equipada, com rótulos claros de Adquirida/Equipada/Preço e um Atributo Cosmético nomeado para cada skin, explicitamente marcado como somente visual.",
+    },
+    highlights: [
+      {
+        en: "Every tower type now has 5 skins: Ironwood (Warden of the Abyss — reworked, Celestial Warden, Arcane Engine, Ancient Hunter, Ironclad Juggernaut), Inferno (Ashen Tyrant — reworked, Volcanic Colossus, Industrial Forge, Solar Ascendant, Plague Furnace), Frostborn (Ancient Guardian — reworked, Void Frost, Arcane Crystal, Celestial Ice, Glacial Warlord), and Stormcaller (Void Storm — reworked, Thunder, Celestial, Arcane, Tempest).",
+        ptBR: "Cada tipo de torre agora tem 5 skins: Ironwood (Guardião do Abismo — reformulada, Guardião Celestial, Motor Arcano, Caçador Ancestral, Fortaleza Blindada), Inferno (Tirano Cinzento — reformulada, Colosso Vulcânico, Forja Industrial, Ascendente Solar, Fornalha da Peste), Frostborn (Guardião Ancestral — reformulada, Geada do Vazio, Cristal Arcano, Gelo Celestial, Senhor da Guerra Glacial), e Stormcaller (Tempestade do Vazio — reformulada, Trovão, Celestial, Arcano, Tempestade).",
+      },
+      {
+        en: "A skin now genuinely changes the tower's identity: its material finish, its core shape (e.g. Ironwood's wood-knot becomes a void-eye, a halo, a spinning gear-core, a spirit-skull, or a forge-core), one extra structural detail at the weapon, its idle particle behavior, and its own projectile/impact color — no longer just a recolor.",
+        ptBR: "Uma skin agora muda de verdade a identidade da torre: seu acabamento de material, a forma do seu núcleo (por exemplo, o nó-de-madeira do Ironwood vira um olho-do-vazio, um halo, um núcleo de engrenagens giratórias, um crânio espiritual ou um núcleo de forja), um detalhe estrutural extra na arma, o comportamento das suas partículas de espera, e a cor do seu próprio projétil/impacto — não é mais só um recolorido.",
+      },
+      {
+        en: "Every skin has its own named Cosmetic Attribute (Void Shot, Solar Impact, Divine Lightning, Black Frost...), shown in the shop and explicitly labeled as visual-only — it never touches damage, range, attack speed, or any other combat number.",
+        ptBR: "Cada skin tem seu próprio Atributo Cosmético nomeado (Disparo do Vazio, Impacto Solar, Raio Divino, Geada Negra...), mostrado na loja e explicitamente rotulado como somente visual — nunca afeta dano, alcance, velocidade de ataque ou qualquer outro número de combate.",
+      },
+      {
+        en: "The Tower Info panel's skin shop now shows a live preview of the actual tower rendered with the hovered/equipped skin, plus clear Owned/Equipped/Price badges, before you spend a single Gem.",
+        ptBR: "A loja de skins do painel de informações da torre agora mostra uma prévia ao vivo da torre real renderizada com a skin em destaque/equipada, além de selos claros de Adquirida/Equipada/Preço, antes de você gastar um único Gem.",
+      },
+      {
+        en: "Skins keep their identity across the tower's entire level range without ever changing its fixed footprint, and still cost Gems at the same 800-Gem Premium price the original skin always had.",
+        ptBR: "As skins mantêm sua identidade em toda a faixa de nível da torre sem nunca mudar seu espaço fixo, e continuam custando Gems no mesmo preço Premium de 800 Gems que a skin original sempre teve.",
+      },
+    ],
+  },
+  {
     id: "v32",
     dateIso: "2026-09-18",
     category: "TOWERS",

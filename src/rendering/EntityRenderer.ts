@@ -4,9 +4,9 @@ import { getEffectiveSpeed } from "@/entities/Enemy";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
 import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
-import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { getTowerSkinDefinition, type SkinMaterialFinish, type SkinParticleStyle, type TowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
-import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight } from "./lighting";
+import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
 import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
@@ -71,6 +71,208 @@ const HIT_REACT_PROFILE: Record<CreatureWeightClass, { windowMs: number; recoilP
 // Towers.
 // ---------------------------------------------------------------------------
 
+/**
+ * TOWER SKIN SYSTEM v2 — a skin's idle particle personality. `drawFloatingMotes`
+ * already accepts count/spread/period/flicker/size; this maps each
+ * `SkinParticleBehavior` to a tuned preset of those (always the skin's own
+ * accent color) layered over the tower's own base preset, so 15 behaviors
+ * cover all 20 skins without a bespoke particle system per skin. An
+ * unequipped tower (`particleStyle` undefined) gets back `base` unchanged.
+ */
+function applySkinParticleStyle(base: FloatingMoteStyle, particleStyle: SkinParticleStyle | undefined): FloatingMoteStyle {
+  if (!particleStyle) return base;
+  const { color, behavior } = particleStyle;
+  switch (behavior) {
+    case "void-wisps":
+      return { ...base, color, count: base.count + 1, periodMs: base.periodMs * 1.3, flicker: 0.4 };
+    case "light-motes":
+      return { ...base, color, size: (base.size ?? 1.3) * 1.15, periodMs: base.periodMs * 1.2 };
+    case "circuit-pulses":
+      return { ...base, color, periodMs: base.periodMs * 0.5, flicker: 0.7, size: (base.size ?? 1.3) * 0.8 };
+    case "spirit-wisps":
+      return { ...base, color, periodMs: base.periodMs * 1.6, spreadY: base.spreadY * 1.2 };
+    case "sparks":
+      return { ...base, color, periodMs: base.periodMs * 0.45, flicker: 0.8, size: (base.size ?? 1.3) * 0.7 };
+    case "steam":
+      return { ...base, color, count: base.count + 2, size: (base.size ?? 1.3) * 1.8, periodMs: base.periodMs * 1.4 };
+    case "solar-flares":
+      return { ...base, color, flicker: 0.5, size: (base.size ?? 1.3) * 1.3 };
+    case "toxic-bubbles":
+      return { ...base, color, periodMs: base.periodMs * 0.8, size: (base.size ?? 1.3) * 1.4 };
+    case "drifting-leaves":
+      return { ...base, color, periodMs: base.periodMs * 1.5, spreadX: base.spreadX * 1.3, size: (base.size ?? 1.3) * 1.6 };
+    case "prism-sparkles":
+      return { ...base, color, flicker: 0.9, periodMs: base.periodMs * 0.6, size: (base.size ?? 1.3) * 0.6 };
+    case "starlight":
+      return { ...base, color, flicker: 0.35, count: base.count + 2 };
+    case "frost-shards":
+      return { ...base, color, periodMs: base.periodMs * 0.9, size: (base.size ?? 1.3) * 0.9 };
+    case "wind-swirl":
+      return { ...base, color, spreadX: base.spreadX * 1.6, periodMs: base.periodMs * 0.7 };
+    case "embers":
+      return { ...base, color, flicker: 0.3 };
+    case "spores":
+    default:
+      return { ...base, color };
+  }
+}
+
+/**
+ * TOWER SKIN SYSTEM v2 — a shared body-texture overlay so a skin's
+ * `material` finish reads as an actual different material (cracked void
+ * stone, riveted armor plating, a faceted crystal cut...), not just a
+ * different fill color. Drawn centered at the current transform origin —
+ * callers `ctx.translate` to roughly the body's visual center first — sized
+ * by `halfW`/`halfH` to that body's own footprint. An unrecognized/absent
+ * material draws nothing (falls back to the base look untouched).
+ */
+function drawSkinMaterialOverlay(
+  ctx: CanvasRenderingContext2D,
+  material: SkinMaterialFinish | undefined,
+  halfW: number,
+  halfH: number,
+  timeMs: number,
+  accentColor: string,
+): void {
+  if (!material) return;
+  ctx.save();
+  switch (material) {
+    case "corrupted": {
+      ctx.strokeStyle = "rgba(0,0,0,0.55)";
+      ctx.lineWidth = 0.6;
+      for (let i = -1; i <= 1; i++) {
+        ctx.beginPath();
+        ctx.moveTo(i * halfW * 0.45, -halfH * 0.8);
+        ctx.lineTo(i * halfW * 0.45 + halfW * 0.18, halfH * 0.7);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "armored": {
+      ctx.fillStyle = "rgba(0,0,0,0.4)";
+      for (const ry of [-halfH * 0.4, halfH * 0.35]) {
+        for (const rx of [-halfW * 0.4, halfW * 0.4]) {
+          ctx.beginPath();
+          ctx.arc(rx, ry, 0.7, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      break;
+    }
+    case "mechanical": {
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(-halfW * 0.55, -halfH * 0.55, halfW * 1.1, halfH * 1.1);
+      ctx.beginPath();
+      ctx.moveTo(-halfW * 0.55, 0);
+      ctx.lineTo(halfW * 0.55, 0);
+      ctx.stroke();
+      break;
+    }
+    case "prismatic": {
+      const hue = (timeMs / 20) % 360;
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = `hsl(${hue}, 85%, 68%)`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfW * 0.65, halfH * 0.65, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "glacial": {
+      ctx.strokeStyle = "rgba(220,250,255,0.4)";
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i < 3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(-halfW * 0.4 + i * halfW * 0.4, -halfH * 0.6);
+        ctx.lineTo(-halfW * 0.25 + i * halfW * 0.4, halfH * 0.5);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "celestial":
+    case "radiant": {
+      const pulse = 0.2 + 0.12 * Math.sin(timeMs / 500);
+      ctx.globalAlpha = pulse;
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfW * 0.7, halfH * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "toxic": {
+      const bubble = (timeMs / 700) % 1;
+      ctx.globalAlpha = 0.32 * (1 - bubble);
+      ctx.fillStyle = accentColor;
+      ctx.beginPath();
+      ctx.arc(0, halfH * 0.3 - bubble * halfH * 0.7, 1.4 + bubble * 1.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "bone": {
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = "#f0ead8";
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfW * 0.7, halfH * 0.7, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "molten": {
+      const pulse = 0.3 + 0.22 * Math.sin(timeMs / 300);
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(-halfW * 0.35, -halfH * 0.4);
+      ctx.lineTo(halfW * 0.08, halfH * 0.08);
+      ctx.lineTo(-halfW * 0.12, halfH * 0.5);
+      ctx.stroke();
+      break;
+    }
+    case "industrial": {
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, halfW * 0.32, 0, Math.PI * 1.5);
+      ctx.stroke();
+      break;
+    }
+    case "tempest": {
+      ctx.strokeStyle = "rgba(255,255,255,0.2)";
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < 2; i++) {
+        const yOff = -halfH * 0.4 + i * halfH * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(-halfW * 0.5, yOff);
+        ctx.quadraticCurveTo(0, yOff - halfH * 0.15, halfW * 0.5, yOff);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "voidtouched": {
+      const pulse = 0.26 + 0.18 * Math.sin(timeMs / 400);
+      ctx.globalAlpha = pulse;
+      ctx.strokeStyle = accentColor;
+      ctx.lineWidth = 0.7;
+      ctx.beginPath();
+      ctx.arc(0, 0, halfW * 0.45, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case "natural": {
+      ctx.globalAlpha = 0.28;
+      ctx.fillStyle = "rgba(120,150,80,0.5)";
+      ctx.beginPath();
+      ctx.ellipse(-halfW * 0.25, halfH * 0.25, halfW * 0.3, halfH * 0.18, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "organic":
+    default:
+      break;
+  }
+  ctx.restore();
+}
+
 export function drawTower(
   ctx: CanvasRenderingContext2D,
   tower: TowerInstance,
@@ -103,16 +305,16 @@ export function drawTower(
 
   switch (tower.type) {
     case "IRONWOOD":
-      drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage);
+      drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage, skin);
       break;
     case "INFERNO":
-      drawInferno(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs);
+      drawInferno(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs, skin);
       break;
     case "FROSTBORN":
-      drawFrostborn(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs);
+      drawFrostborn(ctx, theme, stats.level, timeMs, visualStage, attackFlashMs, skin);
       break;
     case "STORMCALLER":
-      drawStormcaller(ctx, theme, stats.level, timeMs, visualStage, readiness, attackFlashMs);
+      drawStormcaller(ctx, theme, stats.level, timeMs, visualStage, readiness, attackFlashMs, skin);
       break;
   }
 
@@ -208,6 +410,8 @@ export function drawIronwood(
   readiness: number,
   /** Tower Visual Evolution (spec section 9) — 1..TOWER_VISUAL_STAGE_COUNT, see config/towerStats.getTowerVisualStage. Gates real structural additions below, not just scale. */
   visualStage = 1,
+  /** TOWER SKIN SYSTEM v2 — the equipped skin (or null for the default look). Only ever swaps the core shape / adds one weapon detail / retints particles — see that field's own doc comment in config/towerSkins.ts. */
+  skin: TowerSkinDefinition | null = null,
 ): void {
   drawContactShadow(ctx, 20, 9, 0.42);
 
@@ -305,6 +509,13 @@ export function drawIronwood(
   ctx.lineWidth = 1.2;
   ctx.stroke();
 
+  if (skin) {
+    ctx.save();
+    ctx.translate(0, -16);
+    drawSkinMaterialOverlay(ctx, skin.material, 6, 15, timeMs, skin.paletteOverride.accent ?? theme.accent);
+    ctx.restore();
+  }
+
   ctx.strokeStyle = "rgba(20,14,7,0.45)";
   ctx.lineWidth = 0.8;
   for (const x of [-4.5, -1.5, 1.5, 4.5]) {
@@ -367,17 +578,115 @@ export function drawIronwood(
   // bounded via Math.min instead of the old unbounded `level * 0.6`, which
   // used to reach a 45-unit halo at level 60.
   glowBlob(ctx, 0, -15, (9 + Math.min(level, 10) * 0.6) * (1 + coreFlare * 0.3), theme.glow);
-  const knotGrad = ctx.createRadialGradient(-0.8, -16, 0, 0, -15, 4.6);
-  knotGrad.addColorStop(0, "#f2ffe0");
-  knotGrad.addColorStop(0.55, theme.accent);
-  knotGrad.addColorStop(1, "#2c4016");
-  ctx.fillStyle = knotGrad;
-  ctx.beginPath();
-  ctx.arc(0, -15, 3.6 + coreFlare * 0.6, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(20,14,7,0.6)";
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
+  // TOWER SKIN SYSTEM v2 — a skin's `coreShape` replaces this focal "power
+  // heart" entirely (the single highest-impact swap a skin can make); an
+  // unrecognized/absent shape falls through to `default`, the tower's
+  // original wood-knot, byte-for-byte unchanged.
+  switch (skin?.coreShape) {
+    case "void-eye": {
+      const eyeGrad = ctx.createRadialGradient(-0.6, -15.4, 0, 0, -15, 4.4);
+      eyeGrad.addColorStop(0, "#ffffff");
+      eyeGrad.addColorStop(0.45, theme.accent);
+      eyeGrad.addColorStop(1, "#0a0612");
+      ctx.fillStyle = eyeGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, -15, 4.2 + coreFlare * 0.7, 2.6 + coreFlare * 0.5, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#0a0612";
+      ctx.beginPath();
+      ctx.ellipse(0, -15, 1.1, 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "halo": {
+      ctx.strokeStyle = theme.accent;
+      ctx.lineWidth = 1.4;
+      ctx.globalAlpha = 0.85 + coreFlare * 0.15;
+      ctx.beginPath();
+      ctx.arc(0, -15, 4 + coreFlare * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      const haloGrad = ctx.createRadialGradient(0, -15, 0, 0, -15, 3);
+      haloGrad.addColorStop(0, "#ffffff");
+      haloGrad.addColorStop(1, theme.accent);
+      ctx.fillStyle = haloGrad;
+      ctx.beginPath();
+      ctx.arc(0, -15, 2.2 + coreFlare * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "gear-core": {
+      ctx.fillStyle = "#3a4650";
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const r = i % 2 === 0 ? 4.4 : 3.2;
+        const px = Math.sin(a + timeMs / 900) * r;
+        const py = -15 + Math.cos(a + timeMs / 900) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      const gearGrad = ctx.createRadialGradient(0, -15, 0, 0, -15, 2.4);
+      gearGrad.addColorStop(0, "#eafcff");
+      gearGrad.addColorStop(1, theme.accent);
+      ctx.fillStyle = gearGrad;
+      ctx.beginPath();
+      ctx.arc(0, -15, 1.8 + coreFlare * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "spirit-skull": {
+      ctx.fillStyle = "#e8e2d0";
+      ctx.beginPath();
+      ctx.arc(0, -15, 3.2 + coreFlare * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#1a1309";
+      ctx.beginPath();
+      ctx.arc(-1.1, -15.3, 0.7, 0, Math.PI * 2);
+      ctx.arc(1.1, -15.3, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 0.6 + coreFlare * 0.3;
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(0, -15, 5 + coreFlare * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    case "forge-core": {
+      const forgeGrad = ctx.createRadialGradient(-0.6, -15.4, 0, 0, -15, 4.6);
+      forgeGrad.addColorStop(0, "#fff2c9");
+      forgeGrad.addColorStop(0.5, theme.accent);
+      forgeGrad.addColorStop(1, "#2a1c10");
+      ctx.fillStyle = forgeGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, -18.6);
+      ctx.lineTo(3.6, -15);
+      ctx.lineTo(0, -11.4);
+      ctx.lineTo(-3.6, -15);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "#150e07";
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+      break;
+    }
+    default: {
+      const knotGrad = ctx.createRadialGradient(-0.8, -16, 0, 0, -15, 4.6);
+      knotGrad.addColorStop(0, "#f2ffe0");
+      knotGrad.addColorStop(0.55, theme.accent);
+      knotGrad.addColorStop(1, "#2c4016");
+      ctx.fillStyle = knotGrad;
+      ctx.beginPath();
+      ctx.arc(0, -15, 3.6 + coreFlare * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(20,14,7,0.6)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+    }
+  }
 
   // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): a carved bark-rune over the
   // knot, its own glow layered on top of the core's — pulses/intensifies
@@ -397,14 +706,14 @@ export function drawIronwood(
   // pollen drifting slowly around the platform/mount, upward and gently
   // wandering (Forest-identity particle behavior) — continuous, not tied to
   // combat, so the structure always reads as quietly alive with magic.
-  drawFloatingMotes(ctx, 0, -30, timeMs, 11, {
-    count: 5,
-    spreadX: 15,
-    spreadY: 26,
-    color: theme.accent,
-    periodMs: 3400,
-    size: 1.1,
-  });
+  drawFloatingMotes(
+    ctx,
+    0,
+    -30,
+    timeMs,
+    11,
+    applySkinParticleStyle({ count: 5, spreadX: 15, spreadY: 26, color: theme.accent, periodMs: 3400, size: 1.1 }, skin?.particleStyle),
+  );
 
   // --- Support platform: a crossed-beam wooden deck lashed to the trunk
   // just below the mount — reads as "built structure carrying a weapon,"
@@ -544,6 +853,80 @@ export function drawIronwood(
     ctx.restore();
   }
 
+  // TOWER SKIN SYSTEM v2 — one extra structural element at the mount,
+  // present at any level once a skin is equipped (unlike the stage-gated
+  // blade above, which is part of the base tower's own progression).
+  if (skin?.weaponDetail) {
+    ctx.save();
+    ctx.translate(0, mountY);
+    switch (skin.weaponDetail) {
+      case "tendrils": {
+        ctx.strokeStyle = skin.paletteOverride.accent ?? theme.accent;
+        ctx.lineWidth = 1.1;
+        ctx.globalAlpha = 0.6 + 0.25 * Math.sin(timeMs / 500);
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(side * 8, 2);
+          ctx.quadraticCurveTo(side * 14, -2 + Math.sin(timeMs / 700) * 2, side * 10, -8);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "halo-ring": {
+        ctx.strokeStyle = skin.paletteOverride.accent ?? theme.accent;
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.7;
+        ctx.beginPath();
+        ctx.ellipse(0, -2, 15, 4, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "gear-array": {
+        ctx.fillStyle = "#3a4650";
+        for (const side of [-1, 1]) {
+          ctx.save();
+          ctx.translate(side * 9, -1);
+          ctx.rotate(timeMs / 800);
+          for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            ctx.beginPath();
+            ctx.arc(Math.cos(a) * 2.2, Math.sin(a) * 2.2, 0.6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
+        }
+        break;
+      }
+      case "trophies": {
+        for (const side of [-1, 1]) {
+          ctx.fillStyle = "#e8e2d0";
+          ctx.beginPath();
+          ctx.arc(side * 10, 6, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#1a1309";
+          ctx.beginPath();
+          ctx.arc(side * 10 - 0.7, 5.6, 0.5, 0, Math.PI * 2);
+          ctx.arc(side * 10 + 0.7, 5.6, 0.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case "plates": {
+        ctx.fillStyle = "#1c1e20";
+        ctx.fillRect(-13, -3, 5, 6);
+        ctx.fillRect(8, -3, 5, 6);
+        ctx.strokeStyle = "rgba(255,138,58,0.6)";
+        ctx.lineWidth = 0.6;
+        ctx.strokeRect(-13, -3, 5, 6);
+        ctx.strokeRect(8, -3, 5, 6);
+        break;
+      }
+    }
+    ctx.restore();
+  }
+
   // --- Hooded operator, crouched behind the mechanism — small, part of
   // the structure rather than the tower's focal point. No visible face:
   // just a dark hood with two glowing points, more ominous than a face. ---
@@ -641,6 +1024,8 @@ function drawInferno(
   visualStage = 1,
   /** ms since this tower's last attack — drives a brief launch flare at the furnace mouth (spec section 11's CHARGE/LAUNCH beat). */
   attackFlashMs = Infinity,
+  /** TOWER SKIN SYSTEM v2 — the equipped skin (or null). See drawIronwood's own doc comment on this param. */
+  skin: TowerSkinDefinition | null = null,
 ): void {
   const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
   const launchFlare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
@@ -739,6 +1124,13 @@ function drawInferno(
     ctx.fill();
   }
 
+  if (skin) {
+    ctx.save();
+    ctx.translate(0, -6);
+    drawSkinMaterialOverlay(ctx, skin.material, 11, 9, timeMs, skin.paletteOverride.accent ?? theme.accent);
+    ctx.restore();
+  }
+
   // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): red-orange cracks
   // running through the dark iron shell, like lava under black rock
   // (Volcanic-identity vein form) — a real texture in the material, not the
@@ -774,27 +1166,133 @@ function drawInferno(
   ctx.quadraticCurveTo(8, -11, 7.5, 1);
   ctx.closePath();
   ctx.fill();
-  const mouthGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 8);
-  mouthGrad.addColorStop(0, `rgba(255,240,190,${0.85 + 0.15 * pulse + launchFlare * 0.15})`);
-  mouthGrad.addColorStop(0.55, theme.primary);
-  mouthGrad.addColorStop(1, theme.secondary);
-  ctx.fillStyle = mouthGrad;
-  ctx.beginPath();
-  ctx.ellipse(0, -4, 5.6 + launchFlare * 1.8, 7.2 + launchFlare * 1.8, 0, 0, Math.PI * 2);
-  ctx.fill();
-  // IDENTIDADE VISUAL — CAMADA 2 (Núcleo): the mouth IS the living magma
-  // sphere (spec: "esfera de magma viva") — 3 small brighter bubble-dots
-  // surface-and-pop inside it on independent phases, so the core reads as
-  // bubbling/aggressive rather than a flat glowing disc.
-  for (let i = 0; i < 3; i++) {
-    const bubble = (timeMs / 480 + i * 0.33) % 1;
-    ctx.globalAlpha = Math.sin(bubble * Math.PI) * 0.8;
-    ctx.fillStyle = "#fff6dd";
-    ctx.beginPath();
-    ctx.arc(Math.sin(i * 2.1) * 2.6, -5 + Math.cos(i * 1.7) * 2 - bubble * 1.5, 0.9, 0, Math.PI * 2);
-    ctx.fill();
+  // TOWER SKIN SYSTEM v2 — a skin's `coreShape` re-themes the incandescent
+  // core inside the mouth frame above; the frame itself stays (it's the
+  // "furnace opening" silhouette every Inferno skin keeps), only what's
+  // glowing inside it changes. Falls through to the original magma sphere.
+  switch (skin?.coreShape) {
+    case "demon-maw": {
+      ctx.fillStyle = "#0a0508";
+      ctx.beginPath();
+      ctx.moveTo(0, -10);
+      ctx.lineTo(4.4, -3);
+      ctx.lineTo(0, 4);
+      ctx.lineTo(-4.4, -3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = theme.accent;
+      for (const fx of [-2.4, -0.8, 0.8, 2.4]) {
+        ctx.beginPath();
+        ctx.moveTo(fx, -6);
+        ctx.lineTo(fx + 0.6, -3);
+        ctx.lineTo(fx - 0.6, -3);
+        ctx.closePath();
+        ctx.fill();
+      }
+      break;
+    }
+    case "lava-core": {
+      const lavaGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 7.5);
+      lavaGrad.addColorStop(0, "#fff2c9");
+      lavaGrad.addColorStop(0.5, theme.accent);
+      lavaGrad.addColorStop(1, "#2a1408");
+      ctx.fillStyle = lavaGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, -4, 5.4 + launchFlare * 1.6, 7 + launchFlare * 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(20,10,4,0.6)";
+      ctx.lineWidth = 0.8;
+      for (const a of [-0.6, 0, 0.6]) {
+        ctx.beginPath();
+        ctx.moveTo(0, -8);
+        ctx.lineTo(Math.sin(a) * 4, -1);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "pressure-core": {
+      ctx.fillStyle = "#3a4045";
+      ctx.beginPath();
+      ctx.arc(0, -4, 5, 0, Math.PI * 2);
+      ctx.fill();
+      const gaugeGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 3.4);
+      gaugeGrad.addColorStop(0, "#ffffff");
+      gaugeGrad.addColorStop(1, theme.accent);
+      ctx.fillStyle = gaugeGrad;
+      ctx.beginPath();
+      ctx.arc(0, -4, 3.2 + launchFlare * 0.7, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#1a1c1e";
+      ctx.lineWidth = 0.6;
+      const needle = timeMs / 300;
+      ctx.beginPath();
+      ctx.moveTo(0, -4);
+      ctx.lineTo(Math.cos(needle) * 3, -4 + Math.sin(needle) * 3);
+      ctx.stroke();
+      break;
+    }
+    case "solar-core": {
+      const solarGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 8);
+      solarGrad.addColorStop(0, "#ffffff");
+      solarGrad.addColorStop(0.5, theme.accent);
+      solarGrad.addColorStop(1, "#a8843c");
+      ctx.fillStyle = solarGrad;
+      ctx.beginPath();
+      ctx.arc(0, -4, 5.6 + launchFlare * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + timeMs / 1200;
+        ctx.strokeStyle = "rgba(255,246,208,0.6)";
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 5.6, -4 + Math.sin(a) * 5.6);
+        ctx.lineTo(Math.cos(a) * 8, -4 + Math.sin(a) * 8);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "toxic-orb": {
+      const toxicGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 7);
+      toxicGrad.addColorStop(0, "#eaffb0");
+      toxicGrad.addColorStop(0.55, theme.accent);
+      toxicGrad.addColorStop(1, "#182210");
+      ctx.fillStyle = toxicGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, -4, 5.4 + launchFlare * 1.6, 7 + launchFlare * 1.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const bubble = (timeMs / 500) % 1;
+      ctx.globalAlpha = Math.sin(bubble * Math.PI) * 0.7;
+      ctx.fillStyle = "#f0ffe0";
+      ctx.beginPath();
+      ctx.arc(1.2, -6 + bubble * 3, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      break;
+    }
+    default: {
+      const mouthGrad = ctx.createRadialGradient(0, -4, 0, 0, -4, 8);
+      mouthGrad.addColorStop(0, `rgba(255,240,190,${0.85 + 0.15 * pulse + launchFlare * 0.15})`);
+      mouthGrad.addColorStop(0.55, theme.primary);
+      mouthGrad.addColorStop(1, theme.secondary);
+      ctx.fillStyle = mouthGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, -4, 5.6 + launchFlare * 1.8, 7.2 + launchFlare * 1.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // IDENTIDADE VISUAL — CAMADA 2 (Núcleo): the mouth IS the living magma
+      // sphere (spec: "esfera de magma viva") — 3 small brighter bubble-dots
+      // surface-and-pop inside it on independent phases, so the core reads as
+      // bubbling/aggressive rather than a flat glowing disc.
+      for (let i = 0; i < 3; i++) {
+        const bubble = (timeMs / 480 + i * 0.33) % 1;
+        ctx.globalAlpha = Math.sin(bubble * Math.PI) * 0.8;
+        ctx.fillStyle = "#fff6dd";
+        ctx.beginPath();
+        ctx.arc(Math.sin(i * 2.1) * 2.6, -5 + Math.cos(i * 1.7) * 2 - bubble * 1.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
   }
-  ctx.globalAlpha = 1;
   // Muzzle ring — a distinct metal collar around the opening (stage 3+, "arma mais sofisticada").
   if (visualStage >= 3) {
     ctx.strokeStyle = "#6a5f52";
@@ -851,6 +1349,84 @@ function drawInferno(
     ctx.restore();
   }
 
+  // TOWER SKIN SYSTEM v2 — one extra structural element flanking the
+  // furnace mouth, present at any level once a skin is equipped.
+  if (skin?.weaponDetail) {
+    switch (skin.weaponDetail) {
+      case "horns": {
+        ctx.fillStyle = "#0a0508";
+        for (const side of [-1, 1]) {
+          ctx.beginPath();
+          ctx.moveTo(side * 6, -10);
+          ctx.quadraticCurveTo(side * 9, -15, side * 7, -19);
+          ctx.quadraticCurveTo(side * 7.5, -14, side * 5, -10.5);
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      }
+      case "obsidian-plates": {
+        ctx.fillStyle = "#1a1310";
+        ctx.beginPath();
+        ctx.moveTo(-13, -6);
+        ctx.lineTo(-15, -12);
+        ctx.lineTo(-10, -10);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(13, -6);
+        ctx.lineTo(15, -12);
+        ctx.lineTo(10, -10);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+      case "gauges": {
+        for (const side of [-1, 1]) {
+          ctx.fillStyle = "#3a4045";
+          ctx.beginPath();
+          ctx.arc(side * 10.5, -10, 2.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "#eaf2ff";
+          ctx.lineWidth = 0.6;
+          const needle = timeMs / 400 + side;
+          ctx.beginPath();
+          ctx.moveTo(side * 10.5, -10);
+          ctx.lineTo(side * 10.5 + Math.cos(needle) * 1.6, -10 + Math.sin(needle) * 1.6);
+          ctx.stroke();
+        }
+        break;
+      }
+      case "corona": {
+        ctx.globalAlpha = 0.55 + 0.2 * Math.sin(timeMs / 400);
+        ctx.strokeStyle = skin.paletteOverride.accent ?? theme.accent;
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + timeMs / 1500;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * 9, -6 + Math.sin(a) * 9);
+          ctx.lineTo(Math.cos(a) * 12, -6 + Math.sin(a) * 12);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "vents": {
+        ctx.fillStyle = "#182210";
+        ctx.fillRect(-12, -9, 3, 4);
+        ctx.fillRect(9, -9, 3, 4);
+        ctx.globalAlpha = 0.5 + 0.3 * Math.sin(timeMs / 350);
+        ctx.fillStyle = skin.paletteOverride.accent ?? theme.accent;
+        ctx.beginPath();
+        ctx.arc(-10.5, -11, 1.2, 0, Math.PI * 2);
+        ctx.arc(10.5, -11, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+        break;
+      }
+    }
+  }
+
   // IDENTIDADE VISUAL — CAMADA 3 (Runa Gravada): ember-engraved diamond
   // runes on the plating, as if the fire itself burned the marks into the
   // iron (Volcanic-identity rune style) — present from the start at a low
@@ -872,8 +1448,9 @@ function drawInferno(
   ctx.restore();
 
   // Rising embers — density scales with level, independent of visual stage
-  // structural additions (a continuous "power" read, same as before).
-  ctx.fillStyle = "rgba(255,180,90,0.85)";
+  // structural additions (a continuous "power" read, same as before). A
+  // skin retints these to its own accent (e.g. toxic green, solar white).
+  ctx.fillStyle = skin?.particleStyle.color ?? "rgba(255,180,90,0.85)";
   for (let i = 0; i < 3 + Math.min(level, 4); i++) {
     const cycle = (timeMs / 900 + i * 0.33) % 1;
     const y = -12 - cycle * 24;
@@ -888,14 +1465,14 @@ function drawInferno(
   // IDENTIDADE VISUAL — CAMADA 4 (Partículas Flutuantes): slower drifting
   // ash motes alongside the fast rising embers above (Volcanic-identity
   // asks for "sparks AND ash" — the embers are the sparks, this is the ash).
-  drawFloatingMotes(ctx, 0, -14, timeMs, 23, {
-    count: 4,
-    spreadX: 10,
-    spreadY: 30,
-    color: "#8a7a6a",
-    periodMs: 4200,
-    size: 1,
-  });
+  drawFloatingMotes(
+    ctx,
+    0,
+    -14,
+    timeMs,
+    23,
+    applySkinParticleStyle({ count: 4, spreadX: 10, spreadY: 30, color: "#8a7a6a", periodMs: 4200, size: 1 }, skin?.particleStyle),
+  );
 
   // Visual Evolution stage 6 (final form): twin dual chimneys (the second
   // one added on the opposite flank) + a full molten-crack aura — the
@@ -944,6 +1521,8 @@ function drawFrostborn(
   visualStage = 1,
   /** ms since this tower's last attack — drives a brief brighter core pulse at launch (spec section 11's CHARGE/LAUNCH beat). */
   attackFlashMs = Infinity,
+  /** TOWER SKIN SYSTEM v2 — the equipped skin (or null). See drawIronwood's own doc comment on this param. */
+  skin: TowerSkinDefinition | null = null,
 ): void {
   const pulse = 0.5 + 0.5 * Math.sin(timeMs / 500);
   const launchFlare = attackFlashMs < 200 ? 1 - attackFlashMs / 200 : 0;
@@ -1017,6 +1596,13 @@ function drawFrostborn(
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  if (skin) {
+    ctx.save();
+    ctx.translate(0, -spireH * 0.5);
+    drawSkinMaterialOverlay(ctx, skin.material, 6, spireH * 0.5, timeMs, skin.paletteOverride.accent ?? theme.accent);
+    ctx.restore();
+  }
+
   // IDENTIDADE VISUAL — CAMADA 1 (Veios de Energia): cyan-blue cracks
   // through the stone, like fissures in frozen glass (Ice-identity vein
   // form) — thin and glassy rather than the organic/molten cracks the other
@@ -1073,37 +1659,195 @@ function drawFrostborn(
   // and flares brighter — the "arcane energy" beat before a bolt leaves
   // the crystal (spec section 11's CHARGE/LAUNCH for Frostborn).
   glowBlob(ctx, 0, coreY, (8 + Math.min(level, 10) * 0.25) * (1 + launchFlare * 0.35), theme.glow);
-  const coreGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
-  coreGrad.addColorStop(0, "#eafcff");
-  coreGrad.addColorStop(0.55, theme.accent);
-  coreGrad.addColorStop(1, theme.primary);
-  ctx.fillStyle = coreGrad;
-  ctx.beginPath();
-  ctx.arc(0, coreY, 4.4 + launchFlare * 1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = "rgba(255,255,255,0.6)";
-  ctx.lineWidth = 0.9;
-  ctx.stroke();
-  // IDENTIDADE VISUAL — CAMADA 2 reinforcement: facet lines across the orb
-  // so it reads as a cut/faceted ice crystal (Ice-identity core shape),
-  // pulsing slowly like cold breathing via the shared `pulse` clock.
-  ctx.save();
-  ctx.globalAlpha = 0.4 + 0.25 * pulse;
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 0.5;
-  for (const a of [-0.9, -0.3, 0.3, 0.9]) {
-    ctx.beginPath();
-    ctx.moveTo(0, coreY);
-    ctx.lineTo(Math.sin(a) * 4.3, coreY + Math.cos(a) * 3.6);
-    ctx.stroke();
+  // TOWER SKIN SYSTEM v2 — a skin's `coreShape` re-themes the frozen core;
+  // falls through to the original faceted ice crystal.
+  switch (skin?.coreShape) {
+    case "void-shard": {
+      const shardGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
+      shardGrad.addColorStop(0, "#e8dcff");
+      shardGrad.addColorStop(0.55, theme.accent);
+      shardGrad.addColorStop(1, "#0c0814");
+      ctx.fillStyle = shardGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, coreY - 5.5);
+      ctx.lineTo(3.6, coreY);
+      ctx.lineTo(0, coreY + 5.5);
+      ctx.lineTo(-3.6, coreY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(0,0,0,0.5)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      break;
+    }
+    case "prism-cluster": {
+      for (const [dx, dy, r] of [
+        [0, -1, 3.2],
+        [-3, 1.5, 2],
+        [3, 1.5, 2],
+      ] as const) {
+        const hue = ((timeMs / 15 + dx * 40) % 360 + 360) % 360;
+        ctx.fillStyle = `hsl(${hue}, 80%, 72%)`;
+        ctx.beginPath();
+        ctx.arc(dx, coreY + dy, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "starlight-core": {
+      const starGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
+      starGrad.addColorStop(0, "#ffffff");
+      starGrad.addColorStop(0.55, theme.accent);
+      starGrad.addColorStop(1, theme.primary);
+      ctx.fillStyle = starGrad;
+      ctx.beginPath();
+      ctx.arc(0, coreY, 4.2 + launchFlare * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + timeMs / 2000;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * 3, coreY + Math.sin(a) * 3);
+        ctx.lineTo(Math.cos(a) * 7, coreY + Math.sin(a) * 7);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "glacial-core": {
+      ctx.fillStyle = "#0c1c26";
+      ctx.beginPath();
+      ctx.ellipse(0, coreY, 5.6, 4.6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      const glacGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 4.6);
+      glacGrad.addColorStop(0, "#eafcff");
+      glacGrad.addColorStop(1, theme.accent);
+      ctx.fillStyle = glacGrad;
+      ctx.beginPath();
+      ctx.arc(0, coreY, 3.8 + launchFlare * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(10,20,26,0.7)";
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+      break;
+    }
+    case "jade-crystal": {
+      const jadeGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
+      jadeGrad.addColorStop(0, "#eafcda");
+      jadeGrad.addColorStop(0.55, theme.accent);
+      jadeGrad.addColorStop(1, "#1c2c10");
+      ctx.fillStyle = jadeGrad;
+      ctx.beginPath();
+      ctx.moveTo(0, coreY - 5.2);
+      ctx.lineTo(4.2, coreY - 0.8);
+      ctx.lineTo(2.4, coreY + 4.6);
+      ctx.lineTo(-2.4, coreY + 4.6);
+      ctx.lineTo(-4.2, coreY - 0.8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = "rgba(20,30,10,0.6)";
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      break;
+    }
+    default: {
+      const coreGrad = ctx.createRadialGradient(-1, coreY - 1.5, 0, 0, coreY, 5.5);
+      coreGrad.addColorStop(0, "#eafcff");
+      coreGrad.addColorStop(0.55, theme.accent);
+      coreGrad.addColorStop(1, theme.primary);
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, coreY, 4.4 + launchFlare * 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.6)";
+      ctx.lineWidth = 0.9;
+      ctx.stroke();
+      // IDENTIDADE VISUAL — CAMADA 2 reinforcement: facet lines across the
+      // orb so it reads as a cut/faceted ice crystal (Ice-identity core
+      // shape), pulsing slowly like cold breathing via the shared `pulse`
+      // clock.
+      ctx.save();
+      ctx.globalAlpha = 0.4 + 0.25 * pulse;
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 0.5;
+      for (const a of [-0.9, -0.3, 0.3, 0.9]) {
+        ctx.beginPath();
+        ctx.moveTo(0, coreY);
+        ctx.lineTo(Math.sin(a) * 4.3, coreY + Math.cos(a) * 3.6);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
   }
-  ctx.restore();
 
   // Visual Evolution stage 2+: crystal outcrops breaking through the
   // spire's own stone near the base — ice growing FROM the architecture.
   if (visualStage >= 2) {
     drawCrystalShard(ctx, -6, -3, 2.4, theme);
     drawCrystalShard(ctx, 6, -3, 2.4, theme);
+  }
+
+  // TOWER SKIN SYSTEM v2 — one extra structural element on the spire,
+  // present at any level once a skin is equipped.
+  if (skin?.weaponDetail) {
+    switch (skin.weaponDetail) {
+      case "moss-growth": {
+        ctx.fillStyle = "rgba(110,150,70,0.55)";
+        for (const [mx, my] of [
+          [-4, -2],
+          [3, 4],
+          [-2, 8],
+        ] as const) {
+          ctx.beginPath();
+          ctx.ellipse(mx, my, 2.6, 1.5, 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        break;
+      }
+      case "dark-icicles": {
+        ctx.fillStyle = "rgba(60,40,100,0.55)";
+        for (const ix of [-4.5, 4.5]) {
+          ctx.beginPath();
+          ctx.moveTo(ix - 0.8, -spireH * 0.7);
+          ctx.lineTo(ix + 0.8, -spireH * 0.7);
+          ctx.lineTo(ix, -spireH * 0.7 + 7);
+          ctx.closePath();
+          ctx.fill();
+        }
+        break;
+      }
+      case "crystal-array": {
+        for (const [cx, cy] of [
+          [-7, -spireH * 0.3],
+          [7, -spireH * 0.3],
+          [0, -spireH * 0.85],
+        ] as const) {
+          drawCrystalShard(ctx, cx, cy, 1.8, theme, 5);
+        }
+        break;
+      }
+      case "aurora-crown": {
+        ctx.globalAlpha = 0.5 + 0.25 * Math.sin(timeMs / 500);
+        ctx.strokeStyle = skin.paletteOverride.accent ?? theme.accent;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(-10, -spireH - 2);
+        ctx.quadraticCurveTo(0, -spireH - 12, 10, -spireH - 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+        break;
+      }
+      case "ice-armor": {
+        ctx.fillStyle = "rgba(20,50,70,0.6)";
+        ctx.fillRect(-6, -spireH * 0.4, 3, spireH * 0.35);
+        ctx.fillRect(3, -spireH * 0.4, 3, spireH * 0.35);
+        ctx.strokeStyle = "rgba(78,207,255,0.6)";
+        ctx.lineWidth = 0.6;
+        ctx.strokeRect(-6, -spireH * 0.4, 3, spireH * 0.35);
+        ctx.strokeRect(3, -spireH * 0.4, 3, spireH * 0.35);
+        break;
+      }
+    }
   }
 
   // Visual Evolution stage 4+: icicles hanging off the spire's shoulder
@@ -1189,14 +1933,14 @@ function drawFrostborn(
   // snowflakes rising slowly past the spire (Ice-identity particle
   // behavior — rising motes, not sparks), independent of the static
   // twinkles above.
-  drawFloatingMotes(ctx, 0, coreY, timeMs, 37, {
-    count: 5,
-    spreadX: 12,
-    spreadY: spireH + 14,
-    color: "#eafcff",
-    periodMs: 5200,
-    size: 1,
-  });
+  drawFloatingMotes(
+    ctx,
+    0,
+    coreY,
+    timeMs,
+    37,
+    applySkinParticleStyle({ count: 5, spreadX: 12, spreadY: spireH + 14, color: "#eafcff", periodMs: 5200, size: 1 }, skin?.particleStyle),
+  );
 
   // Visual Evolution stage 6 (final form): a crystalline crown atop the
   // spire's tip — the ancient-monument payoff at max level.
@@ -1267,6 +2011,8 @@ function drawStormcaller(
   visualStage = 1,
   readiness = 0,
   attackFlashMs = Infinity,
+  /** TOWER SKIN SYSTEM v2 — the equipped skin (or null). See drawIronwood's own doc comment on this param. */
+  skin: TowerSkinDefinition | null = null,
 ): void {
   const discharge = attackFlashMs < 180 ? 1 - attackFlashMs / 180 : 0;
   // Charge telegraph: only meaningfully visible in the last stretch before
@@ -1339,6 +2085,13 @@ function drawStormcaller(
     ctx.beginPath();
     ctx.ellipse(0, 6, 14 + (1 - discharge) * 14, 6 + (1 - discharge) * 6, 0, 0, Math.PI * 2);
     ctx.stroke();
+    ctx.restore();
+  }
+
+  if (skin) {
+    ctx.save();
+    ctx.translate(0, -12);
+    drawSkinMaterialOverlay(ctx, skin.material, 6, 14, timeMs, skin.paletteOverride.accent ?? theme.accent);
     ctx.restore();
   }
 
@@ -1427,6 +2180,38 @@ function drawStormcaller(
     }
   }
 
+  // TOWER SKIN SYSTEM v2 — one extra pair of rods jutting from the pillar
+  // top, present at any level once a skin is equipped.
+  if (skin?.weaponDetail) {
+    switch (skin.weaponDetail) {
+      case "void-rods":
+      case "lightning-rods-heavy":
+      case "halo-rods":
+      case "rune-rods":
+      case "wind-rods": {
+        const heavy = skin.weaponDetail === "lightning-rods-heavy";
+        for (const sx of [-4, 4]) {
+          ctx.save();
+          ctx.strokeStyle = "#2c2f34";
+          ctx.lineWidth = heavy ? 2.2 : 1.4;
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          ctx.moveTo(sx, -26);
+          ctx.lineTo(sx * 1.6, -30 - (heavy ? 5 : 2));
+          ctx.stroke();
+          ctx.globalAlpha = 0.6 + 0.35 * Math.sin(timeMs / 260 + sx);
+          ctx.fillStyle = skin.paletteOverride.accent ?? theme.accent;
+          ctx.beginPath();
+          ctx.arc(sx * 1.6, -30 - (heavy ? 5 : 2), heavy ? 1.6 : 1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+          ctx.restore();
+        }
+        break;
+      }
+    }
+  }
+
   // TOWER REDESIGN MASTER PASS v2 — Regra Absoluta Nº 1: the orb's own
   // position must never drift with level at all, not even within a
   // previously-capped budget (a prior pass bounded the old unbounded
@@ -1447,15 +2232,14 @@ function drawStormcaller(
   // drifting around the orb continuously (Storm-identity particle behavior
   // — erratic/quick, unlike the slow spores/snow the other towers use),
   // independent of the discharge-only residual sparks below.
-  drawFloatingMotes(ctx, 0, orbY, timeMs, 47, {
-    count: 4,
-    spreadX: 13,
-    spreadY: 14,
-    color: theme.accent,
-    periodMs: 1800,
-    flicker: 0.5,
-    size: 0.9,
-  });
+  drawFloatingMotes(
+    ctx,
+    0,
+    orbY,
+    timeMs,
+    47,
+    applySkinParticleStyle({ count: 4, spreadX: 13, spreadY: 14, color: theme.accent, periodMs: 1800, flicker: 0.5, size: 0.9 }, skin?.particleStyle),
+  );
 
   // A rotating arcane ring around the orb (drawn as a squashed ellipse for
   // a top-down "ring" read) — spins faster as the charge builds.
@@ -1471,10 +2255,86 @@ function drawStormcaller(
   ctx.setLineDash([]);
   ctx.restore();
 
-  ctx.fillStyle = discharge > 0 ? "#f4faff" : theme.accent;
-  ctx.beginPath();
-  ctx.arc(0, orbY, 6 + charge * 1.5 - discharge * 1.5, 0, Math.PI * 2);
-  ctx.fill();
+  // TOWER SKIN SYSTEM v2 — a skin's `coreShape` re-themes the orb itself;
+  // falls through to the original solid accent-colored orb.
+  const orbR = 6 + charge * 1.5 - discharge * 1.5;
+  switch (skin?.coreShape) {
+    case "thunder-orb": {
+      const thunderGrad = ctx.createRadialGradient(-1, orbY - 1, 0, 0, orbY, orbR);
+      thunderGrad.addColorStop(0, "#ffffff");
+      thunderGrad.addColorStop(1, discharge > 0 ? "#f4faff" : theme.accent);
+      ctx.fillStyle = thunderGrad;
+      ctx.beginPath();
+      ctx.arc(0, orbY, orbR, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "divine-orb": {
+      const divineGrad = ctx.createRadialGradient(-1, orbY - 1, 0, 0, orbY, orbR);
+      divineGrad.addColorStop(0, "#ffffff");
+      divineGrad.addColorStop(1, discharge > 0 ? "#fffbe8" : theme.accent);
+      ctx.fillStyle = divineGrad;
+      ctx.beginPath();
+      ctx.arc(0, orbY, orbR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.7)";
+      ctx.lineWidth = 0.6;
+      for (const a of [0, Math.PI / 2]) {
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * orbR, orbY + Math.sin(a) * orbR);
+        ctx.lineTo(-Math.cos(a) * orbR, orbY - Math.sin(a) * orbR);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "rune-array": {
+      const hue = (timeMs / 18) % 360;
+      ctx.fillStyle = discharge > 0 ? "#f4faff" : `hsl(${hue}, 85%, 72%)`;
+      ctx.beginPath();
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const px = Math.cos(a) * orbR;
+        const py = orbY + Math.sin(a) * orbR;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      break;
+    }
+    case "void-orb": {
+      const voidGrad = ctx.createRadialGradient(-1, orbY - 1, 0, 0, orbY, orbR);
+      voidGrad.addColorStop(0, "#f0e8ff");
+      voidGrad.addColorStop(0.6, theme.accent);
+      voidGrad.addColorStop(1, "#08060c");
+      ctx.fillStyle = voidGrad;
+      ctx.beginPath();
+      ctx.arc(0, orbY, orbR, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "cyclone-orb": {
+      ctx.fillStyle = discharge > 0 ? "#f4faff" : theme.accent;
+      ctx.beginPath();
+      ctx.arc(0, orbY, orbR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 0.6;
+      for (let i = 0; i < 2; i++) {
+        const a = timeMs / 400 + i * Math.PI;
+        ctx.beginPath();
+        ctx.arc(0, orbY, orbR * 0.6, a, a + Math.PI * 0.7);
+        ctx.stroke();
+      }
+      break;
+    }
+    default: {
+      ctx.fillStyle = discharge > 0 ? "#f4faff" : theme.accent;
+      ctx.beginPath();
+      ctx.arc(0, orbY, orbR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   // Visual Evolution stage 4+: a second, smaller orb orbits the main one —
   // the structure now channels more than one focus of power.
@@ -3382,20 +4242,25 @@ function drawDisabler(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)
  */
 export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance): void {
   const progress = 1 - projectile.remainingMs / projectile.totalMs;
-  const theme = TOWER_THEME[projectile.towerType];
+  const baseTheme = TOWER_THEME[projectile.towerType];
+  // TOWER SKIN SYSTEM v2 — the firing tower's equipped skin retints this
+  // cosmetic-only projectile (trail/core/impact color) to match, exactly
+  // the same palette-merge drawTower already does for the tower body.
+  const skin = projectile.skinId ? getTowerSkinDefinition(projectile.skinId) : null;
+  const theme = skin ? { ...baseTheme, ...skin.paletteOverride } : baseTheme;
 
   switch (projectile.towerType) {
     case "IRONWOOD":
-      drawIronwoodArrow(ctx, projectile, progress);
+      drawIronwoodArrow(ctx, projectile, progress, skin);
       break;
     case "INFERNO":
-      drawInfernoFireball(ctx, projectile, progress);
+      drawInfernoFireball(ctx, projectile, progress, skin);
       break;
     case "FROSTBORN":
-      drawFrostbornBolt(ctx, projectile, progress);
+      drawFrostbornBolt(ctx, projectile, progress, skin);
       break;
     case "STORMCALLER":
-      drawStormcallerBolt(ctx, projectile, progress);
+      drawStormcallerBolt(ctx, projectile, progress, skin);
       break;
   }
 
@@ -3424,8 +4289,15 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
  * impact) with a fading ember trail behind it, and a bright flash-burst
  * right at impact instead of just a dot.
  */
-function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
+function drawInfernoFireball(
+  ctx: CanvasRenderingContext2D,
+  projectile: ProjectileInstance,
+  progress: number,
+  skin: TowerSkinDefinition | null = null,
+): void {
   const { from, to } = projectile;
+  const accent = skin?.paletteOverride.accent ?? "#ffb35a";
+  const primary = skin?.paletteOverride.primary ?? "#ff6a2e";
   // Special Attack (spec section 27) — "Firestorm": a visibly bigger,
   // slower-lofted fireball with a thicker ember trail, matching the much
   // larger burn radius it actually deals in CombatSystem's special block.
@@ -3445,20 +4317,21 @@ function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: Projecti
     const tx = quadPoint(from.x, midX, to.x, trailT);
     const ty = quadPoint(from.y, midY, to.y, trailT);
     ctx.globalAlpha = Math.max(0, 0.5 - i * 0.11);
-    ctx.fillStyle = i % 2 === 0 ? "#ffb35a" : "#ff6a2e";
+    ctx.fillStyle = i % 2 === 0 ? accent : primary;
     ctx.beginPath();
     ctx.arc(tx, ty, (2.6 - i * 0.25) * scale, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
-  // The fireball itself: hot white core, orange corona.
+  // The fireball itself: hot white core, orange corona — retinted to the
+  // equipped skin's own accent/primary (e.g. toxic green, solar white).
   ctx.save();
   const impactGrow = progress > 0.88 ? (progress - 0.88) / 0.12 : 0;
   const radius = (3.6 + impactGrow * 5) * scale;
   const coreGrad = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, radius);
   coreGrad.addColorStop(0, "#fff4d8");
-  coreGrad.addColorStop(0.4, "#ffb35a");
+  coreGrad.addColorStop(0.4, accent);
   coreGrad.addColorStop(1, "rgba(255,106,46,0)");
   ctx.fillStyle = coreGrad;
   ctx.globalAlpha = 1 - impactGrow * 0.5;
@@ -3473,8 +4346,15 @@ function drawInfernoFireball(ctx: CanvasRenderingContext2D, projectile: Projecti
  * (no lofted arc — a precise beam of cold, not a lobbed projectile),
  * leaving a crystalline trail and crystallizing sharply on impact.
  */
-function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
+function drawFrostbornBolt(
+  ctx: CanvasRenderingContext2D,
+  projectile: ProjectileInstance,
+  progress: number,
+  skin: TowerSkinDefinition | null = null,
+): void {
   const { from, to } = projectile;
+  const accent = skin?.paletteOverride.accent ?? "#eafcff";
+  const glowTint = skin?.paletteOverride.accent ?? "#bdf3ff";
 
   // Special Attack (spec section 27) — "Absolute Zero" freezes every enemy
   // in range from a nova CENTERED ON THE TOWER (see CombatSystem's special
@@ -3486,13 +4366,13 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
     const radius = maxRadius * Math.min(1, progress * 1.4);
     ctx.save();
     ctx.globalAlpha = Math.max(0, 1 - progress) * 0.8;
-    ctx.strokeStyle = "#bdf3ff";
+    ctx.strokeStyle = glowTint;
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
     ctx.stroke();
     ctx.globalAlpha = Math.max(0, 1 - progress) * 0.35;
-    ctx.fillStyle = "#bdf3ff";
+    ctx.fillStyle = glowTint;
     ctx.beginPath();
     ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
     ctx.fill();
@@ -3521,7 +4401,7 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
   ctx.rotate(angle);
   const shardGrad = ctx.createLinearGradient(-5, 0, 3, 0);
   shardGrad.addColorStop(0, "rgba(220,249,255,0)");
-  shardGrad.addColorStop(1, "#eafcff");
+  shardGrad.addColorStop(1, accent);
   ctx.fillStyle = shardGrad;
   ctx.beginPath();
   ctx.moveTo(3.5, 0);
@@ -3538,7 +4418,7 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
     const t = (progress - 0.85) / 0.15;
     ctx.save();
     ctx.globalAlpha = 1 - t;
-    ctx.strokeStyle = "#bdf3ff";
+    ctx.strokeStyle = glowTint;
     ctx.lineWidth = 1.2;
     const shardCount = 5;
     for (let i = 0; i < shardCount; i++) {
@@ -3562,8 +4442,13 @@ function drawFrostbornBolt(ctx: CanvasRenderingContext2D, projectile: Projectile
  * a fading residual-spark aftermath along its path after the initial
  * flash instead of an instant cut to nothing.
  */
-function drawStormcallerBolt(ctx: CanvasRenderingContext2D, projectile: ProjectileInstance, progress: number): void {
-  const theme = TOWER_THEME.STORMCALLER;
+function drawStormcallerBolt(
+  ctx: CanvasRenderingContext2D,
+  projectile: ProjectileInstance,
+  progress: number,
+  skin: TowerSkinDefinition | null = null,
+): void {
+  const theme = skin ? { ...TOWER_THEME.STORMCALLER, ...skin.paletteOverride } : TOWER_THEME.STORMCALLER;
   const flashFade = progress < 0.3 ? 1 : Math.max(0, 1 - (progress - 0.3) / 0.7);
   // Special Attack (spec section 27) — "Chain Overload": a visibly thicker,
   // brighter-glowing bolt matching the much higher per-hit damage and
@@ -3644,8 +4529,10 @@ function drawIronwoodArrow(
   ctx: CanvasRenderingContext2D,
   projectile: ProjectileInstance,
   progress: number,
+  skin: TowerSkinDefinition | null = null,
 ): void {
   const { from, to } = projectile;
+  const trailColor = skin?.paletteOverride.accent ?? "#d4f79a";
   // Special Attack (spec section 27) — "Piercing Shot": a visibly bigger,
   // brighter-trailed bolt matching the guaranteed heavy hit the
   // CombatSystem special block actually resolves.
@@ -3663,8 +4550,8 @@ function drawIronwoodArrow(
 
   ctx.save();
   const trailGradient = ctx.createLinearGradient(from.x, from.y, currentX, currentY);
-  trailGradient.addColorStop(0, "rgba(212,247,154,0)");
-  trailGradient.addColorStop(1, projectile.isSpecial ? "rgba(255,236,180,0.85)" : "rgba(212,247,154,0.6)");
+  trailGradient.addColorStop(0, hexToRgbaLocal(trailColor, 0));
+  trailGradient.addColorStop(1, projectile.isSpecial ? "rgba(255,236,180,0.85)" : hexToRgbaLocal(trailColor, 0.6));
   ctx.strokeStyle = trailGradient;
   ctx.lineWidth = 1.4 * scale;
   ctx.beginPath();

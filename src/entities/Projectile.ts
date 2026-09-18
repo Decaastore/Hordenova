@@ -17,6 +17,8 @@ export interface ProjectileInstance {
   totalMs: number;
   /** Master Implementation spec section 27 — true for a tower's fixed-interval Special Attack (see config/towerSpecials.ts), never a normal attack. Purely a rendering signal (bigger/flashier draw in EntityRenderer.drawProjectile) — carries no extra gameplay authority than a normal projectile already had. */
   isSpecial: boolean;
+  /** TOWER SKIN SYSTEM v2 — the firing tower's equipped skin id at the moment of the shot (or null), so EntityRenderer.drawProjectile can retint/re-theme this cosmetic-only projectile to match. Never read by CombatSystem or anything gameplay-affecting — this struct already carries no gameplay authority (see the doc comment above). */
+  skinId: string | null;
 }
 
 let nextProjectileId = 1;
@@ -32,6 +34,7 @@ export function createProjectile(
   chainTargets: Vector2[] = [],
   isSpecial = false,
   durationMs: number = isSpecial ? SPECIAL_DURATION_MS : DEFAULT_DURATION_MS,
+  skinId: string | null = null,
 ): ProjectileInstance {
   return {
     id: `projectile-${nextProjectileId++}`,
@@ -42,6 +45,7 @@ export function createProjectile(
     remainingMs: durationMs,
     totalMs: durationMs,
     isSpecial,
+    skinId,
   };
 }
 

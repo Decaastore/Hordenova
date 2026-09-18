@@ -103,4 +103,56 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
       }
     });
   });
+
+  describe("TOWER SKIN SYSTEM v2 — every tower gets 1 reformulated + 4 new premium skins", () => {
+    it("every tower type has exactly 5 commercial skins", () => {
+      for (const type of TOWER_TYPES) expect(getSkinsForTower(type).length).toBe(5);
+    });
+
+    it("every skin id is unique across the whole commercial catalog", () => {
+      const ids = TOWER_SKINS.map((s) => s.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("every skin has a non-empty material/coreShape/weaponDetail/projectileStyle and a valid particleStyle", () => {
+      for (const skin of TOWER_SKINS) {
+        expect(skin.material.length).toBeGreaterThan(0);
+        expect(skin.coreShape.length).toBeGreaterThan(0);
+        expect(skin.weaponDetail.length).toBeGreaterThan(0);
+        expect(skin.projectileStyle.length).toBeGreaterThan(0);
+        expect(skin.particleStyle.color.length).toBeGreaterThan(0);
+        expect(skin.particleStyle.behavior.length).toBeGreaterThan(0);
+      }
+    });
+
+    it("no skin is a plain recolor of another skin on the same tower — coreShape and weaponDetail are unique within a tower type", () => {
+      for (const type of TOWER_TYPES) {
+        const skins = getSkinsForTower(type);
+        expect(new Set(skins.map((s) => s.coreShape)).size).toBe(skins.length);
+        expect(new Set(skins.map((s) => s.weaponDetail)).size).toBe(skins.length);
+      }
+    });
+
+    it("every skin has its own cosmetic attribute, explicitly cosmetic and never a gameplay field", () => {
+      for (const skin of TOWER_SKINS) {
+        expect(skin.cosmeticAttribute.i18nKey.length).toBeGreaterThan(0);
+        // Compile-time guarantee reinforced at runtime: cosmeticAttribute is
+        // never one of the keys getTowerLevelStats/getTowerSpecialAtLevel
+        // read, and this object has no `damage`/`range`/`attackSpeed` field.
+        expect(skin.cosmeticAttribute).not.toHaveProperty("damage");
+        expect(skin.cosmeticAttribute).not.toHaveProperty("range");
+        expect(skin.cosmeticAttribute).not.toHaveProperty("attackSpeed");
+      }
+    });
+
+    it("equipping any commercial skin (not just the first) never changes damage/attackSpeed/range", () => {
+      for (const skin of TOWER_SKINS) {
+        const tower = createTowerInstance("slot-1", skin.towerType, { x: 0, y: 0 }, skin.unlockLevel);
+        const before = getTowerStats(tower);
+        expect(equipSkin(tower, skin.id, OWNED([skin.id]))).toBe(true);
+        const after = getTowerStats(tower);
+        expect(after).toEqual(before);
+      }
+    });
+  });
 });

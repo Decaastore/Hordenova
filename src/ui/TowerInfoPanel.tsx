@@ -1,5 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
+import { drawTower } from "@/rendering/EntityRenderer";
 import {
   canChooseSpecialization,
   canUpgradeMastery,
@@ -776,14 +777,51 @@ function SpecializationSection({
 }
 
 /**
- * Progression 2.0 — Tower Skins (spec section 10/11). Cosmetic only:
- * equipping/clearing never appears in this component's gold math.
- *
- * CORREÇÃO DE REQUISITOS (PRÓXIMA GRANDE FASE): a skin now has 3 distinct
- * states instead of 2 — LOCKED (tower hasn't reached unlockLevel this
- * Season yet), PURCHASABLE (level reached, not yet bought — costs Gems),
- * and OWNED (bought once, permanent forever after, equippable any Season
- * regardless of the tower's current level).
+ * TOWER SKIN SYSTEM v2 — a small live-rendered preview using the EXACT
+ * same drawTower the real game uses (never a separate illustration that
+ * could drift out of sync), so a player never buys a skin without seeing
+ * precisely what they're getting: body, material, core, weapon detail,
+ * and idle particles, at the tower's own current level.
+ */
+function SkinPreviewCanvas({ tower, skinId }: { tower: TowerInstance; skinId: string | null }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = 108 * dpr;
+    canvas.height = 108 * dpr;
+    ctx.scale(dpr, dpr);
+    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, position: { x: 54, y: 78 } };
+    let raf = 0;
+    const loop = (t: number) => {
+      ctx.clearRect(0, 0, 108, 108);
+      drawTower(ctx, previewTower, false, t);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [tower, skinId]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{ width: 108, height: 108, borderRadius: 8, background: "rgba(0,0,0,0.28)", border: `1px solid ${PALETTE.uiPanelBorder}` }}
+    />
+  );
+}
+
+/**
+ * TOWER SKIN SYSTEM v2 — a skin has 3 distinct states: LOCKED (tower
+ * hasn't reached unlockLevel this Season yet), PURCHASABLE (level reached,
+ * not yet bought — costs Gems), and OWNED (bought once, permanent forever
+ * after, equippable any Season regardless of the tower's current level).
+ * Cosmetic only throughout: equipping/clearing never appears in this
+ * component's gold math, and a skin's visual fields (material/coreShape/
+ * weaponDetail/particleStyle/projectileStyle/cosmeticAttribute) never touch
+ * damage/range/attackSpeed — see towerSkins.test.ts's guarantee.
  */
 function SkinSection({
   tower,
@@ -807,15 +845,43 @@ function SkinSection({
   // owned (granted at Prestige level 50), so an unreached one never shows up
   // as a permanently-locked commercial card.
   const skins = [...getSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
+  const [previewSkinId, setPreviewSkinId] = useState<string | null>(tower.equippedSkinId);
   if (skins.length === 0) return null;
+
+  const previewSkin = previewSkinId ? (skins.find((s) => s.id === previewSkinId) ?? null) : null;
 
   return (
     <>
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.skinSection")}</div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
+        <SkinPreviewCanvas tower={tower} skinId={previewSkinId} />
+        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, minWidth: 0 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>
+            {previewSkin ? t(`towerSkins.${previewSkin.id}.name` as TranslationKey) : t("towerInfo.skinDefault")}
+          </div>
+          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, lineHeight: 1.35 }}>
+            {previewSkin ? t(`towerSkins.${previewSkin.id}.description` as TranslationKey) : t("towerInfo.skinDefaultDescription")}
+          </div>
+          {previewSkin && (
+            <div style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
+              {t("towerInfo.skinCosmeticAttributeLabel")}: {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeName` as TranslationKey)}
+              <span style={{ display: "block", color: PALETTE.uiTextDim, fontWeight: 400, fontStyle: "italic" }}>
+                {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeDescription` as TranslationKey)}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
         <button
-          onClick={() => onEquip(null)}
+          onClick={() => {
+            onEquip(null);
+            setPreviewSkinId(null);
+          }}
+          onMouseEnter={() => setPreviewSkinId(null)}
           style={{
             ...skinChipStyle,
             borderColor: tower.equippedSkinId === null ? theme.accent : PALETTE.uiPanelBorder,
@@ -823,6 +889,7 @@ function SkinSection({
           }}
         >
           {t("towerInfo.skinDefault")}
+          {tower.equippedSkinId === null && <span style={skinBadgeStyle}>{t("towerInfo.skinEquipped")}</span>}
         </button>
         {skins.map((skin) => {
           const owned = isSkinOwned(skin.id);
@@ -835,10 +902,11 @@ function SkinSection({
               <button
                 key={skin.id}
                 onClick={() => onEquip(skin.id)}
-                title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
+                onMouseEnter={() => setPreviewSkinId(skin.id)}
                 style={{ ...skinChipStyle, borderColor: equipped ? theme.accent : PALETTE.uiPanelBorder, opacity: 1 }}
               >
                 {t(`towerSkins.${skin.id}.name` as TranslationKey)}
+                <span style={skinBadgeStyle}>{equipped ? t("towerInfo.skinEquipped") : t("towerInfo.skinOwned")}</span>
               </button>
             );
           }
@@ -848,8 +916,8 @@ function SkinSection({
               <button
                 key={skin.id}
                 onClick={() => affordable && onPurchase(skin.id)}
+                onMouseEnter={() => setPreviewSkinId(skin.id)}
                 disabled={!affordable}
-                title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
                 style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: affordable ? 1 : 0.55 }}
               >
                 {t(`towerSkins.${skin.id}.name` as TranslationKey)}
@@ -863,8 +931,8 @@ function SkinSection({
           return (
             <button
               key={skin.id}
+              onMouseEnter={() => setPreviewSkinId(skin.id)}
               disabled
-              title={t(`towerSkins.${skin.id}.description` as TranslationKey)}
               style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: 0.45 }}
             >
               {t(`towerSkins.${skin.id}.name` as TranslationKey)}
@@ -1062,6 +1130,18 @@ const skinChipStyle: CSSProperties = {
   fontSize: 10.5,
   fontWeight: 600,
   cursor: "pointer",
+};
+
+const skinBadgeStyle: CSSProperties = {
+  marginLeft: 5,
+  padding: "1px 5px",
+  borderRadius: 999,
+  fontSize: 8,
+  fontWeight: 700,
+  letterSpacing: 0.3,
+  textTransform: "uppercase",
+  background: "rgba(0,0,0,0.35)",
+  color: PALETTE.uiAccentBright,
 };
 
 const equipmentSlotRowStyle: CSSProperties = {
