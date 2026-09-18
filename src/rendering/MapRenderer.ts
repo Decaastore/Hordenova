@@ -4,7 +4,7 @@ import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
-import { drawEnergyCrack, drawFloatingMotes } from "./lighting";
+import { drawEnergyCrack, drawFloatingMotes, rimHighlight } from "./lighting";
 import type { AtmosphereKind, BiomeDefinition } from "./biomes";
 import { MAP_DECORATIONS, type Decoration, type DecorationKind } from "./mapDecorations";
 
@@ -252,42 +252,85 @@ function drawRuinDecor(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): v
   ctx.fill();
 }
 
+/**
+ * TERRAIN + DECORATION VISUAL REWORK — silhouette-before-glow (spec section
+ * 3/5): the previous halo (r=28, up to 0.45 alpha) was big and bright enough
+ * to visually wash out the crystal's own contact shadow, reading as "a green
+ * glow" rather than "a crystal sitting on the ground." Shape now comes
+ * first — a real contact shadow, a buried base wedge the crystal visibly
+ * emerges from, and a second darker facet so more than one crystal FACE
+ * reads at a glance — with the glow trimmed down to a genuinely subtle
+ * emission that no longer competes with any of that.
+ */
 function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
   const color = biome.palette.accentGlow;
   const pulse = 0.6 + 0.4 * Math.sin(timeMs / 900);
+
+  ctx.fillStyle = "rgba(10,10,4,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(0, 6, 7, 2.6, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.save();
   ctx.globalAlpha = pulse;
-  const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 28);
-  glow.addColorStop(0, hexToRgba(color, 0.45));
+  const glow = ctx.createRadialGradient(0, -2, 0, 0, -2, 15);
+  glow.addColorStop(0, hexToRgba(color, 0.32));
   glow.addColorStop(1, hexToRgba(color, 0));
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, 0, 28, 0, Math.PI * 2);
+  ctx.arc(0, -2, 15, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = "rgba(10,10,4,0.28)";
+  // Buried base — the crystal visibly emerges from the ground instead of
+  // hovering above its own shadow.
+  ctx.fillStyle = biome.palette.rockDark;
   ctx.beginPath();
-  ctx.ellipse(0, 6, 8, 3, 0, 0, Math.PI * 2);
+  ctx.moveTo(-4, 6);
+  ctx.lineTo(4, 6);
+  ctx.lineTo(2, 3);
+  ctx.lineTo(-2, 3);
+  ctx.closePath();
   ctx.fill();
 
   ctx.fillStyle = color;
   ctx.beginPath();
   ctx.moveTo(0, -14);
   ctx.lineTo(5, -2);
-  ctx.lineTo(2, 6);
-  ctx.lineTo(-2, 6);
+  ctx.lineTo(2, 5);
+  ctx.lineTo(-2, 5);
   ctx.lineTo(-5, -2);
+  ctx.closePath();
+  ctx.fill();
+  // A second, darker facet on the shadow-facing side — the concrete "mais
+  // de uma face" fix, not just one flat diamond.
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  ctx.beginPath();
+  ctx.moveTo(0, -14);
+  ctx.lineTo(5, -2);
+  ctx.lineTo(2, 5);
+  ctx.lineTo(0, 3);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = "rgba(255,255,255,0.55)";
   ctx.beginPath();
   ctx.moveTo(0, -14);
   ctx.lineTo(2, -2);
-  ctx.lineTo(0, 6);
-  ctx.lineTo(-2, 6);
+  ctx.lineTo(0, 5);
+  ctx.lineTo(-2, 5);
   ctx.closePath();
   ctx.fill();
+  rimHighlight(
+    ctx,
+    () => {
+      ctx.beginPath();
+      ctx.moveTo(-5, -2);
+      ctx.lineTo(0, -14);
+    },
+    "#ffffff",
+    0.9,
+    0.5,
+  );
 }
 
 function drawGrassTuft(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
@@ -366,36 +409,68 @@ function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: 
   ctx.fill();
 }
 
+/**
+ * TERRAIN + DECORATION VISUAL REWORK — the halo used to be big enough
+ * (r=22, 0.55 alpha) and drawn AFTER the pole to sit on top of it, so the
+ * torch read as "an orange blob" with a barely-visible stick inside it
+ * rather than a physical object. Fix, in the brief's own order: (1) the
+ * glow is now a small, restrained pool of ground light drawn BEHIND every
+ * physical part; (2) added the "recipiente" (a real brazier bowl) the fire
+ * sits inside instead of floating directly off the bare pole tip, so the
+ * torch reads as pole+brazier+fire even with the glow mentally switched off.
+ */
 function drawTorch(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
-  ctx.fillStyle = "rgba(10,10,4,0.3)";
+  ctx.fillStyle = "rgba(10,10,4,0.32)";
   ctx.beginPath();
-  ctx.ellipse(0, 12, 4, 2, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 13, 4.4, 2.1, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = biome.palette.rockDark;
-  ctx.fillRect(-1.6, -4, 3.2, 16);
-
   const flicker = Math.sin(timeMs / 130) * 1.4;
-  const glow = ctx.createRadialGradient(0, -10, 0, 0, -10, 22);
-  glow.addColorStop(0, "rgba(255,176,74,0.55)");
+
+  // A small, controlled pool of light on the ground — not the object itself.
+  const glow = ctx.createRadialGradient(0, 4, 0, 0, 4, 13);
+  glow.addColorStop(0, "rgba(255,176,74,0.32)");
+  glow.addColorStop(0.65, "rgba(255,176,74,0.12)");
   glow.addColorStop(1, "rgba(255,176,74,0)");
   ctx.fillStyle = glow;
   ctx.beginPath();
-  ctx.arc(0, -10, 22, 0, Math.PI * 2);
+  ctx.arc(0, 4, 13, 0, Math.PI * 2);
   ctx.fill();
+
+  // Pole — a real support the brazier sits on top of.
+  ctx.fillStyle = biome.palette.rockDark;
+  ctx.fillRect(-1.6, -3, 3.2, 16);
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(-1.6, -3, 1, 16);
+
+  // Brazier — the "recipiente" the fire physically sits inside.
+  ctx.fillStyle = biome.palette.rockDark;
+  ctx.beginPath();
+  ctx.moveTo(-4, -3);
+  ctx.lineTo(4, -3);
+  ctx.lineTo(2.6, -6.5);
+  ctx.lineTo(-2.6, -6.5);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(0,0,0,0.4)";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(-4, -3);
+  ctx.lineTo(4, -3);
+  ctx.stroke();
 
   ctx.fillStyle = biome.palette.accentWarm;
   ctx.beginPath();
-  ctx.moveTo(-3, -5);
+  ctx.moveTo(-3, -5.5);
   ctx.quadraticCurveTo(-3 + flicker, -12, 0, -18);
-  ctx.quadraticCurveTo(3 - flicker, -12, 3, -5);
+  ctx.quadraticCurveTo(3 - flicker, -12, 3, -5.5);
   ctx.closePath();
   ctx.fill();
   ctx.fillStyle = "#ffe08a";
   ctx.beginPath();
-  ctx.moveTo(-1.4, -6);
+  ctx.moveTo(-1.4, -6.5);
   ctx.quadraticCurveTo(-1.4 + flicker * 0.6, -11, 0, -14);
-  ctx.quadraticCurveTo(1.4 - flicker * 0.6, -11, 1.4, -6);
+  ctx.quadraticCurveTo(1.4 - flicker * 0.6, -11, 1.4, -6.5);
   ctx.closePath();
   ctx.fill();
 }

@@ -48,13 +48,47 @@ function buildTreeCanopyGeometry(): THREE.BufferGeometry {
   return buildTaperedTube(points, radii, 7, true);
 }
 
-/** An irregular boulder (extruded jagged plate, not a bare box/sphere) reused for both ROCK and RUIN decorations — a coherent procedural placeholder per the direction's "prefira elementos procedurais simples mas coerentes" guidance. */
+/** An irregular boulder (extruded jagged plate, not a bare box/sphere) for ROCK decorations — a coherent procedural placeholder per the direction's "prefira elementos procedurais simples mas coerentes" guidance. */
 function buildRockGeometry(seed: number): THREE.BufferGeometry {
   const rand = mulberry32(seed);
   const shape = buildJaggedPlateShape(6, 7, rand);
   const geometry = new THREE.ExtrudeGeometry(shape, { depth: 4.5, bevelEnabled: false, curveSegments: 1 });
   geometry.rotateX(-Math.PI / 2);
   geometry.translate(0, 2.2, 0);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+/**
+ * TERRAIN + DECORATION VISUAL REWORK — RUIN used to share `buildRockGeometry`
+ * verbatim with ROCK (see git history), so every "ancient ruin" on the map
+ * was, geometrically, an indistinguishable boulder — zero architectural
+ * identity (spec section 7: "fragmentos arquitetônicos... não criar apenas
+ * uma silhueta escura"). A ruin is now its OWN two-piece composite, built
+ * from the exact same primitives (`buildTaperedTube`, `buildJaggedPlateShape`)
+ * already used for trees/rocks — reuse before new architecture, per the
+ * brief's own priority — just composed differently: a broken column stump
+ * plus a fallen, tilted slab offset beside it, both baked into their own
+ * local space so a single shared per-instance transform (see
+ * `collectPlacements`/`buildInstancedMesh`) keeps the two pieces glued
+ * together exactly like the tree's trunk+canopy pair already does.
+ */
+function buildRuinPillarGeometry(): THREE.BufferGeometry {
+  const points = [new THREE.Vector3(-3, 0, 2), new THREE.Vector3(-3, 12, 2)];
+  return buildTaperedTube(points, [3, 2], 6, true);
+}
+
+function buildRuinSlabGeometry(seed: number): THREE.BufferGeometry {
+  const rand = mulberry32(seed);
+  const shape = buildJaggedPlateShape(6.5, 6, rand);
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: 2.6, bevelEnabled: false, curveSegments: 1 });
+  // Fallen and tilted, not a neat flat pancake — a slab that collapsed
+  // off the pillar rather than a second boulder next to it. Offset far
+  // enough from the pillar that the two pieces read as separate rubble at
+  // normal gameplay zoom, not as one slightly-lumpy boulder.
+  geometry.rotateX(-Math.PI / 2 + 0.36);
+  geometry.rotateZ(0.22);
+  geometry.translate(6.5, 0.8, -4.2);
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -108,7 +142,8 @@ function buildInstancedMesh(
 /** Built once per biome change — everything here is static in world space, so this is never touched again per-frame (see WorldTerrain.tsx's useMemo). */
 export function buildVegetationMeshes(palette: BiomePalette): THREE.Object3D[] {
   const treePlacements = collectPlacements(new Set(["TREE"]));
-  const rockPlacements = collectPlacements(new Set(["ROCK", "RUIN"]));
+  const rockPlacements = collectPlacements(new Set(["ROCK"]));
+  const ruinPlacements = collectPlacements(new Set(["RUIN"]));
 
   // MUNDO 3D — FASE 2: the palette's vegetation tones are AUTHORED very
   // dark (a deliberate moody-forest choice for the 2D icons, which read
@@ -145,6 +180,9 @@ export function buildVegetationMeshes(palette: BiomePalette): THREE.Object3D[] {
     rockPlacements,
     rockColors,
   );
+  const ruinMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97, flatShading: true });
+  const ruinPillars = buildInstancedMesh(buildRuinPillarGeometry(), ruinMaterial, ruinPlacements, rockColors);
+  const ruinSlabs = buildInstancedMesh(buildRuinSlabGeometry(9137), ruinMaterial, ruinPlacements, rockColors);
 
-  return [trunks, canopies, rocks];
+  return [trunks, canopies, rocks, ruinPillars, ruinSlabs];
 }

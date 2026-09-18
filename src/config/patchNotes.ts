@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v29",
+    dateIso: "2026-09-18",
+    category: "INTERFACE",
+    title: {
+      en: "Terrain Objects Rebuilt — Real Shapes Instead of Glow Blobs",
+      ptBR: "Objetos do Terreno Reconstruídos — Formas Reais em vez de Manchas de Brilho",
+    },
+    description: {
+      en: "A follow-up to the visual audit found the second-biggest problem with the scenery: torches, crystals, and ancient ruins were reading as soft glowing blobs rather than physical objects sitting on the ground. The torch's light pool was so large and bright it visually swallowed the torch itself — you could barely tell there was a pole and a flame in there. It's been rebuilt with a proper brazier the fire actually sits inside, and the light is now a small, controlled pool drawn behind the object instead of on top of it. Crystals used to float slightly above their own shadow, which — combined with an oversized glow — made them look like hovering lights instead of mineral formations; they now visibly emerge from a buried base directly above a real ground shadow, with a second darker facet so more than one crystal face reads at a glance. The deepest fix is Ruins: they used to be built from the exact same 3D rock shape as ordinary boulders, so every 'ancient ruin' on the map was, geometrically, an indistinguishable rock — no broken pillar, no fallen slab, nothing that said 'this used to be a structure.' Ruins now have their own two-piece silhouette: a broken column stump beside a tilted, fallen slab, so they finally read as rubble instead of scenery reused from elsewhere. Regular rocks, trees, water, and every other decoration are untouched.",
+      ptBR: "Uma continuação da auditoria visual encontrou o segundo maior problema do cenário: tochas, cristais e ruínas antigas estavam lendo como manchas suaves de brilho em vez de objetos físicos apoiados no chão. O halo de luz da tocha era tão grande e brilhante que engolia visualmente a própria tocha — mal dava para perceber que havia um poste e uma chama ali dentro. Ela foi reconstruída com um braseiro de verdade onde o fogo realmente se apoia, e a luz agora é uma poça pequena e controlada, desenhada atrás do objeto em vez de por cima dele. Os cristais antes flutuavam ligeiramente acima da própria sombra, o que, somado a um brilho grande demais, os fazia parecer luzes suspensas em vez de formações minerais; agora eles visivelmente emergem de uma base enterrada bem acima de uma sombra real no chão, com uma segunda face mais escura para que mais de uma face do cristal seja perceptível num único olhar. O ajuste mais profundo foi nas Ruínas: elas eram construídas com a mesma forma 3D usada pelas pedras comuns, então toda 'ruína antiga' no mapa era, geometricamente, uma pedra indistinguível — nenhum pilar quebrado, nenhuma laje caída, nada que dissesse 'isso já foi uma estrutura'. As ruínas agora têm sua própria silhueta de duas peças: um toco de coluna quebrada ao lado de uma laje caída e inclinada, então finalmente lêem como escombros em vez de cenário reaproveitado de outro lugar. Pedras comuns, árvores, água e qualquer outra decoração permanecem inalteradas.",
+    },
+    highlights: [
+      {
+        en: "Torches now have a real brazier the fire sits inside, and their light is a small, restrained pool drawn behind the object instead of an oversized glow that used to sit on top and hide the pole/flame shape.",
+        ptBR: "As tochas agora têm um braseiro de verdade onde o fogo se apoia, e a luz é uma poça pequena e contida desenhada atrás do objeto, em vez de um brilho grande demais que antes ficava por cima e escondia a forma do poste/chama.",
+      },
+      {
+        en: "Crystals now visibly emerge from a buried base directly above a real ground shadow (previously floating slightly above it), with a second darker facet so more than one crystal face reads at a glance.",
+        ptBR: "Os cristais agora visivelmente emergem de uma base enterrada bem acima de uma sombra real no chão (antes flutuavam ligeiramente acima dela), com uma segunda face mais escura para que mais de uma face seja perceptível num único olhar.",
+      },
+      {
+        en: "Ancient Ruins are no longer built from the same 3D shape as ordinary rocks — they're now a distinct broken-pillar-plus-fallen-slab silhouette, so ruins finally read as rubble instead of an indistinguishable boulder.",
+        ptBR: "Ruínas Antigas deixaram de ser construídas com a mesma forma 3D das pedras comuns — agora têm uma silhueta própria de pilar quebrado com uma laje caída ao lado, então as ruínas finalmente lêem como escombros em vez de uma pedra indistinguível.",
+      },
+      {
+        en: "Purely visual — no change to gameplay, combat, economy, tower/castle mechanics, or the Boss redesign shipped in the previous update.",
+        ptBR: "Puramente visual — nenhuma mudança em gameplay, combate, economia, mecânicas de torre/castelo ou no redesign do Chefe lançado na atualização anterior.",
+      },
+    ],
+  },
+  {
     id: "v28",
     dateIso: "2026-09-17",
     category: "BOSSES",
