@@ -113,15 +113,25 @@ describe("biomeCreatures registry", () => {
     }
   });
 
-  it("the original 6 biomes' bosses are NOT in the custom registry (they fall through to the shared Colossus body unchanged)", () => {
-    for (const id of Object.keys(MAIN_BOSSES)) {
-      if (["hollow-warden", "molten-colossus", "glacial-sovereign", "sand-devourer", "grave-tyrant", "abyssal-maw"].includes(id)) {
-        expect(BOSS_CREATURE_RENDERERS[id], id).toBeUndefined();
-      }
+  it("ORIGINAL BOSSES REDESIGN — the 6 original main bosses and 6 original mini-bosses now each have their own bespoke registered creature renderer, and no two of the 12 share the same function", () => {
+    const mainIds = ["hollow-warden", "molten-colossus", "glacial-sovereign", "sand-devourer", "grave-tyrant", "abyssal-maw"];
+    const miniIds = ["ashfen-warlord", "briar-summoner", "mossback-regenerator", "gloom-jammer", "stonebound-sentinel", "ferocious-berserker"];
+    for (const id of mainIds) {
+      expect(MAIN_BOSSES[id], id).toBeDefined();
+      expect(BOSS_CREATURE_RENDERERS[id], id).toBeTypeOf("function");
     }
-    for (const id of Object.keys(MINI_BOSSES)) {
-      if (["ashfen-warlord", "briar-summoner", "mossback-regenerator", "gloom-jammer", "stonebound-sentinel", "ferocious-berserker"].includes(id)) {
-        expect(BOSS_CREATURE_RENDERERS[id], id).toBeUndefined();
+    for (const id of miniIds) {
+      expect(MINI_BOSSES[id], id).toBeDefined();
+      expect(BOSS_CREATURE_RENDERERS[id], id).toBeTypeOf("function");
+    }
+    // Unlike the 10-biome expansion's shared main/mini pairs, none of these
+    // 12 renderers are shared with each other — the original mini-bosses
+    // rotate globally across every original phase (bossConfig.ts's
+    // MINI_BOSS_ROSTER), so there is no real biome pairing to mirror.
+    const allIds = [...mainIds, ...miniIds];
+    for (let i = 0; i < allIds.length; i++) {
+      for (let j = i + 1; j < allIds.length; j++) {
+        expect(BOSS_CREATURE_RENDERERS[allIds[i]!], `${allIds[i]} vs ${allIds[j]}`).not.toBe(BOSS_CREATURE_RENDERERS[allIds[j]!]);
       }
     }
   });

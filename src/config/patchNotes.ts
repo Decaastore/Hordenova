@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v31",
+    dateIso: "2026-09-18",
+    category: "BOSSES",
+    title: {
+      en: "The First Six Bosses Finally Look Like Themselves",
+      ptBR: "Os Primeiros Seis Chefes Finalmente Têm Cara Própria",
+    },
+    description: {
+      en: "Hollow Warden, Molten Colossus, Glacial Sovereign, Sand Devourer, Grave Tyrant, and Abyssal Maw — the six main bosses that guard waves 30 through 130 — were, until now, all sharing one identical generic body underneath a different name and color. So were their six mini-bosses (Ashfen Warlord, Briar Summoner, Mossback Regenerator, Gloom Jammer, Stonebound Sentinel, Ferocious Berserker). Every one of the twelve now has its own hand-built silhouette, body plan, and material: Hollow Warden is a hollow-chested stone guardian with its core floating in an empty cavity between its armor plates; Molten Colossus is a squat mass of cracked rock with magma glowing through the seams; Glacial Sovereign has no legs at all, gliding on a skirt of ice shards; Sand Devourer is a segmented, legless burrower that's mouth-first, not humanoid; Grave Tyrant is a broad, cloaked tyrant with a torn breastplate; Abyssal Maw is a limbless, asymmetric mass dominated by one huge jagged mouth. You should now be able to tell which boss you're facing from its shape alone, without reading its name or health bar.",
+      ptBR: "O Guardião Oco, O Colosso em Fusão, O Soberano Glacial, O Devorador de Areia, O Tirano da Sepultura e As Fauces Abissais — os seis chefes principais das ondas 30 a 130 — até agora compartilhavam todos o mesmo corpo genérico, só com nome e cor diferentes. O mesmo valia para os seis mini-chefes (Senhor da Guerra de Ashfen, Invocador de Espinhos, Dorso-de-Musgo Regenerador, Interferente Sombrio, Sentinela de Pedra, Berserker Feroz). Agora, cada um dos doze tem sua própria silhueta, estrutura corporal e material desenhados à mão: O Guardião Oco é um sentinela de pedra com o peito literalmente vazio, o núcleo flutuando numa cavidade entre as placas de armadura; O Colosso em Fusão é uma massa atarracada de rocha rachada com magma brilhando pelas fendas; O Soberano Glacial não tem pernas, deslizando sobre uma saia de fragmentos de gelo; O Devorador de Areia é um ser segmentado e sem pernas, guiado pela boca, não humanoide; O Tirano da Sepultura é um tirano largo e encapuzado com a armadura do peito rasgada; As Fauces Abissais são uma massa assimétrica sem membros, dominada por uma única boca enorme e dentada. Agora deve ser possível reconhecer qual chefe você está enfrentando só pela forma, sem precisar ler o nome ou a barra de vida.",
+    },
+    highlights: [
+      {
+        en: "All 6 original main bosses (waves 30/50/70/90/110/130) and all 6 original mini-bosses now have their own bespoke body and silhouette — none of them share the old generic 'Void Colossus' shape anymore.",
+        ptBR: "Os 6 chefes principais originais (ondas 30/50/70/90/110/130) e os 6 mini-chefes originais agora têm corpo e silhueta próprios — nenhum deles ainda usa a antiga forma genérica de 'Colosso do Vazio'.",
+      },
+      {
+        en: "Each boss's body language is unrelated to the others': hollow-chested guardian, legless magma mass, legless ice glider, legless burrowing mouth, cloaked broad tyrant, and a limbless jaw-dominated horror.",
+        ptBR: "A linguagem corporal de cada chefe é diferente da dos outros: guardião de peito vazio, massa de magma sem pernas, planador de gelo sem pernas, boca escavadora sem pernas, tirano largo e encapuzado, e um horror sem membros dominado por uma mandíbula.",
+      },
+      {
+        en: "Each main boss's core/energy still recolors per biome as before (orange in Volcanic Wastes, icy blue in Frozen Tundra, and so on) — only the body underneath changed.",
+        ptBR: "O núcleo/energia de cada chefe principal continua mudando de cor por bioma como antes (laranja no Deserto Vulcânico, azul gelado na Tundra Congelada, e assim por diante) — só o corpo por baixo mudou.",
+      },
+    ],
+  },
+  {
     id: "v30",
     dateIso: "2026-09-18",
     category: "CONTENT",

@@ -14,5 +14,12 @@ import "./ashenValley";
 import "./moonGardens";
 import "./defiledCathedral";
 import "./leviathanCoast";
+import "./ancientForest";
+import "./volcanicWastes";
+import "./frozenTundra";
+import "./cursedDesert";
+import "./darkRuins";
+import "./abyss";
+import "./originalMiniBosses";
 
 export { NEW_ENEMY_RENDERERS, BOSS_CREATURE_RENDERERS } from "./registry";
