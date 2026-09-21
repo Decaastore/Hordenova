@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
 import { createItemInstance } from "@/entities/Item";
-import { createAuctionListingForItem, isTradeUnlocked, unlockTrade } from "./MarketplaceService";
-import { getAuctionMinBid } from "@/config/marketplace";
+import { createAuctionListingForItem, isTradeUnlocked, placeDemoBid, refreshMarketplace, unlockTrade } from "./MarketplaceService";
+import * as MarketplaceService from "./MarketplaceService";
+import { getAuctionListingFeeDualPrice, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
 import { TRADE_UNLOCK_PRICE, dualGemPrice } from "@/config/gemsEconomy";
 import { getTowerSkinDefinition, TOWER_SKINS } from "@/config/towerSkins";
 import { SEASON_EPOCH_MS } from "./SeasonClock";
@@ -50,11 +51,15 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   }
 
   // ---------------------------------------------------------------------
-  // Scenario 1: 500 Free / 0 Purchased, Trade Locked -> unlock with Free.
+  // Scenario 1: 1,500 Free / 0 Purchased, Trade Locked -> unlock with Free.
+  // Trade Unlock is deliberately ASYMMETRIC (1,500 Free / 500 Purchased —
+  // a real 3x premium, not the usual 1.5x) per the economy update: it's the
+  // gate into the whole player-to-player Marketplace, so it must be a real
+  // mid-term F2P goal, not something 500 casual Free Gems trivially clears.
   // ---------------------------------------------------------------------
-  it("scenario 1: 500 Free / 0 Purchased unlocks Trade with FREE Gems", () => {
-    updateSave({ freeGems: 500, purchasedGems: 0, tradeUnlocked: false });
-    expect(TRADE_UNLOCK_PRICE).toEqual({ free: 500, purchased: 500 });
+  it("scenario 1: 1,500 Free / 0 Purchased unlocks Trade with FREE Gems", () => {
+    updateSave({ freeGems: 1500, purchasedGems: 0, tradeUnlocked: false });
+    expect(TRADE_UNLOCK_PRICE).toEqual({ free: 1500, purchased: 500 });
     const result = unlockTrade("FREE");
     expect(result).toEqual({ ok: true });
     const save = loadSave();
@@ -148,33 +153,37 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   });
 
   // ---------------------------------------------------------------------
-  // Scenario 7: 2,000 Free / 0 Purchased, Trade Unlocked -> attempt
-  // Marketplace purchase (the listing fee, the one real Gems-moving action
-  // this local build exposes — see MarketplaceService.ts's own header).
-  // MUST FAIL — the Marketplace never accepts Free Gems.
+  // Scenario 7 (REVISED per ECONOMY UPDATE section 8/9): 2,000 Free / 0
+  // Purchased, Trade Unlocked -> LISTING (selling) an item. This must now
+  // SUCCEED using Free Gems — a pure F2P player who unlocked Trade with
+  // Free Gems must still be able to sell, per the user's explicit worked
+  // example (F2P sells a Mythic item without ever having bought Gems).
+  // Only BUYING another player's item is conceptually Purchased-Gems-only
+  // — see the HONESTY test below for why that has no real transaction to
+  // test against in this codebase.
   // ---------------------------------------------------------------------
-  it("scenario 7: 2,000 Free / 0 Purchased — Marketplace listing fee FAILS (Free Gems never eligible)", () => {
+  it("scenario 7 (revised): 2,000 Free / 0 Purchased, Trade Unlocked — LISTING an item with Free Gems SUCCEEDS", () => {
     const seller = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
     updateSave({ playerId: "player-1", inventory: [seller], freeGems: 2000, purchasedGems: 0, tradeUnlocked: true });
     expect(isTradeUnlocked()).toBe(true);
 
-    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.reason).toBe("INSUFFICIENT_PURCHASED_GEMS");
+    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24, "FREE");
+    expect(result.ok).toBe(true);
     const save = loadSave();
-    expect(save.freeGems).toBe(2000); // completely untouched
-    expect(save.auctionListings).toHaveLength(0);
+    expect(save.freeGems).toBeLessThan(2000); // the fee was actually paid, in Free Gems
+    expect(save.purchasedGems).toBe(0); // never touched — no cross-currency debit
+    expect(save.auctionListings).toHaveLength(1);
   });
 
   // ---------------------------------------------------------------------
-  // Scenario 8: 0 Free / 2,000 Purchased, Trade Unlocked -> attempt
-  // Marketplace purchase. MUST SUCCEED.
+  // Scenario 8: 0 Free / 2,000 Purchased, Trade Unlocked -> listing still
+  // works exactly as before when the seller pays with Purchased Gems too.
   // ---------------------------------------------------------------------
   it("scenario 8: 0 Free / 2,000 Purchased — Marketplace listing fee SUCCEEDS", () => {
     const seller = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
     updateSave({ playerId: "player-1", inventory: [seller], freeGems: 0, purchasedGems: 2000, tradeUnlocked: true });
 
-    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     expect(result.ok).toBe(true);
     const save = loadSave();
     expect(save.purchasedGems).toBeLessThan(2000); // the fee was actually paid
@@ -226,7 +235,7 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   });
 
   it("exploit: Trade Unlock cannot be purchased twice (idempotent, no re-charge)", () => {
-    updateSave({ freeGems: 500, purchasedGems: 500, tradeUnlocked: false });
+    updateSave({ freeGems: 1500, purchasedGems: 500, tradeUnlocked: false });
     expect(unlockTrade("FREE")).toEqual({ ok: true });
     // Second attempt, even with funds available in the OTHER currency, is refused.
     expect(unlockTrade("PURCHASED")).toEqual({ ok: false, reason: "ALREADY_UNLOCKED" });
@@ -268,7 +277,7 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   it("exploit: Marketplace listing is blocked entirely while Trade is locked, regardless of Purchased Gems balance", () => {
     const seller = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
     updateSave({ playerId: "player-1", inventory: [seller], purchasedGems: 999_999, tradeUnlocked: false });
-    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    const result = createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe("TRADE_LOCKED");
   });
@@ -290,9 +299,10 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   });
 
   it("exploit: every real spend re-validates the CURRENT balance server-side (engine-side), never trusting a stale client read", () => {
-    updateSave({ freeGems: 300, purchasedGems: 0 });
+    updateSave({ freeGems: 1500, purchasedGems: 0 });
     const engine = new GameEngine();
     engine.startRun();
+    expect(engine.canUnlockTrade("FREE")).toBe(true); // genuinely affordable at this point
     // A UI might have read canUnlockTrade() as true a moment ago; the
     // balance changes before the actual spend call (e.g. another tab).
     updateSave({ freeGems: 0 });
@@ -312,5 +322,173 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
     // Sanity — the definition lookup used by the engine agrees.
     const def = getTowerSkinDefinition(premiumSkins[0]!.id)!;
     expect(dualGemPrice(def.gemCost)).toEqual({ free: 1200, purchased: 800 });
+  });
+});
+
+/**
+ * ECONOMY UPDATE (2026-09-21) — "ATUALIZAÇÃO IMPORTANTE DO SISTEMA
+ * ECONÔMICO". Trade Unlock is re-priced to a deliberate 3x asymmetry
+ * (1,500 Free / 500 Purchased, replacing the old flat 500/500) so it reads
+ * as a real mid-term F2P goal rather than a trivial side-effect of normal
+ * play, while SELLING (listing) becomes dual-priced so a pure F2P player
+ * who unlocked Trade with Free Gems can still list and sell without ever
+ * owning Purchased Gems. This block implements the user's own 9 new
+ * numbered test scenarios (spec section 17) verbatim.
+ */
+describe("ECONOMY UPDATE — Trade Unlock 1,500 Free / 500 Purchased (spec section 17's 9 scenarios)", () => {
+  const NOW = SEASON_EPOCH_MS + 1000;
+
+  beforeEach(() => {
+    window.localStorage.clear();
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("17.1: 999 Free / 0 Purchased, Trade Locked -> cannot unlock with either currency", () => {
+    updateSave({ freeGems: 999, purchasedGems: 0, tradeUnlocked: false });
+    expect(unlockTrade("FREE")).toEqual({ ok: false, reason: "INSUFFICIENT_FREE_GEMS" });
+    expect(unlockTrade("PURCHASED")).toEqual({ ok: false, reason: "INSUFFICIENT_PURCHASED_GEMS" });
+    expect(loadSave().tradeUnlocked).toBe(false);
+  });
+
+  it("17.2: 1,499 Free / 0 Purchased, Trade Locked -> still cannot unlock (one Gem short of the 1,500 threshold)", () => {
+    updateSave({ freeGems: 1499, purchasedGems: 0, tradeUnlocked: false });
+    expect(unlockTrade("FREE")).toEqual({ ok: false, reason: "INSUFFICIENT_FREE_GEMS" });
+    expect(loadSave().tradeUnlocked).toBe(false);
+  });
+
+  it("17.3: 1,500 Free / 0 Purchased, Trade Locked -> unlocks", () => {
+    updateSave({ freeGems: 1500, purchasedGems: 0, tradeUnlocked: false });
+    expect(unlockTrade("FREE")).toEqual({ ok: true });
+    expect(loadSave().tradeUnlocked).toBe(true);
+  });
+
+  it("17.4: 0 Free / 499 Purchased, Trade Locked -> cannot unlock", () => {
+    updateSave({ freeGems: 0, purchasedGems: 499, tradeUnlocked: false });
+    expect(unlockTrade("PURCHASED")).toEqual({ ok: false, reason: "INSUFFICIENT_PURCHASED_GEMS" });
+    expect(loadSave().tradeUnlocked).toBe(false);
+  });
+
+  it("17.5: 0 Free / 500 Purchased, Trade Locked -> unlocks", () => {
+    updateSave({ freeGems: 0, purchasedGems: 500, tradeUnlocked: false });
+    expect(unlockTrade("PURCHASED")).toEqual({ ok: true });
+    expect(loadSave().tradeUnlocked).toBe(true);
+  });
+
+  it("17.6: 1,500 Free / 500 Purchased, Trade Locked -> the player may choose EITHER currency, never auto-picked", () => {
+    updateSave({ freeGems: 1500, purchasedGems: 500, tradeUnlocked: false });
+    expect(unlockTrade("FREE")).toEqual({ ok: true });
+    expect(loadSave().purchasedGems).toBe(500); // choosing FREE never touches Purchased
+
+    window.localStorage.clear();
+    updateSave({ freeGems: 1500, purchasedGems: 500, tradeUnlocked: false });
+    expect(unlockTrade("PURCHASED")).toEqual({ ok: true });
+    expect(loadSave().freeGems).toBe(1500); // choosing PURCHASED never touches Free
+  });
+
+  /**
+   * 17.7 / 17.8 — "attempt to buy a player's item with Free/Purchased
+   * Gems". HONESTY NOTE: this codebase has NO real player-to-player BUY
+   * transaction to test against (see MarketplaceService.ts's own header —
+   * every listing's sellerId is always this save's own playerId, and the
+   * only bid path, placeDemoBid, is a local DEMO_BIDDER_ID that never
+   * spends real Gems from either currency; see "scenario 3" above). So
+   * "Free Gems can never buy a player's item" currently holds vacuously —
+   * there is no way for ANY currency to buy a listed item yet — rather
+   * than via a per-currency check on a real buy function. Fabricating a
+   * fake buy path just to exercise a currency branch that doesn't exist in
+   * real code would violate this codebase's own "não inventar dados" rule
+   * (see MarketplaceService.ts/AuctionManager.ts headers), so instead this
+   * test proves the architectural fact directly: the only bid-shaped
+   * export on MarketplaceService is placeDemoBid, and it never touches
+   * either Gems balance.
+   */
+  it("17.7/17.8 (HONESTY): no code path lets a real player spend Free OR Purchased Gems to buy another player's listed item — the only bid path is the local demo bidder, which spends no real Gems at all", () => {
+    const exportNames = Object.keys(MarketplaceService);
+    // Distinguish the one action that actually PLACES a bid (spends/could
+    // spend Gems) from mere read-only getters like getAuctionMinimumBidForItem
+    // or getLeadingBidderForAuction, which only report existing state.
+    const bidPlacingExports = exportNames.filter((name) => /^place.*bid/i.test(name) || /buy/i.test(name));
+    expect(bidPlacingExports).toEqual(["placeDemoBid"]);
+
+    const seller = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
+    updateSave({ playerId: "player-1", inventory: [seller], freeGems: 5000, purchasedGems: 1000, tradeUnlocked: true });
+    createAuctionListingForItem(seller.instanceId, getAuctionMinBid("UNCOMMON"), 24, "FREE");
+    const listingId = loadSave().auctionListings[0]!.id;
+    const before = loadSave();
+
+    placeDemoBid(listingId, getMinimumNextBid(getAuctionMinBid("UNCOMMON")));
+
+    // The demo bid moves no Gems at all, from either bucket — for either
+    // Free or Purchased, "buying" today spends nothing, because nothing
+    // buys anything yet.
+    const after = loadSave();
+    expect(after.freeGems).toBe(before.freeGems);
+    expect(after.purchasedGems).toBe(before.purchasedGems);
+  });
+
+  /**
+   * 17.9 — "F2P obtains a rare item, unlocks Trade with Free Gems, lists,
+   * sells, and receives Purchased Gems." HONESTY NOTE: the F2P-side half of
+   * this (obtain item -> unlock Trade with Free Gems -> list it, with NO
+   * Purchased-Gems requirement anywhere in that chain) is fully real
+   * production code and is verified below end-to-end. The "receives
+   * Purchased Gems from the sale" half needs a real BUYER paying real
+   * Gems — and per this file's own 17.7/17.8 test and
+   * MarketplaceService.ts/AuctionManager.ts's own header, this local build
+   * has no real second account: the only bid path is the local demo
+   * bidder, which settleExpiredAuctions deliberately credits with ZERO
+   * Gems ("crediting Gems that were never actually spent by anyone would
+   * be currency duplication" — AuctionManager.ts's own words). So this
+   * test proves BOTH real facts honestly: the F2P listing chain works with
+   * pure Free Gems, AND a demo settlement still (correctly) pays the
+   * seller nothing, because nothing was really bought. Once a real second
+   * account exists, wiring a real buy transaction to spend that buyer's
+   * Purchased Gems and credit the seller identically is the follow-up work
+   * — not something to fake here.
+   */
+  it("17.9 (partially real, honestly labeled): F2P unlocks Trade and lists a Mythic item using ONLY Free Gems — the seller-side chain works end-to-end without ever touching Purchased Gems", () => {
+    const item = createItemInstance("crown_of_the_hollow_king", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
+    const listingFee = getAuctionListingFeeDualPrice("MYTHIC");
+    updateSave({
+      playerId: "player-1",
+      inventory: [item],
+      freeGems: TRADE_UNLOCK_PRICE.free + listingFee.free,
+      purchasedGems: 0,
+      tradeUnlocked: false,
+    });
+
+    // Unlock Trade using ONLY Free Gems — a pure F2P path.
+    expect(unlockTrade("FREE")).toEqual({ ok: true });
+    expect(loadSave().freeGems).toBe(listingFee.free);
+    expect(loadSave().purchasedGems).toBe(0);
+
+    // List the Mythic item, paying the listing fee with the Free Gems left
+    // over — no Purchased Gems required anywhere in this chain.
+    const floor = getAuctionMinBid("MYTHIC");
+    const listResult = createAuctionListingForItem(item.instanceId, floor, 24, "FREE");
+    expect(listResult.ok).toBe(true);
+    expect(loadSave().freeGems).toBe(0);
+    expect(loadSave().purchasedGems).toBe(0); // never needed, never touched
+    expect(loadSave().inventory[0]!.pendingAuction).toBe(true);
+
+    // The only bid path this local build exposes is the demo bidder — and,
+    // honestly, it settles for zero real Gems either way (no real buyer
+    // exists yet to have actually spent any).
+    const listingId = loadSave().auctionListings[0]!.id;
+    const bidAmount = getMinimumNextBid(floor);
+    expect(placeDemoBid(listingId, bidAmount)).toBe(true);
+
+    vi.setSystemTime(NOW + 25 * 60 * 60 * 1000);
+    refreshMarketplace();
+
+    const finalSave = loadSave();
+    expect(finalSave.auctionListings[0]!.status).toBe("SOLD");
+    expect(finalSave.purchasedGems).toBe(0); // honestly zero — no real buyer ever paid
+    expect(finalSave.freeGems).toBe(0);
   });
 });

@@ -12,7 +12,7 @@ import {
   placeDemoBid,
   refreshMarketplace,
 } from "./MarketplaceService";
-import { DEMO_BIDDER_ID, getAuctionListingFee, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
+import { DEMO_BIDDER_ID, getAuctionListingFee, getAuctionListingFeeDualPrice, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
 import { checkFusionEligibility } from "./ItemFusion";
 import { getItemDefinition } from "@/config/itemDefinitions";
 
@@ -45,7 +45,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     const fee = getAuctionListingFee("UNCOMMON");
     const floor = getAuctionMinBid("UNCOMMON");
 
-    const result = createAuctionListingForItem(item.instanceId, floor, 24);
+    const result = createAuctionListingForItem(item.instanceId, floor, 24, "PURCHASED");
     expect(result.ok).toBe(true);
 
     const save = loadSave();
@@ -56,10 +56,33 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(save.auctionListings[0]!.listingFeePaid).toBe(fee);
   });
 
+  it("ECONOMY UPDATE section 8/9: a pure F2P seller (0 Purchased Gems) can list an item paying the fee entirely in Free Gems", () => {
+    const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
+    updateSave({ playerId: PLAYER, inventory: [item], freeGems: 1000, purchasedGems: 0, tradeUnlocked: true });
+    const fee = getAuctionListingFeeDualPrice("UNCOMMON");
+    const floor = getAuctionMinBid("UNCOMMON");
+
+    const result = createAuctionListingForItem(item.instanceId, floor, 24, "FREE");
+    expect(result.ok).toBe(true);
+
+    const save = loadSave();
+    expect(save.freeGems).toBe(1000 - fee.free);
+    expect(save.purchasedGems).toBe(0); // never touched — no cross-currency debit
+    expect(save.inventory[0]!.pendingAuction).toBe(true);
+  });
+
+  it("ECONOMY UPDATE: listing fee fails with INSUFFICIENT_FREE_GEMS when Free Gems alone can't cover it, even with Purchased Gems sitting unused", () => {
+    const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
+    updateSave({ playerId: PLAYER, inventory: [item], freeGems: 0, purchasedGems: 1000, tradeUnlocked: true });
+    const result = createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "FREE");
+    expect(result).toEqual({ ok: false, reason: "INSUFFICIENT_FREE_GEMS" });
+    expect(loadSave().purchasedGems).toBe(1000); // never auto-falls-back to the other currency
+  });
+
   it("rejects a minBid below the real rarity floor — never trusts an arbitrary UI value", () => {
     const item = seedTradableItem();
     const floor = getAuctionMinBid("UNCOMMON");
-    const result = createAuctionListingForItem(item.instanceId, floor - 1, 24);
+    const result = createAuctionListingForItem(item.instanceId, floor - 1, 24, "PURCHASED");
     expect(result.ok).toBe(false);
     expect(loadSave().auctionListings).toHaveLength(0);
   });
@@ -67,7 +90,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
   it("rejects listing without enough Gems for the fee, and never charges a partial fee", () => {
     const item = seedTradableItem();
     updateSave({ purchasedGems: 0 });
-    const result = createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    const result = createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     expect(result.ok).toBe(false);
     const save = loadSave();
     expect(save.purchasedGems).toBe(0);
@@ -76,7 +99,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 12: an item locked in an auction cannot be equipped on a tower", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const lockedItem = loadSave().inventory[0]!;
     expect(lockedItem.pendingAuction).toBe(true);
 
@@ -86,7 +109,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 12: an item locked in an auction cannot be selected for Item Fusion", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const lockedItem = loadSave().inventory[0]!;
     const eligibility = checkFusionEligibility([lockedItem], [lockedItem.instanceId], PLAYER);
     expect(eligibility.ok).toBe(false);
@@ -94,7 +117,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 3: a demo bid is recorded on the listing without spending real Gems", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
     const gemsBefore = loadSave().purchasedGems;
 
@@ -108,7 +131,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 10: a bid below the real minimum is rejected", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
     const ok = placeDemoBid(listingId, 1);
     expect(ok).toBe(false);
@@ -117,7 +140,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 6: settling an expired auction with a bid marks it SOLD, unlocks the item, never duplicates it, and grants no phantom Gems", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
     placeDemoBid(listingId, FIRST_BID);
     const gemsAfterBid = loadSave().purchasedGems;
@@ -135,7 +158,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
   it("scenario 7: settling an expired auction with zero bids returns the item unlocked, fee stays forfeited", () => {
     const item = seedTradableItem();
     const fee = getAuctionListingFee("UNCOMMON");
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12, "PURCHASED");
     const gemsAfterListing = loadSave().purchasedGems;
     expect(gemsAfterListing).toBe(1000 - fee);
 
@@ -150,7 +173,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("scenario 12 (anti-sniping) real-flow: a bid inside the last window extends the persisted endsAt", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12, "PURCHASED");
     const listing = loadSave().auctionListings[0]!;
     const nearEnd = listing.endsAt - 60_000; // 1 minute before close, inside the 2-minute anti-snipe window
     vi.setSystemTime(nearEnd);
@@ -162,7 +185,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("cancelling an active listing with zero bids unlocks the item and marks it CANCELLED", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
 
     const ok = cancelMyAuctionListing(listingId);
@@ -174,7 +197,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("cannot cancel once a real bid exists — protects the reserved slot for the current leader", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
     placeDemoBid(listingId, FIRST_BID);
 
@@ -185,7 +208,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("getActiveAuctionListings only returns ACTIVE listings; getMyAuctionListings returns full permanent history", () => {
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
 
     expect(getActiveAuctionListings()).toHaveLength(1);
@@ -198,7 +221,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(getPriceHistoryForItemDefinition("mosswood_charm").sales).toEqual([]);
 
     const item = seedTradableItem();
-    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
+    createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12, "PURCHASED");
     const listingId = loadSave().auctionListings[0]!.id;
     placeDemoBid(listingId, FIRST_BID);
     vi.setSystemTime(DAY0 + 13 * HOUR);
@@ -231,7 +254,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
       updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, tradeUnlocked: true });
 
       const floor = getAuctionMinBid(def.rarity);
-      const result = createAuctionListingForItem(item.instanceId, floor, 24);
+      const result = createAuctionListingForItem(item.instanceId, floor, 24, "PURCHASED");
       expect(result.ok).toBe(true);
 
       const listingId = loadSave().auctionListings[0]!.id;

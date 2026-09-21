@@ -147,6 +147,9 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
           <p style={heroTaglineStyle}>{t("marketplace.hero.tagline")}</p>
           <div style={heroRowStyle}>
             <div style={gemsBadgeStyle}>
+              {t("hud.freeGems")}: <strong>{save.freeGems.toLocaleString()}</strong>
+            </div>
+            <div style={gemsBadgeStyle}>
               {t("hud.purchasedGems")}: <strong>{save.purchasedGems.toLocaleString()}</strong>
             </div>
             {save.tradeUnlocked && (
@@ -164,6 +167,7 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
             <p style={tradeLockedExplainerStyle}>
               {t("marketplace.trade.unlockPrompt", { free: getTradeUnlockPrice().free, purchased: getTradeUnlockPrice().purchased })}
             </p>
+            <p style={tradeLockedExplainerStyle}>{t("marketplace.trade.priceHint")}</p>
             <DualGemPriceButtons
               price={getTradeUnlockPrice()}
               freeBalance={save.freeGems}
@@ -277,10 +281,11 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
       {creating && (
         <CreateAuctionModal
           eligibleItems={eligibleItems}
+          freeGemsBalance={save.freeGems}
           purchasedGemsBalance={save.purchasedGems}
           onClose={() => setCreating(false)}
-          onCreate={(instanceId, minBid, durationHours) => {
-            const result = createAuctionListingForItem(instanceId, minBid, durationHours);
+          onCreate={(instanceId, minBid, durationHours, currency) => {
+            const result = createAuctionListingForItem(instanceId, minBid, durationHours, currency);
             setRefreshTick((n) => n + 1);
             return result;
           }}

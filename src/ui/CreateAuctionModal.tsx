@@ -4,38 +4,41 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
-import { AUCTION_DURATION_HOURS, getAuctionListingFee, getAuctionMinBid, type AuctionDurationHours } from "@/config/marketplace";
+import { AUCTION_DURATION_HOURS, getAuctionListingFeeDualPrice, getAuctionMinBid, type AuctionDurationHours } from "@/config/marketplace";
+import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
 import type { ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
 import { ItemGlyph } from "./ItemGlyph";
+import { DualGemPriceButtons } from "./DualGemPriceButtons";
 import type { CreateListingResult } from "@/engine/MarketplaceService";
 
 interface CreateAuctionModalProps {
   eligibleItems: readonly ItemInstance[];
-  /** GEMS ECONOMY v2 — the Marketplace listing fee is Purchased-Gems-ONLY; this is never the Free Gems balance. */
+  /** GEMS ECONOMY v2 — listing (selling) accepts EITHER currency; a pure F2P seller pays this fee entirely from freeGems. */
+  freeGemsBalance: number;
   purchasedGemsBalance: number;
   onClose: () => void;
-  onCreate: (instanceId: string, minBid: number, durationHours: AuctionDurationHours) => CreateListingResult;
+  onCreate: (instanceId: string, minBid: number, durationHours: AuctionDurationHours, currency: GemCurrency) => CreateListingResult;
 }
 
 type Step = "PICK" | "CONFIGURE";
 
-/** CREATE AUCTION flow — spec section 17: item, minimum bid, duration selector (12/24/48/72h), fee/total display, and the mandatory "your item will be locked" notice BEFORE confirmation. */
-export function CreateAuctionModal({ eligibleItems, purchasedGemsBalance, onClose, onCreate }: CreateAuctionModalProps) {
+/** CREATE AUCTION flow — spec section 17: item, minimum bid, duration selector (12/24/48/72h), dual fee/total display, and the mandatory "your item will be locked" notice BEFORE confirmation. */
+export function CreateAuctionModal({ eligibleItems, freeGemsBalance, purchasedGemsBalance, onClose, onCreate }: CreateAuctionModalProps) {
   const { t } = useLanguage();
   const [step, setStep] = useState<Step>("PICK");
   const [selected, setSelected] = useState<ItemInstance | null>(null);
   const [minBidInput, setMinBidInput] = useState<string | null>(null);
   const [duration, setDuration] = useState<AuctionDurationHours>(24);
-  const [confirming, setConfirming] = useState(false);
+  const [confirmCurrency, setConfirmCurrency] = useState<GemCurrency | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const def = selected ? getItemDefinition(selected.itemDefinitionId) : null;
   const rarity = def ? getRarityDefinition(def.rarity) : null;
   const floor = def ? getAuctionMinBid(def.rarity) : 0;
-  const fee = def ? getAuctionListingFee(def.rarity) : 0;
+  const feePrice = def ? getAuctionListingFeeDualPrice(def.rarity) : { free: 0, purchased: 0 };
   const minBid = minBidInput !== null ? Number(minBidInput) : floor;
-  const canAffordFee = purchasedGemsBalance >= fee;
+  const canAffordFee = freeGemsBalance >= feePrice.free || purchasedGemsBalance >= feePrice.purchased;
   const validMinBid = Number.isFinite(minBid) && minBid >= floor;
 
   return (
@@ -122,11 +125,17 @@ export function CreateAuctionModal({ eligibleItems, purchasedGemsBalance, onClos
             <div style={summaryBoxStyle}>
               <div style={summaryRowStyle}>
                 <span>{t("marketplace.create.feeLabel")}</span>
-                <span style={{ color: canAffordFee ? PALETTE.uiText : PALETTE.danger, fontWeight: 700 }}>{fee.toLocaleString()} 💎</span>
-              </div>
-              <div style={summaryRowStyle}>
-                <span>{t("marketplace.create.totalLabel")}</span>
-                <span style={{ fontWeight: 800, color: PALETTE.gold }}>{fee.toLocaleString()} 💎</span>
+                <span style={{ fontWeight: 700 }}>
+                  <span style={{ color: freeGemsBalance >= feePrice.free ? PALETTE.uiText : PALETTE.danger }}>
+                    🔒 {feePrice.free.toLocaleString()}
+                  </span>
+                  {"  "}
+                  {t("marketplace.create.feeOr")}
+                  {"  "}
+                  <span style={{ color: purchasedGemsBalance >= feePrice.purchased ? PALETTE.uiText : PALETTE.danger }}>
+                    💎 {feePrice.purchased.toLocaleString()}
+                  </span>
+                </span>
               </div>
               {!canAffordFee && <div style={insufficientStyle}>{t("marketplace.create.insufficientGems")}</div>}
             </div>
@@ -135,35 +144,41 @@ export function CreateAuctionModal({ eligibleItems, purchasedGemsBalance, onClos
 
             {error && <div style={insufficientStyle}>{error}</div>}
 
-            {confirming ? (
+            {confirmCurrency !== null ? (
               <div style={confirmBoxStyle}>
-                <div style={confirmTextStyle}>{t("marketplace.create.confirmPrompt")}</div>
+                <div style={confirmTextStyle}>
+                  {t("marketplace.create.confirmPrompt", {
+                    amount: gemPriceForCurrency(feePrice, confirmCurrency),
+                    icon: confirmCurrency === "FREE" ? "🔒" : "💎",
+                  })}
+                </div>
                 <button
                   onClick={() => {
-                    const result = onCreate(selected.instanceId, Math.floor(minBid), duration);
+                    const result = onCreate(selected.instanceId, Math.floor(minBid), duration, confirmCurrency);
                     if (result.ok) {
                       onClose();
                     } else {
                       setError(t("marketplace.create.createFailed"));
-                      setConfirming(false);
+                      setConfirmCurrency(null);
                     }
                   }}
                   style={confirmYesStyle}
                 >
                   {t("marketplace.create.confirmYes")}
                 </button>
-                <button onClick={() => setConfirming(false)} style={confirmNoStyle}>
+                <button onClick={() => setConfirmCurrency(null)} style={confirmNoStyle}>
                   {t("marketplace.create.confirmNo")}
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setConfirming(true)}
-                disabled={!validMinBid || !canAffordFee}
-                style={{ ...createButtonStyle, opacity: validMinBid && canAffordFee ? 1 : 0.45 }}
-              >
-                {t("marketplace.create.confirmButton")}
-              </button>
+              validMinBid && (
+                <DualGemPriceButtons
+                  price={feePrice}
+                  freeBalance={freeGemsBalance}
+                  purchasedBalance={purchasedGemsBalance}
+                  onPay={(currency) => setConfirmCurrency(currency)}
+                />
+              )
             )}
           </div>
         )}
@@ -394,19 +409,5 @@ const confirmNoStyle: CSSProperties = {
   color: PALETTE.uiTextDim,
   fontWeight: 700,
   fontSize: 10.5,
-  cursor: "pointer",
-};
-
-const createButtonStyle: CSSProperties = {
-  marginTop: 14,
-  width: "100%",
-  padding: "11px 0",
-  borderRadius: 9,
-  border: `2px solid ${PALETTE.gold}`,
-  background: `linear-gradient(180deg, #ffe9a0, ${PALETTE.gold} 60%, #d98a2a)`,
-  color: "#3a2408",
-  fontWeight: 800,
-  fontSize: 13,
-  letterSpacing: 1,
   cursor: "pointer",
 };

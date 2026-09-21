@@ -1,3 +1,4 @@
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
 import type { Rarity } from "./rarity";
 
 /**
@@ -31,6 +32,14 @@ export const AUCTION_MIN_BID_BY_RARITY: Record<Rarity, number> = {
  * 8), never large enough to discourage using the Marketplace at all. Set at
  * roughly the same ~5-8% ratio as the user's own worked example (100 Gems
  * fee on a 2000 Gems minimum bid), scaled per rarity tier.
+ *
+ * This is the PURCHASED-Gems anchor only. LISTING (selling) is dual-priced
+ * like every other system in the game — see `getAuctionListingFeeDualPrice`
+ * below — because selling an item you own carries no Purchased-Gems
+ * requirement: a pure F2P seller must be able to list using only Free Gems,
+ * per the economy spec's explicit worked example (F2P unlocks Trade with
+ * Free Gems, lists a Mythic item, sells it, receives Purchased Gems from
+ * the buyer). Only BUYING another player's item is Purchased-Gems-only.
  */
 export const AUCTION_LISTING_FEE_BY_RARITY: Record<Rarity, number> = {
   COMMON: 3,
@@ -76,6 +85,11 @@ export function getAuctionMinBid(rarity: Rarity): number {
 
 export function getAuctionListingFee(rarity: Rarity): number {
   return AUCTION_LISTING_FEE_BY_RARITY[rarity];
+}
+
+/** Dual-priced listing fee — the seller picks either currency; see `AUCTION_LISTING_FEE_BY_RARITY`'s own comment for why selling has no Purchased-Gems requirement. */
+export function getAuctionListingFeeDualPrice(rarity: Rarity): DualGemPrice {
+  return dualGemPrice(getAuctionListingFee(rarity));
 }
 
 /**

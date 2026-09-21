@@ -240,10 +240,11 @@ export interface SaveData {
 
   /**
    * GEMS ECONOMY v2 — the gate before the Marketplace (listing OR bidding)
-   * becomes usable at all. Spends either 500 Free OR 500 Purchased Gems,
-   * once, permanently (config/gemsEconomy.ts's TRADE_UNLOCK_PRICE) — never
-   * re-locked, never re-charged. false on every save that predates this
-   * field, exactly like every other one-time permanent unlock in this file.
+   * becomes usable at all. Spends either 1,500 Free OR 500 Purchased Gems
+   * (config/gemsEconomy.ts's TRADE_UNLOCK_PRICE — a deliberate 3x asymmetry,
+   * not the usual 1.5x multiplier), once, permanently — never re-locked,
+   * never re-charged. false on every save that predates this field, exactly
+   * like every other one-time permanent unlock in this file.
    */
   tradeUnlocked: boolean;
 }

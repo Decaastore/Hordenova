@@ -9,10 +9,14 @@
  *
  *   💎 PURCHASED GEMS — bought from a real-money store (not yet built in
  *   this local client — see GameEngine.ts's own note on where that IAP
- *   entry point would plug in). Valid for every system below, PLUS the
- *   Marketplace (config/marketplace.ts), which is Purchased-Gems-ONLY —
- *   Free Gems must never buy another player's tradeable item, or the
- *   gameplay economy would leak directly into the player-to-player one.
+ *   entry point would plug in). Valid for every system below, PLUS
+ *   BUYING on the Marketplace (config/marketplace.ts), which is
+ *   Purchased-Gems-ONLY — Free Gems must never buy another player's
+ *   tradeable item, or the gameplay economy would leak directly into the
+ *   player-to-player one. LISTING an item you own (the seller side) has no
+ *   such restriction — a pure F2P player can list and sell using nothing
+ *   but Free Gems for the listing fee, and receives Purchased Gems from the
+ *   sale regardless of which currency paid for their Trade Unlock.
  *
  * NEVER: a system that auto-picks a currency, blends the two into one
  * payment, or converts one into the other. Every dual-priced action always
@@ -39,10 +43,14 @@
  *   the SAME thing a payer gets faster. Never impossible, never a rounding
  *   error away from the payer's price.
  *
- * The one deliberate exception is Trade Unlock, which the spec fixes at an
- * explicit flat 500/500 (see TRADE_UNLOCK_PRICE below) — unlocking Trading
- * itself is not a "buy power faster" decision, so it carries no premium
- * either way.
+ * The one deliberate exception is Trade Unlock (see TRADE_UNLOCK_PRICE
+ * below), which is NOT run through FREE_GEMS_PRICE_MULTIPLIER at all and
+ * carries a much steeper, explicitly spec'd asymmetry (1,500 Free / 500
+ * Purchased — a 3x premium, not 1.5x): Trade Unlock is not just another
+ * upgrade, it's the gate into the entire player-to-player Marketplace
+ * economy (buying/selling/listing Boss/Legendary/Mythic items), so a
+ * free player is meant to reach it as a real mid-term goal, never as an
+ * early, trivial side-effect of normal Free Gems income.
  */
 
 export type GemCurrency = "FREE" | "PURCHASED";
@@ -69,13 +77,22 @@ export function gemPriceForCurrency(price: DualGemPrice, currency: GemCurrency):
 
 /**
  * TRADE UNLOCK — the one gate before the Marketplace (config/marketplace.ts)
- * becomes usable at all (listing OR bidding). Fixed at an explicit flat
- * 500 Free OR 500 Purchased Gems (spec's own exact numbers) — deliberately
- * NOT run through FREE_GEMS_PRICE_MULTIPLIER, since unlocking access isn't a
- * "power now vs. later" decision the effort-premium logic applies to.
+ * becomes usable at all (listing OR bidding). Deliberately asymmetric per
+ * spec's own exact numbers: 1,500 Free OR 500 Purchased Gems — a real 3x
+ * premium for the free path, NOT the uniform 1.5x FREE_GEMS_PRICE_MULTIPLIER
+ * every other dual-priced system uses. Rationale: Trade access isn't a
+ * "convenience now vs. later" purchase like a Skin or a Prestige level —
+ * it's the door into the entire player-to-player economy (selling/buying/
+ * listing rare and Boss/Legendary/Mythic items), so it must read as a real
+ * mid-term F2P goal, never something 500-800 casual Free Gems trivially
+ * clears on day one. Purchased stays at the pre-existing 500 anchor
+ * unchanged — a paying player's access speed is untouched.
+ *
  * Spending EITHER currency here only unlocks Trading — it never converts
  * currency, and Marketplace PURCHASES remain Purchased-Gems-only regardless
  * of which currency paid for this unlock (see GameEngine/MarketplaceService's
- * own "no conversion" contracts).
+ * own "no conversion" contracts). Selling an item you own is allowed either
+ * way once unlocked; only BUYING another player's item requires Purchased
+ * Gems specifically.
  */
-export const TRADE_UNLOCK_PRICE: DualGemPrice = { free: 500, purchased: 500 };
+export const TRADE_UNLOCK_PRICE: DualGemPrice = { free: 1500, purchased: 500 };
