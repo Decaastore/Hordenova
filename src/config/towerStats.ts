@@ -4,6 +4,11 @@
  * entities/Tower.ts only forwards into getTowerLevelStats()).
  */
 
+// Type-only import — erased at compile time, so this never creates a real
+// runtime circular dependency even though towerSkins.ts itself imports
+// `TowerType` from this file.
+import type { SkinGameplayEffect } from "./towerSkins";
+
 export type TowerType = "IRONWOOD" | "INFERNO" | "FROSTBORN" | "STORMCALLER";
 
 export const TOWER_TYPES: readonly TowerType[] = [
@@ -215,8 +220,17 @@ export function getTowerLevelStats(type: TowerType, level: number): TowerLevelSt
  * `MILESTONE_UNLOCKS` below for the matching UI callout), which is what
  * actually makes a build decision matter — not just "which tower has the
  * biggest number."
+ *
+ * `skinEffect` (TOWER SKIN SYSTEM v3) is an explicit, optional third
+ * parameter — never inferred, never looked up here — applying a skin's own
+ * `SkinGameplayEffect` (config/towerSkins.ts) on top of the level-scaled
+ * base above. Every real combat call site (engine/CombatSystem.ts) passes
+ * the CURRENTLY EQUIPPED skin's effect; every display-only call site that
+ * has no specific tower instance in hand (screens/WikiScreen.tsx's static
+ * level previews) simply omits it and gets the tower's true base numbers —
+ * there is no way to accidentally leak a skin's effect into either.
  */
-export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpecial {
+export function getTowerSpecialAtLevel(type: TowerType, level: number, skinEffect?: SkinGameplayEffect): TowerSpecial {
   const clamped = Math.min(Math.max(level, 1), MAX_TOWER_LEVEL);
   const milestones = milestonesPassed(clamped);
 
@@ -225,19 +239,21 @@ export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpe
       const base = TOWER_SPECIALS.IRONWOOD;
       return {
         type: "IRONWOOD",
-        critChance: round2(Math.min(0.6, base.critChance + (clamped - 1) * 0.012)),
+        critChance: round2(Math.min(0.6, base.critChance + (clamped - 1) * 0.012 + (skinEffect?.critChanceAdd ?? 0))),
         critMultiplier: round2(base.critMultiplier + milestones * 0.25),
         // "Giant Slayer" — unlocks at 15, scales further at 25 (both milestone levels).
-        bossDamageMultiplier: clamped >= 15 ? round2(1.25 + (clamped >= 25 ? 0.25 : 0)) : 1,
+        bossDamageMultiplier: round2(
+          (clamped >= 15 ? 1.25 + (clamped >= 25 ? 0.25 : 0) : 1) + (skinEffect?.bossDamageMultAdd ?? 0),
+        ),
       };
     }
     case "INFERNO": {
       const base = TOWER_SPECIALS.INFERNO;
       return {
         type: "INFERNO",
-        aoeRadius: round2(base.aoeRadius + (clamped - 1) * 1.4 + milestones * 4),
-        burnDamagePerSecond: round2(base.burnDamagePerSecond + (clamped - 1) * 0.35),
-        burnDurationMs: base.burnDurationMs + milestones * 300,
+        aoeRadius: round2((base.aoeRadius + (clamped - 1) * 1.4 + milestones * 4) * (skinEffect?.aoeRadiusMult ?? 1)),
+        burnDamagePerSecond: round2((base.burnDamagePerSecond + (clamped - 1) * 0.35) * (skinEffect?.burnDamageMult ?? 1)),
+        burnDurationMs: base.burnDurationMs + milestones * 300 + (skinEffect?.burnDurationMsAdd ?? 0),
         // "Wildfire" — burn starts stacking at 10, a third stack unlocks at 20.
         burnMaxStacks: clamped >= 20 ? 3 : clamped >= 10 ? 2 : 1,
       };
@@ -248,9 +264,11 @@ export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpe
       const freezeChance = clamped >= 20 ? 0.3 : clamped >= 10 ? 0.15 : 0;
       return {
         type: "FROSTBORN",
-        slowPercent: round2(Math.min(0.75, base.slowPercent + (clamped - 1) * 0.01)),
+        slowPercent: round2(
+          Math.min(0.75, Math.max(0, base.slowPercent + (clamped - 1) * 0.01 + (skinEffect?.slowPercentAdd ?? 0))),
+        ),
         slowDurationMs: base.slowDurationMs + milestones * 250,
-        freezeChance,
+        freezeChance: round2(Math.max(0, Math.min(1, freezeChance + (skinEffect?.freezeChanceAdd ?? 0)))),
         freezeDurationMs: base.freezeDurationMs + (clamped >= 20 ? 400 : 0),
       };
     }
@@ -261,8 +279,10 @@ export function getTowerSpecialAtLevel(type: TowerType, level: number): TowerSpe
       return {
         type: "STORMCALLER",
         chainTargets: base.chainTargets + Math.floor(clamped / 10),
-        chainFalloff: Math.min(0.85, base.chainFalloff + milestones * 0.04),
-        armorPenetration,
+        chainFalloff: round2(
+          Math.max(0, Math.min(0.85, base.chainFalloff + milestones * 0.04 + (skinEffect?.chainFalloffAdd ?? 0))),
+        ),
+        armorPenetration: round2(Math.max(0, Math.min(1, armorPenetration + (skinEffect?.armorPenetrationAdd ?? 0)))),
       };
     }
   }

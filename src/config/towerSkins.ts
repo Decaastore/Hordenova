@@ -1,15 +1,21 @@
 import type { TowerType } from "./towerStats";
 
 /**
- * TOWER SKIN SYSTEM v2 — "FASE ADICIONAL: TOWER SKIN SYSTEM + PREMIUM GEM
- * SKINS". The original architecture (still true below) shipped exactly one
- * real skin per tower type, and that skin was ONLY a 4-color palette swap
- * plus a dead `ornament` flag EntityRenderer.ts never actually read — so
- * every "skin" in the game read as a recolor, not a different tower. This
- * pass keeps every structural guarantee (a skin NEVER appears in
- * TowerLevelStats/TowerSpecial and is never read by CombatSystem.ts — see
- * towerSkins.test.ts) while giving a skin real visual authority over five
- * independent axes read by rendering/EntityRenderer.ts's draw{Type}
+ * TOWER SKIN SYSTEM v3 — "REVISÃO PROFISSIONAL: TORRES + SKINS + GAMEPLAY
+ * ATTRIBUTES + SHOP/PREVIEW". v2 gave every skin real VISUAL authority over
+ * five independent axes (below) but kept skins purely cosmetic — this pass
+ * is the deliberate, explicit reversal of that one constraint: a commercial
+ * skin now also carries a small, bounded `gameplayEffect` (see that type's
+ * own doc comment) that Tower.getTowerStats and towerStats.getTowerSpecialAtLevel
+ * apply ONLY while the skin is actually equipped (`tower.equippedSkinId`) —
+ * never during a shop/panel PREVIEW, which only ever renders a throwaway
+ * copy of the tower object and never touches `equippedSkinId` for real (see
+ * ui/TowerInfoPanel.tsx's SkinPreviewCanvas). Every other v2 guarantee is
+ * untouched: a skin never appears in TowerLevelStats/TowerSpecial's own
+ * BASE numbers (only as an explicit, separate modifier applied on top), and
+ * never changes the tower's footprint.
+ *
+ * The five VISUAL axes read by rendering/EntityRenderer.ts's draw{Type}
  * functions and drawProjectile: `material` (a shading/overlay treatment
  * applied to the body), `coreShape` (the tower's focal "power source" —
  * ballista knot / furnace mouth / frozen core / rune orb — swapped for a
@@ -89,6 +95,58 @@ export interface SkinParticleStyle {
 }
 
 /**
+ * SIDEGRADE, NEVER A STRICT UPGRADE — every field here is small (bounded to
+ * ±8%, see towerSkins.test.ts's own numeric-bounds assertions) and every
+ * commercial skin below pairs exactly one upside field with exactly one
+ * downside field, so no skin is ever strictly better than the default look
+ * in every situation — it specializes the tower's existing archetype
+ * instead of generically inflating it (spec: "SIDEGRADES / SPECIALIZATIONS,
+ * não power creep"). All fields are optional and multiplicative/additive
+ * over the tower's already-computed base+Mastery numbers:
+ *   - `*Mult` fields multiply the stat (1.06 = +6%, 0.96 = -4%).
+ *   - `*Add` fields add directly to the stat's own unit (a fraction like
+ *     0.05 = +5 percentage points for a chance/percent stat, or ms for a
+ *     duration) — NEGATIVE is a real, valid downside for several of these
+ *     (e.g. a lower `chainFalloffAdd` is a BUFF — see Stormcaller Tempest —
+ *     while a lower `slowPercentAdd` is a nerf, so "sign = good" does not
+ *     hold uniformly; towerSkins.test.ts documents each skin's own
+ *     buff/nerf pair explicitly rather than inferring it from sign alone).
+ * Only the fields relevant to a tower's own archetype are ever set on that
+ * tower's skins (e.g. `burnDamageMult` only appears on INFERNO skins).
+ * Applied by entities/Tower.ts's getTowerStats (damage/attackSpeed/range)
+ * and config/towerStats.ts's getTowerSpecialAtLevel (everything else) —
+ * BOTH accept the effect as an explicit optional parameter, sourced ONLY
+ * from `tower.equippedSkinId`'s own definition, so a skin merely being
+ * PREVIEWED (which never touches `equippedSkinId`) can never apply it.
+ */
+export interface SkinGameplayEffect {
+  damageMult?: number;
+  attackSpeedMult?: number;
+  rangeMult?: number;
+  /** IRONWOOD only. */
+  critChanceAdd?: number;
+  /** IRONWOOD only. */
+  bossDamageMultAdd?: number;
+  /** INFERNO only. */
+  aoeRadiusMult?: number;
+  /** INFERNO only. */
+  burnDamageMult?: number;
+  /** INFERNO only, milliseconds. */
+  burnDurationMsAdd?: number;
+  /** FROSTBORN only. */
+  slowPercentAdd?: number;
+  /** FROSTBORN only. */
+  freezeChanceAdd?: number;
+  /** STORMCALLER only. */
+  armorPenetrationAdd?: number;
+  /** STORMCALLER only — LOWER is the buff (chain hits retain more damage per jump). */
+  chainFalloffAdd?: number;
+}
+
+/** Every field absent — the explicit, reusable "this skin/tier changes nothing about gameplay" value. Used by every PRESTIGE skin (a free P50 reward must never also be a free permanent combat-stat upgrade — see PRESTIGE_TOWER_SKINS's own doc comment) and by anything else that is cosmetic-only. */
+export const NO_GAMEPLAY_EFFECT: SkinGameplayEffect = {};
+
+/**
  * HORDENOVA Season/Progression v1.0 — commercial tier, one of three fixed
  * price points (see TOWER_SKIN_TIER_PRICES). Purely a pricing classification
  * — never read by combat code, never affects catalog/ownership/equip logic.
@@ -138,15 +196,17 @@ export interface TowerSkinDefinition {
   /** The fired projectile's shape/trail/impact identity — read by EntityRenderer.drawProjectile via the tower's equipped skin (threaded through ProjectileInstance.skinId, set at fire time by CombatSystem). An unrecognized value draws the tower type's default projectile. */
   projectileStyle: string;
   /**
-   * Shown in the shop as "Cosmetic Attribute — <name>". This is NOT a
-   * second mechanic: it is the shop-facing NAME for this skin's own
-   * `projectileStyle` (its attack visual signature) — one skin, one visual
-   * identity, described once in flavor text and drawn once by the
-   * renderer. Never read by CombatSystem/getTowerStats/getTowerSpecialAtLevel
-   * — see towerSkins.test.ts's "cosmetic attribute never touches gameplay"
-   * guarantee.
+   * Shown in the shop as "Cosmetic Attribute — <name>". Purely the
+   * shop-facing NAME for this skin's own `projectileStyle` (its attack
+   * visual signature) — never itself a gameplay input. The REAL gameplay
+   * numbers live in `gameplayEffect` below and are always shown to the
+   * player as their own explicit "GAMEPLAY EFFECTS" block (spec: "nunca
+   * esconder o efeito") — this field and that one are deliberately never
+   * conflated, see towerSkins.test.ts.
    */
   cosmeticAttribute: { i18nKey: string };
+  /** See SkinGameplayEffect's own doc comment. `NO_GAMEPLAY_EFFECT` for every PRESTIGE skin. */
+  gameplayEffect: SkinGameplayEffect;
 }
 
 export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
@@ -174,6 +234,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#8a3fff", behavior: "void-wisps" },
     projectileStyle: "void-bolt",
     cosmeticAttribute: { i18nKey: "IRONWOOD_WARDEN_OF_THE_ABYSS" },
+    gameplayEffect: { critChanceAdd: 0.05, attackSpeedMult: 0.96 },
   },
   {
     id: "IRONWOOD_CELESTIAL_WARDEN",
@@ -189,6 +250,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#fff2c9", behavior: "light-motes" },
     projectileStyle: "radiant-arrow",
     cosmeticAttribute: { i18nKey: "IRONWOOD_CELESTIAL_WARDEN" },
+    gameplayEffect: { rangeMult: 1.06, damageMult: 0.96 },
   },
   {
     id: "IRONWOOD_ARCANE_ENGINE",
@@ -204,6 +266,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#6adfff", behavior: "circuit-pulses" },
     projectileStyle: "energy-bolt",
     cosmeticAttribute: { i18nKey: "IRONWOOD_ARCANE_ENGINE" },
+    gameplayEffect: { attackSpeedMult: 1.06, damageMult: 0.96 },
   },
   {
     id: "IRONWOOD_ANCIENT_HUNTER",
@@ -219,6 +282,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#8fffb0", behavior: "spirit-wisps" },
     projectileStyle: "spirit-arrow",
     cosmeticAttribute: { i18nKey: "IRONWOOD_ANCIENT_HUNTER" },
+    gameplayEffect: { bossDamageMultAdd: 0.06, attackSpeedMult: 0.97 },
   },
   {
     id: "IRONWOOD_IRONCLAD_JUGGERNAUT",
@@ -234,6 +298,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ff8a3a", behavior: "sparks" },
     projectileStyle: "heavy-bolt",
     cosmeticAttribute: { i18nKey: "IRONWOOD_IRONCLAD_JUGGERNAUT" },
+    gameplayEffect: { damageMult: 1.07, attackSpeedMult: 0.95 },
   },
 
   // ---------------------------------------------------------------------
@@ -258,6 +323,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ff2e2e", behavior: "embers" },
     projectileStyle: "hellfire-orb",
     cosmeticAttribute: { i18nKey: "INFERNO_ASHEN_TYRANT" },
+    gameplayEffect: { burnDamageMult: 1.06, aoeRadiusMult: 0.96 },
   },
   {
     id: "INFERNO_VOLCANIC_COLOSSUS",
@@ -273,6 +339,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ff8a3a", behavior: "embers" },
     projectileStyle: "magma-orb",
     cosmeticAttribute: { i18nKey: "INFERNO_VOLCANIC_COLOSSUS" },
+    gameplayEffect: { aoeRadiusMult: 1.06, damageMult: 0.96 },
   },
   {
     id: "INFERNO_INDUSTRIAL_FORGE",
@@ -288,6 +355,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#eaf2ff", behavior: "steam" },
     projectileStyle: "pressure-bolt",
     cosmeticAttribute: { i18nKey: "INFERNO_INDUSTRIAL_FORGE" },
+    gameplayEffect: { attackSpeedMult: 1.06, burnDamageMult: 0.96 },
   },
   {
     id: "INFERNO_SOLAR_ASCENDANT",
@@ -303,6 +371,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#fff6d0", behavior: "solar-flares" },
     projectileStyle: "solar-orb",
     cosmeticAttribute: { i18nKey: "INFERNO_SOLAR_ASCENDANT" },
+    gameplayEffect: { damageMult: 1.06, attackSpeedMult: 0.96 },
   },
   {
     id: "INFERNO_PLAGUE_FURNACE",
@@ -318,6 +387,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#aaff4a", behavior: "toxic-bubbles" },
     projectileStyle: "toxic-orb",
     cosmeticAttribute: { i18nKey: "INFERNO_PLAGUE_FURNACE" },
+    gameplayEffect: { burnDurationMsAdd: 240, damageMult: 0.97 },
   },
 
   // ---------------------------------------------------------------------
@@ -344,6 +414,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#c8f0a0", behavior: "drifting-leaves" },
     projectileStyle: "jade-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_ANCIENT_GUARDIAN" },
+    gameplayEffect: { rangeMult: 1.05, damageMult: 0.96 },
   },
   {
     id: "FROSTBORN_VOID_FROST",
@@ -359,6 +430,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#7a4aff", behavior: "void-wisps" },
     projectileStyle: "black-frost-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_VOID_FROST" },
+    gameplayEffect: { freezeChanceAdd: 0.05, attackSpeedMult: 0.96 },
   },
   {
     id: "FROSTBORN_ARCANE_CRYSTAL",
@@ -374,6 +446,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ff9ae0", behavior: "prism-sparkles" },
     projectileStyle: "prism-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_ARCANE_CRYSTAL" },
+    gameplayEffect: { damageMult: 1.06, rangeMult: 0.96 },
   },
   {
     id: "FROSTBORN_CELESTIAL_ICE",
@@ -389,6 +462,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#eaf6ff", behavior: "starlight" },
     projectileStyle: "starfrost-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_CELESTIAL_ICE" },
+    gameplayEffect: { slowPercentAdd: 0.06, damageMult: 0.96 },
   },
   {
     id: "FROSTBORN_GLACIAL_WARLORD",
@@ -404,6 +478,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#4ecfff", behavior: "frost-shards" },
     projectileStyle: "glacial-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_GLACIAL_WARLORD" },
+    gameplayEffect: { attackSpeedMult: 1.06, slowPercentAdd: -0.04 },
   },
 
   // ---------------------------------------------------------------------
@@ -428,6 +503,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#5a1fff", behavior: "void-wisps" },
     projectileStyle: "void-arc",
     cosmeticAttribute: { i18nKey: "STORMCALLER_VOID" },
+    gameplayEffect: { armorPenetrationAdd: 0.06, attackSpeedMult: 0.96 },
   },
   {
     id: "STORMCALLER_THUNDER",
@@ -443,6 +519,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#4ac8ff", behavior: "sparks" },
     projectileStyle: "thunder-bolt",
     cosmeticAttribute: { i18nKey: "STORMCALLER_THUNDER" },
+    gameplayEffect: { damageMult: 1.07, rangeMult: 0.96 },
   },
   {
     id: "STORMCALLER_CELESTIAL",
@@ -458,6 +535,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ffe9a0", behavior: "light-motes" },
     projectileStyle: "divine-bolt",
     cosmeticAttribute: { i18nKey: "STORMCALLER_CELESTIAL" },
+    gameplayEffect: { rangeMult: 1.06, damageMult: 0.96 },
   },
   {
     id: "STORMCALLER_ARCANE",
@@ -473,6 +551,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#d89aff", behavior: "prism-sparkles" },
     projectileStyle: "arcane-bolt",
     cosmeticAttribute: { i18nKey: "STORMCALLER_ARCANE" },
+    gameplayEffect: { attackSpeedMult: 1.06, damageMult: 0.96 },
   },
   {
     id: "STORMCALLER_TEMPEST",
@@ -488,6 +567,7 @@ export const TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#6affd0", behavior: "wind-swirl" },
     projectileStyle: "cyclone-bolt",
     cosmeticAttribute: { i18nKey: "STORMCALLER_TEMPEST" },
+    gameplayEffect: { chainFalloffAdd: -0.05, attackSpeedMult: 0.96 },
   },
 ];
 
@@ -517,6 +597,7 @@ export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ffd257", behavior: "light-motes" },
     projectileStyle: "radiant-arrow",
     cosmeticAttribute: { i18nKey: "IRONWOOD_PRESTIGE_ASCENDANT" },
+    gameplayEffect: NO_GAMEPLAY_EFFECT,
   },
   {
     id: "INFERNO_PRESTIGE_ASCENDANT",
@@ -532,6 +613,7 @@ export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ffd257", behavior: "solar-flares" },
     projectileStyle: "solar-orb",
     cosmeticAttribute: { i18nKey: "INFERNO_PRESTIGE_ASCENDANT" },
+    gameplayEffect: NO_GAMEPLAY_EFFECT,
   },
   {
     id: "FROSTBORN_PRESTIGE_ASCENDANT",
@@ -547,6 +629,7 @@ export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ffd257", behavior: "starlight" },
     projectileStyle: "starfrost-bolt",
     cosmeticAttribute: { i18nKey: "FROSTBORN_PRESTIGE_ASCENDANT" },
+    gameplayEffect: NO_GAMEPLAY_EFFECT,
   },
   {
     id: "STORMCALLER_PRESTIGE_ASCENDANT",
@@ -562,6 +645,7 @@ export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
     particleStyle: { color: "#ffd257", behavior: "light-motes" },
     projectileStyle: "divine-bolt",
     cosmeticAttribute: { i18nKey: "STORMCALLER_PRESTIGE_ASCENDANT" },
+    gameplayEffect: NO_GAMEPLAY_EFFECT,
   },
 ];
 

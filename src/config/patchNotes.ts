@@ -70,6 +70,68 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v35",
+    dateIso: "2026-09-21",
+    category: "FIXES",
+    title: {
+      en: "Floating Isles — Fixed Overlapping/Duplicated Water Ponds",
+      ptBR: "Ilhas Flutuantes — Corrigidas Lagoas de Água Sobrepostas/Duplicadas",
+    },
+    description: {
+      en: "Floating Isles (and, to a lesser degree, every other biome with water ponds) could place two ponds close enough to visually overlap into what looked like a single duplicated, broken lake, and could place a pond so close to the enemy path or a tower slot that its edge spilled onto them — because the placement check only ever compared a decoration's center point to the path/slots, never its actual drawn size. Every decoration kind now carries its own real visual footprint, and placement requires that footprint to clear both the play area and every other already-placed decoration, not just avoid a bare point. Floating Isles specifically had the most water ponds of any biome after Leviathan Coast, so it showed the bug most often.",
+      ptBR: "Ilhas Flutuantes (e, em menor grau, qualquer outro bioma com lagoas de água) podia posicionar duas lagoas próximas o suficiente para se sobreporem visualmente, parecendo um único lago duplicado e quebrado, e podia posicionar uma lagoa perto o bastante do caminho dos inimigos ou de um slot de torre para que sua borda invadisse essas áreas — porque a verificação de posicionamento só comparava o ponto central de uma decoração com o caminho/slots, nunca seu tamanho real desenhado. Cada tipo de decoração agora carrega seu próprio espaço visual real, e o posicionamento exige que esse espaço fique livre tanto da área de jogo quanto de qualquer outra decoração já posicionada, não apenas evitando um ponto isolado. As Ilhas Flutuantes especificamente tinham a maior quantidade de lagoas de água entre os biomas depois da Costa dos Leviatãs, por isso mostravam o bug com mais frequência.",
+    },
+    highlights: [
+      {
+        en: "Root cause: decoration placement only checked a bare center point against the path/tower-slots and against nothing else already placed — large decorations like water ponds (up to ~54px of visual radius) could legally sit with their center just outside the clearance zone while their drawn shape still spilled across it.",
+        ptBR: "Causa raiz: o posicionamento de decorações só verificava um ponto central isolado contra o caminho/slots de torre e contra nada mais já posicionado — decorações grandes como lagoas de água (até ~54px de raio visual) podiam ter seu centro logo fora da zona de segurança enquanto sua forma desenhada ainda invadia essa área.",
+      },
+      {
+        en: "Fix: every decoration kind now has an approximate real footprint radius; placement requires that footprint (not just the point) to clear the enemy path, every tower slot, AND every other already-placed decoration — verified with new automated tests across all 10 biomes that ship water.",
+        ptBR: "Correção: cada tipo de decoração agora tem um raio de espaço visual aproximado real; o posicionamento exige que esse espaço (não apenas o ponto) fique livre do caminho dos inimigos, de todo slot de torre E de toda outra decoração já posicionada — verificado com novos testes automatizados em todos os 10 biomas que têm água.",
+      },
+      {
+        en: "Purely a placement/visual fix — no gameplay values, path geometry, or tower-slot positions changed.",
+        ptBR: "Uma correção puramente de posicionamento/visual — nenhum valor de jogabilidade, geometria do caminho ou posição de slot de torre foi alterado.",
+      },
+    ],
+  },
+  {
+    id: "v34",
+    dateIso: "2026-09-21",
+    category: "TOWERS",
+    title: {
+      en: "Tower Skins Now Have Real (Small, Balanced) Gameplay Effects, Plus a Proper Shop Preview",
+      ptBR: "Skins de Torre Agora Têm Efeitos Reais de Jogabilidade (Pequenos e Balanceados), Além de uma Prévia de Loja de Verdade",
+    },
+    description: {
+      en: "Every one of the 20 commercial tower skins now carries a small, explicit gameplay effect on top of its visual identity — always one clear upside paired with one clear downside (e.g. Ironwood's Warden of the Abyss: +5% Crit Chance, -4% Attack Speed), never a flat power boost, so a skin is a genuine sidegrade/specialization rather than a straight upgrade. The effect only ever activates while the skin is actually equipped on a tower — merely browsing or previewing a skin in the shop never applies it. The skin shop itself (inside each tower's info panel) now shows every skin at all times, including ones you don't own yet: a locked skin shows its real price, its exact gameplay-effect numbers, and a live preview of the real tower rendered with it equipped — nothing is hidden behind a purchase. The preview also has an L1/L20/L40/L60 level scrubber, so you can see exactly how a skin's look evolves across the tower's full level range before ever spending a Gem.",
+      ptBR: "Cada uma das 20 skins comerciais de torre agora carrega um efeito de jogabilidade pequeno e explícito além da sua identidade visual — sempre um benefício claro combinado com uma desvantagem clara (por exemplo, o Guardião do Abismo do Ironwood: +5% de Chance de Crítico, -4% de Velocidade de Ataque), nunca um aumento de poder puro, então uma skin é uma verdadeira especialização/variante, não um upgrade direto. O efeito só é ativado enquanto a skin está de fato equipada em uma torre — apenas navegar ou pré-visualizar uma skin na loja nunca o aplica. A própria loja de skins (dentro do painel de informações de cada torre) agora mostra todas as skins o tempo todo, incluindo as que você ainda não possui: uma skin bloqueada mostra seu preço real, seus números exatos de efeito de jogabilidade, e uma prévia ao vivo da torre real renderizada com ela equipada — nada fica escondido atrás de uma compra. A prévia também tem um seletor de nível L1/L20/L40/L60, para você ver exatamente como a aparência de uma skin evolui em toda a faixa de nível da torre antes de gastar um único Gem.",
+    },
+    highlights: [
+      {
+        en: "All 20 commercial skins now have a real, bounded gameplay effect (±3-8% on stats like Damage/Range/Attack Speed/Crit Chance/Boss Damage, or the equivalent archetype-specific stat for Inferno's burn, Frostborn's slow/freeze, and Stormcaller's armor penetration/chain damage) — always paired as one upside plus one downside, so no skin is ever strictly better than the tower's default look.",
+        ptBR: "Todas as 20 skins comerciais agora têm um efeito de jogabilidade real e limitado (±3-8% em estatísticas como Dano/Alcance/Velocidade de Ataque/Chance de Crítico/Dano a Chefes, ou a estatística equivalente específica do arquétipo para a queimadura do Inferno, a lentidão/congelamento do Frostborn e a penetração de armadura/dano em cadeia do Stormcaller) — sempre combinado como um benefício mais uma desvantagem, então nenhuma skin é estritamente melhor que a aparência padrão da torre.",
+      },
+      {
+        en: "The effect is applied ONLY through actually equipping a skin on a real tower — previewing, hovering, or browsing a skin (owned or not) never changes a tower's real damage/range/attack-speed/special numbers, verified by automated tests.",
+        ptBR: "O efeito só é aplicado ao equipar de fato uma skin em uma torre real — pré-visualizar, passar o mouse ou navegar por uma skin (adquirida ou não) nunca muda os números reais de dano/alcance/velocidade de ataque/especial de uma torre, verificado por testes automatizados.",
+      },
+      {
+        en: "Locked skins are now always visible in the shop (never hidden), each showing its price, its exact Gameplay Effects numbers, and a real live preview of the tower rendered with it — clicking a locked skin previews it instantly, with no purchase required to look.",
+        ptBR: "Skins bloqueadas agora ficam sempre visíveis na loja (nunca escondidas), cada uma mostrando seu preço, seus números exatos de Efeitos de Jogabilidade, e uma prévia ao vivo real da torre renderizada com ela — clicar em uma skin bloqueada a pré-visualiza instantaneamente, sem necessidade de comprar para ver.",
+      },
+      {
+        en: "New L1/L20/L40/L60 level scrubber in the skin preview lets you see a skin's evolution across the tower's entire level range without touching the tower's real (Season-scoped) level — the footprint never changes at any of these levels.",
+        ptBR: "Novo seletor de nível L1/L20/L40/L60 na prévia da skin permite ver a evolução de uma skin em toda a faixa de nível da torre sem alterar o nível real (da Temporada) da torre — o espaço ocupado nunca muda em nenhum desses níveis.",
+      },
+      {
+        en: "Every Prestige-exclusive skin (the free Prestige-50 reward) stays purely cosmetic with zero gameplay effect, by design — a free reward was never meant to also be a free permanent combat-stat upgrade.",
+        ptBR: "Toda skin exclusiva de Prestígio (a recompensa gratuita de Prestígio 50) continua puramente cosmética, com efeito de jogabilidade zero, por design — uma recompensa gratuita nunca deveria também ser um upgrade permanente e gratuito de estatística de combate.",
+      },
+    ],
+  },
+  {
     id: "v33",
     dateIso: "2026-09-18",
     category: "TOWERS",

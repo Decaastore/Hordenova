@@ -5,6 +5,7 @@ import {
   canChooseSpecialization,
   canUpgradeMastery,
   canUpgradeSpecialization,
+  getEquippedSkinGameplayEffect,
   getMasteryUpgradeCostFor,
   getSpecializationUpgradeCostFor,
   getTowerStats,
@@ -26,7 +27,7 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getPrestigeSkinsForTower, getSkinsForTower } from "@/config/towerSkins";
+import { getPrestigeSkinsForTower, getSkinsForTower, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
 import { REPOSITION_GEM_COST } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
@@ -152,7 +153,7 @@ export function TowerInfoPanel({
       {survival.maxShield > 0 && <Row label={t("towerInfo.shield")} value={`${Math.ceil(tower.shieldHp)} / ${survival.maxShield}`} />}
 
       <div style={{ ...sectionLabelStyle, marginTop: 4 }}>{t("towerInfo.special")}</div>
-      {renderSpecialLines(tower.type, tower.level, t).map((line) => (
+      {renderSpecialLines(tower.type, tower.level, t, getEquippedSkinGameplayEffect(tower)).map((line) => (
         <div key={line.label}>
           <Row label={line.label} value={line.value} dim={line.locked} />
           {line.note && <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, fontStyle: "italic" }}>{line.note}</div>}
@@ -783,7 +784,10 @@ function SpecializationSection({
  * precisely what they're getting: body, material, core, weapon detail,
  * and idle particles, at the tower's own current level.
  */
-function SkinPreviewCanvas({ tower, skinId }: { tower: TowerInstance; skinId: string | null }) {
+/** L1/L20/L40/L60 — the fixed evolution checkpoints the preview scrubber lets a player jump to, matching the tower's real visual-stage milestones without ever touching the tower's actual (Season-scoped) level. */
+const SKIN_PREVIEW_LEVELS: readonly number[] = [1, 20, 40, 60];
+
+function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstance; skinId: string | null; previewLevel: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -794,7 +798,15 @@ function SkinPreviewCanvas({ tower, skinId }: { tower: TowerInstance; skinId: st
     canvas.width = 108 * dpr;
     canvas.height = 108 * dpr;
     ctx.scale(dpr, dpr);
-    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, position: { x: 54, y: 78 } };
+    // PREVIEW-ONLY OBJECT — never the real tower, never mutated back into
+    // engine state. `level` here overrides ONLY what gets drawn (via
+    // drawTower's own visualStage lookup); it never touches the account's
+    // actual Season-scoped tower.level, and reading gameplayEffect from
+    // THIS object is structurally impossible from here since drawTower is a
+    // pure renderer that never calls getTowerStats/getTowerSpecialAtLevel —
+    // see entities/Tower.ts's getTowerStats doc comment for the other half
+    // of this guarantee (why equipping for real is the only path in).
+    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, level: previewLevel, position: { x: 54, y: 78 } };
     let raf = 0;
     const loop = (t: number) => {
       ctx.clearRect(0, 0, 108, 108);
@@ -803,7 +815,7 @@ function SkinPreviewCanvas({ tower, skinId }: { tower: TowerInstance; skinId: st
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [tower, skinId]);
+  }, [tower, skinId, previewLevel]);
 
   return (
     <canvas
@@ -813,15 +825,39 @@ function SkinPreviewCanvas({ tower, skinId }: { tower: TowerInstance; skinId: st
   );
 }
 
+/** Formats a SkinGameplayEffect into short, explicit "+X% Stat" / "-X% Stat" lines — never a vague blurb, so the player always knows exactly what they're buying (spec: "nunca esconder o efeito"). Empty array = purely cosmetic (Default, and every PRESTIGE skin). */
+function formatGameplayEffectLines(effect: SkinGameplayEffect, t: Translate): string[] {
+  const lines: string[] = [];
+  const pctMult = (mult: number) => `${mult >= 1 ? "+" : ""}${Math.round((mult - 1) * 100)}%`;
+  const pctAdd = (add: number) => `${add >= 0 ? "+" : ""}${Math.round(add * 100)}%`;
+  if (effect.damageMult) lines.push(`${pctMult(effect.damageMult)} ${t("towerInfo.gameplayEffects.damage")}`);
+  if (effect.attackSpeedMult) lines.push(`${pctMult(effect.attackSpeedMult)} ${t("towerInfo.gameplayEffects.attackSpeed")}`);
+  if (effect.rangeMult) lines.push(`${pctMult(effect.rangeMult)} ${t("towerInfo.gameplayEffects.range")}`);
+  if (effect.critChanceAdd) lines.push(`${pctAdd(effect.critChanceAdd)} ${t("towerInfo.gameplayEffects.critChance")}`);
+  if (effect.bossDamageMultAdd) lines.push(`${pctAdd(effect.bossDamageMultAdd)} ${t("towerInfo.gameplayEffects.bossDamage")}`);
+  if (effect.aoeRadiusMult) lines.push(`${pctMult(effect.aoeRadiusMult)} ${t("towerInfo.gameplayEffects.aoeRadius")}`);
+  if (effect.burnDamageMult) lines.push(`${pctMult(effect.burnDamageMult)} ${t("towerInfo.gameplayEffects.burnDamage")}`);
+  if (effect.burnDurationMsAdd) lines.push(`+${(effect.burnDurationMsAdd / 1000).toFixed(1)}s ${t("towerInfo.gameplayEffects.burnDuration")}`);
+  if (effect.slowPercentAdd) lines.push(`${pctAdd(effect.slowPercentAdd)} ${t("towerInfo.gameplayEffects.slowPercent")}`);
+  if (effect.freezeChanceAdd) lines.push(`${pctAdd(effect.freezeChanceAdd)} ${t("towerInfo.gameplayEffects.freezeChance")}`);
+  if (effect.armorPenetrationAdd) lines.push(`${pctAdd(effect.armorPenetrationAdd)} ${t("towerInfo.gameplayEffects.armorPenetration")}`);
+  // chainFalloffAdd: LOWER is the buff (less damage lost per chain jump) —
+  // shown negated so the player always reads a positive number as "better".
+  if (effect.chainFalloffAdd) lines.push(`${pctAdd(-effect.chainFalloffAdd)} ${t("towerInfo.gameplayEffects.chainRetention")}`);
+  return lines;
+}
+
 /**
- * TOWER SKIN SYSTEM v2 — a skin has 3 distinct states: LOCKED (tower
- * hasn't reached unlockLevel this Season yet), PURCHASABLE (level reached,
- * not yet bought — costs Gems), and OWNED (bought once, permanent forever
- * after, equippable any Season regardless of the tower's current level).
- * Cosmetic only throughout: equipping/clearing never appears in this
- * component's gold math, and a skin's visual fields (material/coreShape/
- * weaponDetail/particleStyle/projectileStyle/cosmeticAttribute) never touch
- * damage/range/attackSpeed — see towerSkins.test.ts's guarantee.
+ * TOWER SKIN SYSTEM v3 — every skin (Default, every owned/locked commercial
+ * skin, and any owned Prestige skin) is ALWAYS shown, regardless of
+ * ownership or level — a locked skin never disappears, it shows its real
+ * price, its real gameplay effects, and stays fully PREVIEWABLE (spec:
+ * "skins bloqueadas devem ser visíveis... o jogador deve conseguir clicar
+ * na skin mesmo sem possuir"). PREVIEW is purely visual: clicking any skin
+ * (owned or not) only changes `previewSkinId`/`previewLevel` — local
+ * component state that SkinPreviewCanvas renders from a disposable copy of
+ * the tower — and never calls onEquip, so the real gameplay effect only
+ * ever activates through an explicit EQUIP click on an OWNED skin.
  */
 function SkinSection({
   tower,
@@ -846,17 +882,19 @@ function SkinSection({
   // as a permanently-locked commercial card.
   const skins = [...getSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
   const [previewSkinId, setPreviewSkinId] = useState<string | null>(tower.equippedSkinId);
+  const [previewLevel, setPreviewLevel] = useState<number>(() => nearestPreviewLevel(tower.level));
   if (skins.length === 0) return null;
 
-  const previewSkin = previewSkinId ? (skins.find((s) => s.id === previewSkinId) ?? null) : null;
+  const previewSkin: TowerSkinDefinition | null = previewSkinId ? (skins.find((s) => s.id === previewSkinId) ?? null) : null;
+  const previewEffectLines = previewSkin ? formatGameplayEffectLines(previewSkin.gameplayEffect, t) : [];
 
   return (
     <>
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.skinSection")}</div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-        <SkinPreviewCanvas tower={tower} skinId={previewSkinId} />
+      <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+        <SkinPreviewCanvas tower={tower} skinId={previewSkinId} previewLevel={previewLevel} />
         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, minWidth: 0 }}>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>
             {previewSkin ? t(`towerSkins.${previewSkin.id}.name` as TranslationKey) : t("towerInfo.skinDefault")}
@@ -875,73 +913,152 @@ function SkinSection({
         </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-        <button
-          onClick={() => {
-            onEquip(null);
-            setPreviewSkinId(null);
-          }}
-          onMouseEnter={() => setPreviewSkinId(null)}
-          style={{
-            ...skinChipStyle,
-            borderColor: tower.equippedSkinId === null ? theme.accent : PALETTE.uiPanelBorder,
-            opacity: 1,
-          }}
-        >
-          {t("towerInfo.skinDefault")}
-          {tower.equippedSkinId === null && <span style={skinBadgeStyle}>{t("towerInfo.skinEquipped")}</span>}
-        </button>
+      {/* L1/L20/L40/L60 evolution scrubber — same footprint at every level (Absolute Rule #1), only the preview's own level number changes, never the real tower's. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+        <span style={{ fontSize: 9, color: PALETTE.uiTextDim }}>{t("towerInfo.skinPreviewLevel")}</span>
+        <div style={{ display: "flex", gap: 3 }}>
+          {SKIN_PREVIEW_LEVELS.map((lvl) => (
+            <button
+              key={lvl}
+              onClick={() => setPreviewLevel(lvl)}
+              style={{
+                ...previewLevelChipStyle,
+                borderColor: previewLevel === lvl ? theme.accent : PALETTE.uiPanelBorder,
+                color: previewLevel === lvl ? theme.accent : PALETTE.uiTextDim,
+              }}
+            >
+              L{lvl}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Real, transparent gameplay numbers for whatever is currently PREVIEWED — never applied until actually equipped (see the component doc comment above). */}
+      <div style={{ fontSize: 9, color: PALETTE.uiTextDim, fontWeight: 700, letterSpacing: 0.4, marginBottom: 2 }}>
+        {t("towerInfo.skinGameplayEffectsLabel")}
+      </div>
+      <div style={{ marginBottom: 8 }}>
+        {previewEffectLines.length === 0 ? (
+          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, fontStyle: "italic" }}>{t("towerInfo.skinGameplayEffectsNone")}</div>
+        ) : (
+          previewEffectLines.map((line) => (
+            <div key={line} style={{ fontSize: 10, color: PALETTE.uiText }}>
+              {line}
+            </div>
+          ))
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+        <SkinRow
+          name={t("towerInfo.skinDefault")}
+          selected={previewSkinId === null}
+          badge={tower.equippedSkinId === null ? { text: t("towerInfo.skinEquipped"), tone: "equipped" } : null}
+          theme={theme}
+          onPreview={() => setPreviewSkinId(null)}
+          action={
+            tower.equippedSkinId !== null ? (
+              <button onClick={() => onEquip(null)} style={{ ...skinActionButtonStyle, borderColor: theme.primary }}>
+                {t("towerInfo.skinEquipAction")}
+              </button>
+            ) : null
+          }
+        />
         {skins.map((skin) => {
           const owned = isSkinOwned(skin.id);
           const equipped = tower.equippedSkinId === skin.id;
           const reachedLevel = tower.level >= skin.unlockLevel;
           const affordable = gems >= skin.gemCost;
+          const selected = previewSkinId === skin.id;
 
+          let badge: { text: string; tone: "equipped" | "owned" | "locked" } | null = null;
+          let action: ReactNode = null;
           if (owned) {
-            return (
-              <button
-                key={skin.id}
-                onClick={() => onEquip(skin.id)}
-                onMouseEnter={() => setPreviewSkinId(skin.id)}
-                style={{ ...skinChipStyle, borderColor: equipped ? theme.accent : PALETTE.uiPanelBorder, opacity: 1 }}
-              >
-                {t(`towerSkins.${skin.id}.name` as TranslationKey)}
-                <span style={skinBadgeStyle}>{equipped ? t("towerInfo.skinEquipped") : t("towerInfo.skinOwned")}</span>
+            badge = equipped ? { text: t("towerInfo.skinEquipped"), tone: "equipped" } : { text: t("towerInfo.skinOwned"), tone: "owned" };
+            action = equipped ? (
+              <button onClick={() => onEquip(null)} style={{ ...skinActionButtonStyle, borderColor: PALETTE.uiPanelBorder }}>
+                {t("towerInfo.skinUnequipAction")}
+              </button>
+            ) : (
+              <button onClick={() => onEquip(skin.id)} style={{ ...skinActionButtonStyle, borderColor: theme.primary }}>
+                {t("towerInfo.skinEquipAction")}
               </button>
             );
-          }
-
-          if (reachedLevel) {
-            return (
+          } else {
+            badge = { text: t("towerInfo.skinLocked"), tone: "locked" };
+            action = reachedLevel ? (
               <button
-                key={skin.id}
                 onClick={() => affordable && onPurchase(skin.id)}
-                onMouseEnter={() => setPreviewSkinId(skin.id)}
                 disabled={!affordable}
-                style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: affordable ? 1 : 0.55 }}
+                style={{ ...skinActionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
               >
-                {t(`towerSkins.${skin.id}.name` as TranslationKey)}
-                <span style={{ marginLeft: 4, display: "inline-flex", alignItems: "center", gap: 2 }}>
-                  <GemIcon size={9} color={PALETTE.gem} /> {skin.gemCost}
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  {t("towerInfo.skinBuy")} <GemIcon size={9} color={PALETTE.gem} /> {skin.gemCost}
                 </span>
               </button>
+            ) : (
+              <span style={{ fontSize: 9, color: PALETTE.uiTextDim, opacity: 0.8 }}>{t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })}</span>
             );
           }
 
           return (
-            <button
+            <SkinRow
               key={skin.id}
-              onMouseEnter={() => setPreviewSkinId(skin.id)}
-              disabled
-              style={{ ...skinChipStyle, borderColor: PALETTE.uiPanelBorder, opacity: 0.45 }}
-            >
-              {t(`towerSkins.${skin.id}.name` as TranslationKey)}
-              <span style={{ marginLeft: 4, opacity: 0.7 }}>({t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })})</span>
-            </button>
+              name={t(`towerSkins.${skin.id}.name` as TranslationKey)}
+              selected={selected}
+              badge={badge}
+              theme={theme}
+              onPreview={() => setPreviewSkinId(skin.id)}
+              action={action}
+            />
           );
         })}
       </div>
     </>
+  );
+}
+
+/** Nearest scrubber checkpoint at or below `level`, so opening the panel previews a level the player has actually reached rather than always jumping to L1. */
+function nearestPreviewLevel(level: number): number {
+  let best = SKIN_PREVIEW_LEVELS[0]!;
+  for (const lvl of SKIN_PREVIEW_LEVELS) if (lvl <= level) best = lvl;
+  return best;
+}
+
+/**
+ * One skin's row — ALWAYS clickable for preview (the whole row, not just an
+ * enabled purchase button) regardless of ownership/level, per the mandatory
+ * "locked skins stay visible and previewable" rule. The row itself never
+ * equips or purchases anything; `action` (passed in) is the only element
+ * that can.
+ */
+function SkinRow({
+  name,
+  selected,
+  badge,
+  theme,
+  onPreview,
+  action,
+}: {
+  name: string;
+  selected: boolean;
+  badge: { text: string; tone: "equipped" | "owned" | "locked" } | null;
+  theme: (typeof TOWER_THEME)[TowerType];
+  onPreview: () => void;
+  action: ReactNode;
+}) {
+  const badgeColor =
+    badge?.tone === "equipped" ? theme.accent : badge?.tone === "owned" ? PALETTE.uiTextDim : PALETTE.uiTextDim;
+  return (
+    <div style={{ ...skinRowStyle, borderColor: selected ? theme.accent : PALETTE.uiPanelBorder }}>
+      <button onClick={onPreview} style={skinRowNameButtonStyle} title={name}>
+        <span style={{ fontSize: 10.5, fontWeight: 600, color: PALETTE.uiText }}>{name}</span>
+        {badge && (
+          <span style={{ fontSize: 8.5, fontWeight: 700, color: badgeColor, letterSpacing: 0.3 }}>{badge.text}</span>
+        )}
+      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>{action}</div>
+    </div>
   );
 }
 
@@ -953,9 +1070,9 @@ interface SpecialLine {
   note?: string;
 }
 
-/** Per-type dynamic specialization readout — real current values, not just the static role blurb. */
-function renderSpecialLines(type: TowerType, level: number, t: Translate): SpecialLine[] {
-  const special = getTowerSpecialAtLevel(type, level);
+/** Per-type dynamic specialization readout — real current values, not just the static role blurb. `skinEffect` (the tower's currently EQUIPPED skin only, never a preview) makes this panel's numbers match exactly what CombatSystem.ts actually uses. */
+function renderSpecialLines(type: TowerType, level: number, t: Translate, skinEffect?: SkinGameplayEffect): SpecialLine[] {
+  const special = getTowerSpecialAtLevel(type, level, skinEffect);
 
   switch (special.type) {
     case "IRONWOOD":
@@ -1121,27 +1238,52 @@ const specOptionButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const skinChipStyle: CSSProperties = {
-  padding: "5px 9px",
+const previewLevelChipStyle: CSSProperties = {
+  padding: "2px 7px",
   borderRadius: 999,
   border: "1px solid",
   background: "rgba(255,255,255,0.04)",
-  color: PALETTE.uiText,
-  fontSize: 10.5,
-  fontWeight: 600,
+  fontSize: 9,
+  fontWeight: 700,
   cursor: "pointer",
 };
 
-const skinBadgeStyle: CSSProperties = {
-  marginLeft: 5,
-  padding: "1px 5px",
-  borderRadius: 999,
-  fontSize: 8,
+/** The whole row is clickable for PREVIEW (mandatory: a locked skin stays fully previewable) — this styles just the name+badge button half of it, never the row's action button. */
+const skinRowNameButtonStyle: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "flex-start",
+  gap: 1,
+  padding: "6px 8px",
+  border: "none",
+  background: "transparent",
+  cursor: "pointer",
+  textAlign: "left",
+};
+
+const skinRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 6,
+  borderRadius: 8,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.03)",
+  paddingRight: 8,
+};
+
+const skinActionButtonStyle: CSSProperties = {
+  padding: "4px 8px",
+  borderRadius: 6,
+  border: "1px solid",
+  background: "rgba(255,255,255,0.05)",
+  color: PALETTE.uiText,
+  fontSize: 9,
   fontWeight: 700,
-  letterSpacing: 0.3,
-  textTransform: "uppercase",
-  background: "rgba(0,0,0,0.35)",
-  color: PALETTE.uiAccentBright,
+  cursor: "pointer",
+  whiteSpace: "nowrap",
 };
 
 const equipmentSlotRowStyle: CSSProperties = {

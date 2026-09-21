@@ -226,18 +226,52 @@ export function applySiegeDamage(tower: TowerInstance, rawDamage: number, disabl
  * one-time Gems unlock — never a recurring Gems purchase. That is why this
  * no longer violates the NEVER-P2W contract: Gems buy access to the track,
  * Gold buys every point of power in it, exactly like Specialization.
+ *
+ * TOWER SKIN SYSTEM v3 — a skin's own `gameplayEffect` (config/towerSkins.ts)
+ * is applied last, on top of Mastery, and ONLY when `tower.equippedSkinId`
+ * is actually set — this is the ONE deliberate, explicit exception to the
+ * "Gems never buy combat power directly" pattern above, scoped tightly on
+ * purpose: every field is small (±8% or less, see SkinGameplayEffect's own
+ * doc comment) and every commercial skin pairs exactly one upside with one
+ * downside (a sidegrade, never a strict upgrade — towerSkins.test.ts proves
+ * this numerically for all 20). A skin merely being PREVIEWED in the shop
+ * never reaches this function with a different `tower` object at all (see
+ * ui/TowerInfoPanel.tsx's SkinPreviewCanvas, which renders a disposable
+ * copy purely for drawing) — this is the only place the effect is ever
+ * read, so there is no separate "preview must not apply the bonus" check
+ * needed here; it is structurally impossible for a preview to reach it.
  */
 export function getTowerStats(tower: TowerInstance): TowerLevelStats {
   const levelStats = getTowerLevelStats(tower.type, tower.level);
-  if (tower.masteryLevel <= 0) return levelStats;
+  let damage = levelStats.damage;
+  let attackSpeed = levelStats.attackSpeed;
+  let range = levelStats.range;
 
-  const bonuses = getMasteryBonuses(tower.masteryLevel);
+  if (tower.masteryLevel > 0) {
+    const bonuses = getMasteryBonuses(tower.masteryLevel);
+    damage *= bonuses.damageMultiplier;
+    attackSpeed *= bonuses.attackSpeedMultiplier;
+    range *= bonuses.rangeMultiplier;
+  }
+
+  const skinEffect = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;
+  if (skinEffect) {
+    if (skinEffect.damageMult) damage *= skinEffect.damageMult;
+    if (skinEffect.attackSpeedMult) attackSpeed *= skinEffect.attackSpeedMult;
+    if (skinEffect.rangeMult) range *= skinEffect.rangeMult;
+  }
+
   return {
     ...levelStats,
-    damage: round2(levelStats.damage * bonuses.damageMultiplier),
-    attackSpeed: round2(levelStats.attackSpeed * bonuses.attackSpeedMultiplier),
-    range: round2(levelStats.range * bonuses.rangeMultiplier),
+    damage: round2(damage),
+    attackSpeed: round2(attackSpeed),
+    range: round2(range),
   };
+}
+
+/** The currently equipped skin's gameplay effect, or undefined for the default look / an unrecognized id — the one place CombatSystem.ts and the UI should read this from, so "which skin's effect applies" is never computed two different ways. */
+export function getEquippedSkinGameplayEffect(tower: TowerInstance) {
+  return tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;
 }
 
 /**
@@ -446,7 +480,13 @@ export function upgradeSpecialization(tower: TowerInstance): void {
 }
 
 // ---------------------------------------------------------------------------
-// Progression 2.0 — Skins (cosmetic only, never read by combat code).
+// Progression 2.0 — Skins. VISUALLY always cosmetic-only (a skin never
+// changes footprint/silhouette scale). TOWER SKIN SYSTEM v3 adds one small,
+// bounded, explicit gameplay effect per commercial skin — see getTowerStats
+// above and SkinGameplayEffect's own doc comment in config/towerSkins.ts —
+// applied ONLY through `tower.equippedSkinId`, never through ownership or
+// preview alone (equipSkin below is still the only function that ever
+// mutates `equippedSkinId`).
 // ---------------------------------------------------------------------------
 
 /**

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { getSkinsForTower, getTowerSkinDefinition, TOWER_SKIN_TIER_PRICES, TOWER_SKINS } from "./towerSkins";
+import {
+  getSkinsForTower,
+  getTowerSkinDefinition,
+  NO_GAMEPLAY_EFFECT,
+  PRESTIGE_TOWER_SKINS,
+  TOWER_SKIN_TIER_PRICES,
+  TOWER_SKINS,
+  type SkinGameplayEffect,
+} from "./towerSkins";
 import { TOWER_TYPES, getTowerLevelStats, getTowerSpecialAtLevel } from "./towerStats";
-import { canEquipSkin, canPurchaseSkin, createTowerInstance, equipSkin, getTowerStats } from "@/entities/Tower";
+import { canEquipSkin, canPurchaseSkin, createTowerInstance, equipSkin, getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 
 const OWNED = (ids: string[]) => new Set(ids);
 
@@ -12,28 +20,6 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
 
   it("every skin has a positive Gems cost — never free, never Gold", () => {
     for (const skin of TOWER_SKINS) expect(skin.gemCost).toBeGreaterThan(0);
-  });
-
-  it("equipping an owned skin never changes damage/attackSpeed/range/special behavior", () => {
-    const skin = getSkinsForTower("IRONWOOD")[0]!;
-    const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, skin.unlockLevel);
-    const statsBefore = getTowerStats(tower);
-    const specialBefore = getTowerSpecialAtLevel(tower.type, tower.level);
-
-    const applied = equipSkin(tower, skin.id, OWNED([skin.id]));
-    expect(applied).toBe(true);
-    expect(tower.equippedSkinId).toBe(skin.id);
-
-    const statsAfter = getTowerStats(tower);
-    const specialAfter = getTowerSpecialAtLevel(tower.type, tower.level);
-    expect(statsAfter.damage).toBeCloseTo(statsBefore.damage, 5);
-    expect(statsAfter.attackSpeed).toBeCloseTo(statsBefore.attackSpeed, 5);
-    expect(statsAfter.range).toBeCloseTo(statsBefore.range, 5);
-    // getTowerStats/getTowerSpecialAtLevel take only (type, level) — a skin
-    // id is architecturally NOT one of their inputs, so this is really a
-    // compile-time guarantee, but assert the runtime values agree too.
-    expect(statsAfter).toEqual(getTowerLevelStats(tower.type, tower.level));
-    expect(specialAfter).toEqual(specialBefore);
   });
 
   it("a skin cannot be equipped if not owned, even at/above its unlockLevel", () => {
@@ -104,7 +90,7 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
     });
   });
 
-  describe("TOWER SKIN SYSTEM v2 — every tower gets 1 reformulated + 4 new premium skins", () => {
+  describe("TOWER SKIN SYSTEM v2/v3 — every tower gets 1 reformulated + 4 new premium skins, each visually distinct", () => {
     it("every tower type has exactly 5 commercial skins", () => {
       for (const type of TOWER_TYPES) expect(getSkinsForTower(type).length).toBe(5);
     });
@@ -133,26 +119,172 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
       }
     });
 
-    it("every skin has its own cosmetic attribute, explicitly cosmetic and never a gameplay field", () => {
+    it("every skin has its own cosmetic attribute name, never a gameplay field itself", () => {
       for (const skin of TOWER_SKINS) {
         expect(skin.cosmeticAttribute.i18nKey.length).toBeGreaterThan(0);
-        // Compile-time guarantee reinforced at runtime: cosmeticAttribute is
-        // never one of the keys getTowerLevelStats/getTowerSpecialAtLevel
-        // read, and this object has no `damage`/`range`/`attackSpeed` field.
         expect(skin.cosmeticAttribute).not.toHaveProperty("damage");
         expect(skin.cosmeticAttribute).not.toHaveProperty("range");
         expect(skin.cosmeticAttribute).not.toHaveProperty("attackSpeed");
       }
     });
+  });
 
-    it("equipping any commercial skin (not just the first) never changes damage/attackSpeed/range", () => {
+  describe("TOWER SKIN SYSTEM v3 — real, bounded, sidegrade gameplay effects (REVISÃO PROFISSIONAL spec)", () => {
+    // Every multiplicative field bounded to ±10%; every additive percentage
+    // field bounded to ±8 percentage points; burn duration bounded to a
+    // small, explicit millisecond range — "pequenos e significativos", never
+    // "+50% damage" (spec section 4/22).
+    const MULT_MIN = 0.9;
+    const MULT_MAX = 1.1;
+    const ADD_MAX_ABS = 0.08;
+    const BURN_MS_MAX = 500;
+
+    it("every commercial skin's gameplayEffect fields are all within the approved small bounds", () => {
       for (const skin of TOWER_SKINS) {
-        const tower = createTowerInstance("slot-1", skin.towerType, { x: 0, y: 0 }, skin.unlockLevel);
-        const before = getTowerStats(tower);
-        expect(equipSkin(tower, skin.id, OWNED([skin.id]))).toBe(true);
-        const after = getTowerStats(tower);
-        expect(after).toEqual(before);
+        const e = skin.gameplayEffect;
+        for (const [key, value] of Object.entries(e) as [keyof SkinGameplayEffect, number][]) {
+          if (key === "burnDurationMsAdd") {
+            expect(Math.abs(value)).toBeLessThanOrEqual(BURN_MS_MAX);
+          } else if (key.endsWith("Mult")) {
+            expect(value).toBeGreaterThanOrEqual(MULT_MIN);
+            expect(value).toBeLessThanOrEqual(MULT_MAX);
+          } else {
+            expect(Math.abs(value)).toBeLessThanOrEqual(ADD_MAX_ABS);
+          }
+        }
       }
+    });
+
+    /**
+     * SIDEGRADE, NEVER A STRICT UPGRADE — for every commercial skin, exactly
+     * one field is a buff and at least one other field is a matching
+     * downside. `chainFalloffAdd` is the one field where LOWER is the buff
+     * (see SkinGameplayEffect's own doc comment); everything else follows
+     * "*Mult > 1 or *Add > 0 is a buff" directly.
+     */
+    function isBuffField(key: keyof SkinGameplayEffect, value: number): boolean {
+      if (key === "chainFalloffAdd") return value < 0;
+      if (key.endsWith("Mult")) return value > 1;
+      return value > 0;
+    }
+
+    it("every commercial skin pairs at least one buff with at least one downside — never a strict, drawback-free upgrade", () => {
+      for (const skin of TOWER_SKINS) {
+        const entries = Object.entries(skin.gameplayEffect) as [keyof SkinGameplayEffect, number][];
+        expect(entries.length).toBeGreaterThanOrEqual(2);
+        const buffs = entries.filter(([key, value]) => isBuffField(key, value));
+        const downsides = entries.filter(([key, value]) => !isBuffField(key, value));
+        expect(buffs.length).toBeGreaterThanOrEqual(1);
+        expect(downsides.length).toBeGreaterThanOrEqual(1);
+      }
+    });
+
+    it("every PRESTIGE skin (free P50 reward) has NO_GAMEPLAY_EFFECT — a free reward must never also be a free permanent combat-stat upgrade", () => {
+      for (const skin of PRESTIGE_TOWER_SKINS) {
+        expect(skin.gameplayEffect).toEqual(NO_GAMEPLAY_EFFECT);
+        expect(Object.keys(skin.gameplayEffect).length).toBe(0);
+      }
+    });
+
+    it("equipping a skin with damageMult/attackSpeedMult/rangeMult applies EXACTLY that multiplier on top of the tower's base stats", () => {
+      const skin = getSkinsForTower("IRONWOOD").find((s) => s.gameplayEffect.damageMult)!;
+      expect(skin).toBeTruthy();
+      const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, skin.unlockLevel);
+      const base = getTowerLevelStats(tower.type, tower.level);
+
+      expect(equipSkin(tower, skin.id, OWNED([skin.id]))).toBe(true);
+      const equipped = getTowerStats(tower);
+
+      const expectedDamage = base.damage * (skin.gameplayEffect.damageMult ?? 1);
+      const expectedAttackSpeed = base.attackSpeed * (skin.gameplayEffect.attackSpeedMult ?? 1);
+      const expectedRange = base.range * (skin.gameplayEffect.rangeMult ?? 1);
+      expect(equipped.damage).toBeCloseTo(Math.round(expectedDamage * 100) / 100, 5);
+      expect(equipped.attackSpeed).toBeCloseTo(Math.round(expectedAttackSpeed * 100) / 100, 5);
+      expect(equipped.range).toBeCloseTo(Math.round(expectedRange * 100) / 100, 5);
+    });
+
+    it("unequipping removes the skin's stat effect exactly, reverting to base stats", () => {
+      const skin = getSkinsForTower("STORMCALLER")[0]!;
+      const tower = createTowerInstance("slot-1", "STORMCALLER", { x: 0, y: 0 }, skin.unlockLevel);
+      const before = getTowerStats(tower);
+
+      equipSkin(tower, skin.id, OWNED([skin.id]));
+      const during = getTowerStats(tower);
+      expect(during).not.toEqual(before);
+
+      expect(equipSkin(tower, null, OWNED([skin.id]))).toBe(true);
+      const after = getTowerStats(tower);
+      expect(after).toEqual(before);
+    });
+
+    it("getEquippedSkinGameplayEffect returns undefined when no skin is equipped, and the skin's own effect once equipped", () => {
+      const skin = getSkinsForTower("FROSTBORN")[0]!;
+      const tower = createTowerInstance("slot-1", "FROSTBORN", { x: 0, y: 0 }, skin.unlockLevel);
+      expect(getEquippedSkinGameplayEffect(tower)).toBeUndefined();
+      equipSkin(tower, skin.id, OWNED([skin.id]));
+      expect(getEquippedSkinGameplayEffect(tower)).toEqual(skin.gameplayEffect);
+    });
+
+    it("a skin merely looked up (never equipped) — the shop/panel PREVIEW case — never changes a tower's real stats", () => {
+      const skin = getSkinsForTower("INFERNO")[0]!;
+      const tower = createTowerInstance("slot-1", "INFERNO", { x: 0, y: 0 }, skin.unlockLevel);
+      const before = getTowerStats(tower);
+      // Simulates the UI reading the skin's definition/effect for display —
+      // exactly what a PREVIEW does — WITHOUT ever calling equipSkin.
+      void getTowerSkinDefinition(skin.id)?.gameplayEffect;
+      expect(tower.equippedSkinId).toBeNull();
+      expect(getTowerStats(tower)).toEqual(before);
+    });
+
+    it("getTowerSpecialAtLevel with no skinEffect argument (Wiki/static previews) returns the tower's true unmodified base special", () => {
+      const withoutSkin = getTowerSpecialAtLevel("IRONWOOD", 20);
+      const withEmptyEffect = getTowerSpecialAtLevel("IRONWOOD", 20, {});
+      expect(withoutSkin).toEqual(withEmptyEffect);
+    });
+
+    it("getTowerSpecialAtLevel applies IRONWOOD's critChanceAdd/bossDamageMultAdd exactly", () => {
+      const skin = getSkinsForTower("IRONWOOD").find((s) => s.gameplayEffect.critChanceAdd)!;
+      expect(skin).toBeTruthy();
+      const base = getTowerSpecialAtLevel("IRONWOOD", 20);
+      const withSkin = getTowerSpecialAtLevel("IRONWOOD", 20, skin.gameplayEffect);
+      if (withSkin.type !== "IRONWOOD" || base.type !== "IRONWOOD") throw new Error("unreachable");
+      expect(withSkin.critChance).toBeCloseTo(base.critChance + (skin.gameplayEffect.critChanceAdd ?? 0), 5);
+    });
+
+    it("getTowerSpecialAtLevel applies INFERNO's aoeRadiusMult/burnDamageMult/burnDurationMsAdd exactly", () => {
+      const skin = getSkinsForTower("INFERNO").find((s) => s.gameplayEffect.aoeRadiusMult)!;
+      expect(skin).toBeTruthy();
+      const base = getTowerSpecialAtLevel("INFERNO", 20);
+      const withSkin = getTowerSpecialAtLevel("INFERNO", 20, skin.gameplayEffect);
+      if (withSkin.type !== "INFERNO" || base.type !== "INFERNO") throw new Error("unreachable");
+      expect(withSkin.aoeRadius).toBeCloseTo(base.aoeRadius * (skin.gameplayEffect.aoeRadiusMult ?? 1), 1);
+    });
+
+    it("getTowerSpecialAtLevel applies FROSTBORN's slowPercentAdd/freezeChanceAdd exactly, clamped to [0,1]", () => {
+      const skin = getSkinsForTower("FROSTBORN").find((s) => s.gameplayEffect.freezeChanceAdd)!;
+      expect(skin).toBeTruthy();
+      const base = getTowerSpecialAtLevel("FROSTBORN", 20);
+      const withSkin = getTowerSpecialAtLevel("FROSTBORN", 20, skin.gameplayEffect);
+      if (withSkin.type !== "FROSTBORN" || base.type !== "FROSTBORN") throw new Error("unreachable");
+      expect(withSkin.freezeChance).toBeCloseTo(base.freezeChance + (skin.gameplayEffect.freezeChanceAdd ?? 0), 5);
+      expect(withSkin.freezeChance).toBeGreaterThanOrEqual(0);
+      expect(withSkin.freezeChance).toBeLessThanOrEqual(1);
+    });
+
+    it("getTowerSpecialAtLevel applies STORMCALLER's armorPenetrationAdd/chainFalloffAdd exactly, clamped", () => {
+      const skin = getSkinsForTower("STORMCALLER").find((s) => s.gameplayEffect.armorPenetrationAdd)!;
+      expect(skin).toBeTruthy();
+      const base = getTowerSpecialAtLevel("STORMCALLER", 20);
+      const withSkin = getTowerSpecialAtLevel("STORMCALLER", 20, skin.gameplayEffect);
+      if (withSkin.type !== "STORMCALLER" || base.type !== "STORMCALLER") throw new Error("unreachable");
+      expect(withSkin.armorPenetration).toBeCloseTo(base.armorPenetration + (skin.gameplayEffect.armorPenetrationAdd ?? 0), 5);
+
+      const tempest = getSkinsForTower("STORMCALLER").find((s) => (s.gameplayEffect.chainFalloffAdd ?? 0) < 0)!;
+      expect(tempest).toBeTruthy();
+      const withTempest = getTowerSpecialAtLevel("STORMCALLER", 20, tempest.gameplayEffect);
+      if (withTempest.type !== "STORMCALLER") throw new Error("unreachable");
+      // Lower falloff than base = the buff working as intended.
+      expect(withTempest.chainFalloff).toBeLessThan(base.chainFalloff);
     });
   });
 });

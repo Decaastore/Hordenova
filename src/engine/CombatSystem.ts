@@ -1,5 +1,6 @@
 import {
   disableTower,
+  getEquippedSkinGameplayEffect,
   getTowerMuzzleOffset,
   getTowerStats,
   isTowerReadyForSpecial,
@@ -205,7 +206,7 @@ function resolveNormalAttack(
   resetTowerCooldown(tower);
   const special = applyMasteryToSpecial(
     applySpecializationToSpecial(
-      getTowerSpecialAtLevel(tower.type, tower.level),
+      getTowerSpecialAtLevel(tower.type, tower.level, getEquippedSkinGameplayEffect(tower)),
       tower.specializationId,
       tower.specializationLevel,
     ),
@@ -322,7 +323,10 @@ function resolveSpecialAttack(
     dealDamage(tower, target, stats.damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
     projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
   } else if (ultimate === "INFERNO") {
-    const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level) as Extract<TowerSpecial, { type: "INFERNO" }>;
+    const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level, getEquippedSkinGameplayEffect(tower)) as Extract<
+      TowerSpecial,
+      { type: "INFERNO" }
+    >;
     const radius = infernoSpecial.aoeRadius * INFERNO_SPECIAL.radiusMultiplier;
     for (const enemy of enemies) {
       if (isEnemyDead(enemy)) continue;
@@ -343,7 +347,11 @@ function resolveSpecialAttack(
     }
     projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
   } else if (ultimate === "STORMCALLER") {
-    const stormSpecial = getTowerSpecialAtLevel("STORMCALLER", tower.level) as Extract<TowerSpecial, { type: "STORMCALLER" }>;
+    const stormSpecial = getTowerSpecialAtLevel(
+      "STORMCALLER",
+      tower.level,
+      getEquippedSkinGameplayEffect(tower),
+    ) as Extract<TowerSpecial, { type: "STORMCALLER" }>;
     let chainDamage = stats.damage * STORMCALLER_SPECIAL.damageMultiplier;
     dealDamage(tower, target, chainDamage, stormSpecial.armorPenetration);
 
