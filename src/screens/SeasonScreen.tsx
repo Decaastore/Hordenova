@@ -7,7 +7,7 @@ import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeede
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
-import { getPrestigeTier, getPrestigeUpgradeCost } from "@/config/prestige";
+import { getPrestigeTier, getPrestigeUpgradeDualPrice } from "@/config/prestige";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { AscensionPanel } from "@/ui/AscensionPanel";
@@ -43,7 +43,7 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
   const seasonProgress = Math.min(1, Math.max(0, 1 - status.timeRemainingMs / SEASON_DURATION_MS));
   const bestPhase = getPhaseForWave(Math.max(1, status.seasonBestWave));
   const prestigeTier = getPrestigeTier(save.prestigeLevel);
-  const prestigeNextCost = getPrestigeUpgradeCost(save.prestigeLevel);
+  const prestigeNextPrice = getPrestigeUpgradeDualPrice(save.prestigeLevel);
   const prestigeTierLabel =
     t(`prestige.tiers.${prestigeTier.nameKey}` as TranslationKey) + (prestigeTier.cycle > 0 ? ` ${prestigeTier.cycle + 1}` : "");
 
@@ -96,7 +96,9 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
             <span style={{ ...prestigeTierLabelStyle, color: prestigeTier.color }}>{prestigeTierLabel}</span>
             <span style={prestigeLevelBadgeStyle}>{t("prestige.level", { level: save.prestigeLevel })}</span>
           </div>
-          <p style={prestigeHintStyle}>{t("ranking.prestigeHint", { cost: prestigeNextCost })}</p>
+          <p style={prestigeHintStyle}>
+            {t("ranking.prestigeHint", { free: prestigeNextPrice.free, purchased: prestigeNextPrice.purchased })}
+          </p>
         </div>
 
         <button onClick={onPlay} style={playButtonStyle}>

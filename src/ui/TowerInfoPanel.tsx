@@ -372,7 +372,7 @@ function EquipmentSection({
               {confirmingUnlockSlot === slotIndex && unlockPrice !== null && (
                 <div style={switchConfirmBoxStyle}>
                   <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
-                    {t("towerInfo.equipment.unlockConfirm", { index: slotIndex + 1, cost: unlockPrice.purchased })}
+                    {t("towerInfo.equipment.unlockConfirm", { index: slotIndex + 1 })}
                   </div>
                   <DualGemPriceButtons
                     price={unlockPrice}

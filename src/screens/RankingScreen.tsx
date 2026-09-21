@@ -3,7 +3,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
-import { getPrestigeTier, getPrestigeUpgradeCost } from "@/config/prestige";
+import { getPrestigeTier, getPrestigeUpgradeDualPrice } from "@/config/prestige";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -32,7 +32,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
   const save = useMemo(() => loadSave(), []);
   const status = useMemo(() => getAscensionStatus(), []);
   const prestigeTier = getPrestigeTier(save.prestigeLevel);
-  const prestigeNextCost = getPrestigeUpgradeCost(save.prestigeLevel);
+  const prestigeNextPrice = getPrestigeUpgradeDualPrice(save.prestigeLevel);
   const prestigeTierLabel =
     t(`prestige.tiers.${prestigeTier.nameKey}` as TranslationKey) + (prestigeTier.cycle > 0 ? ` ${prestigeTier.cycle + 1}` : "");
 
@@ -71,7 +71,9 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
             <span style={{ ...prestigeTierLabelStyle, color: prestigeTier.color }}>{prestigeTierLabel}</span>
           </div>
           <div style={prestigeLevelStyle}>{t("prestige.level", { level: save.prestigeLevel })}</div>
-          <p style={prestigeHintStyle}>{t("ranking.prestigeHint", { cost: prestigeNextCost })}</p>
+          <p style={prestigeHintStyle}>
+            {t("ranking.prestigeHint", { free: prestigeNextPrice.free, purchased: prestigeNextPrice.purchased })}
+          </p>
         </div>
 
         <div style={recordsRowStyle}>

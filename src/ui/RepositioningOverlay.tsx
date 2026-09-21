@@ -38,6 +38,8 @@ interface RepositioningConfirmProps {
 interface RepositioningBlockedProps {
   mode: "blocked";
   price: DualGemPrice;
+  freeGems: number;
+  purchasedGems: number;
   onClose: () => void;
 }
 
@@ -63,7 +65,7 @@ export function RepositioningOverlay(props: RepositioningOverlayProps) {
       <div style={modalBackdropStyle}>
         <div style={modalStyle}>
           <div style={modalTitleStyle}>{t("reposition.confirmTitle")}</div>
-          <div style={modalBodyStyle}>{t("reposition.confirmBody", { cost: props.price.purchased })}</div>
+          <div style={modalBodyStyle}>{t("reposition.confirmBody")}</div>
           <div style={{ marginTop: 10 }}>
             <DualGemPriceButtons
               price={props.price}
@@ -86,7 +88,14 @@ export function RepositioningOverlay(props: RepositioningOverlayProps) {
     <div style={modalBackdropStyle}>
       <div style={modalStyle}>
         <div style={{ ...modalTitleStyle, color: PALETTE.danger }}>{t("reposition.insufficientTitle")}</div>
-        <div style={modalBodyStyle}>{t("reposition.insufficientBody", { cost: props.price.purchased })}</div>
+        <div style={modalBodyStyle}>
+          {t("reposition.insufficientBody", {
+            freeHave: props.freeGems,
+            freeNeed: props.price.free,
+            purchasedHave: props.purchasedGems,
+            purchasedNeed: props.price.purchased,
+          })}
+        </div>
         <div style={modalButtonRowStyle}>
           <button onClick={props.onClose} style={primaryButtonStyle}>
             {t("reposition.close")}

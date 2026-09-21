@@ -404,7 +404,7 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     const unlockButton = findExactButton("UNLOCK")!;
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).not.toHaveBeenCalled();
-    expect(container.textContent).toContain(`Unlock Slot 2 for ${SLOT_2_PRICE.purchased} Gems`);
+    expect(container.textContent).toContain("Unlock Slot 2?");
     expect(findButtonByText(container, "🔒")).not.toBeNull();
     expect(findButtonByText(container, "💎")).not.toBeNull();
   });

@@ -304,7 +304,13 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           />
         )}
         {repositionUi.phase === "blocked" && (
-          <RepositioningOverlay mode="blocked" price={repositionUi.price} onClose={() => setRepositionUi({ phase: "idle" })} />
+          <RepositioningOverlay
+            mode="blocked"
+            price={repositionUi.price}
+            freeGems={hud.freeGems}
+            purchasedGems={hud.purchasedGems}
+            onClose={() => setRepositionUi({ phase: "idle" })}
+          />
         )}
 
         {hud.phase === "PROGRESSION_STOPPED" && !reportDismissed && (

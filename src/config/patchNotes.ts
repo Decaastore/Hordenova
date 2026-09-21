@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v36",
+    dateIso: "2026-09-21",
+    category: "SYSTEMS",
+    title: {
+      en: "Gems Split Into Two Real Currencies — Free and Purchased",
+      ptBR: "Gemas Divididas em Duas Moedas Reais — Grátis e Compradas",
+    },
+    description: {
+      en: "Gems are no longer a single pool. Every Gem you earn by playing (fragments, waves, bosses, quests, Season rewards, roulette milestones) is now 🔒 Free Gems, and every Gem you buy from the store is 💎 Purchased Gems — tracked completely separately, forever. Almost everything Gems can buy (Tower Upgrades, Mastery, Prestige, Specialization, Skins, equipment-slot unlocks, Reposition, and the new Trade Unlock) now shows two separate prices — a Free price and a Purchased price — and always lets you pick which one to pay with; nothing is ever auto-selected or split across both. The one exception is the Marketplace: listing an item for auction always costs Purchased Gems specifically, so what you earn by playing can never quietly become tradeable value between players.",
+      ptBR: "As Gemas não são mais um único saldo. Toda Gema que você ganha jogando (fragmentos, ondas, chefes, missões, recompensas de Season, marcos da roleta) agora é 🔒 Gema Grátis, e toda Gema que você compra na loja é 💎 Gema Comprada — rastreadas de forma totalmente separada, para sempre. Quase tudo que Gemas podem comprar (Melhorias de Torre, Maestria, Prestígio, Especialização, Skins, desbloqueios de slot de equipamento, Reposicionamento e o novo Desbloqueio de Comércio) agora mostra dois preços separados — um preço em Gemas Grátis e um em Gemas Compradas — e sempre deixa você escolher com qual pagar; nada é selecionado automaticamente ou dividido entre as duas. A única exceção é o Mercado: anunciar um item em leilão sempre custa Gemas Compradas especificamente, então o que você ganha jogando nunca vira silenciosamente valor negociável entre jogadores.",
+    },
+    highlights: [
+      {
+        en: "New Trade Unlock gate: the Marketplace is locked until you spend 500 Free OR 500 Purchased Gems to unlock it once, permanently — after that, listing an item still always costs Purchased Gems.",
+        ptBR: "Novo portão de Desbloqueio de Comércio: o Mercado fica bloqueado até você gastar 500 Gemas Grátis OU 500 Gemas Compradas para desbloqueá-lo uma vez, permanentemente — depois disso, anunciar um item ainda sempre custa Gemas Compradas.",
+      },
+      {
+        en: "The Wallet (top HUD bar) now shows 🔒 Free Gems and 💎 Purchased Gems as two separate stats, each with its own explanation on hover — never one ambiguous \"Gems\" number again.",
+        ptBR: "A carteira (barra superior do HUD) agora mostra 🔒 Gemas Grátis e 💎 Gemas Compradas como dois indicadores separados, cada um com sua própria explicação ao passar o mouse — nunca mais um número ambíguo de \"Gemas\".",
+      },
+      {
+        en: "Every price you can't afford now says exactly which currency and exactly how many more you need — never a generic \"not enough Gems\".",
+        ptBR: "Todo preço que você não pode pagar agora diz exatamente qual moeda e exatamente quantas a mais você precisa — nunca mais um genérico \"Gemas insuficientes\".",
+      },
+      {
+        en: "Existing Gem balances migrate honestly: since HORDENOVA has never had a real purchase flow, every Gem already on your save becomes Free Gems — nothing is lost, and Purchased Gems simply start at 0 until a store exists.",
+        ptBR: "Os saldos de Gemas existentes migram de forma honesta: como o HORDENOVA nunca teve um fluxo de compra real, toda Gema que já estava no seu save vira Gema Grátis — nada é perdido, e as Gemas Compradas simplesmente começam em 0 até que uma loja exista.",
+      },
+      {
+        en: "Skin prices (1,200 Free / 800 Purchased for every commercial skin) are unchanged — this is a currency split, not a price increase.",
+        ptBR: "Os preços das skins (1.200 Grátis / 800 Compradas para toda skin comercial) permanecem iguais — isto é uma divisão de moeda, não um aumento de preço.",
+      },
+    ],
+  },
+  {
     id: "v35",
     dateIso: "2026-09-21",
     category: "FIXES",
