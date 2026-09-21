@@ -38,7 +38,12 @@ export type LedgerEventType =
   | "AUCTION_BID_PLACED"
   | "AUCTION_SETTLED_SOLD"
   | "AUCTION_SETTLED_UNSOLD"
-  | "AUCTION_CANCELLED";
+  | "AUCTION_CANCELLED"
+  // PLAYER ECONOMY UNIFICATION — Direct Trade's Purchased-Gems leg, mirroring
+  // ITEM_TRADED's own "trade:<sessionId>" source exactly. Never GEMS_EARNED/
+  // GEMS_SPENT: those mean "this save's balance moved against the game's own
+  // sinks/faucets", not a peer-to-peer transfer between two players' Gems.
+  | "GEMS_TRADED";
 
 export interface LedgerEvent {
   eventId: string;
@@ -51,9 +56,9 @@ export interface LedgerEvent {
   toOwner: string | null;
   /** Free-form provenance string — a boss id, "trade:<sessionId>", "auction:<listingId>", a milestone wave number, "specialization:<id>", etc. */
   source: string;
-  /** Present for GEMS_EARNED/GEMS_SPENT/GEM_SHARDS_EARNED — the gold-equivalent quantity, and for COSMETIC_PURCHASED/INVENTORY_EXPANSION_PURCHASED the gem cost paid. Absent for ITEM_* events. */
+  /** Present for GEMS_EARNED/GEMS_SPENT/GEM_SHARDS_EARNED/GEMS_TRADED — the gold-equivalent quantity, and for COSMETIC_PURCHASED/INVENTORY_EXPANSION_PURCHASED the gem cost paid. Absent for ITEM_* events. */
   amount?: number;
-  /** GEMS ECONOMY v2 — present ONLY for GEMS_EARNED/GEMS_SPENT: which of the two real, separately-tracked balances this event moved (see engine/SaveSystem.ts's SaveData.freeGems/purchasedGems). Never absent for a real dual-currency event — an old pre-migration ledger entry simply has no `currency` at all, which callers must treat as historical, not as either bucket. */
+  /** GEMS ECONOMY v2 — present ONLY for GEMS_EARNED/GEMS_SPENT/GEMS_TRADED: which of the two real, separately-tracked balances this event moved (see engine/SaveSystem.ts's SaveData.freeGems/purchasedGems). Never absent for a real dual-currency event — an old pre-migration ledger entry simply has no `currency` at all, which callers must treat as historical, not as either bucket. GEMS_TRADED is always "PURCHASED" — Free Gems structurally cannot enter a TradeOffer (see engine/TradeManager.ts). */
   currency?: "FREE" | "PURCHASED";
 }
 

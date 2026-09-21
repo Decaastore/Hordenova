@@ -40,6 +40,12 @@ describe("engine/AuctionManager.ts — the auction state machine (MARKETPLACE / 
     expect(canListItemForAuction({ ...owned, pendingAuction: true }, SELLER)).toBe(false);
   });
 
+  it("PLAYER ECONOMY UNIFICATION: canListItemForAuction rejects an item currently equipped on a tower — it can no longer be sold out from under the tower using it", () => {
+    const owned = createItemInstance("ancient_core", SELLER, { type: "BOSS_DROP", refId: "hollow-warden" });
+    expect(canListItemForAuction(owned, SELLER, false)).toBe(true);
+    expect(canListItemForAuction(owned, SELLER, true)).toBe(false);
+  });
+
   it("scenario 3/9: a valid bid is recorded, updates the leader, and is reflected in getMinimumNextBid", () => {
     const l = listing();
     const outcome = placeBid(l, BIDDER, FIRST_BID, NOW + 1000);

@@ -165,9 +165,22 @@ export function cancelAuctionListing(listing: AuctionListing, requesterId: strin
   return { ok: true, listing: { ...listing, status: "CANCELLED", settledAt: now } };
 }
 
-/** A real, owned, tradable, not-already-locked item is the only thing that can ever be listed (spec section 17's soulbound rule, reused verbatim — the exact same rule that already blocks a soulbound item from TradeManager). */
-export function canListItemForAuction(item: Pick<ItemInstance, "ownerId" | "tradable" | "pendingTrade" | "pendingAuction">, ownerId: string): boolean {
-  return item.ownerId === ownerId && item.tradable && !item.pendingTrade && !item.pendingAuction;
+/**
+ * A real, owned, tradable, not-already-locked, not-currently-equipped item
+ * is the only thing that can ever be listed (spec section 17's soulbound
+ * rule, reused verbatim — the exact same rule that already blocks a
+ * soulbound item from TradeManager). PLAYER ECONOMY UNIFICATION spec
+ * section 12/14: `isEquipped` closes a real pre-existing gap — nothing
+ * previously stopped a tower's equipped item from being listed out from
+ * under it. Callers compute `isEquipped` via
+ * InventoryManager.isItemEquippedAnywhere(save.towerLoadout, instanceId).
+ */
+export function canListItemForAuction(
+  item: Pick<ItemInstance, "ownerId" | "tradable" | "pendingTrade" | "pendingAuction">,
+  ownerId: string,
+  isEquipped = false,
+): boolean {
+  return item.ownerId === ownerId && item.tradable && !item.pendingTrade && !item.pendingAuction && !isEquipped;
 }
 
 export { createAuctionListing, getCurrentBidAmount, getLeadingBidderId };

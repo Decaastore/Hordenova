@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v37",
+    dateIso: "2026-09-21",
+    category: "SYSTEMS",
+    title: {
+      en: "Direct Inventory Trading — One Unlock for the Whole Player Economy",
+      ptBR: "Troca Direta pelo Inventário — Um Único Desbloqueio para Toda a Economia entre Jogadores",
+    },
+    description: {
+      en: "A new Trade tab (inside the Inventory panel) lets you build a real offer of items and 💎 Purchased Gems to trade directly with another player — item for item, item for Purchased Gems, or Purchased Gems for Purchased Gems. It shares the exact same single unlock as the Marketplace: there is no separate 'Trade Unlock' purchase, ever. As always, 🔒 Free Gems can never appear in a trade at all — the trade offer itself has no field for them. HORDENOVA has no live matchmaking server yet, so the Trade tab is fully built, fully tested, and honestly says so instead of faking an opponent — the moment matchmaking exists, this exact screen connects to it.",
+      ptBR: "Uma nova aba de Troca (dentro do painel de Inventário) permite montar uma oferta real de itens e 💎 Gemas Compradas para negociar diretamente com outro jogador — item por item, item por Gemas Compradas, ou Gemas Compradas por Gemas Compradas. Ela compartilha exatamente o mesmo desbloqueio único do Mercado: nunca existe uma compra separada de 'Desbloqueio de Troca'. Como sempre, 🔒 Gemas Grátis nunca podem aparecer em uma troca — a própria oferta de troca não tem campo para elas. O HORDENOVA ainda não tem um servidor de matchmaking ativo, então a aba de Troca está totalmente implementada e testada, e diz isso honestamente em vez de fingir um adversário — no momento em que o matchmaking existir, esta mesma tela se conectará a ele.",
+    },
+    highlights: [
+      {
+        en: "One single unlock (1,500 🔒 Free OR 500 💎 Purchased Gems, unchanged) now grants Marketplace AND Direct Trade together — the game never charges twice for the two halves of the player economy.",
+        ptBR: "Um único desbloqueio (1.500 🔒 Gemas Grátis OU 500 💎 Gemas Compradas, sem alteração) agora concede Mercado E Troca Direta juntos — o jogo nunca cobra duas vezes pelas duas metades da economia entre jogadores.",
+      },
+      {
+        en: "Real double-confirmation: changing either side's items or Purchased Gems after confirming — even by the other player — un-confirms both sides, so nobody can be locked into a deal that quietly changed underneath them.",
+        ptBR: "Confirmação dupla de verdade: mudar os itens ou as Gemas Compradas de qualquer um dos lados depois de confirmado — mesmo pelo outro jogador — invalida a confirmação dos dois lados, então ninguém fica preso a um acordo que mudou silenciosamente.",
+      },
+      {
+        en: "Fixed a real gap shared by the Marketplace and Trade: an item currently equipped on a tower could previously be listed or offered away while still equipped. Both systems now correctly block an equipped item until you unequip it first.",
+        ptBR: "Corrigida uma falha real compartilhada pelo Mercado e pela Troca: um item atualmente equipado em uma torre antes podia ser anunciado ou oferecido enquanto ainda estava equipado. Os dois sistemas agora bloqueiam corretamente um item equipado até que você o desequipe primeiro.",
+      },
+      {
+        en: "Every trade re-checks real ownership, tradability, and your actual Purchased Gems balance at the exact moment it executes — never trusting a stale offer — so a trade can never partially complete or duplicate an item.",
+        ptBR: "Toda troca reconfere a posse real, a possibilidade de negociação e o saldo real de Gemas Compradas no exato momento da execução — nunca confiando em uma oferta desatualizada — então uma troca nunca pode ser concluída parcialmente ou duplicar um item.",
+      },
+    ],
+  },
+  {
     id: "v36",
     dateIso: "2026-09-21",
     category: "SYSTEMS",

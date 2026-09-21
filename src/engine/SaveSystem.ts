@@ -12,6 +12,7 @@ import type { AscensionHistoryEntry, SeasonRewardRecord } from "@/config/ascensi
 import { generateId } from "@/utils/id";
 import { seasonClock } from "./SeasonClock";
 import type { AuctionListing } from "@/entities/Auction";
+import type { TradeSession } from "./TradeManager";
 
 /**
  * Master Implementation spec section 2/36 — the ASCENSION season's own
@@ -239,17 +240,31 @@ export interface SaveData {
   auctionListings: AuctionListing[];
 
   /**
-   * GEMS ECONOMY v2 — the gate before the Marketplace (listing OR bidding)
-   * becomes usable at all. Spends either 1,500 Free OR 500 Purchased Gems
-   * (config/gemsEconomy.ts's TRADE_UNLOCK_PRICE — a deliberate 3x asymmetry,
-   * not the usual 1.5x multiplier), once, permanently — never re-locked,
-   * never re-charged. false on every save that predates this field, exactly
-   * like every other one-time permanent unlock in this file.
+   * PLAYER ECONOMY UNLOCK — the ONE gate before the ENTIRE player-to-player
+   * economy becomes usable: Marketplace (listing AND bidding) AND Direct
+   * Inventory Trade, together, from a single purchase — never two separate
+   * unlocks. Spends either 1,500 Free OR 500 Purchased Gems (config/
+   * gemsEconomy.ts's TRADE_UNLOCK_PRICE — a deliberate 3x asymmetry, not the
+   * usual 1.5x multiplier), once, permanently — never re-locked, never
+   * re-charged, and never charged again for the other half of the economy.
+   * false on every save that predates this field, exactly like every other
+   * one-time permanent unlock in this file.
    */
   tradeUnlocked: boolean;
+
+  /**
+   * PLAYER ECONOMY UNIFICATION — Direct Inventory Trade's one live session,
+   * if any. null whenever nothing is being negotiated (the overwhelmingly
+   * common case today, since no matchmaking layer exists yet to ever create
+   * one — see engine/TradeManager.ts's own header). Kept on the permanent
+   * SaveData, not a separate namespace, so a session genuinely survives a
+   * page reload exactly like every other in-progress economic action here
+   * (an active Marketplace listing, a pending Roulette spin).
+   */
+  activeTradeSession: TradeSession | null;
 }
 
-export const SAVE_DATA_VERSION = 20;
+export const SAVE_DATA_VERSION = 21;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -300,6 +315,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   lastFreeRepositionDayIndex: null,
   auctionListings: [],
   tradeUnlocked: false,
+  activeTradeSession: null,
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -625,6 +641,45 @@ function parseAuctionListings(raw: unknown): AuctionListing[] {
   }));
 }
 
+/**
+ * Self-healing parse for `activeTradeSession` (save v20 -> v21) — a brand
+ * new field, same "sensible fresh-account default for a pre-existing save"
+ * pattern as auctionListings/tradeUnlocked above: any malformed/partial
+ * session (or the near-universal `null`, since no matchmaking layer exists
+ * to ever create a real one yet) simply resolves to null rather than
+ * resurrecting a corrupted negotiation.
+ */
+function isValidTradeOffer(raw: unknown): raw is TradeSession["offerA"] {
+  if (!raw || typeof raw !== "object") return false;
+  const o = raw as Partial<TradeSession["offerA"]>;
+  return (
+    typeof o.playerId === "string" &&
+    Array.isArray(o.itemInstanceIds) &&
+    o.itemInstanceIds.every((id) => typeof id === "string") &&
+    typeof o.purchasedGems === "number" &&
+    typeof o.confirmed === "boolean"
+  );
+}
+
+function isValidTradeSession(raw: unknown): raw is TradeSession {
+  if (!raw || typeof raw !== "object") return false;
+  const s = raw as Partial<TradeSession>;
+  return (
+    typeof s.id === "string" &&
+    typeof s.createdAt === "number" &&
+    typeof s.playerAId === "string" &&
+    typeof s.playerBId === "string" &&
+    isValidTradeOffer(s.offerA) &&
+    isValidTradeOffer(s.offerB) &&
+    (s.status === "PENDING" || s.status === "COMPLETED" || s.status === "CANCELLED") &&
+    (s.completedAt === null || typeof s.completedAt === "number")
+  );
+}
+
+function parseActiveTradeSession(raw: unknown): TradeSession | null {
+  return isValidTradeSession(raw) ? raw : null;
+}
+
 /** Self-healing parse for `equippedTowerSkinByType` — drops any key that isn't a real TowerType, or a skin id that doesn't actually belong to that tower type. */
 function parseEquippedTowerSkinByType(raw: unknown): Partial<Record<TowerType, string>> {
   if (!raw || typeof raw !== "object") return {};
@@ -799,6 +854,10 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // every other additive migration in this function: no save older
       // than this field has ever unlocked Trading.
       tradeUnlocked: typeof parsed.tradeUnlocked === "boolean" ? parsed.tradeUnlocked : false,
+      // PLAYER ECONOMY UNIFICATION (save v20 -> v21) — brand new field, same
+      // "sensible fresh-account default for a pre-existing save" pattern as
+      // every other additive migration in this function.
+      activeTradeSession: parseActiveTradeSession(parsed.activeTradeSession),
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

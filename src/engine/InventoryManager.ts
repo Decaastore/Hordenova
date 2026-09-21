@@ -2,6 +2,7 @@ import type { ItemCategory } from "@/config/itemDefinitions";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import type { Rarity } from "@/config/rarity";
 import type { ItemInstance } from "@/entities/Item";
+import type { TowerLoadoutEntry } from "@/entities/Tower";
 
 /**
  * Item System spec section 13 — pure functions over an ItemInstance[],
@@ -69,4 +70,18 @@ export function getItemsByRarity(inventory: readonly ItemInstance[], rarity: Rar
 
 export function countByDefinition(inventory: readonly ItemInstance[], itemDefinitionId: string): number {
   return inventory.filter((item) => item.itemDefinitionId === itemDefinitionId).length;
+}
+
+/**
+ * PLAYER ECONOMY UNIFICATION spec section 12/14 — the ONE place that
+ * answers "is this exact item currently equipped on any tower", shared by
+ * both Marketplace listing eligibility (engine/AuctionManager.ts's
+ * canListItemForAuction) and Trade offer eligibility (engine/TradeManager.ts's
+ * canOfferItemInTrade), so the two systems can never drift into allowing a
+ * currently-equipped item to be listed/traded out from under its own tower
+ * — the exact "item listado e equipado ao mesmo tempo" race the spec calls
+ * out. Previously nothing checked this at all (a real gap this closes).
+ */
+export function isItemEquippedAnywhere(towers: readonly TowerLoadoutEntry[], instanceId: string): boolean {
+  return towers.some((tower) => tower.equippedItemInstanceIds?.includes(instanceId) ?? false);
 }

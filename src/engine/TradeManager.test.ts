@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
   addItemToOffer,
+  canOfferItemInTrade,
   cancelTrade,
   confirmOffer,
   createTradeSession,
   executeTrade,
   removeItemFromOffer,
-  setCurrencyOffer,
+  setPurchasedGemsOffer,
   validateTradeExecution,
+  type TradePartySnapshot,
 } from "./TradeManager";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
 
@@ -18,12 +20,23 @@ function ownedBy(owner: string, defId = "ancient_core"): ItemInstance {
   return createItemInstance(defId, owner, { type: "BOSS_DROP", refId: "hollow-warden" });
 }
 
+/** Builds a TradePartySnapshot with sensible defaults — a huge Gems balance (never the thing under test unless overridden) and no equipped items. */
+function party(inventory: readonly ItemInstance[], overrides: Partial<TradePartySnapshot> = {}): TradePartySnapshot {
+  return { inventory, purchasedGemsBalance: 1_000_000, equippedInstanceIds: new Set(), ...overrides };
+}
+
 describe("TradeManager", () => {
   it("createTradeSession starts PENDING with empty, unconfirmed offers on both sides", () => {
     const session = createTradeSession(PLAYER_A, PLAYER_B);
     expect(session.status).toBe("PENDING");
-    expect(session.offerA).toEqual({ playerId: PLAYER_A, itemInstanceIds: [], currency: 0, confirmed: false });
-    expect(session.offerB).toEqual({ playerId: PLAYER_B, itemInstanceIds: [], currency: 0, confirmed: false });
+    expect(session.offerA).toEqual({ playerId: PLAYER_A, itemInstanceIds: [], purchasedGems: 0, confirmed: false });
+    expect(session.offerB).toEqual({ playerId: PLAYER_B, itemInstanceIds: [], purchasedGems: 0, confirmed: false });
+  });
+
+  it("PLAYER ECONOMY UNIFICATION spec section 4: a TradeOffer has no freeGems field at all — Free Gems are structurally inexpressible in a trade, not merely hidden by the UI", () => {
+    const session = createTradeSession(PLAYER_A, PLAYER_B);
+    expect(Object.keys(session.offerA).sort()).toEqual(["confirmed", "itemInstanceIds", "playerId", "purchasedGems"]);
+    expect("freeGems" in session.offerA).toBe(false);
   });
 
   it("addItemToOffer adds to the correct side and ignores an unknown playerId", () => {
@@ -43,7 +56,7 @@ describe("TradeManager", () => {
     expect(session.offerA.itemInstanceIds).toEqual(["item-1"]);
   });
 
-  it("changing either offer un-confirms BOTH sides — prevents committing against a stale offer (spec section 16)", () => {
+  it("changing either offer un-confirms BOTH sides — prevents committing against a stale offer (spec section 10)", () => {
     let session = createTradeSession(PLAYER_A, PLAYER_B);
     session = confirmOffer(session, PLAYER_A);
     session = confirmOffer(session, PLAYER_B);
@@ -54,10 +67,21 @@ describe("TradeManager", () => {
     expect(session.offerB.confirmed).toBe(false);
   });
 
-  it("setCurrencyOffer rejects a negative amount", () => {
+  it("changing the Purchased Gems offer also un-confirms both sides (spec section 10's worked example: A confirmed, B lowers 2,000 -> 500 Gems, A loses its confirmation)", () => {
     let session = createTradeSession(PLAYER_A, PLAYER_B);
-    session = setCurrencyOffer(session, PLAYER_A, -50);
-    expect(session.offerA.currency).toBe(0);
+    session = setPurchasedGemsOffer(session, PLAYER_B, 2000);
+    session = confirmOffer(session, PLAYER_A);
+    session = confirmOffer(session, PLAYER_B);
+
+    session = setPurchasedGemsOffer(session, PLAYER_B, 500);
+    expect(session.offerA.confirmed).toBe(false);
+    expect(session.offerB.confirmed).toBe(false);
+  });
+
+  it("setPurchasedGemsOffer rejects a negative amount", () => {
+    let session = createTradeSession(PLAYER_A, PLAYER_B);
+    session = setPurchasedGemsOffer(session, PLAYER_A, -50);
+    expect(session.offerA.purchasedGems).toBe(0);
   });
 
   it("cancelTrade marks CANCELLED and further mutation is a no-op", () => {
@@ -68,11 +92,23 @@ describe("TradeManager", () => {
     expect(afterAdd.offerA.itemInstanceIds).toEqual([]);
   });
 
+  describe("canOfferItemInTrade", () => {
+    it("requires ownership, tradability, no existing lock, and not currently equipped", () => {
+      const owned = ownedBy(PLAYER_A);
+      expect(canOfferItemInTrade(owned, PLAYER_A)).toBe(true);
+      expect(canOfferItemInTrade(owned, "someone-else")).toBe(false);
+      expect(canOfferItemInTrade({ ...owned, tradable: false }, PLAYER_A)).toBe(false);
+      expect(canOfferItemInTrade({ ...owned, pendingTrade: true }, PLAYER_A)).toBe(false);
+      expect(canOfferItemInTrade({ ...owned, pendingAuction: true }, PLAYER_A)).toBe(false);
+      expect(canOfferItemInTrade(owned, PLAYER_A, true)).toBe(false); // equipped
+    });
+  });
+
   describe("validateTradeExecution", () => {
     it("fails NOT_CONFIRMED when only one side confirmed", () => {
       let session = createTradeSession(PLAYER_A, PLAYER_B);
       session = confirmOffer(session, PLAYER_A);
-      const result = validateTradeExecution(session, [], []);
+      const result = validateTradeExecution(session, party([]), party([]));
       expect(result).toEqual({ ok: false, reason: "NOT_CONFIRMED" });
     });
 
@@ -82,7 +118,7 @@ describe("TradeManager", () => {
       session = addItemToOffer(session, PLAYER_A, itemOwnedByB.instanceId); // A tries to offer B's item
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = validateTradeExecution(session, [itemOwnedByB], []);
+      const result = validateTradeExecution(session, party([itemOwnedByB]), party([]));
       expect(result).toEqual({ ok: false, reason: "ITEM_NOT_OWNED", instanceId: itemOwnedByB.instanceId });
     });
 
@@ -92,7 +128,7 @@ describe("TradeManager", () => {
       session = addItemToOffer(session, PLAYER_A, soulbound.instanceId);
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = validateTradeExecution(session, [soulbound], []);
+      const result = validateTradeExecution(session, party([soulbound]), party([]));
       expect(result).toEqual({ ok: false, reason: "ITEM_NOT_TRADABLE", instanceId: soulbound.instanceId });
     });
 
@@ -101,23 +137,44 @@ describe("TradeManager", () => {
       session = addItemToOffer(session, PLAYER_A, "ghost-item");
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = validateTradeExecution(session, [], []);
+      const result = validateTradeExecution(session, party([]), party([]));
       expect(result).toEqual({ ok: false, reason: "ITEM_NOT_FOUND", instanceId: "ghost-item" });
+    });
+
+    it("PLAYER ECONOMY UNIFICATION spec section 12: fails ITEM_EQUIPPED when the offered item is currently equipped on a tower — closes the 'item listado e equipado ao mesmo tempo' race", () => {
+      const equipped = ownedBy(PLAYER_A);
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = addItemToOffer(session, PLAYER_A, equipped.instanceId);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      const result = validateTradeExecution(session, party([equipped], { equippedInstanceIds: new Set([equipped.instanceId]) }), party([]));
+      expect(result).toEqual({ ok: false, reason: "ITEM_EQUIPPED", instanceId: equipped.instanceId });
+    });
+
+    it("spec section 24: fails INSUFFICIENT_PURCHASED_GEMS when a side offered more Gems than it actually has right now", () => {
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = setPurchasedGemsOffer(session, PLAYER_A, 2000);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      // A's real balance dropped to 500 (e.g. spent elsewhere) between
+      // offering 2,000 and this commit-time re-check.
+      const result = validateTradeExecution(session, party([], { purchasedGemsBalance: 500 }), party([]));
+      expect(result).toEqual({ ok: false, reason: "INSUFFICIENT_PURCHASED_GEMS" });
     });
   });
 
   describe("executeTrade — the atomic ownership transfer", () => {
-    it("transfers items both ways and moves currency in a single call, or nothing at all", () => {
+    it("transfers items both ways and moves Purchased Gems in a single call, or nothing at all", () => {
       const aItem = ownedBy(PLAYER_A, "ancient_core");
       const bItem = ownedBy(PLAYER_B, "hollow_sigil");
 
       let session = createTradeSession(PLAYER_A, PLAYER_B);
       session = addItemToOffer(session, PLAYER_A, aItem.instanceId);
       session = addItemToOffer(session, PLAYER_B, bItem.instanceId);
-      session = setCurrencyOffer(session, PLAYER_A, 100);
+      session = setPurchasedGemsOffer(session, PLAYER_A, 100);
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = executeTrade(session, [aItem], [bItem], 5000);
+      const result = executeTrade(session, party([aItem]), party([bItem]), 5000);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
 
@@ -128,9 +185,41 @@ describe("TradeManager", () => {
       expect(result.updatedInventoryB).toHaveLength(1);
       expect(result.updatedInventoryB[0]!.instanceId).toBe(aItem.instanceId);
       expect(result.updatedInventoryB[0]!.ownerId).toBe(PLAYER_B);
-      expect(result.currencyDeltaA).toBe(-100);
-      expect(result.currencyDeltaB).toBe(100);
-      expect(result.ledgerEvents).toHaveLength(2);
+      expect(result.purchasedGemsDeltaA).toBe(-100);
+      expect(result.purchasedGemsDeltaB).toBe(100);
+      expect(result.ledgerEvents).toHaveLength(3); // 2x ITEM_TRADED + 1x GEMS_TRADED
+      const gemsEvent = result.ledgerEvents.find((e) => e.eventType === "GEMS_TRADED")!;
+      expect(gemsEvent).toMatchObject({ fromOwner: PLAYER_A, toOwner: PLAYER_B, amount: 100, currency: "PURCHASED" });
+    });
+
+    it("spec section 3: Purchased Gems <-> Purchased Gems (no items either side) is a real, supported trade — the model never special-cased items as mandatory", () => {
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = setPurchasedGemsOffer(session, PLAYER_A, 500);
+      session = setPurchasedGemsOffer(session, PLAYER_B, 800);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      const result = executeTrade(session, party([]), party([]));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      // Net: B gave 800, received 500 back -> B nets -300; A nets +300.
+      expect(result.purchasedGemsDeltaA).toBe(300);
+      expect(result.purchasedGemsDeltaB).toBe(-300);
+      expect(result.ledgerEvents).toHaveLength(1);
+      expect(result.ledgerEvents[0]).toMatchObject({ eventType: "GEMS_TRADED", fromOwner: PLAYER_B, toOwner: PLAYER_A, amount: 300 });
+    });
+
+    it("a trade with equal Gems offers on both sides nets to zero and emits no GEMS_TRADED event", () => {
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = setPurchasedGemsOffer(session, PLAYER_A, 500);
+      session = setPurchasedGemsOffer(session, PLAYER_B, 500);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      const result = executeTrade(session, party([]), party([]));
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.purchasedGemsDeltaA).toBe(0);
+      expect(result.purchasedGemsDeltaB).toBe(0);
+      expect(result.ledgerEvents).toHaveLength(0);
     });
 
     it("appends a TRADED history entry with the correct fromOwner/toOwner on the transferred item", () => {
@@ -139,7 +228,7 @@ describe("TradeManager", () => {
       session = addItemToOffer(session, PLAYER_A, aItem.instanceId);
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = executeTrade(session, [aItem], [], 7777);
+      const result = executeTrade(session, party([aItem]), party([]), 7777);
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       const transferred = result.updatedInventoryB[0]!;
@@ -157,18 +246,41 @@ describe("TradeManager", () => {
       session = addItemToOffer(session, PLAYER_A, soulbound.instanceId);
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = executeTrade(session, [soulbound], []);
+      const result = executeTrade(session, party([soulbound]), party([]));
       expect(result.ok).toBe(false);
     });
 
-    it("prevents double-spend: a second trade session for the same already-traded item fails at execution, even though it looked valid when built (spec section 16)", () => {
+    it("is a no-op when an offered item is equipped on a tower — the equip-then-trade race", () => {
+      const equipped = ownedBy(PLAYER_A);
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = addItemToOffer(session, PLAYER_A, equipped.instanceId);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      const result = executeTrade(session, party([equipped], { equippedInstanceIds: new Set([equipped.instanceId]) }), party([]));
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.reason).toBe("ITEM_EQUIPPED");
+    });
+
+    it("is a no-op when a side's real Purchased Gems balance can't cover what it confirmed offering (spec section 24: saldo insuficiente)", () => {
+      let session = createTradeSession(PLAYER_A, PLAYER_B);
+      session = setPurchasedGemsOffer(session, PLAYER_A, 2000);
+      session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
+
+      const result = executeTrade(session, party([], { purchasedGemsBalance: 500 }), party([]));
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.reason).toBe("INSUFFICIENT_PURCHASED_GEMS");
+    });
+
+    it("prevents double-spend: a second trade session for the same already-traded item fails at execution, even though it looked valid when built (spec section 12)", () => {
       const contested = ownedBy(PLAYER_A, "ancient_core");
 
       // First trade: A -> B. Executes successfully.
       let sessionOne = createTradeSession(PLAYER_A, PLAYER_B);
       sessionOne = addItemToOffer(sessionOne, PLAYER_A, contested.instanceId);
       sessionOne = confirmOffer(confirmOffer(sessionOne, PLAYER_A), PLAYER_B);
-      const resultOne = executeTrade(sessionOne, [contested], []);
+      const resultOne = executeTrade(sessionOne, party([contested]), party([]));
       expect(resultOne.ok).toBe(true);
       if (!resultOne.ok) return;
 
@@ -181,7 +293,7 @@ describe("TradeManager", () => {
 
       // Ground truth: A's REAL current inventory (post-trade-one) no longer has it.
       const aRealInventoryNow = resultOne.updatedInventoryA; // [] — A gave it away
-      const result = executeTrade(sessionTwo, aRealInventoryNow, []);
+      const result = executeTrade(sessionTwo, party(aRealInventoryNow), party([]));
       expect(result.ok).toBe(false);
       if (result.ok) return;
       expect(result.reason).toBe("ITEM_NOT_FOUND");
@@ -196,7 +308,7 @@ describe("TradeManager", () => {
       session = { ...session, offerA: { ...session.offerA, itemInstanceIds: [aItem.instanceId, aItem.instanceId] } };
       session = confirmOffer(confirmOffer(session, PLAYER_A), PLAYER_B);
 
-      const result = validateTradeExecution(session, [aItem], []);
+      const result = validateTradeExecution(session, party([aItem]), party([]));
       expect(result).toEqual({ ok: false, reason: "DUPLICATE_ITEM_IN_OFFER", instanceId: aItem.instanceId });
     });
 

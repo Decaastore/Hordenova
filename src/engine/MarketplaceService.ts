@@ -1,7 +1,7 @@
 import { loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import { findItem } from "./InventoryManager";
+import { findItem, isItemEquippedAnywhere } from "./InventoryManager";
 import {
   createAuctionListing,
   getCurrentBidAmount,
@@ -161,7 +161,7 @@ export function canListItemInMarketplace(instanceId: string): boolean {
   const save = loadSave();
   if (!save.tradeUnlocked) return false;
   const item = findItem(save.inventory, instanceId);
-  return !!item && canListItemForAuction(item, save.playerId);
+  return !!item && canListItemForAuction(item, save.playerId, isItemEquippedAnywhere(save.towerLoadout, instanceId));
 }
 
 export function getMinimumNextBidForAuction(auctionId: string): number | null {
@@ -209,7 +209,9 @@ export function createAuctionListingForItem(
   const save = loadSave();
   if (!save.tradeUnlocked) return { ok: false, reason: "TRADE_LOCKED" };
   const item = findItem(save.inventory, instanceId);
-  if (!item || !canListItemForAuction(item, save.playerId)) return { ok: false, reason: "NOT_ELIGIBLE" };
+  if (!item || !canListItemForAuction(item, save.playerId, isItemEquippedAnywhere(save.towerLoadout, instanceId))) {
+    return { ok: false, reason: "NOT_ELIGIBLE" };
+  }
   const def = getItemDefinition(item.itemDefinitionId);
   if (!def) return { ok: false, reason: "NOT_FOUND" };
   const floor = getAuctionMinBid(def.rarity);

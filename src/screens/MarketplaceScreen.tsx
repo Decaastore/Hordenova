@@ -17,6 +17,7 @@ import {
 } from "@/engine/MarketplaceService";
 import { DualGemPriceButtons } from "@/ui/DualGemPriceButtons";
 import { canListItemForAuction } from "@/engine/AuctionManager";
+import { isItemEquippedAnywhere } from "@/engine/InventoryManager";
 import { getCurrentBidAmount, type AuctionListing } from "@/entities/Auction";
 import { getItemDefinition, type ItemCategory } from "@/config/itemDefinitions";
 import { RARITIES, type Rarity } from "@/config/rarity";
@@ -76,7 +77,10 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
   const myListings = useMemo(() => getMyAuctionListings(), [refreshTick]);
 
   const eligibleItems = useMemo(
-    () => save.inventory.filter((item) => canListItemForAuction(item, save.playerId)),
+    () =>
+      save.inventory.filter((item) =>
+        canListItemForAuction(item, save.playerId, isItemEquippedAnywhere(save.towerLoadout, item.instanceId)),
+      ),
     [save],
   );
 
