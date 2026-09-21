@@ -104,7 +104,7 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
 
   it("the NOTHING outcome grants absolutely nothing — no Castle HP, no Gems, no skin — but still consumes the pending spin", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.9); // [85,100) -> NOTHING
-    updateSave({ currentWave: 9, bestWave: 9, gold: 99_999, gems: 0, towerLoadout: STRONG_LOADOUT });
+    updateSave({ currentWave: 9, bestWave: 9, gold: 99_999, freeGems: 0, towerLoadout: STRONG_LOADOUT });
     const engine = new GameEngine();
     engine.startRun();
     runUntilWaveAtLeast(engine, 10);
@@ -113,7 +113,7 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
     const hud = engine.getHudSnapshot();
     expect(hud.pendingRouletteResult).toEqual({ wave: 10, rewardType: "NOTHING", castleHpGranted: 0, gemsGranted: 0, castleSkinId: null });
     expect(hud.maxBaseHp).toBe(RUN_START.baseHp);
-    expect(engine.getGemBalance()).toBe(0);
+    expect(engine.getFreeGemBalance()).toBe(0);
     expect(hud.pendingRouletteSpinWave).toBeNull();
   });
 
@@ -184,15 +184,15 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
 
   it("the GEM outcome adds exactly ROULETTE_GEM_REWARD_AMOUNT Gems via the real GemManager path, only once spun", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.8); // [76,84) -> GEM
-    updateSave({ currentWave: 9, bestWave: 9, gold: 99_999, gems: 0, towerLoadout: STRONG_LOADOUT });
+    updateSave({ currentWave: 9, bestWave: 9, gold: 99_999, freeGems: 0, towerLoadout: STRONG_LOADOUT });
     const engine = new GameEngine();
     engine.startRun();
     runUntilWaveAtLeast(engine, 10);
-    expect(engine.getGemBalance()).toBe(0); // not granted yet
+    expect(engine.getFreeGemBalance()).toBe(0); // not granted yet
 
     engine.spinPendingRoulette();
     expect(engine.getHudSnapshot().pendingRouletteResult).toMatchObject({ rewardType: "GEM", gemsGranted: ROULETTE_GEM_REWARD_AMOUNT });
-    expect(engine.getGemBalance()).toBe(ROULETTE_GEM_REWARD_AMOUNT);
+    expect(engine.getFreeGemBalance()).toBe(ROULETTE_GEM_REWARD_AMOUNT);
   });
 
   it("the CASTLE_SKIN outcome grants a real, previously-unowned Castle Skin — permanent, non-consumable, only once spun", () => {
@@ -219,7 +219,7 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
       currentWave: 9,
       bestWave: 9,
       gold: 99_999,
-      gems: 0,
+      freeGems: 0,
       unlockedCastleSkinIds: CASTLE_SKINS.map((s) => s.id), // already owns every real skin
       towerLoadout: STRONG_LOADOUT,
     });
@@ -233,7 +233,7 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
       castleSkinId: null,
       gemsGranted: ROULETTE_CASTLE_SKIN_FALLBACK_GEMS,
     });
-    expect(engine.getGemBalance()).toBe(ROULETTE_CASTLE_SKIN_FALLBACK_GEMS);
+    expect(engine.getFreeGemBalance()).toBe(ROULETTE_CASTLE_SKIN_FALLBACK_GEMS);
   });
 
   it("AUDITORIA spec section 12 — Offline Defense crossing multiple milestones queues them as pending, never auto-rolls/auto-grants", () => {

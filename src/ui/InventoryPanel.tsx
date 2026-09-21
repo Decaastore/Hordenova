@@ -14,6 +14,7 @@ import { EconomyStatsPanel } from "./EconomyStatsPanel";
 import { GameEngine } from "@/engine/GameEngine";
 import { ItemGlyph } from "./ItemGlyph";
 import { ItemHoverCard, ITEM_TOOLTIP_KEYFRAMES } from "./ItemTooltip";
+import type { GemCurrency } from "@/config/gemsEconomy";
 
 /**
  * ITENS COMO ITENS REAIS — fixed display order for the inventory's category
@@ -64,12 +65,13 @@ interface InventoryPanelProps {
   /** Progression 2.0 spec section 34 — manual, player-triggered Shards -> Gems conversion. */
   gemShards: number;
   onConvertGemShards: () => void;
-  /** Master Implementation Pass spec section 7-8 — Profile Prestige, the recurring cosmetic Gem sink. */
-  gems: number;
+  /** Master Implementation Pass spec section 7-8 — Profile Prestige, the recurring cosmetic Gem sink. GEMS ECONOMY v2 — dual-currency balances. */
+  freeGems: number;
+  purchasedGems: number;
   prestigeLevel: number;
   /** The account's all-time record wave — gates whether Prestige is unlocked at all (see config/prestige.ts's canUnlockPrestige). */
   bestWave: number;
-  onUpgradePrestige: () => void;
+  onUpgradePrestige: (currency: GemCurrency) => void;
   /** SISTEMA DE FUSÃO DE ITENS — read-only pre-check for the UI (enables/disables CONFIRMAR FUSÃO, explains why blocked). Re-validated again, unconditionally, by onAttemptFusion itself — the UI's own read is never trusted for the actual spend. */
   getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
   /** Pays out the atomic fusion attempt — consumes the 3 selected items and, on success only, creates 1 superior item. See engine/GameEngine.ts's attemptFusion for the exact 8-step guarantee. */
@@ -101,7 +103,8 @@ export function InventoryPanel({
   onClaimOverflowItem,
   gemShards,
   onConvertGemShards,
-  gems,
+  freeGems,
+  purchasedGems,
   prestigeLevel,
   bestWave,
   onUpgradePrestige,
@@ -309,7 +312,8 @@ export function InventoryPanel({
               itemsOwnedTotal: inventory.length,
               itemsFoundTotal: inventory.length,
             }}
-            gems={gems}
+            freeGems={freeGems}
+            purchasedGems={purchasedGems}
             prestigeLevel={prestigeLevel}
             bestWave={bestWave}
             onUpgradePrestige={onUpgradePrestige}

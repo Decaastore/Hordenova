@@ -25,7 +25,7 @@ import { CASTLE_SKINS, PRESTIGE_CASTLE_SKIN_ID } from "@/config/castleSkins";
 import {
   canUnlockPrestige,
   getPrestigeBonuses,
-  getPrestigeUpgradeCost,
+  getPrestigeUpgradeDualPrice,
   PRESTIGE_MILESTONE_REWARDS,
   type PrestigeBonuses,
 } from "@/config/prestige";
@@ -71,11 +71,16 @@ import {
   type TowerInstance,
   type TowerLoadoutEntry,
 } from "@/entities/Tower";
-import { getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
+import { getItemSlotUnlockCost, getItemSlotUnlockPrice, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
-import { getTowerSkinDefinition, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
-import { SPECIALIZATION_CHANGE_GEM_COST, SPECIALIZATION_UNLOCK_GEM_COST, type SpecializationId } from "@/config/specializations";
-import { REPOSITION_GEM_COST } from "@/config/repositioning";
+import { getTowerSkinDefinition, getTowerSkinDualPrice, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
+import {
+  SPECIALIZATION_CHANGE_GEM_PRICE,
+  SPECIALIZATION_UNLOCK_GEM_PRICE,
+  type SpecializationId,
+} from "@/config/specializations";
+import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
+import { gemPriceForCurrency, TRADE_UNLOCK_PRICE, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
 import { getCurrentDayIndex } from "./DailyClock";
 import {
   advanceEnemy,
@@ -136,8 +141,10 @@ export interface HudSnapshot {
   /** The stable, hand-authored i18n key (`phases.<phaseI18nKey>.name`) — always one of the original PHASES entries' own id, even during an endgame rotation lap that reuses it under a suffixed `phaseId`. Use this, never `phaseId`, for any translated phase name/tagline. */
   phaseI18nKey: string;
   gold: number;
-  /** Progression 2.0 — the convenience/cosmetics currency (spec section 33). Shown in the HUD, never spendable on power. */
-  gems: number;
+  /** GEMS ECONOMY v2 — 🔒 earned exclusively through gameplay. Never spendable on power; valid for every Gems-priced system. */
+  freeGems: number;
+  /** GEMS ECONOMY v2 — 💎 bought from the store. Never spendable on power; valid for every Gems-priced system PLUS the Marketplace (Purchased-Gems-only). */
+  purchasedGems: number;
   gemShards: number;
   baseHp: number;
   maxBaseHp: number;
@@ -186,7 +193,7 @@ export interface RouletteResult {
   rewardType: RouletteRewardType;
   /** > 0 only for a CASTLE_HP_* outcome. */
   castleHpGranted: number;
-  /** > 0 for the GEM outcome, or for a CASTLE_SKIN roll that fell back to Gems because every real skin was already owned. */
+  /** > 0 for the GEM outcome, or for a CASTLE_SKIN roll that fell back to Gems because every real skin was already owned. GEMS ECONOMY v2 — always Free Gems (a gameplay reward), never Purchased. */
   gemsGranted: number;
   /** Set only when a real, previously-unowned Castle Skin was granted. */
   castleSkinId: string | null;
@@ -230,7 +237,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.wave === b.wave &&
     a.phaseId === b.phaseId &&
     a.gold === b.gold &&
-    a.gems === b.gems &&
+    a.freeGems === b.freeGems &&
+    a.purchasedGems === b.purchasedGems &&
     a.gemShards === b.gemShards &&
     a.baseHp === b.baseHp &&
     a.maxBaseHp === b.maxBaseHp &&
@@ -327,15 +335,22 @@ export class GameEngine {
   private localFirstDiscoveries: LocalFirstDiscoveries = {};
   private pendingItemRewards: ItemInstance[] = [];
 
-  // Progression 2.0 — Gem Economy (spec sections 33-40). `gems`/`gemShards`
-  // are private exactly like `gold` above: every read/write goes through
-  // this class's own methods (getGemBalance/addGems/spendGems/
-  // convertGemShards below), which is what satisfies spec section 37's
-  // "GemManager... não pode permitir player.gems += 100 direto na UI" —
-  // there simply is no path from UI code to these fields except through
-  // those methods, the same guarantee `gold` already has.
-  private gems = 0;
+  // Progression 2.0 / GEMS ECONOMY v2 — Gem Economy. `freeGems`/
+  // `purchasedGems`/`gemShards` are private exactly like `gold` above:
+  // every read/write goes through this class's own methods
+  // (getFreeGemBalance/getPurchasedGemBalance/addFreeGems/addPurchasedGems/
+  // spendGems/convertGemShards below), which is what satisfies spec section
+  // 37's "GemManager... não pode permitir player.gems += 100 direto na UI"
+  // — there simply is no path from UI code to these fields except through
+  // those methods, the same guarantee `gold` already has. The two balances
+  // are NEVER blended into one number anywhere, and there is no code path
+  // that moves value from one into the other (see config/gemsEconomy.ts's
+  // own header for the full no-conversion contract).
+  private freeGems = 0;
+  private purchasedGems = 0;
   private gemShards = 0;
+  /** GEMS ECONOMY v2 — the permanent, one-time Trade Unlock gate (see canUnlockTrade/unlockTrade below). */
+  private tradeUnlocked = false;
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
 
@@ -468,8 +483,10 @@ export class GameEngine {
     this.bossesDefeatedTotal = save.bossesDefeatedTotal;
     this.miniBossesDefeatedTotal = save.miniBossesDefeatedTotal;
     this.localFirstDiscoveries = save.localFirstDiscoveries;
-    this.gems = save.gems;
+    this.freeGems = save.freeGems;
+    this.purchasedGems = save.purchasedGems;
     this.gemShards = save.gemShards;
+    this.tradeUnlocked = save.tradeUnlocked;
     this.inventoryCapacity = save.inventoryCapacity;
     this.overflowInventory = save.overflowInventory;
     this.castleHpBonus = save.castleHpBonus;
@@ -679,9 +696,9 @@ export class GameEngine {
     return this.lastFreeRepositionDayIndex !== getCurrentDayIndex();
   }
 
-  /** 0 when the free daily reposition is still available, REPOSITION_GEM_COST otherwise. UI must show this and get confirmation before ever calling repositionTower with a non-zero cost. */
-  getRepositionCost(): number {
-    return this.isFreeRepositionAvailable() ? 0 : REPOSITION_GEM_COST;
+  /** {free:0, purchased:0} when the free daily reposition is still available, REPOSITION_GEM_PRICE otherwise. UI must show BOTH prices and get an explicit currency choice before ever calling repositionTower with a non-zero cost. */
+  getRepositionPrice(): DualGemPrice {
+    return this.isFreeRepositionAvailable() ? { free: 0, purchased: 0 } : REPOSITION_GEM_PRICE;
   }
 
   /**
@@ -695,14 +712,17 @@ export class GameEngine {
    * Mastery, Specialization, ownership, HP and every other field are
    * completely untouched, on both towers.
    *
-   * Spends REPOSITION_GEM_COST Gems when the day's free use is already
-   * spent — the caller (UI) is responsible for showing a confirmation
-   * before calling this whenever getRepositionCost() > 0, exactly like
-   * every other Gems purchase in this engine (switchTowerSpecialization,
+   * Spends REPOSITION_GEM_PRICE Gems (in whichever `currency` the caller
+   * chose) when the day's free use is already spent — the caller (UI) is
+   * responsible for showing a confirmation with BOTH prices, and passing
+   * the player's explicit choice, before calling this whenever
+   * getRepositionPrice() > 0 in either currency, exactly like every other
+   * Gems purchase in this engine (switchTowerSpecialization,
    * purchaseTowerSkin, ...): this method performs the action unconditionally
-   * once called, it never itself prompts.
+   * once called, it never itself prompts, and never auto-picks a currency.
+   * `currency` is ignored (may be omitted) when the free daily use applies.
    */
-  repositionTower(fromSlotId: string, toSlotId: string): boolean {
+  repositionTower(fromSlotId: string, toSlotId: string, currency?: GemCurrency): boolean {
     if (!this.canModifyLoadout()) return false;
     if (fromSlotId === toSlotId) return false;
 
@@ -711,7 +731,8 @@ export class GameEngine {
     if (!fromTower || !toSlot) return false;
 
     const isFree = this.isFreeRepositionAvailable();
-    if (!isFree && !this.canAffordGems(REPOSITION_GEM_COST)) return false;
+    const cost = isFree ? 0 : gemPriceForCurrency(REPOSITION_GEM_PRICE, currency ?? "PURCHASED");
+    if (!isFree && (!currency || !this.canAffordGemsInCurrency(cost, currency))) return false;
 
     const toTower = this.towers.find((t) => t.slotId === toSlotId);
     const fromSlot = TOWER_SLOTS.find((s) => s.id === fromSlotId)!;
@@ -726,7 +747,7 @@ export class GameEngine {
     if (isFree) {
       this.lastFreeRepositionDayIndex = getCurrentDayIndex();
     } else {
-      this.spendGems(REPOSITION_GEM_COST, "tower_reposition");
+      this.spendGems(cost, "tower_reposition", currency!);
     }
 
     this.persist();
@@ -840,7 +861,7 @@ export class GameEngine {
     return !!tower && canChooseSpecialization(tower);
   }
 
-  /** Every SpecializationId this account has ever purchased for `type` — permanent, never reset. Used by the UI to show an already-owned path as a free re-activation instead of another SPECIALIZATION_UNLOCK_GEM_COST charge. */
+  /** Every SpecializationId this account has ever purchased for `type` — permanent, never reset. Used by the UI to show an already-owned path as a free re-activation instead of another SPECIALIZATION_UNLOCK_GEM_PRICE charge. */
   getUnlockedSpecializationIdsForType(type: TowerType): readonly SpecializationId[] {
     return this.unlockedSpecializationIds[type] ?? [];
   }
@@ -849,28 +870,38 @@ export class GameEngine {
     return this.getUnlockedSpecializationIdsForType(type).includes(id);
   }
 
+  getSpecializationUnlockPrice(): DualGemPrice {
+    return SPECIALIZATION_UNLOCK_GEM_PRICE;
+  }
+
+  getSpecializationChangePrice(): DualGemPrice {
+    return SPECIALIZATION_CHANGE_GEM_PRICE;
+  }
+
   /**
    * The CHOICE of a specialization path (null -> an active pick, for THIS
    * Season) is free the moment the account already owns that exact path
    * (see isSpecializationUnlocked) — re-activating something already paid
    * for never charges Gems again. Choosing a path this account has NEVER
-   * owned costs SPECIALIZATION_UNLOCK_GEM_COST Gems, once, and grants
-   * PERMANENT ownership of it from that point on. Every level after the
-   * choice (via upgradeSelectedTowerSpecialization below) always costs Gold.
+   * owned costs SPECIALIZATION_UNLOCK_GEM_PRICE Gems (in the caller's
+   * explicitly chosen `currency`), once, and grants PERMANENT ownership of
+   * it from that point on. Every level after the choice (via
+   * upgradeSelectedTowerSpecialization below) always costs Gold.
    */
-  chooseTowerSpecialization(specializationId: SpecializationId): boolean {
+  chooseTowerSpecialization(specializationId: SpecializationId, currency: GemCurrency = "PURCHASED"): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !canChooseSpecialization(tower)) return false;
 
     const alreadyOwned = this.isSpecializationUnlocked(tower.type, specializationId);
-    if (!alreadyOwned && !this.canAffordGems(SPECIALIZATION_UNLOCK_GEM_COST)) return false;
+    const cost = gemPriceForCurrency(SPECIALIZATION_UNLOCK_GEM_PRICE, currency);
+    if (!alreadyOwned && !this.canAffordGemsInCurrency(cost, currency)) return false;
 
     const applied = chooseSpecializationEntity(tower, specializationId);
     if (!applied) return false;
 
     if (!alreadyOwned) {
-      this.spendGems(SPECIALIZATION_UNLOCK_GEM_COST, `specialization:${specializationId}`);
+      this.spendGems(cost, `specialization:${specializationId}`, currency);
       const owned = this.unlockedSpecializationIds[tower.type] ?? [];
       this.unlockedSpecializationIds[tower.type] = [...owned, specializationId];
     }
@@ -882,12 +913,13 @@ export class GameEngine {
 
   /**
    * "Trocar Especialização" — a flat, unconditional SPECIALIZATION_CHANGE_
-   * GEM_COST Gems purchase that switches the selected tower's ACTIVE
-   * specialization to a DIFFERENT path this account already owns. Replaces
-   * the old Specialization Respec Token system entirely: there is no free
-   * or earned respec anymore, only this flat Gems purchase, and it only
-   * ever moves between paths already paid for once — picking a brand-new
-   * path still goes through chooseTowerSpecialization (500 Gems) instead.
+   * GEM_PRICE Gems purchase (in the caller's explicitly chosen `currency`)
+   * that switches the selected tower's ACTIVE specialization to a DIFFERENT
+   * path this account already owns. Replaces the old Specialization Respec
+   * Token system entirely: there is no free or earned respec anymore, only
+   * this flat Gems purchase, and it only ever moves between paths already
+   * paid for once — picking a brand-new path still goes through
+   * chooseTowerSpecialization instead.
    */
   canSwitchSelectedTowerSpecialization(newId: SpecializationId): boolean {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
@@ -895,13 +927,14 @@ export class GameEngine {
     return this.isSpecializationUnlocked(tower.type, newId);
   }
 
-  switchTowerSpecialization(newId: SpecializationId): boolean {
+  switchTowerSpecialization(newId: SpecializationId, currency: GemCurrency = "PURCHASED"): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !this.canSwitchSelectedTowerSpecialization(newId)) return false;
-    if (!this.canAffordGems(SPECIALIZATION_CHANGE_GEM_COST)) return false;
+    const cost = gemPriceForCurrency(SPECIALIZATION_CHANGE_GEM_PRICE, currency);
+    if (!this.canAffordGemsInCurrency(cost, currency)) return false;
 
-    this.spendGems(SPECIALIZATION_CHANGE_GEM_COST, `specialization_change:${newId}`);
+    this.spendGems(cost, `specialization_change:${newId}`, currency);
     switchSpecializationEntity(tower, newId);
     this.emitAudio({ type: "tower_upgrade" });
     this.persist();
@@ -997,28 +1030,34 @@ export class GameEngine {
     return getItemSlotUnlockCost(slotIndex);
   }
 
-  /** Whether `slotIndex` is purchasable on the selected tower right now — not already unlocked, in range, and this account can afford its Gems cost. UI is responsible for the mandatory confirmation step before calling unlockItemSlotOnSelectedTower. */
-  canUnlockItemSlotOnSelectedTower(slotIndex: number): boolean {
+  /** GEMS ECONOMY v2 — dual price to unlock `slotIndex`, for UI display before purchase. Returns null for an out-of-range index. */
+  getItemSlotUnlockDualPrice(slotIndex: number): DualGemPrice | null {
+    if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return null;
+    return getItemSlotUnlockPrice(slotIndex);
+  }
+
+  /** Whether `slotIndex` is purchasable on the selected tower right now with `currency` — not already unlocked, in range, and this account can afford that currency's price. UI is responsible for the mandatory confirmation step before calling unlockItemSlotOnSelectedTower. */
+  canUnlockItemSlotOnSelectedTower(slotIndex: number, currency: GemCurrency): boolean {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !canUnlockItemSlot(tower, slotIndex)) return false;
-    return this.canAffordGems(getItemSlotUnlockCost(slotIndex));
+    return this.canAffordGemsInCurrency(gemPriceForCurrency(getItemSlotUnlockPrice(slotIndex), currency), currency);
   }
 
   /**
-   * Pays the one-time, PERMANENT Gems cost to unlock `slotIndex` on the
-   * selected tower's TYPE, forever — never re-charged for this type/slot
-   * again, never re-locked by a Season Reset (unlockedItemSlots is never
-   * touched by AscensionManager's season-reset updateSave call). Synced
-   * across every placed tower of the same type, exactly like
-   * unlockSelectedTowerMastery.
+   * Pays the one-time, PERMANENT Gems price (in the caller's explicitly
+   * chosen `currency`) to unlock `slotIndex` on the selected tower's TYPE,
+   * forever — never re-charged for this type/slot again, never re-locked by
+   * a Season Reset (unlockedItemSlots is never touched by AscensionManager's
+   * season-reset updateSave call). Synced across every placed tower of the
+   * same type, exactly like unlockSelectedTowerMastery.
    */
-  unlockItemSlotOnSelectedTower(slotIndex: number): boolean {
+  unlockItemSlotOnSelectedTower(slotIndex: number, currency: GemCurrency): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
-    if (!tower || !this.canUnlockItemSlotOnSelectedTower(slotIndex)) return false;
+    if (!tower || !this.canUnlockItemSlotOnSelectedTower(slotIndex, currency)) return false;
 
-    const cost = getItemSlotUnlockCost(slotIndex);
-    this.spendGems(cost, `item_slot:${tower.type}:${slotIndex}`);
+    const cost = gemPriceForCurrency(getItemSlotUnlockPrice(slotIndex), currency);
+    this.spendGems(cost, `item_slot:${tower.type}:${slotIndex}`, currency);
     unlockItemSlotEntity(tower, slotIndex);
     const updated = [...tower.unlockedItemSlots];
     this.unlockedItemSlots[tower.type] = updated;
@@ -1159,6 +1198,12 @@ export class GameEngine {
     return getTowerSkinDefinition(skinId)?.gemCost ?? null;
   }
 
+  /** GEMS ECONOMY v2 — dual price to buy `skinId` (🔒 1,200 / 💎 800 for every PREMIUM commercial skin), or null if the id isn't a real skin. */
+  getTowerSkinDualGemPrice(skinId: string): DualGemPrice | null {
+    const def = getTowerSkinDefinition(skinId);
+    return def ? getTowerSkinDualPrice(def) : null;
+  }
+
   isTowerSkinOwned(skinId: string): boolean {
     return this.ownedTowerSkinIds.has(skinId);
   }
@@ -1169,14 +1214,15 @@ export class GameEngine {
   }
 
   /** Debits Gems atomically (spendGems already guards insufficient balance) and grants PERMANENT ownership — never revoked by a future Season's tower-level reset. */
-  purchaseTowerSkin(skinId: string): boolean {
+  purchaseTowerSkin(skinId: string, currency: GemCurrency): boolean {
     if (!this.canModifyLoadout()) return false;
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower || !canPurchaseSkinEntity(tower, skinId, this.ownedTowerSkinIds)) return false;
 
     const def = getTowerSkinDefinition(skinId);
     if (!def) return false;
-    if (!this.spendGems(def.gemCost, `tower_skin:${skinId}`)) return false;
+    const cost = gemPriceForCurrency(getTowerSkinDualPrice(def), currency);
+    if (!this.spendGems(cost, `tower_skin:${skinId}`, currency)) return false;
 
     this.ownedTowerSkinIds.add(skinId);
     this.persist();
@@ -1202,24 +1248,48 @@ export class GameEngine {
   }
 
   // -------------------------------------------------------------------
-  // Progression 2.0 — Gem Economy (spec section 33-40). Every mutation
-  // routes through here and appends a ledger event (engine/EconomyLedger.ts)
-  // — see the field-level comment on `gems`/`gemShards` above for why this
-  // already satisfies the "no direct UI mutation" requirement.
+  // GEMS ECONOMY v2 — dual-currency Gem Economy. Every mutation routes
+  // through here and appends a ledger event (engine/EconomyLedger.ts,
+  // tagged with `currency`) — see the field-level comment on `freeGems`/
+  // `purchasedGems`/`gemShards` above for why this already satisfies the
+  // "no direct UI mutation" requirement. NO method in this block ever
+  // blends the two balances or moves value from one into the other — see
+  // config/gemsEconomy.ts's own header for the full no-conversion contract.
   // -------------------------------------------------------------------
 
-  getGemBalance(): number {
-    return this.gems;
+  getFreeGemBalance(): number {
+    return this.freeGems;
+  }
+
+  getPurchasedGemBalance(): number {
+    return this.purchasedGems;
   }
 
   getGemShardBalance(): number {
     return this.gemShards;
   }
 
-  private addGems(amount: number, source: string): void {
+  /** 🔒 Grants Free Gems — used ONLY for gameplay rewards (Gem Shard conversion, Roulette, Prestige/Ascension/Season milestones). Never called for a real-money purchase. */
+  private addFreeGems(amount: number, source: string): void {
     if (amount <= 0) return;
-    this.gems += amount;
-    appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount });
+    this.freeGems += amount;
+    appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount, currency: "FREE" });
+  }
+
+  /**
+   * 💎 Grants Purchased Gems — PUBLIC (unlike addFreeGems) because this is
+   * the one real entry point a future real-money IAP integration would
+   * call. No payment gateway exists in this local client (see config/
+   * gemsEconomy.ts's header) — nothing in this codebase calls this today —
+   * but the architecture must not block a real purchase flow from plugging
+   * in here later. Never called for a gameplay reward.
+   */
+  addPurchasedGems(amount: number, source: string): void {
+    if (amount <= 0) return;
+    this.purchasedGems += amount;
+    appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount, currency: "PURCHASED" });
+    this.persist();
+    this.notify();
   }
 
   private addGemShards(amount: number, source: string): void {
@@ -1228,27 +1298,45 @@ export class GameEngine {
     appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: this.playerId, source, amount });
   }
 
-  canAffordGems(amount: number): boolean {
-    return this.gems >= amount;
+  canAffordFreeGems(amount: number): boolean {
+    return this.freeGems >= amount;
+  }
+
+  canAffordPurchasedGems(amount: number): boolean {
+    return this.purchasedGems >= amount;
+  }
+
+  /** Reads whichever balance `currency` names — the one place every dual-priced method below decides "can I afford this", so no call site hand-rolls the branch differently. */
+  canAffordGemsInCurrency(amount: number, currency: GemCurrency): boolean {
+    return currency === "FREE" ? this.canAffordFreeGems(amount) : this.canAffordPurchasedGems(amount);
   }
 
   /**
-   * The only Gems ever spend on is Specialization unlock (chooseTowerSpecialization
-   * above), Convenience, and Cosmetics — never damage/HP/level/victory/phase
-   * directly (spec section 23's forbidden list). Callers are responsible for
-   * applying whatever the purchase unlocks; this method only owns the
-   * balance mutation + ledger record.
+   * Spends EXACTLY `amount` from the ONE bucket `currency` names — never
+   * blends Free+Purchased, never auto-selects, never allows a partial
+   * payment split across both (spec: "pagamento não pode ser dividido
+   * automaticamente"). Gems are only ever spent on Convenience and
+   * Cosmetics — never damage/HP/level/victory/phase directly (spec section
+   * 23's forbidden list). Callers are responsible for applying whatever the
+   * purchase unlocks; this method only owns the balance mutation + ledger
+   * record.
    */
-  spendGems(amount: number, reason: string): boolean {
-    if (amount <= 0 || this.gems < amount) return false;
-    this.gems -= amount;
-    appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: this.playerId, toOwner: null, source: reason, amount });
+  spendGems(amount: number, reason: string, currency: GemCurrency): boolean {
+    if (amount <= 0) return false;
+    if (currency === "FREE") {
+      if (this.freeGems < amount) return false;
+      this.freeGems -= amount;
+    } else {
+      if (this.purchasedGems < amount) return false;
+      this.purchasedGems -= amount;
+    }
+    appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: this.playerId, toOwner: null, source: reason, amount, currency });
     this.persist();
     this.notify();
     return true;
   }
 
-  /** Gem Shards -> Gems conversion (spec section 34: "se a conversão não fizer sentido, deixe a arquitetura preparada sem inventar uma economia arbitrária"). A conservative fixed rate, player-triggered — never automatic. */
+  /** Gem Shards -> Gems conversion (spec section 34: "se a conversão não fizer sentido, deixe a arquitetura preparada sem inventar uma economia arbitrária"). A conservative fixed rate, player-triggered — never automatic. GEMS ECONOMY v2: lands ONLY in `freeGems` — Fragments are a gameplay-earned resource, so their converted value is gameplay-earned too; this conversion must never inflate `purchasedGems`. */
   static readonly GEM_SHARD_TO_GEM_RATE = 10;
 
   /**
@@ -1273,7 +1361,39 @@ export class GameEngine {
     const shardsToConvert = Math.floor(this.gemShards / rate) * rate;
     const gemsGained = shardsToConvert / rate;
     this.gemShards -= shardsToConvert;
-    this.addGems(gemsGained, "gem_shard_conversion");
+    this.addFreeGems(gemsGained, "gem_shard_conversion");
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // GEMS ECONOMY v2 — TRADE UNLOCK. The gate before the Marketplace
+  // (listing OR bidding) becomes usable at all — see MarketplaceService.ts,
+  // which enforces the SAME gate on its own side (Marketplace screens read
+  // SaveData directly rather than through a live GameEngine instance, per
+  // that file's own header). Exposed here too so live gameplay UI (the
+  // Wallet) can show Trade status without a Marketplace screen mounted.
+  // -------------------------------------------------------------------
+
+  isTradeUnlocked(): boolean {
+    return this.tradeUnlocked;
+  }
+
+  getTradeUnlockPrice(): DualGemPrice {
+    return TRADE_UNLOCK_PRICE;
+  }
+
+  canUnlockTrade(currency: GemCurrency): boolean {
+    if (this.tradeUnlocked) return false;
+    return this.canAffordGemsInCurrency(gemPriceForCurrency(TRADE_UNLOCK_PRICE, currency), currency);
+  }
+
+  /** Spends the chosen currency's Trade Unlock price in full — never converts currency, only flips the permanent `tradeUnlocked` gate. */
+  unlockTrade(currency: GemCurrency): boolean {
+    if (!this.canUnlockTrade(currency)) return false;
+    if (!this.spendGems(gemPriceForCurrency(TRADE_UNLOCK_PRICE, currency), "trade_unlock", currency)) return false;
+    this.tradeUnlocked = true;
     this.persist();
     this.notify();
     return true;
@@ -1301,10 +1421,14 @@ export class GameEngine {
     return getPrestigeBonuses(this.prestigeLevel);
   }
 
-  upgradePrestige(): boolean {
+  getPrestigeUpgradeDualPrice(): DualGemPrice {
+    return getPrestigeUpgradeDualPrice(this.prestigeLevel);
+  }
+
+  upgradePrestige(currency: GemCurrency): boolean {
     if (!canUnlockPrestige(this.bestWave)) return false;
-    const cost = getPrestigeUpgradeCost(this.prestigeLevel);
-    if (!this.spendGems(cost, "profile_prestige")) return false;
+    const cost = gemPriceForCurrency(getPrestigeUpgradeDualPrice(this.prestigeLevel), currency);
+    if (!this.spendGems(cost, "profile_prestige", currency)) return false;
     this.prestigeLevel += 1;
     this.grantEarnedPrestigeMilestoneRewards();
     this.persist();
@@ -1722,7 +1846,7 @@ export class GameEngine {
       this.baseHp += castleHpGranted;
     } else if (rewardType === "GEM") {
       gemsGranted = ROULETTE_GEM_REWARD_AMOUNT;
-      this.addGems(gemsGranted, `roulette_wave_${wave}`);
+      this.addFreeGems(gemsGranted, `roulette_wave_${wave}`);
     } else if (rewardType === "CASTLE_SKIN") {
       // Grant the first real skin this save doesn't already own; if every
       // real Castle Skin is already unlocked, the 1%-rarity roll falls back
@@ -1733,7 +1857,7 @@ export class GameEngine {
         this.unlockedCastleSkinIds = [...this.unlockedCastleSkinIds, unowned.id];
       } else {
         gemsGranted = ROULETTE_CASTLE_SKIN_FALLBACK_GEMS;
-        this.addGems(gemsGranted, `roulette_wave_${wave}_skin_fallback`);
+        this.addFreeGems(gemsGranted, `roulette_wave_${wave}_skin_fallback`);
       }
     }
     // else rewardType === "NOTHING" — grant absolutely nothing (spec section
@@ -1976,8 +2100,10 @@ export class GameEngine {
         bossesDefeatedTotal: this.bossesDefeatedTotal,
         miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,
         localFirstDiscoveries: this.localFirstDiscoveries,
-        gems: this.gems,
+        freeGems: this.freeGems,
+        purchasedGems: this.purchasedGems,
         gemShards: this.gemShards,
+        tradeUnlocked: this.tradeUnlocked,
         inventoryCapacity: this.inventoryCapacity,
         overflowInventory: this.overflowInventory,
         castleHpBonus: this.castleHpBonus,
@@ -2012,7 +2138,8 @@ export class GameEngine {
       phaseId: getPhaseForWave(this.wave.currentWave).id,
       phaseI18nKey: getPhaseForWave(this.wave.currentWave).i18nKey,
       gold: this.gold,
-      gems: this.gems,
+      freeGems: this.freeGems,
+      purchasedGems: this.purchasedGems,
       gemShards: this.gemShards,
       baseHp: this.baseHp,
       maxBaseHp: this.maxBaseHp,

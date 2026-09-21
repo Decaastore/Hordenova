@@ -76,9 +76,27 @@ export interface SaveData {
   /** Audio spec section 13 — 0..1, but only ever set to one of the 5 discrete UI steps (0/0.25/0.5/0.75/1). */
   sfxVolume: number;
   sfxMuted: boolean;
-  /** Progression 2.0 spec section 33/37 — the convenience/cosmetics currency. Never a combat-power lever, see engine/GameEngine.ts's GemManager-pattern methods. */
-  gems: number;
-  /** Progression 2.0 spec section 34 — earned from bosses/milestones, manually convertible to Gems at a fixed rate (see GameEngine.convertGemShards). */
+  /**
+   * GEMS ECONOMY v2 (save v19 -> v20) — the convenience/cosmetics currency,
+   * split into two real, separately-tracked balances by ORIGIN (never a
+   * combat-power lever either way, see engine/GameEngine.ts's GemManager-
+   * pattern methods). Replaces the single pre-v20 `gems` field entirely —
+   * see loadSave's own migration comment for exactly how a legacy balance
+   * is carried forward.
+   *
+   * 🔒 freeGems — earned exclusively through gameplay (Gem Shard/Fragment
+   * conversion, Roulette, Prestige/Ascension/Season rewards). Valid for
+   * every Gems-priced system in the game.
+   *
+   * 💎 purchasedGems — bought from a real-money store. Valid for every
+   * Gems-priced system PLUS the Marketplace (config/marketplace.ts), which
+   * is Purchased-Gems-ONLY (see MarketplaceService.ts). Nothing anywhere is
+   * allowed to move value between these two fields, or from `gemShards`
+   * into `purchasedGems` — see config/gemsEconomy.ts's own header.
+   */
+  freeGems: number;
+  purchasedGems: number;
+  /** Progression 2.0 spec section 34 — earned from bosses/milestones, manually convertible to Gems at a fixed rate (see GameEngine.convertGemShards). GEMS ECONOMY v2: this conversion lands ONLY in `freeGems`, never `purchasedGems` — Fragments are a gameplay-earned resource, so their converted value is gameplay-earned too. */
   gemShards: number;
   /** Progression 2.0 spec section 36/39 — usable inventory slots. Starts at DEFAULT_INVENTORY_CAPACITY; a future Gem-purchased expansion raises this. */
   inventoryCapacity: number;
@@ -219,9 +237,18 @@ export interface SaveData {
    * same lazy-boundary pattern SeasonClock already uses for Season resets.
    */
   auctionListings: AuctionListing[];
+
+  /**
+   * GEMS ECONOMY v2 — the gate before the Marketplace (listing OR bidding)
+   * becomes usable at all. Spends either 500 Free OR 500 Purchased Gems,
+   * once, permanently (config/gemsEconomy.ts's TRADE_UNLOCK_PRICE) — never
+   * re-locked, never re-charged. false on every save that predates this
+   * field, exactly like every other one-time permanent unlock in this file.
+   */
+  tradeUnlocked: boolean;
 }
 
-export const SAVE_DATA_VERSION = 19;
+export const SAVE_DATA_VERSION = 20;
 
 export const DEFAULT_SAVE_DATA: SaveData = {
   version: SAVE_DATA_VERSION,
@@ -246,7 +273,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   localFirstDiscoveries: {},
   sfxVolume: 1,
   sfxMuted: false,
-  gems: 0,
+  freeGems: 0,
+  purchasedGems: 0,
   gemShards: 0,
   inventoryCapacity: DEFAULT_INVENTORY_CAPACITY,
   overflowInventory: [],
@@ -270,6 +298,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   unlockedItemSlots: {},
   lastFreeRepositionDayIndex: null,
   auctionListings: [],
+  tradeUnlocked: false,
 };
 
 const VALID_SFX_VOLUME_STEPS = new Set([0, 0.25, 0.5, 0.75, 1]);
@@ -626,6 +655,12 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
     // carried forward as ownership rather than silently discarded — see
     // deriveMasteryUnlockedFromLegacyLevels/deriveUnlockedSpecializationIdsFromLegacyLoadout.
     const legacySave = !(typeof parsed.version === "number" && parsed.version >= 16);
+    // GEMS ECONOMY v2 (save v19 -> v20) — see the `freeGems` field's own
+    // migration comment below for the full rationale; `parsed` is read as
+    // `unknown` here specifically because pre-v20 SaveData had a `gems`
+    // field that no longer exists on the type at all.
+    const legacySaveGems = !(typeof parsed.version === "number" && parsed.version >= 20);
+    const legacyGemsValue = typeof (parsed as unknown as { gems?: unknown }).gems === "number" ? (parsed as unknown as { gems: number }).gems : 0;
     // Item Slots (spec section 7/12) need to validate equippedItemInstanceIds
     // against real ownership, so inventory is parsed BEFORE the loadout.
     const parsedInventory = parseInventory(parsed.inventory);
@@ -661,7 +696,25 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // migration branch: "gems: 0 / gemShards: 0 / a full-size fresh
       // inventoryCapacity / an empty overflow" is exactly what a save that
       // never had a Gem economy SHOULD start at.
-      gems: typeof parsed.gems === "number" && parsed.gems >= 0 ? parsed.gems : 0,
+      //
+      // GEMS ECONOMY v2 (save v19 -> v20) — the single `gems` balance
+      // splits into freeGems/purchasedGems. This client has never had a
+      // real-money purchase flow (no IAP integration exists anywhere in
+      // this codebase — every Gems grant traced in the pre-migration audit
+      // is a gameplay reward: Gem Shard conversion, Roulette, Prestige/
+      // Ascension/Season milestones), so 100% of any legacy `gems` balance
+      // was earned through play, never bought. The only honest migration
+      // is therefore: legacy `gems` -> `freeGems` in full, `purchasedGems`
+      // starts at 0 — never invented, never split by guess (see this
+      // file's own "self-healing, never fabricate" discipline elsewhere).
+      // A save already at v20+ reads its own real freeGems/purchasedGems
+      // fields directly instead.
+      freeGems: legacySaveGems
+        ? Math.max(0, legacyGemsValue)
+        : typeof parsed.freeGems === "number" && parsed.freeGems >= 0
+          ? parsed.freeGems
+          : 0,
+      purchasedGems: typeof parsed.purchasedGems === "number" && parsed.purchasedGems >= 0 ? parsed.purchasedGems : 0,
       gemShards: typeof parsed.gemShards === "number" && parsed.gemShards >= 0 ? parsed.gemShards : 0,
       inventoryCapacity:
         typeof parsed.inventoryCapacity === "number" && parsed.inventoryCapacity > 0
@@ -740,6 +793,11 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // every other additive migration in this function: no auction has
       // ever existed for a save older than this field.
       auctionListings: parseAuctionListings(parsed.auctionListings),
+      // GEMS ECONOMY v2 (save v19 -> v20) — brand new field, same
+      // "sensible fresh-account default for a pre-existing save" pattern as
+      // every other additive migration in this function: no save older
+      // than this field has ever unlocked Trading.
+      tradeUnlocked: typeof parsed.tradeUnlocked === "boolean" ? parsed.tradeUnlocked : false,
     };
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;

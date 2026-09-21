@@ -9,8 +9,9 @@ import { createRoot, type Root } from "react-dom/client";
 import { TowerInfoPanel } from "./TowerInfoPanel";
 import { LanguageProvider } from "@/i18n/LanguageContext";
 import { createTowerInstance, type TowerInstance } from "@/entities/Tower";
-import { SPECIALIZATION_CHANGE_GEM_COST } from "@/config/specializations";
+import { SPECIALIZATION_CHANGE_GEM_PRICE } from "@/config/specializations";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
+import type { DualGemPrice, GemCurrency } from "@/config/gemsEconomy";
 
 function makeTower(overrides: Partial<TowerInstance> = {}): TowerInstance {
   const tower = createTowerInstance(
@@ -30,18 +31,19 @@ function makeTower(overrides: Partial<TowerInstance> = {}): TowerInstance {
 function renderPanel(props: {
   tower: TowerInstance;
   gold?: number;
-  gems?: number;
+  freeGems?: number;
+  purchasedGems?: number;
   unlockedSpecializationIdsForType?: readonly string[];
-  onSwitchSpecialization?: (id: string) => void;
+  onSwitchSpecialization?: (id: string, currency: GemCurrency) => void;
   itemSlots?: readonly (ItemInstance | null)[];
   inventory?: readonly ItemInstance[];
   canEquipToSlot?: (instanceId: string, slotIndex: number) => boolean;
   onEquipItem?: (instanceId: string, slotIndex: number) => void;
   onUnequipItem?: (slotIndex: number) => void;
   unlockedSlots?: readonly boolean[];
-  getSlotUnlockCost?: (slotIndex: number) => number | null;
-  canUnlockSlot?: (slotIndex: number) => boolean;
-  onUnlockSlot?: (slotIndex: number) => void;
+  getSlotUnlockPrice?: (slotIndex: number) => DualGemPrice | null;
+  canUnlockSlot?: (slotIndex: number, currency: GemCurrency) => boolean;
+  onUnlockSlot?: (slotIndex: number, currency: GemCurrency) => void;
 }): { container: HTMLDivElement; root: Root } {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -52,7 +54,8 @@ function renderPanel(props: {
         <TowerInfoPanel
           tower={props.tower}
           gold={props.gold ?? 999999}
-          gems={props.gems ?? 999999}
+          freeGems={props.freeGems ?? 999999}
+          purchasedGems={props.purchasedGems ?? 999999}
           onUpgrade={() => {}}
           onClose={() => {}}
           onChooseSpecialization={() => {}}
@@ -72,7 +75,7 @@ function renderPanel(props: {
           onEquipItem={props.onEquipItem ?? (() => {})}
           onUnequipItem={props.onUnequipItem ?? (() => {})}
           unlockedSlots={props.unlockedSlots ?? [true, true, true]}
-          getSlotUnlockCost={props.getSlotUnlockCost ?? (() => 250)}
+          getSlotUnlockPrice={props.getSlotUnlockPrice ?? (() => null)}
           canUnlockSlot={props.canUnlockSlot ?? (() => true)}
           onUnlockSlot={props.onUnlockSlot ?? (() => {})}
         />
@@ -93,7 +96,10 @@ function findButtonByText(container: HTMLDivElement, text: string): HTMLButtonEl
  * exactly where the reported "it doesn't appear" bug turned out to live in
  * spirit (a real player almost never naturally owns 2+ specializations for
  * one tower type, so the — correctly gated — action legitimately never
- * showed for them). These tests pin the actual rendering contract.
+ * showed for them). These tests pin the actual rendering contract, updated
+ * for GEMS ECONOMY v2's dual 🔒 Free / 💎 Purchased price buttons — paying
+ * with either currency now switches specialization directly from the
+ * confirmation box (there is no separate single "CONFIRM" step).
  */
 describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progression v1.0)", () => {
   let container: HTMLDivElement;
@@ -113,7 +119,7 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
     expect(container.textContent).not.toContain("SWITCH SPECIALIZATION");
   });
 
-  it("shows a clearly labeled switch action, with the 200 Gems cost, once a 2nd path is owned", () => {
+  it("shows a clearly labeled switch action, with the real dual (Free/Purchased) price, once a 2nd path is owned", () => {
     ({ container, root } = renderPanel({
       tower: makeTower(),
       unlockedSpecializationIdsForType: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"],
@@ -121,7 +127,8 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
     expect(container.textContent).toContain("SWITCH SPECIALIZATION");
     const switchButton = findButtonByText(container, "Breaker");
     expect(switchButton).not.toBeNull();
-    expect(switchButton!.textContent).toContain(String(SPECIALIZATION_CHANGE_GEM_COST));
+    expect(switchButton!.textContent).toContain(String(SPECIALIZATION_CHANGE_GEM_PRICE.free));
+    expect(switchButton!.textContent).toContain(String(SPECIALIZATION_CHANGE_GEM_PRICE.purchased));
     expect(switchButton!.disabled).toBe(false);
   });
 
@@ -135,7 +142,7 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
     expect(findButtonByText(container, "Vanguard")).toBeNull();
   });
 
-  it("clicking a switch target shows a confirmation prompt WITHOUT spending Gems yet", () => {
+  it("clicking a switch target shows a confirmation prompt with BOTH currency options, WITHOUT spending Gems yet", () => {
     const onSwitch = vi.fn();
     ({ container, root } = renderPanel({
       tower: makeTower(),
@@ -147,11 +154,12 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
 
     expect(onSwitch).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Breaker");
-    expect(findButtonByText(container, "CONFIRM")).not.toBeNull();
+    expect(findButtonByText(container, "🔒")).not.toBeNull();
+    expect(findButtonByText(container, "💎")).not.toBeNull();
     expect(findButtonByText(container, "CANCEL")).not.toBeNull();
   });
 
-  it("confirming the switch calls onSwitchSpecialization exactly once with the chosen id", () => {
+  it("confirming the switch by paying with PURCHASED Gems calls onSwitchSpecialization exactly once with the chosen id and currency", () => {
     const onSwitch = vi.fn();
     ({ container, root } = renderPanel({
       tower: makeTower(),
@@ -159,10 +167,24 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
       onSwitchSpecialization: onSwitch,
     }));
     act(() => findButtonByText(container, "Breaker")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findButtonByText(container, "CONFIRM")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => findButtonByText(container, "💎")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     expect(onSwitch).toHaveBeenCalledTimes(1);
-    expect(onSwitch).toHaveBeenCalledWith("IRONWOOD_BREAKER");
+    expect(onSwitch).toHaveBeenCalledWith("IRONWOOD_BREAKER", "PURCHASED");
+  });
+
+  it("confirming the switch by paying with FREE Gems calls onSwitchSpecialization exactly once with the chosen id and currency", () => {
+    const onSwitch = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSpecializationIdsForType: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"],
+      onSwitchSpecialization: onSwitch,
+    }));
+    act(() => findButtonByText(container, "Breaker")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    act(() => findButtonByText(container, "🔒")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    expect(onSwitch).toHaveBeenCalledTimes(1);
+    expect(onSwitch).toHaveBeenCalledWith("IRONWOOD_BREAKER", "FREE");
   });
 
   it("canceling the confirmation calls onSwitchSpecialization zero times and returns to the target list", () => {
@@ -176,15 +198,17 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
     act(() => findButtonByText(container, "CANCEL")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     expect(onSwitch).not.toHaveBeenCalled();
-    expect(findButtonByText(container, "CONFIRM")).toBeNull();
+    expect(container.textContent).not.toContain("Switch specialization to"); // confirm box gone
+    expect(findButtonByText(container, "CANCEL")).toBeNull();
     expect(findButtonByText(container, "Breaker")).not.toBeNull(); // back to the plain target button
   });
 
-  it("disables the switch action when the account cannot afford the 200 Gems cost, and it stays inert", () => {
+  it("disables the switch action when the account cannot afford EITHER currency's price, and it stays inert", () => {
     const onSwitch = vi.fn();
     ({ container, root } = renderPanel({
       tower: makeTower(),
-      gems: SPECIALIZATION_CHANGE_GEM_COST - 1,
+      freeGems: SPECIALIZATION_CHANGE_GEM_PRICE.free - 1,
+      purchasedGems: SPECIALIZATION_CHANGE_GEM_PRICE.purchased - 1,
       unlockedSpecializationIdsForType: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"],
       onSwitchSpecialization: onSwitch,
     }));
@@ -193,7 +217,18 @@ describe("TowerInfoPanel — \"Trocar Especialização\" (HORDENOVA Season/Progr
 
     act(() => switchButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onSwitch).not.toHaveBeenCalled();
-    expect(findButtonByText(container, "CONFIRM")).toBeNull(); // never reached the confirm step
+    expect(container.textContent).not.toContain("Switch specialization to"); // never reached the confirm step
+  });
+
+  it("stays enabled when only ONE currency is affordable — the account can still switch by paying with that currency", () => {
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      freeGems: 0,
+      purchasedGems: SPECIALIZATION_CHANGE_GEM_PRICE.purchased,
+      unlockedSpecializationIdsForType: ["IRONWOOD_EXECUTIONER", "IRONWOOD_BREAKER"],
+    }));
+    const switchButton = findButtonByText(container, "Breaker")!;
+    expect(switchButton.disabled).toBe(false);
   });
 });
 
@@ -271,10 +306,11 @@ describe("TowerInfoPanel — Equipment slots (BALANCEAMENTO DEFINITIVO spec sect
 });
 
 /**
- * SISTEMA DE SLOTS DE EQUIPAMENTO — the lock/unlock UI itself: Slot 1 always
- * reads unlocked; Slot 2/3 show their Gems cost and a mandatory confirmation
- * step before any Gems are spent (onUnlockSlot must never fire from the
- * initial click).
+ * SISTEMA DE SLOTS DE EQUIPAMENTO — the lock/unlock UI itself, updated for
+ * GEMS ECONOMY v2: Slot 1 always reads unlocked; Slot 2/3 show their real
+ * dual (Free/Purchased) price and a mandatory confirmation step — rendered
+ * as the shared DualGemPriceButtons — before any Gems are spent (onUnlockSlot
+ * must never fire from the initial click).
  */
 describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIPAMENTO)", () => {
   let container: HTMLDivElement;
@@ -293,37 +329,67 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === text) ?? null;
   }
 
+  const SLOT_2_PRICE: DualGemPrice = { free: 375, purchased: 250 };
+  const SLOT_3_PRICE: DualGemPrice = { free: 750, purchased: 500 };
+  const pricesByIndex: (DualGemPrice | null)[] = [null, SLOT_2_PRICE, SLOT_3_PRICE];
+
   it("Slot 1 shows as unlocked and never shows an unlock action", () => {
-    ({ container, root } = renderPanel({ tower: makeTower(), unlockedSlots: [true, false, false] }));
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
+    }));
     expect(container.textContent).toContain("Unlocked");
     const equipButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "EQUIP");
     // Only slot 1 (unlocked) offers EQUIP — slots 2/3 are locked.
     expect(equipButtons).toHaveLength(1);
   });
 
-  it("a locked slot (2/3) shows its Gems cost and an UNLOCK action instead of EQUIP", () => {
+  it("a locked slot (2/3) shows its real dual price and an UNLOCK action instead of EQUIP", () => {
     ({ container, root } = renderPanel({
       tower: makeTower(),
       unlockedSlots: [true, false, false],
-      getSlotUnlockCost: (i) => [0, 250, 500][i] ?? null,
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
     }));
-    expect(container.textContent).toContain("250 Gems");
-    expect(container.textContent).toContain("500 Gems");
+    expect(container.textContent).toContain(String(SLOT_2_PRICE.free));
+    expect(container.textContent).toContain(String(SLOT_2_PRICE.purchased));
+    expect(container.textContent).toContain(String(SLOT_3_PRICE.free));
+    expect(container.textContent).toContain(String(SLOT_3_PRICE.purchased));
     expect(findExactButton("UNLOCK")).not.toBeNull();
   });
 
-  it("insufficient Gems disables UNLOCK and shows how many Gems are missing", () => {
+  it("insufficient Gems in BOTH currencies disables the UNLOCK button entirely", () => {
     ({ container, root } = renderPanel({
       tower: makeTower(),
-      gems: 100,
+      freeGems: 0,
+      purchasedGems: 0,
       unlockedSlots: [true, false, false],
-      getSlotUnlockCost: () => 250,
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
       canUnlockSlot: () => false,
     }));
-    expect(container.textContent).toContain("Missing");
-    expect(container.textContent).toContain("150 Gems"); // 250 - 100
     const unlockButtons = Array.from(container.querySelectorAll("button")).filter((b) => b.textContent === "UNLOCK");
+    expect(unlockButtons.length).toBeGreaterThan(0);
     expect(unlockButtons.every((b) => b.disabled)).toBe(true);
+  });
+
+  it("with only Purchased Gems sufficient, UNLOCK stays enabled and the confirmation step disables the Free button with the exact shortfall in its tooltip", () => {
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      freeGems: 100,
+      purchasedGems: 999999,
+      unlockedSlots: [true, false, false],
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
+      canUnlockSlot: (_slotIndex, currency) => currency === "PURCHASED",
+    }));
+    const unlockButton = findExactButton("UNLOCK")!;
+    expect(unlockButton.disabled).toBe(false);
+    act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+
+    const freeButton = findButtonByText(container, "🔒")!;
+    const purchasedButton = findButtonByText(container, "💎")!;
+    expect(freeButton.disabled).toBe(true);
+    expect(freeButton.title).toContain(`100 / ${SLOT_2_PRICE.free}`);
+    expect(purchasedButton.disabled).toBe(false);
   });
 
   it("clicking UNLOCK only arms a confirmation step — onUnlockSlot is NOT called from the initial click", () => {
@@ -331,31 +397,50 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     ({ container, root } = renderPanel({
       tower: makeTower(),
       unlockedSlots: [true, false, false],
-      getSlotUnlockCost: () => 250,
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
       canUnlockSlot: () => true,
       onUnlockSlot,
     }));
     const unlockButton = findExactButton("UNLOCK")!;
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).not.toHaveBeenCalled();
-    expect(container.textContent).toContain("CONFIRM UNLOCK");
+    expect(container.textContent).toContain(`Unlock Slot 2 for ${SLOT_2_PRICE.purchased} Gems`);
+    expect(findButtonByText(container, "🔒")).not.toBeNull();
+    expect(findButtonByText(container, "💎")).not.toBeNull();
   });
 
-  it("confirming the unlock calls onUnlockSlot exactly once with the right slot index — Gems are spent only from this explicit confirm", () => {
+  it("confirming the unlock by paying with PURCHASED Gems calls onUnlockSlot exactly once with the right slot index and currency", () => {
     const onUnlockSlot = vi.fn();
     ({ container, root } = renderPanel({
       tower: makeTower(),
       unlockedSlots: [true, false, false],
-      getSlotUnlockCost: () => 250,
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
       canUnlockSlot: () => true,
       onUnlockSlot,
     }));
     const unlockButton = findExactButton("UNLOCK")!;
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    const confirmButton = findButtonByText(container, "CONFIRM UNLOCK")!;
-    act(() => confirmButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const purchasedButton = findButtonByText(container, "💎")!;
+    act(() => purchasedButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).toHaveBeenCalledTimes(1);
-    expect(onUnlockSlot).toHaveBeenCalledWith(1);
+    expect(onUnlockSlot).toHaveBeenCalledWith(1, "PURCHASED");
+  });
+
+  it("confirming the unlock by paying with FREE Gems calls onUnlockSlot exactly once with the right slot index and currency", () => {
+    const onUnlockSlot = vi.fn();
+    ({ container, root } = renderPanel({
+      tower: makeTower(),
+      unlockedSlots: [true, false, false],
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
+      canUnlockSlot: () => true,
+      onUnlockSlot,
+    }));
+    const unlockButton = findExactButton("UNLOCK")!;
+    act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const freeButton = findButtonByText(container, "🔒")!;
+    act(() => freeButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    expect(onUnlockSlot).toHaveBeenCalledTimes(1);
+    expect(onUnlockSlot).toHaveBeenCalledWith(1, "FREE");
   });
 
   it("canceling the confirmation calls onUnlockSlot zero times and returns to the locked row", () => {
@@ -363,7 +448,7 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     ({ container, root } = renderPanel({
       tower: makeTower(),
       unlockedSlots: [true, false, false],
-      getSlotUnlockCost: () => 250,
+      getSlotUnlockPrice: (i) => pricesByIndex[i] ?? null,
       canUnlockSlot: () => true,
       onUnlockSlot,
     }));

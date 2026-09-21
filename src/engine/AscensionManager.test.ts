@@ -47,7 +47,7 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     mockSeasonNumber(2); // now in season 2 — season 1 has fully ended
     updateSave({
       ascensionLastSyncedSeason: 1,
-      gems: 10,
+      freeGems: 10,
       ownedCosmetics: [],
       seasonBestWave: 55,
       currentWave: 55,
@@ -65,7 +65,7 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.ascensionTop5).toBe(1);
 
     const expectedBundle = getSeasonRewardBundle(1, 1);
-    expect(main.gems).toBe(10 + expectedBundle.gems);
+    expect(main.freeGems).toBe(10 + expectedBundle.gems);
     for (const cosmetic of expectedBundle.cosmetics) expect(main.ownedCosmetics).toContain(cosmetic.id);
 
     expect(main.ascensionLastSyncedSeason).toBe(2);
@@ -287,7 +287,7 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
 
   it("a season that ended with NO participation (never left wave 0) is recorded but grants no reward — no free-riding an idle account", () => {
     mockSeasonNumber(2);
-    updateSave({ ascensionLastSyncedSeason: 1, gems: 0, seasonBestWave: 0 });
+    updateSave({ ascensionLastSyncedSeason: 1, freeGems: 0, seasonBestWave: 0 });
 
     syncSeasonIfNeeded();
 
@@ -295,26 +295,26 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.ascensionHistory).toHaveLength(1);
     expect(main.ascensionHistory[0]!.rank).toBeNull();
     expect(main.ascensionSeasonsWon).toBe(0);
-    expect(main.gems).toBe(0);
+    expect(main.freeGems).toBe(0);
     expect(main.ownedCosmetics).toEqual([]);
   });
 
   it("calling syncSeasonIfNeeded twice for the same boundary never double-grants (idempotent)", () => {
     mockSeasonNumber(2);
-    updateSave({ ascensionLastSyncedSeason: 1, gems: 0, seasonBestWave: 30 });
+    updateSave({ ascensionLastSyncedSeason: 1, freeGems: 0, seasonBestWave: 30 });
 
     syncSeasonIfNeeded();
-    const gemsAfterFirst = loadSave().gems;
+    const gemsAfterFirst = loadSave().freeGems;
     const historyAfterFirst = loadSave().ascensionHistory.length;
 
     syncSeasonIfNeeded(); // already caught up — must be a pure no-op
-    expect(loadSave().gems).toBe(gemsAfterFirst);
+    expect(loadSave().freeGems).toBe(gemsAfterFirst);
     expect(loadSave().ascensionHistory).toHaveLength(historyAfterFirst);
   });
 
   it("multiple fully-skipped seasons (app closed for a month) each get their own history entry, only the last-played one uses real leftover progress", () => {
     mockSeasonNumber(5); // 4 seasons (1,2,3,4) have all fully ended
-    updateSave({ ascensionLastSyncedSeason: 1, gems: 0, seasonBestWave: 20 }); // real progress from season 1
+    updateSave({ ascensionLastSyncedSeason: 1, freeGems: 0, seasonBestWave: 20 }); // real progress from season 1
 
     syncSeasonIfNeeded();
 
@@ -346,7 +346,7 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
 
   it("finalizing a placed season records a full SeasonRewardRecord (spec section 24: SeasonId/PlayerId/RewardId/RewardType/Rank/GrantedAt) per reward, Gems included, and never duplicates them on re-sync", () => {
     mockSeasonNumber(2);
-    updateSave({ ascensionLastSyncedSeason: 1, gems: 0, seasonRewardRecords: [], seasonBestWave: 40 });
+    updateSave({ ascensionLastSyncedSeason: 1, freeGems: 0, seasonRewardRecords: [], seasonBestWave: 40 });
 
     syncSeasonIfNeeded();
 
@@ -465,7 +465,7 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     const item = createItemInstance("mosswood_charm", "player-1", { type: "BOSS_DROP", refId: "hollow-warden" });
     updateSave({
       bestWave: 300,
-      gems: 4321,
+      freeGems: 4321,
       gemShards: 7,
       prestigeLevel: 12,
       masteryUnlocked: { IRONWOOD: true },
@@ -494,7 +494,7 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
 
     const main = loadSave();
     expect(main.playerId).toBe(playerIdBefore);
-    expect(main.gems).toBe(4321);
+    expect(main.freeGems).toBe(4321);
     expect(main.gemShards).toBe(7);
     expect(main.prestigeLevel).toBe(12);
     expect(main.masteryUnlocked.IRONWOOD).toBe(true);

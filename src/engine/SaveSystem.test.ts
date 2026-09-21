@@ -125,7 +125,7 @@ describe("SaveSystem", () => {
       expect(loaded.bestWave).toBe(240);
       expect(loaded.gold).toBe(88_000);
       expect(loaded.currentWave).toBe(240);
-      expect(loaded.gems).toBe(42);
+      expect(loaded.freeGems).toBe(42);
       // Brand-new fields self-heal to a fresh-account default, never throwing/dropping the save.
       expect(loaded.prestigeLevel).toBe(0);
       expect(loaded.towerLoadout[0]?.masteryLevel).toBe(0);
@@ -225,7 +225,7 @@ describe("SaveSystem", () => {
       // this migration only ever ADDS fields, never a destructive reset.
       expect(loaded.bestWave).toBe(200);
       expect(loaded.gold).toBe(5000);
-      expect(loaded.gems).toBe(42);
+      expect(loaded.freeGems).toBe(42);
       // The removed Respec Token field is gone, not resurrected.
       expect((loaded as unknown as { towerRespecTokensSpent?: unknown }).towerRespecTokensSpent).toBeUndefined();
     });
@@ -270,7 +270,7 @@ describe("SaveSystem", () => {
       // Pre-existing progress is fully preserved.
       expect(loaded.bestWave).toBe(300);
       expect(loaded.gold).toBe(5000);
-      expect(loaded.gems).toBe(900);
+      expect(loaded.freeGems).toBe(900);
       expect(loaded.towerLoadout[0]?.level).toBe(20);
       // Brand-new fields self-heal to a fresh-account default.
       expect(loaded.lastFreeRepositionDayIndex).toBeNull();
@@ -332,7 +332,7 @@ describe("SaveSystem", () => {
       expect(loaded.version).toBe(SAVE_DATA_VERSION);
       expect(loaded.bestWave).toBe(400);
       expect(loaded.gold).toBe(9000);
-      expect(loaded.gems).toBe(1200);
+      expect(loaded.freeGems).toBe(1200);
       expect(loaded.auctionListings).toEqual([]);
       expect(loaded.inventory[0]?.pendingAuction).toBe(false);
     });

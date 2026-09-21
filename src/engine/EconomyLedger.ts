@@ -53,6 +53,8 @@ export interface LedgerEvent {
   source: string;
   /** Present for GEMS_EARNED/GEMS_SPENT/GEM_SHARDS_EARNED — the gold-equivalent quantity, and for COSMETIC_PURCHASED/INVENTORY_EXPANSION_PURCHASED the gem cost paid. Absent for ITEM_* events. */
   amount?: number;
+  /** GEMS ECONOMY v2 — present ONLY for GEMS_EARNED/GEMS_SPENT: which of the two real, separately-tracked balances this event moved (see engine/SaveSystem.ts's SaveData.freeGems/purchasedGems). Never absent for a real dual-currency event — an old pre-migration ledger entry simply has no `currency` at all, which callers must treat as historical, not as either bucket. */
+  currency?: "FREE" | "PURCHASED";
 }
 
 const LEDGER_STORAGE_KEY = "hordenova.ledger.v1";
@@ -76,7 +78,8 @@ function isValidEvent(raw: unknown): raw is LedgerEvent {
     typeof e.source === "string" &&
     (e.itemInstanceId === undefined || typeof e.itemInstanceId === "string") &&
     (e.itemDefinitionId === undefined || typeof e.itemDefinitionId === "string") &&
-    (e.amount === undefined || typeof e.amount === "number")
+    (e.amount === undefined || typeof e.amount === "number") &&
+    (e.currency === undefined || e.currency === "FREE" || e.currency === "PURCHASED")
   );
 }
 

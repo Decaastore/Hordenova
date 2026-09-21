@@ -22,13 +22,13 @@ import {
 } from "@/config/towerStats";
 import {
   getSpecializationsForTower,
-  SPECIALIZATION_CHANGE_GEM_COST,
-  SPECIALIZATION_UNLOCK_GEM_COST,
+  SPECIALIZATION_CHANGE_GEM_PRICE,
+  SPECIALIZATION_UNLOCK_GEM_PRICE,
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getPrestigeSkinsForTower, getSkinsForTower, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
-import { REPOSITION_GEM_COST } from "@/config/repositioning";
+import { getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
+import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
@@ -36,20 +36,23 @@ import type { ItemInstance } from "@/entities/Item";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { CoinIcon, GemIcon } from "./icons";
+import { CoinIcon } from "./icons";
 import { ItemGlyph } from "./ItemGlyph";
+import { DualGemPriceButtons } from "./DualGemPriceButtons";
+import type { DualGemPrice, GemCurrency } from "@/config/gemsEconomy";
 
 interface TowerInfoPanelProps {
   tower: TowerInstance;
   gold: number;
-  gems: number;
+  freeGems: number;
+  purchasedGems: number;
   onUpgrade: () => void;
   onClose: () => void;
-  onChooseSpecialization: (id: SpecializationId) => void;
+  onChooseSpecialization: (id: SpecializationId, currency: GemCurrency) => void;
   onUpgradeSpecialization: () => void;
   onEquipSkin: (skinId: string | null) => void;
-  /** CORREÇÃO DE REQUISITOS — Gems-only permanent purchase, separate from equip. */
-  onPurchaseSkin: (skinId: string) => void;
+  /** CORREÇÃO DE REQUISITOS — Gems-only permanent purchase, separate from equip. GEMS ECONOMY v2 — caller chooses which currency pays. */
+  onPurchaseSkin: (skinId: string, currency: GemCurrency) => void;
   /** Whether `skinId` is already permanently owned — reused so this component never needs its own copy of the ownership set. */
   isSkinOwned: (skinId: string) => boolean;
   /** HORDENOVA Season/Progression v1.0 — one-time, PERMANENT Gems unlock, mirroring onChooseSpecialization. Never touches the current (Season-scoped) Mastery level. */
@@ -58,8 +61,8 @@ interface TowerInfoPanelProps {
   onUpgradeMastery: () => void;
   /** Every SpecializationId this account has ever purchased for the selected tower's TYPE — permanent, never reset. A path in this list is free to (re-)choose or switch to. */
   unlockedSpecializationIdsForType: readonly SpecializationId[];
-  /** "Trocar Especialização" — 200 Gems, switches to a DIFFERENT path already in `unlockedSpecializationIdsForType`. */
-  onSwitchSpecialization: (id: SpecializationId) => void;
+  /** "Trocar Especialização" — dual-priced, switches to a DIFFERENT path already in `unlockedSpecializationIdsForType`. */
+  onSwitchSpecialization: (id: SpecializationId, currency: GemCurrency) => void;
   /** BALANCEAMENTO DEFINITIVO spec section 6 — whether the account's one free Tower Repositioning for today is still unused. */
   repositionFreeAvailable: boolean;
   /** Enters "pick a destination on the map" mode for this tower — see screens/GameScreen.tsx and ui/RepositioningOverlay.tsx for the map-click + confirmation flow. */
@@ -73,12 +76,12 @@ interface TowerInfoPanelProps {
   onUnequipItem: (slotIndex: number) => void;
   /** SISTEMA DE SLOTS DE EQUIPAMENTO — the selected tower's per-slot unlocked state (index 0 always true). */
   unlockedSlots: readonly boolean[];
-  /** Gems cost to unlock `slotIndex`, or null out of range. Slot 0 always reads a cost but is never shown as purchasable — already unlocked. */
-  getSlotUnlockCost: (slotIndex: number) => number | null;
-  /** Whether `slotIndex` is purchasable right now (not already unlocked AND this account can afford it). */
-  canUnlockSlot: (slotIndex: number) => boolean;
-  /** Pays the one-time, PERMANENT Gems cost to unlock `slotIndex`. Caller (this component) owns the mandatory confirmation step beforehand — Gems must never be spent without it. */
-  onUnlockSlot: (slotIndex: number) => void;
+  /** GEMS ECONOMY v2 — dual price to unlock `slotIndex`, or null out of range. Slot 0 always reads a price but is never shown as purchasable — already unlocked. */
+  getSlotUnlockPrice: (slotIndex: number) => DualGemPrice | null;
+  /** Whether `slotIndex` is purchasable right now with `currency` (not already unlocked AND this account can afford that currency's price). */
+  canUnlockSlot: (slotIndex: number, currency: GemCurrency) => boolean;
+  /** Pays the one-time, PERMANENT Gems price (in the caller's chosen currency) to unlock `slotIndex`. Caller (this component) owns the mandatory confirmation step beforehand — Gems must never be spent without it. */
+  onUnlockSlot: (slotIndex: number, currency: GemCurrency) => void;
 }
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -93,7 +96,8 @@ type Translate = ReturnType<typeof useLanguage>["t"];
 export function TowerInfoPanel({
   tower,
   gold,
-  gems,
+  freeGems,
+  purchasedGems,
   onUpgrade,
   onClose,
   onChooseSpecialization,
@@ -113,7 +117,7 @@ export function TowerInfoPanel({
   onEquipItem,
   onUnequipItem,
   unlockedSlots,
-  getSlotUnlockCost,
+  getSlotUnlockPrice,
   canUnlockSlot,
   onUnlockSlot,
 }: TowerInfoPanelProps) {
@@ -220,7 +224,8 @@ export function TowerInfoPanel({
         key={`specialization-${tower.id}`}
         tower={tower}
         gold={gold}
-        gems={gems}
+        freeGems={freeGems}
+        purchasedGems={purchasedGems}
         theme={theme}
         t={t}
         onChoose={onChooseSpecialization}
@@ -231,7 +236,8 @@ export function TowerInfoPanel({
 
       <SkinSection
         tower={tower}
-        gems={gems}
+        freeGems={freeGems}
+        purchasedGems={purchasedGems}
         theme={theme}
         t={t}
         onEquip={onEquipSkin}
@@ -243,14 +249,15 @@ export function TowerInfoPanel({
         key={`equipment-${tower.id}`}
         theme={theme}
         t={t}
-        gems={gems}
+        freeGems={freeGems}
+        purchasedGems={purchasedGems}
         itemSlots={itemSlots}
         inventory={inventory}
         canEquipToSlot={canEquipToSlot}
         onEquip={onEquipItem}
         onUnequip={onUnequipItem}
         unlockedSlots={unlockedSlots}
-        getSlotUnlockCost={getSlotUnlockCost}
+        getSlotUnlockPrice={getSlotUnlockPrice}
         canUnlockSlot={canUnlockSlot}
         onUnlockSlot={onUnlockSlot}
       />
@@ -272,29 +279,31 @@ export function TowerInfoPanel({
 function EquipmentSection({
   theme,
   t,
-  gems,
+  freeGems,
+  purchasedGems,
   itemSlots,
   inventory,
   canEquipToSlot,
   onEquip,
   onUnequip,
   unlockedSlots,
-  getSlotUnlockCost,
+  getSlotUnlockPrice,
   canUnlockSlot,
   onUnlockSlot,
 }: {
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
-  gems: number;
+  freeGems: number;
+  purchasedGems: number;
   itemSlots: readonly (ItemInstance | null)[];
   inventory: readonly ItemInstance[];
   canEquipToSlot: (instanceId: string, slotIndex: number) => boolean;
   onEquip: (instanceId: string, slotIndex: number) => void;
   onUnequip: (slotIndex: number) => void;
   unlockedSlots: readonly boolean[];
-  getSlotUnlockCost: (slotIndex: number) => number | null;
-  canUnlockSlot: (slotIndex: number) => boolean;
-  onUnlockSlot: (slotIndex: number) => void;
+  getSlotUnlockPrice: (slotIndex: number) => DualGemPrice | null;
+  canUnlockSlot: (slotIndex: number, currency: GemCurrency) => boolean;
+  onUnlockSlot: (slotIndex: number, currency: GemCurrency) => void;
 }) {
   const [pickingSlot, setPickingSlot] = useState<number | null>(null);
   // SISTEMA DE SLOTS DE EQUIPAMENTO — "confirmação obrigatória antes de
@@ -313,26 +322,23 @@ function EquipmentSection({
           const equipped = itemSlots[slotIndex] ?? null;
           const equippedDef = equipped ? getItemDefinition(equipped.itemDefinitionId) : null;
           const isUnlocked = unlockedSlots[slotIndex] === true;
-          const unlockCost = getSlotUnlockCost(slotIndex);
+          const unlockPrice = getSlotUnlockPrice(slotIndex);
+          const slotAffordableSomehow = !!unlockPrice && (canUnlockSlot(slotIndex, "FREE") || canUnlockSlot(slotIndex, "PURCHASED"));
 
           return (
             <div key={slotIndex}>
               <div style={equipmentSlotRowStyle}>
                 <span style={equipmentSlotLabelStyle}>{t("towerInfo.equipment.slot", { index: slotIndex + 1 })}</span>
-                {!isUnlocked && unlockCost !== null ? (
+                {!isUnlocked && unlockPrice !== null ? (
                   <>
-                    <span style={equipmentEmptyLabelStyle}>
-                      {gems >= unlockCost
-                        ? t("towerInfo.equipment.unlockCost", { cost: unlockCost })
-                        : t("towerInfo.equipment.insufficientGems", { cost: unlockCost - gems })}
-                    </span>
+                    <span style={equipmentEmptyLabelStyle}>🔒 {unlockPrice.free} / 💎 {unlockPrice.purchased}</span>
                     <button
                       onClick={() => setConfirmingUnlockSlot(slotIndex)}
-                      disabled={!canUnlockSlot(slotIndex)}
+                      disabled={!slotAffordableSomehow}
                       style={{
                         ...equipmentActionButtonStyle,
                         borderColor: theme.primary,
-                        opacity: canUnlockSlot(slotIndex) ? 1 : 0.5,
+                        opacity: slotAffordableSomehow ? 1 : 0.5,
                       }}
                     >
                       {t("towerInfo.equipment.unlock")}
@@ -363,32 +369,26 @@ function EquipmentSection({
                 )}
               </div>
 
-              {confirmingUnlockSlot === slotIndex && unlockCost !== null && (
+              {confirmingUnlockSlot === slotIndex && unlockPrice !== null && (
                 <div style={switchConfirmBoxStyle}>
                   <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
-                    {t("towerInfo.equipment.unlockConfirm", { index: slotIndex + 1, cost: unlockCost })}
+                    {t("towerInfo.equipment.unlockConfirm", { index: slotIndex + 1, cost: unlockPrice.purchased })}
                   </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    <button
-                      onClick={() => {
-                        onUnlockSlot(slotIndex);
-                        setConfirmingUnlockSlot(null);
-                      }}
-                      style={{ ...upgradeButtonStyle, width: "100%", marginTop: 0, borderColor: theme.primary }}
-                    >
-                      <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                        {t("towerInfo.equipment.unlockConfirmYes")}
-                        <span style={{ opacity: 0.6 }}>·</span>
-                        <GemIcon size={10} color={PALETTE.gem} /> {unlockCost}
-                      </span>
-                    </button>
-                    <button
-                      onClick={() => setConfirmingUnlockSlot(null)}
-                      style={{ ...switchButtonStyle, width: "100%", marginTop: 0, textAlign: "center" }}
-                    >
-                      {t("towerInfo.equipment.unlockConfirmNo")}
-                    </button>
-                  </div>
+                  <DualGemPriceButtons
+                    price={unlockPrice}
+                    freeBalance={freeGems}
+                    purchasedBalance={purchasedGems}
+                    onPay={(currency) => {
+                      onUnlockSlot(slotIndex, currency);
+                      setConfirmingUnlockSlot(null);
+                    }}
+                  />
+                  <button
+                    onClick={() => setConfirmingUnlockSlot(null)}
+                    style={{ ...switchButtonStyle, width: "100%", marginTop: 6, textAlign: "center" }}
+                  >
+                    {t("towerInfo.equipment.unlockConfirmNo")}
+                  </button>
                 </div>
               )}
 
@@ -483,9 +483,7 @@ function RepositionSection({
           {freeAvailable ? (
             t("towerInfo.reposition.free")
           ) : (
-            <>
-              <GemIcon size={10} color={PALETTE.gem} /> {REPOSITION_GEM_COST}
-            </>
+            <>🔒 {REPOSITION_GEM_PRICE.free} / 💎 {REPOSITION_GEM_PRICE.purchased}</>
           )}
         </span>
       </button>
@@ -607,7 +605,8 @@ function MasterySection({
 function SpecializationSection({
   tower,
   gold,
-  gems,
+  freeGems,
+  purchasedGems,
   theme,
   t,
   onChoose,
@@ -617,13 +616,14 @@ function SpecializationSection({
 }: {
   tower: TowerInstance;
   gold: number;
-  gems: number;
+  freeGems: number;
+  purchasedGems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
-  onChoose: (id: SpecializationId) => void;
+  onChoose: (id: SpecializationId, currency: GemCurrency) => void;
   onUpgrade: () => void;
   unlockedSpecializationIdsForType: readonly SpecializationId[];
-  onSwitch: (id: SpecializationId) => void;
+  onSwitch: (id: SpecializationId, currency: GemCurrency) => void;
 }) {
   // Confirm-before-spend step for "Trocar Especialização" — declared here,
   // before any early return, per the Rules of Hooks. Reset whenever a
@@ -653,28 +653,31 @@ function SpecializationSection({
         <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
           {options.map((option) => {
             const owned = unlockedSpecializationIdsForType.includes(option.id);
-            const affordable = owned || gems >= SPECIALIZATION_UNLOCK_GEM_COST;
             return (
-              <button
-                key={option.id}
-                onClick={() => onChoose(option.id)}
-                disabled={!affordable}
-                style={{ ...specOptionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
-              >
+              <div key={option.id} style={{ ...specOptionButtonStyle, borderColor: theme.primary, cursor: "default" }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t(`specializations.${option.id}.name`)}</div>
                 <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 1, lineHeight: 1.3 }}>
                   {t(`specializations.${option.id}.description`)}
                 </div>
-                <div style={{ fontSize: 10, color: theme.accent, marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4 }}>
-                  {owned ? (
-                    t("towerInfo.specializationReactivate")
-                  ) : (
-                    <>
-                      {t("towerInfo.specializationChoose")} · <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_UNLOCK_GEM_COST}
-                    </>
-                  )}
-                </div>
-              </button>
+                {owned ? (
+                  <button
+                    onClick={() => onChoose(option.id, "PURCHASED")}
+                    style={{ ...specOptionButtonStyle, marginTop: 4, padding: "5px 8px", borderColor: theme.accent }}
+                  >
+                    {t("towerInfo.specializationReactivate")}
+                  </button>
+                ) : (
+                  <div style={{ marginTop: 4 }}>
+                    <DualGemPriceButtons
+                      price={SPECIALIZATION_UNLOCK_GEM_PRICE}
+                      freeBalance={freeGems}
+                      purchasedBalance={purchasedGems}
+                      onPay={(currency) => onChoose(option.id, currency)}
+                      compact
+                    />
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
@@ -686,7 +689,7 @@ function SpecializationSection({
   const specAffordable = specCost !== null && gold >= specCost;
   const canUpgrade = canUpgradeSpecialization(tower);
   const switchTargets = unlockedSpecializationIdsForType.filter((id) => id !== tower.specializationId);
-  const switchAffordable = gems >= SPECIALIZATION_CHANGE_GEM_COST;
+  const switchAffordable = freeGems >= SPECIALIZATION_CHANGE_GEM_PRICE.free || purchasedGems >= SPECIALIZATION_CHANGE_GEM_PRICE.purchased;
 
   return (
     <>
@@ -727,33 +730,21 @@ function SpecializationSection({
               <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
                 {t("towerInfo.specializationSwitchConfirm", { name: t(`specializations.${confirmingSwitchId}.name`) })}
               </div>
-              {!switchAffordable && (
-                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginBottom: 6, fontStyle: "italic" }}>
-                  {t("towerInfo.specializationInsufficientGems", { cost: SPECIALIZATION_CHANGE_GEM_COST })}
-                </div>
-              )}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                <button
-                  onClick={() => {
-                    onSwitch(confirmingSwitchId);
-                    setConfirmingSwitchId(null);
-                  }}
-                  disabled={!switchAffordable}
-                  style={{ ...upgradeButtonStyle, width: "100%", marginTop: 0, borderColor: theme.primary, opacity: switchAffordable ? 1 : 0.5 }}
-                >
-                  <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
-                    {t("towerInfo.specializationSwitchConfirmYes")}
-                    <span style={{ opacity: 0.6 }}>·</span>
-                    <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
-                  </span>
-                </button>
-                <button
-                  onClick={() => setConfirmingSwitchId(null)}
-                  style={{ ...switchButtonStyle, width: "100%", marginTop: 0, textAlign: "center" }}
-                >
-                  {t("towerInfo.specializationSwitchConfirmNo")}
-                </button>
-              </div>
+              <DualGemPriceButtons
+                price={SPECIALIZATION_CHANGE_GEM_PRICE}
+                freeBalance={freeGems}
+                purchasedBalance={purchasedGems}
+                onPay={(currency) => {
+                  onSwitch(confirmingSwitchId, currency);
+                  setConfirmingSwitchId(null);
+                }}
+              />
+              <button
+                onClick={() => setConfirmingSwitchId(null)}
+                style={{ ...switchButtonStyle, width: "100%", marginTop: 6, textAlign: "center" }}
+              >
+                {t("towerInfo.specializationSwitchConfirmNo")}
+              </button>
             </div>
           ) : (
             switchTargets.map((id) => (
@@ -766,7 +757,7 @@ function SpecializationSection({
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
                   {t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
                   <span style={{ opacity: 0.6 }}>·</span>
-                  <GemIcon size={10} color={PALETTE.gem} /> {SPECIALIZATION_CHANGE_GEM_COST}
+                  🔒 {SPECIALIZATION_CHANGE_GEM_PRICE.free} / 💎 {SPECIALIZATION_CHANGE_GEM_PRICE.purchased}
                 </span>
               </button>
             ))
@@ -861,7 +852,8 @@ function formatGameplayEffectLines(effect: SkinGameplayEffect, t: Translate): st
  */
 function SkinSection({
   tower,
-  gems,
+  freeGems,
+  purchasedGems,
   theme,
   t,
   onEquip,
@@ -869,11 +861,12 @@ function SkinSection({
   isSkinOwned,
 }: {
   tower: TowerInstance;
-  gems: number;
+  freeGems: number;
+  purchasedGems: number;
   theme: (typeof TOWER_THEME)[TowerType];
   t: Translate;
   onEquip: (skinId: string | null) => void;
-  onPurchase: (skinId: string) => void;
+  onPurchase: (skinId: string, currency: GemCurrency) => void;
   isSkinOwned: (skinId: string) => boolean;
 }) {
   // FASE 6 — Prestige-exclusive skins (never sold, see towerSkins.ts's
@@ -968,7 +961,7 @@ function SkinSection({
           const owned = isSkinOwned(skin.id);
           const equipped = tower.equippedSkinId === skin.id;
           const reachedLevel = tower.level >= skin.unlockLevel;
-          const affordable = gems >= skin.gemCost;
+          const dualPrice = getTowerSkinDualPrice(skin);
           const selected = previewSkinId === skin.id;
 
           let badge: { text: string; tone: "equipped" | "owned" | "locked" } | null = null;
@@ -987,15 +980,16 @@ function SkinSection({
           } else {
             badge = { text: t("towerInfo.skinLocked"), tone: "locked" };
             action = reachedLevel ? (
-              <button
-                onClick={() => affordable && onPurchase(skin.id)}
-                disabled={!affordable}
-                style={{ ...skinActionButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
-              >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 3 }}>
-                  {t("towerInfo.skinBuy")} <GemIcon size={9} color={PALETTE.gem} /> {skin.gemCost}
-                </span>
-              </button>
+              <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-end" }}>
+                <span style={{ fontSize: 8.5, color: PALETTE.uiTextDim, fontWeight: 700, letterSpacing: 0.3 }}>{t("towerInfo.skinBuy")}</span>
+                <DualGemPriceButtons
+                  price={dualPrice}
+                  freeBalance={freeGems}
+                  purchasedBalance={purchasedGems}
+                  onPay={(currency) => onPurchase(skin.id, currency)}
+                  compact
+                />
+              </div>
             ) : (
               <span style={{ fontSize: 9, color: PALETTE.uiTextDim, opacity: 0.8 }}>{t("towerInfo.skinLockedUntil", { level: skin.unlockLevel })}</span>
             );

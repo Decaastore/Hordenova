@@ -137,7 +137,9 @@ function grantSeasonRewards(seasonNumber: number, rank: AscensionRank): void {
   }
 
   updateSave({
-    gems: main.gems + bundle.gems,
+    // GEMS ECONOMY v2 — Season rank rewards are earned through gameplay
+    // (competitive ranking), so they land in freeGems, never purchasedGems.
+    freeGems: main.freeGems + bundle.gems,
     ownedCosmetics: [...main.ownedCosmetics, ...newCosmeticIds],
     seasonRewardRecords: [...main.seasonRewardRecords, ...newRecords],
     ascensionSeasonsWon: main.ascensionSeasonsWon + (rank === 1 ? 1 : 0),
@@ -151,6 +153,7 @@ function grantSeasonRewards(seasonNumber: number, rank: AscensionRank): void {
     toOwner: main.playerId,
     source: `ascension:season-${seasonNumber}:rank-${rank}`,
     amount: bundle.gems,
+    currency: "FREE",
   });
 }
 

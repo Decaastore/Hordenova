@@ -32,7 +32,8 @@ function renderPanel(props: {
           onClaimOverflowItem={() => {}}
           gemShards={0}
           onConvertGemShards={() => {}}
-          gems={0}
+          freeGems={0}
+          purchasedGems={0}
           prestigeLevel={0}
           bestWave={0}
           onUpgradePrestige={() => {}}

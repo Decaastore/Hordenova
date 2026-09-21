@@ -1,5 +1,6 @@
 import type { TowerSpecial, TowerType } from "./towerStats";
 import { TOWER_DEFINITIONS } from "./towerStats";
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
 
 /**
  * Progression 2.0 — Specialization / Upgrade Slot architecture (spec
@@ -142,6 +143,8 @@ export function specializationEffectScale(level: number): number {
  * unlock is a genuine goal, not an instant spend.
  */
 export const SPECIALIZATION_UNLOCK_GEM_COST = 500;
+/** GEMS ECONOMY v2 — dual price derived from the cost above (config/gemsEconomy.ts's own methodology: Purchased = unchanged, Free = 1.5x). */
+export const SPECIALIZATION_UNLOCK_GEM_PRICE: DualGemPrice = dualGemPrice(SPECIALIZATION_UNLOCK_GEM_COST);
 
 /**
  * "Trocar Especialização" — HORDENOVA Season/Progression v1.0. A flat,
@@ -155,6 +158,8 @@ export const SPECIALIZATION_UNLOCK_GEM_COST = 500;
  * between paths already paid for once.
  */
 export const SPECIALIZATION_CHANGE_GEM_COST = 200;
+/** GEMS ECONOMY v2 — dual price derived from the cost above. */
+export const SPECIALIZATION_CHANGE_GEM_PRICE: DualGemPrice = dualGemPrice(SPECIALIZATION_CHANGE_GEM_COST);
 
 export interface SpecializationDefinition {
   id: SpecializationId;

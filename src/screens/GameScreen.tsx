@@ -22,6 +22,7 @@ import { EndgameWallBanner } from "@/ui/EndgameWallBanner";
 import { RepositioningOverlay } from "@/ui/RepositioningOverlay";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
+import type { DualGemPrice } from "@/config/gemsEconomy";
 
 // INIMIGOS 3D — dynamic import so three.js/@react-three/fiber never land in
 // this screen's own bundle unless the overlay actually mounts (gated by
@@ -94,8 +95,8 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   type RepositionUiState =
     | { phase: "idle" }
     | { phase: "picking"; fromSlotId: string }
-    | { phase: "confirm"; fromSlotId: string; toSlotId: string; cost: number }
-    | { phase: "blocked"; cost: number };
+    | { phase: "confirm"; fromSlotId: string; toSlotId: string; price: DualGemPrice }
+    | { phase: "blocked"; price: DualGemPrice };
   const [repositionUi, setRepositionUi] = useState<RepositionUiState>({ phase: "idle" });
 
   useEffect(() => {
@@ -121,16 +122,16 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     }
   }, [engine]);
 
-  /** Executes (free) or opens the Gems confirmation/blocked prompt for a chosen destination slot — shared by both the empty-slot and swap-with-occupied-slot paths below. */
+  /** Executes (free) or opens the Gems confirmation/blocked prompt for a chosen destination slot — shared by both the empty-slot and swap-with-occupied-slot paths below. GEMS ECONOMY v2 — the prompt always shows BOTH prices; "blocked" only when NEITHER currency can afford it. */
   const resolveRepositionDestination = (fromSlotId: string, toSlotId: string) => {
-    const cost = engine.getRepositionCost();
-    if (cost === 0) {
+    const price = engine.getRepositionPrice();
+    if (price.free === 0 && price.purchased === 0) {
       engine.repositionTower(fromSlotId, toSlotId);
       setRepositionUi({ phase: "idle" });
-    } else if (hud.gems < cost) {
-      setRepositionUi({ phase: "blocked", cost });
+    } else if (hud.freeGems < price.free && hud.purchasedGems < price.purchased) {
+      setRepositionUi({ phase: "blocked", price });
     } else {
-      setRepositionUi({ phase: "confirm", fromSlotId, toSlotId, cost });
+      setRepositionUi({ phase: "confirm", fromSlotId, toSlotId, price });
     }
   };
 
@@ -259,18 +260,19 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           <TowerInfoPanel
             tower={selectedTower}
             gold={hud.gold}
-            gems={hud.gems}
+            freeGems={hud.freeGems}
+            purchasedGems={hud.purchasedGems}
             onUpgrade={() => engine.upgradeSelectedTower()}
             onClose={() => engine.selectTower(null)}
-            onChooseSpecialization={(id) => engine.chooseTowerSpecialization(id)}
+            onChooseSpecialization={(id, currency) => engine.chooseTowerSpecialization(id, currency)}
             onUpgradeSpecialization={() => engine.upgradeSelectedTowerSpecialization()}
             onEquipSkin={(skinId) => engine.equipSkinOnSelectedTower(skinId)}
-            onPurchaseSkin={(skinId) => engine.purchaseTowerSkin(skinId)}
+            onPurchaseSkin={(skinId, currency) => engine.purchaseTowerSkin(skinId, currency)}
             isSkinOwned={(skinId) => engine.isTowerSkinOwned(skinId)}
             onUnlockMastery={() => engine.unlockSelectedTowerMastery()}
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
             unlockedSpecializationIdsForType={engine.getUnlockedSpecializationIdsForType(selectedTower.type)}
-            onSwitchSpecialization={(id) => engine.switchTowerSpecialization(id)}
+            onSwitchSpecialization={(id, currency) => engine.switchTowerSpecialization(id, currency)}
             repositionFreeAvailable={hud.repositionFreeAvailable}
             onStartReposition={() => handleStartReposition(selectedTower.slotId)}
             itemSlots={engine.getSelectedTowerItemSlots()}
@@ -279,9 +281,9 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onEquipItem={(instanceId, slotIndex) => engine.equipItemOnSelectedTower(instanceId, slotIndex)}
             onUnequipItem={(slotIndex) => engine.unequipItemFromSelectedTower(slotIndex)}
             unlockedSlots={engine.getSelectedTowerUnlockedSlots()}
-            getSlotUnlockCost={(slotIndex) => engine.getItemSlotUnlockGemCost(slotIndex)}
-            canUnlockSlot={(slotIndex) => engine.canUnlockItemSlotOnSelectedTower(slotIndex)}
-            onUnlockSlot={(slotIndex) => engine.unlockItemSlotOnSelectedTower(slotIndex)}
+            getSlotUnlockPrice={(slotIndex) => engine.getItemSlotUnlockDualPrice(slotIndex)}
+            canUnlockSlot={(slotIndex, currency) => engine.canUnlockItemSlotOnSelectedTower(slotIndex, currency)}
+            onUnlockSlot={(slotIndex, currency) => engine.unlockItemSlotOnSelectedTower(slotIndex, currency)}
           />
         )}
 
@@ -291,16 +293,18 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         {repositionUi.phase === "confirm" && (
           <RepositioningOverlay
             mode="confirm"
-            cost={repositionUi.cost}
-            onConfirm={() => {
-              engine.repositionTower(repositionUi.fromSlotId, repositionUi.toSlotId);
+            price={repositionUi.price}
+            freeGems={hud.freeGems}
+            purchasedGems={hud.purchasedGems}
+            onConfirm={(currency) => {
+              engine.repositionTower(repositionUi.fromSlotId, repositionUi.toSlotId, currency);
               setRepositionUi({ phase: "idle" });
             }}
             onCancel={() => setRepositionUi({ phase: "idle" })}
           />
         )}
         {repositionUi.phase === "blocked" && (
-          <RepositioningOverlay mode="blocked" cost={repositionUi.cost} onClose={() => setRepositionUi({ phase: "idle" })} />
+          <RepositioningOverlay mode="blocked" price={repositionUi.price} onClose={() => setRepositionUi({ phase: "idle" })} />
         )}
 
         {hud.phase === "PROGRESSION_STOPPED" && !reportDismissed && (
@@ -327,10 +331,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onClaimOverflowItem={(instanceId) => engine.claimOverflowItem(instanceId)}
             gemShards={hud.gemShards}
             onConvertGemShards={() => engine.convertGemShards()}
-            gems={hud.gems}
+            freeGems={hud.freeGems}
+            purchasedGems={hud.purchasedGems}
             prestigeLevel={engine.getPrestigeLevel()}
             bestWave={hud.bestWave}
-            onUpgradePrestige={() => engine.upgradePrestige()}
+            onUpgradePrestige={(currency) => engine.upgradePrestige(currency)}
             getFusionEligibility={(ids) => engine.getFusionEligibility(ids)}
             onAttemptFusion={(ids) => engine.attemptFusion(ids)}
           />

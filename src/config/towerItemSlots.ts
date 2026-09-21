@@ -21,6 +21,8 @@
  * uniform (no per-slot type restriction) — the smallest defensible shape
  * given nothing in the current 6-item catalog is itself slot-typed.
  */
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
+
 export const TOWER_ITEM_SLOT_COUNT = 3;
 
 /**
@@ -38,6 +40,11 @@ export function getItemSlotUnlockCost(slotIndex: number): number {
   const cost = TOWER_ITEM_SLOT_UNLOCK_GEM_COST[slotIndex];
   if (cost === undefined) throw new Error(`getItemSlotUnlockCost: slotIndex ${slotIndex} out of range`);
   return cost;
+}
+
+/** GEMS ECONOMY v2 — dual price for `slotIndex`, derived from getItemSlotUnlockCost (config/gemsEconomy.ts's own methodology). */
+export function getItemSlotUnlockPrice(slotIndex: number): DualGemPrice {
+  return dualGemPrice(getItemSlotUnlockCost(slotIndex));
 }
 
 /** Fresh-tower default: only slot 0 (the free slot) starts unlocked. */

@@ -25,7 +25,7 @@ const FIRST_BID = getMinimumNextBid(getAuctionMinBid("UNCOMMON"));
 /** mosswood_charm: real UNCOMMON, tradable item (see config/itemDefinitions.ts). */
 function seedTradableItem() {
   const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-  updateSave({ playerId: PLAYER, inventory: [item], gems: 1000 });
+  updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, tradeUnlocked: true });
   return item;
 }
 
@@ -49,7 +49,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(result.ok).toBe(true);
 
     const save = loadSave();
-    expect(save.gems).toBe(1000 - fee);
+    expect(save.purchasedGems).toBe(1000 - fee);
     expect(save.inventory[0]!.pendingAuction).toBe(true);
     expect(save.auctionListings).toHaveLength(1);
     expect(save.auctionListings[0]!.minBid).toBe(floor);
@@ -66,11 +66,11 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
 
   it("rejects listing without enough Gems for the fee, and never charges a partial fee", () => {
     const item = seedTradableItem();
-    updateSave({ gems: 0 });
+    updateSave({ purchasedGems: 0 });
     const result = createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
     expect(result.ok).toBe(false);
     const save = loadSave();
-    expect(save.gems).toBe(0);
+    expect(save.purchasedGems).toBe(0);
     expect(save.auctionListings).toHaveLength(0);
   });
 
@@ -96,14 +96,14 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     const item = seedTradableItem();
     createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24);
     const listingId = loadSave().auctionListings[0]!.id;
-    const gemsBefore = loadSave().gems;
+    const gemsBefore = loadSave().purchasedGems;
 
     const ok = placeDemoBid(listingId, FIRST_BID);
     expect(ok).toBe(true);
     const listing = getAuctionListing(listingId)!;
     expect(listing.bids).toHaveLength(1);
     expect(listing.bids[0]!.bidderId).toBe(DEMO_BIDDER_ID);
-    expect(loadSave().gems).toBe(gemsBefore); // demo bids never touch real Gems
+    expect(loadSave().purchasedGems).toBe(gemsBefore); // demo bids never touch real Gems
   });
 
   it("scenario 10: a bid below the real minimum is rejected", () => {
@@ -120,7 +120,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
     const listingId = loadSave().auctionListings[0]!.id;
     placeDemoBid(listingId, FIRST_BID);
-    const gemsAfterBid = loadSave().gems;
+    const gemsAfterBid = loadSave().purchasedGems;
 
     vi.setSystemTime(DAY0 + 13 * HOUR);
     refreshMarketplace();
@@ -129,14 +129,14 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(save.auctionListings[0]!.status).toBe("SOLD");
     expect(save.inventory).toHaveLength(1); // no duplication
     expect(save.inventory[0]!.pendingAuction).toBe(false);
-    expect(save.gems).toBe(gemsAfterBid); // demo win never credits real Gems (no real Gems ever paid for it)
+    expect(save.purchasedGems).toBe(gemsAfterBid); // demo win never credits real Gems (no real Gems ever paid for it)
   });
 
   it("scenario 7: settling an expired auction with zero bids returns the item unlocked, fee stays forfeited", () => {
     const item = seedTradableItem();
     const fee = getAuctionListingFee("UNCOMMON");
     createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 12);
-    const gemsAfterListing = loadSave().gems;
+    const gemsAfterListing = loadSave().purchasedGems;
     expect(gemsAfterListing).toBe(1000 - fee);
 
     vi.setSystemTime(DAY0 + 13 * HOUR);
@@ -145,7 +145,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     const save = loadSave();
     expect(save.auctionListings[0]!.status).toBe("UNSOLD");
     expect(save.inventory[0]!.pendingAuction).toBe(false);
-    expect(save.gems).toBe(gemsAfterListing); // fee never refunded
+    expect(save.purchasedGems).toBe(gemsAfterListing); // fee never refunded
   });
 
   it("scenario 12 (anti-sniping) real-flow: a bid inside the last window extends the persisted endsAt", () => {
@@ -228,7 +228,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
       expect(def.tradable).toBe(true);
 
       const item = createItemInstance(amuletId, PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-      updateSave({ playerId: PLAYER, inventory: [item], gems: 1000 });
+      updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, tradeUnlocked: true });
 
       const floor = getAuctionMinBid(def.rarity);
       const result = createAuctionListingForItem(item.instanceId, floor, 24);

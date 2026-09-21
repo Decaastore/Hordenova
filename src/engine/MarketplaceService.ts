@@ -23,6 +23,7 @@ import {
   isDemoBidder,
   type AuctionDurationHours,
 } from "@/config/marketplace";
+import { gemPriceForCurrency, TRADE_UNLOCK_PRICE, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
 
 /**
  * MARKETPLACE / LEILÃO — meta-screen orchestration, mirroring
@@ -48,7 +49,14 @@ import {
 function settleExpiredAuctions(save: SaveData, now = Date.now()): SaveData {
   let listings = save.auctionListings;
   let inventory = save.inventory;
-  let gems = save.gems;
+  // GEMS ECONOMY v2 — a real Marketplace sale's proceeds are the
+  // player-to-player trade economy's own value, so they land in
+  // purchasedGems (the ONLY currency the Marketplace ever moves), never
+  // freeGems — crediting freeGems here would let a gameplay-earned
+  // currency re-enter the tradeable-item economy through the back door,
+  // exactly what the spec's "Free Gems must never buy/become tradeable
+  // value" rule forbids.
+  let purchasedGems = save.purchasedGems;
   let changed = false;
 
   for (let i = 0; i < listings.length; i++) {
@@ -66,7 +74,7 @@ function settleExpiredAuctions(save: SaveData, now = Date.now()): SaveData {
       // config/marketplace.ts's DEMO_BIDDER_ID doc comment) — crediting the
       // seller here for a demo win would be creating currency from
       // nothing, exactly what spec section 22 forbids.
-      if (!isDemoBidder(outcome.winnerId)) gems += outcome.amount;
+      if (!isDemoBidder(outcome.winnerId)) purchasedGems += outcome.amount;
       appendLedgerEvent(outcome.ledgerEvent);
     } else {
       appendLedgerEvent(outcome.ledgerEvent);
@@ -74,7 +82,7 @@ function settleExpiredAuctions(save: SaveData, now = Date.now()): SaveData {
   }
 
   if (!changed) return save;
-  return updateSave({ auctionListings: listings, inventory, gems });
+  return updateSave({ auctionListings: listings, inventory, purchasedGems });
 }
 
 /** Lazy settlement — see SaveData.auctionListings's own doc comment. Call before reading listings from any Marketplace screen (mirrors AscensionManager.syncSeasonIfNeeded's wall-clock-boundary pattern). */
@@ -150,6 +158,7 @@ export function getAuctionListingFeeForItem(instanceId: string): number | null {
 
 export function canListItemInMarketplace(instanceId: string): boolean {
   const save = loadSave();
+  if (!save.tradeUnlocked) return false;
   const item = findItem(save.inventory, instanceId);
   return !!item && canListItemForAuction(item, save.playerId);
 }
@@ -164,17 +173,26 @@ export function getLeadingBidderForAuction(auctionId: string): string | null {
   return listing ? getLeadingBidderId(listing) : null;
 }
 
-export type CreateListingResult = { ok: true } | { ok: false; reason: "NOT_FOUND" | "NOT_ELIGIBLE" | "BELOW_MINIMUM" | "INSUFFICIENT_GEMS" };
+export type CreateListingResult =
+  | { ok: true }
+  | { ok: false; reason: "NOT_FOUND" | "NOT_ELIGIBLE" | "BELOW_MINIMUM" | "TRADE_LOCKED" | "INSUFFICIENT_PURCHASED_GEMS" };
 
 /**
  * Atomic create: re-validates ownership/tradability/lock state and the
  * chosen minBid against the real rarity floor (never trusting an earlier
- * UI read — spec section 22), debits the real listing fee, and only then
- * locks the item and appends the listing — one single updateSave, never a
- * partial state.
+ * UI read — spec section 22), requires Trade to be unlocked, debits the
+ * real listing fee, and only then locks the item and appends the listing —
+ * one single updateSave, never a partial state.
+ *
+ * GEMS ECONOMY v2 — the listing fee is Purchased-Gems-ONLY, exactly like
+ * every other Marketplace currency movement (see this file's own header
+ * and config/gemsEconomy.ts): the entire Marketplace apparatus draws only
+ * from the player-to-player trade currency, never from gameplay-earned
+ * Free Gems.
  */
 export function createAuctionListingForItem(instanceId: string, minBid: number, durationHours: AuctionDurationHours): CreateListingResult {
   const save = loadSave();
+  if (!save.tradeUnlocked) return { ok: false, reason: "TRADE_LOCKED" };
   const item = findItem(save.inventory, instanceId);
   if (!item || !canListItemForAuction(item, save.playerId)) return { ok: false, reason: "NOT_ELIGIBLE" };
   const def = getItemDefinition(item.itemDefinitionId);
@@ -182,12 +200,19 @@ export function createAuctionListingForItem(instanceId: string, minBid: number, 
   const floor = getAuctionMinBid(def.rarity);
   if (!Number.isFinite(minBid) || minBid < floor) return { ok: false, reason: "BELOW_MINIMUM" };
   const fee = getAuctionListingFee(def.rarity);
-  if (save.gems < fee) return { ok: false, reason: "INSUFFICIENT_GEMS" };
+  if (save.purchasedGems < fee) return { ok: false, reason: "INSUFFICIENT_PURCHASED_GEMS" };
 
   const listing = createAuctionListing(save.playerId, item.instanceId, item.itemDefinitionId, minBid, fee, getAuctionDurationMs(durationHours));
   const inventory = save.inventory.map((i) => (i.instanceId === instanceId ? { ...i, pendingAuction: true } : i));
 
-  appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: `auction_listing_fee:${item.itemDefinitionId}`, amount: fee });
+  appendLedgerEvent({
+    eventType: "GEMS_SPENT",
+    fromOwner: save.playerId,
+    toOwner: null,
+    source: `auction_listing_fee:${item.itemDefinitionId}`,
+    amount: fee,
+    currency: "PURCHASED",
+  });
   appendLedgerEvent({
     eventType: "AUCTION_LISTED",
     itemInstanceId: item.instanceId,
@@ -197,7 +222,45 @@ export function createAuctionListingForItem(instanceId: string, minBid: number, 
     source: `auction:${listing.id}`,
     amount: fee,
   });
-  updateSave({ gems: save.gems - fee, inventory, auctionListings: [...save.auctionListings, listing] });
+  updateSave({ purchasedGems: save.purchasedGems - fee, inventory, auctionListings: [...save.auctionListings, listing] });
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------
+// GEMS ECONOMY v2 — TRADE UNLOCK. The gate before ANY Marketplace action
+// (listing or bidding) is allowed at all. Spends either Free OR Purchased
+// Gems (config/gemsEconomy.ts's TRADE_UNLOCK_PRICE, 500/500) — unlike the
+// listing fee above, unlocking Trading itself is not restricted to
+// Purchased Gems, so an F2P player who only ever earns Free Gems can still
+// reach the Marketplace door; only what they can BUY once inside is
+// restricted (see createAuctionListingForItem above).
+// ---------------------------------------------------------------------
+
+export function isTradeUnlocked(): boolean {
+  return loadSave().tradeUnlocked;
+}
+
+export function getTradeUnlockPrice(): DualGemPrice {
+  return TRADE_UNLOCK_PRICE;
+}
+
+export type TradeUnlockResult = { ok: true } | { ok: false; reason: "ALREADY_UNLOCKED" | "INSUFFICIENT_FREE_GEMS" | "INSUFFICIENT_PURCHASED_GEMS" };
+
+/** Spends the chosen currency's Trade Unlock price IN FULL from that ONE bucket — never blends Free+Purchased, never converts currency (only flips the permanent gate). */
+export function unlockTrade(currency: GemCurrency): TradeUnlockResult {
+  const save = loadSave();
+  if (save.tradeUnlocked) return { ok: false, reason: "ALREADY_UNLOCKED" };
+  const cost = gemPriceForCurrency(TRADE_UNLOCK_PRICE, currency);
+
+  if (currency === "FREE") {
+    if (save.freeGems < cost) return { ok: false, reason: "INSUFFICIENT_FREE_GEMS" };
+    appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: "trade_unlock", amount: cost, currency: "FREE" });
+    updateSave({ freeGems: save.freeGems - cost, tradeUnlocked: true });
+  } else {
+    if (save.purchasedGems < cost) return { ok: false, reason: "INSUFFICIENT_PURCHASED_GEMS" };
+    appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: "trade_unlock", amount: cost, currency: "PURCHASED" });
+    updateSave({ purchasedGems: save.purchasedGems - cost, tradeUnlocked: true });
+  }
   return { ok: true };
 }
 
@@ -232,6 +295,7 @@ export function cancelMyAuctionListing(auctionId: string): boolean {
  */
 export function placeDemoBid(auctionId: string, amount: number): boolean {
   const save = loadSave();
+  if (!save.tradeUnlocked) return false;
   const index = save.auctionListings.findIndex((l) => l.id === auctionId);
   if (index === -1) return false;
   const outcome = placeBidPure(save.auctionListings[index]!, DEMO_BIDDER_ID, amount);

@@ -11,7 +11,7 @@ import {
   getMasteryUpgradeCostFor,
   type TowerInstance,
 } from "@/entities/Tower";
-import { getSpecializationsForTower, SPECIALIZATION_UNLOCK_GEM_COST } from "@/config/specializations";
+import { getSpecializationsForTower, SPECIALIZATION_UNLOCK_GEM_PRICE } from "@/config/specializations";
 import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
 
 /**
@@ -106,10 +106,10 @@ function spendGemsOnMasteryAndSpecialization(engine: GameEngine, towers: readonl
       engine.selectTower(t.id);
       return engine.canChooseSpecializationForSelectedTower();
     });
-    if (!towerToSpecialize || !engine.canAffordGems(SPECIALIZATION_UNLOCK_GEM_COST)) return;
+    if (!towerToSpecialize || !engine.canAffordFreeGems(SPECIALIZATION_UNLOCK_GEM_PRICE.free)) return;
     engine.selectTower(towerToSpecialize.id);
     const options = getSpecializationsForTower(towerToSpecialize.type);
-    if (!engine.chooseTowerSpecialization(options[0]!.id)) return;
+    if (!engine.chooseTowerSpecialization(options[0]!.id, "FREE")) return;
   }
 }
 

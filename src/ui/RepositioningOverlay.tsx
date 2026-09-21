@@ -1,7 +1,8 @@
 import type { CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { GemIcon } from "./icons";
+import { DualGemPriceButtons } from "./DualGemPriceButtons";
+import type { DualGemPrice, GemCurrency } from "@/config/gemsEconomy";
 
 /**
  * BALANCEAMENTO DEFINITIVO spec section 6/8 — the map-click half of Tower
@@ -27,14 +28,16 @@ interface RepositioningPickingProps {
 
 interface RepositioningConfirmProps {
   mode: "confirm";
-  cost: number;
-  onConfirm: () => void;
+  price: DualGemPrice;
+  freeGems: number;
+  purchasedGems: number;
+  onConfirm: (currency: GemCurrency) => void;
   onCancel: () => void;
 }
 
 interface RepositioningBlockedProps {
   mode: "blocked";
-  cost: number;
+  price: DualGemPrice;
   onClose: () => void;
 }
 
@@ -60,19 +63,18 @@ export function RepositioningOverlay(props: RepositioningOverlayProps) {
       <div style={modalBackdropStyle}>
         <div style={modalStyle}>
           <div style={modalTitleStyle}>{t("reposition.confirmTitle")}</div>
-          <div style={modalBodyStyle}>
-            {t("reposition.confirmBody", { cost: props.cost })}
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, marginLeft: 6 }}>
-              <GemIcon size={11} color={PALETTE.gem} />
-              {props.cost}
-            </span>
+          <div style={modalBodyStyle}>{t("reposition.confirmBody", { cost: props.price.purchased })}</div>
+          <div style={{ marginTop: 10 }}>
+            <DualGemPriceButtons
+              price={props.price}
+              freeBalance={props.freeGems}
+              purchasedBalance={props.purchasedGems}
+              onPay={props.onConfirm}
+            />
           </div>
           <div style={modalButtonRowStyle}>
             <button onClick={props.onCancel} style={secondaryButtonStyle}>
               {t("reposition.cancel")}
-            </button>
-            <button onClick={props.onConfirm} style={primaryButtonStyle}>
-              {t("reposition.confirm")}
             </button>
           </div>
         </div>
@@ -84,7 +86,7 @@ export function RepositioningOverlay(props: RepositioningOverlayProps) {
     <div style={modalBackdropStyle}>
       <div style={modalStyle}>
         <div style={{ ...modalTitleStyle, color: PALETTE.danger }}>{t("reposition.insufficientTitle")}</div>
-        <div style={modalBodyStyle}>{t("reposition.insufficientBody", { cost: props.cost })}</div>
+        <div style={modalBodyStyle}>{t("reposition.insufficientBody", { cost: props.price.purchased })}</div>
         <div style={modalButtonRowStyle}>
           <button onClick={props.onClose} style={primaryButtonStyle}>
             {t("reposition.close")}

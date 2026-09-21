@@ -15,14 +15,15 @@ import { ItemGlyph } from "./ItemGlyph";
 interface AuctionDetailModalProps {
   listing: AuctionListing;
   nowMs: number;
-  gemsBalance: number;
+  /** GEMS ECONOMY v2 — Marketplace purchases are Purchased-Gems-ONLY. */
+  purchasedGemsBalance: number;
   priceHistory: PriceHistory;
   onClose: () => void;
   onPlaceDemoBid: (amount: number) => { ok: true } | { ok: false; reason: string };
 }
 
 /** Item detail — spec: large art, name, rarity, origin Boss, description, stats, drop chance, ownership history (real, per-instance, via the listed item's own ItemHistoryEntry array is NOT shown here since the listing only tracks the item DEFINITION for browsing purposes; the real per-copy history lives on ItemDetailsModal for owned items), current/next bid, countdown, bid count, recent bid history, BID NOW. */
-export function AuctionDetailModal({ listing, nowMs, gemsBalance, priceHistory, onClose, onPlaceDemoBid }: AuctionDetailModalProps) {
+export function AuctionDetailModal({ listing, nowMs, purchasedGemsBalance, priceHistory, onClose, onPlaceDemoBid }: AuctionDetailModalProps) {
   const { t } = useLanguage();
   const [bidInput, setBidInput] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
@@ -141,7 +142,7 @@ export function AuctionDetailModal({ listing, nowMs, gemsBalance, priceHistory, 
           <div style={closedNoticeStyle}>{t("marketplace.detail.auctionClosed")}</div>
         )}
 
-        <div style={gemsFooterStyle}>{t("hud.gems")}: {gemsBalance.toLocaleString()}</div>
+        <div style={gemsFooterStyle}>{t("hud.purchasedGems")}: {purchasedGemsBalance.toLocaleString()}</div>
       </div>
     </div>
   );

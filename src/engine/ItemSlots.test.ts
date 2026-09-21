@@ -34,7 +34,7 @@ describe("Tower Equipment Slots (real GameEngine) — BALANCEAMENTO DEFINITIVO s
   });
 
   function setup(): GameEngine {
-    updateSave({ gold: 100_000, gems: 100_000, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 100_000, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
@@ -45,8 +45,8 @@ describe("Tower Equipment Slots (real GameEngine) — BALANCEAMENTO DEFINITIVO s
     // unlock economy (see the dedicated describe block below for that) — pay
     // to unlock every slot up front so equipping into slot 1/2 behaves
     // exactly as it did before slot locking existed.
-    engine.unlockItemSlotOnSelectedTower(1);
-    engine.unlockItemSlotOnSelectedTower(2);
+    engine.unlockItemSlotOnSelectedTower(1, "PURCHASED");
+    engine.unlockItemSlotOnSelectedTower(2, "PURCHASED");
     return engine;
   }
 
@@ -200,7 +200,7 @@ describe("Item Slot unlock economy (real GameEngine) — SISTEMA DE SLOTS DE EQU
   });
 
   function setupUnfunded(): GameEngine {
-    updateSave({ gold: 100_000, gems: 0, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 0, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
@@ -212,7 +212,7 @@ describe("Item Slot unlock economy (real GameEngine) — SISTEMA DE SLOTS DE EQU
   it("Slot 1 (index 0) is free and already unlocked on a freshly placed tower — never purchasable", () => {
     const engine = setupUnfunded();
     expect(engine.getSelectedTowerUnlockedSlots()).toEqual([true, false, false]);
-    expect(engine.canUnlockItemSlotOnSelectedTower(0)).toBe(false);
+    expect(engine.canUnlockItemSlotOnSelectedTower(0, "PURCHASED")).toBe(false);
   });
 
   it("Slot 2 (index 1) costs exactly 250 Gems", () => {
@@ -227,56 +227,56 @@ describe("Item Slot unlock economy (real GameEngine) — SISTEMA DE SLOTS DE EQU
 
   it("insufficient Gems blocks the purchase — the slot stays locked and no Gems are deducted", () => {
     setupUnfunded();
-    updateSave({ gems: 249 });
+    updateSave({ purchasedGems: 249 });
     const fresh = new GameEngine();
     fresh.startRun();
     const tower = fresh.getRenderSnapshot().towers[0]!;
     fresh.selectTower(tower.id);
 
-    expect(fresh.canUnlockItemSlotOnSelectedTower(1)).toBe(false);
-    expect(fresh.unlockItemSlotOnSelectedTower(1)).toBe(false);
+    expect(fresh.canUnlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(false);
+    expect(fresh.unlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(false);
     expect(fresh.getSelectedTowerUnlockedSlots()[1]).toBe(false);
-    expect(fresh.getGemBalance()).toBe(249);
+    expect(fresh.getPurchasedGemBalance()).toBe(249);
   });
 
   it("sufficient Gems allows the purchase — the slot unlocks and exactly the Gems cost is deducted", () => {
-    updateSave({ gold: 100_000, gems: 250, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 250, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
     const tower = engine.getRenderSnapshot().towers[0]!;
     engine.selectTower(tower.id);
 
-    expect(engine.canUnlockItemSlotOnSelectedTower(1)).toBe(true);
-    expect(engine.unlockItemSlotOnSelectedTower(1)).toBe(true);
+    expect(engine.canUnlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(true);
+    expect(engine.unlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(true);
     expect(engine.getSelectedTowerUnlockedSlots()[1]).toBe(true);
-    expect(engine.getGemBalance()).toBe(0);
+    expect(engine.getPurchasedGemBalance()).toBe(0);
   });
 
   it("unlocking is permanent and idempotent — a second attempt on an already-unlocked slot is refused and never double-charges Gems", () => {
-    updateSave({ gold: 100_000, gems: 1000, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 1000, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
     const tower = engine.getRenderSnapshot().towers[0]!;
     engine.selectTower(tower.id);
-    engine.unlockItemSlotOnSelectedTower(1);
-    const gemsAfterFirstUnlock = engine.getGemBalance();
+    engine.unlockItemSlotOnSelectedTower(1, "PURCHASED");
+    const gemsAfterFirstUnlock = engine.getPurchasedGemBalance();
 
-    expect(engine.canUnlockItemSlotOnSelectedTower(1)).toBe(false);
-    expect(engine.unlockItemSlotOnSelectedTower(1)).toBe(false);
-    expect(engine.getGemBalance()).toBe(gemsAfterFirstUnlock);
+    expect(engine.canUnlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(false);
+    expect(engine.unlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(false);
+    expect(engine.getPurchasedGemBalance()).toBe(gemsAfterFirstUnlock);
   });
 
   it("an unlocked slot stays unlocked even with no item currently equipped in it — unlock and equip are fully independent", () => {
     setupUnfunded();
-    updateSave({ gems: 250 });
+    updateSave({ purchasedGems: 250 });
     const fresh = new GameEngine();
     fresh.startRun();
     const tower = fresh.getRenderSnapshot().towers[0]!;
     fresh.selectTower(tower.id);
 
-    expect(fresh.unlockItemSlotOnSelectedTower(1)).toBe(true);
+    expect(fresh.unlockItemSlotOnSelectedTower(1, "PURCHASED")).toBe(true);
     expect(fresh.getSelectedTowerUnlockedSlots()[1]).toBe(true);
     expect(fresh.getSelectedTowerItemSlots()[1]).toBeNull();
 

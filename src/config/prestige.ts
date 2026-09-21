@@ -1,3 +1,5 @@
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
+
 /**
  * HORDENOVA Season/Progression v1.0 — PROFILE PRESTIGE. Permanent,
  * account-wide (never per-tower, never reset by a Season boundary), funded
@@ -64,6 +66,11 @@ export function getPrestigeUpgradeCost(currentLevel: number): number {
   const tailLevels = Math.max(0, targetLevel - PRESTIGE_COST_COMPOUND_LEVEL_CAP);
   const linearTail = 1 + tailLevels * PRESTIGE_COST_LINEAR_TAIL_GROWTH;
   return Math.round(PRESTIGE_BASE_COST_GEMS * compound * linearTail) + targetLevel;
+}
+
+/** GEMS ECONOMY v2 — dual price to go from `currentLevel` to `currentLevel + 1`, derived from getPrestigeUpgradeCost (config/gemsEconomy.ts's own methodology). */
+export function getPrestigeUpgradeDualPrice(currentLevel: number): DualGemPrice {
+  return dualGemPrice(getPrestigeUpgradeCost(currentLevel));
 }
 
 /** Every 10 levels is a new cosmetic tier — i18n key: prestige.tiers.<name> */

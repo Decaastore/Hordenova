@@ -10,19 +10,23 @@ import {
   getPrestigeBonuses,
   getPrestigeTier,
   getPrestigeUpgradeCost,
+  getPrestigeUpgradeDualPrice,
   PRESTIGE_FUNCTIONAL_CAP_LEVEL,
   PRESTIGE_MIN_BEST_WAVE,
 } from "@/config/prestige";
+import { DualGemPriceButtons } from "./DualGemPriceButtons";
+import type { GemCurrency } from "@/config/gemsEconomy";
 import { GemIcon } from "./icons";
 
 interface EconomyStatsPanelProps {
   summary: LocalEconomySummary;
-  /** Master Implementation Pass spec section 7-8 — Profile Prestige. */
-  gems: number;
+  /** Master Implementation Pass spec section 7-8 — Profile Prestige. GEMS ECONOMY v2 — dual-currency balances. */
+  freeGems: number;
+  purchasedGems: number;
   prestigeLevel: number;
   /** The account's all-time record wave — gates whether Prestige is unlocked at all (see config/prestige.ts's canUnlockPrestige). */
   bestWave: number;
-  onUpgradePrestige: () => void;
+  onUpgradePrestige: (currency: GemCurrency) => void;
 }
 
 /** (multiplier - 1) * 100, formatted with at most 1 decimal and no trailing ".0" — every Prestige bonus is a multiple of 0.5%, so this never needs more precision than that. */
@@ -32,7 +36,7 @@ function formatBonusPercent(multiplier: number): string {
 }
 
 /** Item System spec sections 18/21/33 — shows exactly what this device can honestly know, and states plainly that anything cross-player is unavailable rather than inventing a number. */
-export function EconomyStatsPanel({ summary, gems, prestigeLevel, bestWave, onUpgradePrestige }: EconomyStatsPanelProps) {
+export function EconomyStatsPanel({ summary, freeGems, purchasedGems, prestigeLevel, bestWave, onUpgradePrestige }: EconomyStatsPanelProps) {
   const { t } = useLanguage();
   const global = getGlobalEconomyStats();
 
@@ -47,7 +51,7 @@ export function EconomyStatsPanel({ summary, gems, prestigeLevel, bestWave, onUp
 
       <div style={{ ...sectionTitleStyle, marginTop: 18 }}>{t("prestige.title")}</div>
       {canUnlockPrestige(bestWave) ? (
-        <PrestigeUnlockedView gems={gems} prestigeLevel={prestigeLevel} onUpgradePrestige={onUpgradePrestige} />
+        <PrestigeUnlockedView freeGems={freeGems} purchasedGems={purchasedGems} prestigeLevel={prestigeLevel} onUpgradePrestige={onUpgradePrestige} />
       ) : (
         <PrestigeLockedView bestWave={bestWave} />
       )}
@@ -76,21 +80,22 @@ function PrestigeLockedView({ bestWave }: { bestWave: number }) {
 }
 
 function PrestigeUnlockedView({
-  gems,
+  freeGems,
+  purchasedGems,
   prestigeLevel,
   onUpgradePrestige,
 }: {
-  gems: number;
+  freeGems: number;
+  purchasedGems: number;
   prestigeLevel: number;
-  onUpgradePrestige: () => void;
+  onUpgradePrestige: (currency: GemCurrency) => void;
 }) {
   const { t } = useLanguage();
   const tier = getPrestigeTier(prestigeLevel);
   const tierLabel = t(`prestige.tiers.${tier.nameKey}` as TranslationKey) + (tier.cycle > 0 ? ` ${tier.cycle + 1}` : "");
   const current = getPrestigeBonuses(prestigeLevel);
   const next = getPrestigeBonuses(prestigeLevel + 1);
-  const nextCost = getPrestigeUpgradeCost(prestigeLevel);
-  const affordable = gems >= nextCost;
+  const nextPrice = getPrestigeUpgradeDualPrice(prestigeLevel);
   const nextGoldGain = next.goldMultiplier - current.goldMultiplier;
   const nextGemShardGain = next.gemShardMultiplier - current.gemShardMultiplier;
   const nextHasEconomicBonus = nextGoldGain > 0 || nextGemShardGain > 0;
@@ -113,29 +118,17 @@ function PrestigeUnlockedView({
       <div style={{ ...prestigeCardStyle, marginTop: 10, borderColor: PALETTE.gem }}>
         <div style={sectionSubtitleStyle}>{t("prestige.nextLevelTitle")}</div>
         <div style={levelLineStyle}>{t("prestige.levelPlain", { level: prestigeLevel + 1 })}</div>
-        <div style={nextCostRowStyle}>
-          <GemIcon size={11} color={PALETTE.gem} /> {t("prestige.cost", { cost: nextCost })}
-        </div>
         <div style={currentGemsRowStyle}>
-          {t("prestige.currentGemsLabel")}: <GemIcon size={10} color={PALETTE.gem} /> {gems}
-        </div>
-        <div style={progressBarTrackStyle}>
-          <div
-            style={{
-              ...progressBarFillStyle,
-              width: `${Math.round(Math.min(1, gems / Math.max(1, nextCost)) * 100)}%`,
-            }}
-          />
+          🔒 {freeGems.toLocaleString()} · 💎 {purchasedGems.toLocaleString()}
         </div>
         {nextHasEconomicBonus ? (
           <BenefitLines goldMultiplier={1 + nextGoldGain} gemShardMultiplier={1 + nextGemShardGain} />
         ) : (
           <div style={capNoteStyle}>{t("prestige.noAdditionalBonus")}</div>
         )}
-        <button onClick={onUpgradePrestige} disabled={!affordable} style={{ ...prestigeButtonStyle, opacity: affordable ? 1 : 0.5 }}>
-          {t("prestige.upgrade")}
-        </button>
-        {!affordable && <div style={insufficientStyle}>{t("prestige.insufficientGems", { amount: nextCost - gems })}</div>}
+        <div style={{ marginTop: 8 }}>
+          <DualGemPriceButtons price={nextPrice} freeBalance={freeGems} purchasedBalance={purchasedGems} onPay={onUpgradePrestige} />
+        </div>
       </div>
 
       <p style={permanentHintStyle}>{t("prestige.permanentHint")}</p>
@@ -304,40 +297,11 @@ const benefitLineSmallStyle: CSSProperties = {
   color: PALETTE.success,
 };
 
-const nextCostRowStyle: CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  gap: 4,
-  fontSize: 11,
-  color: PALETTE.gem,
-  fontWeight: 700,
-  marginTop: 4,
-};
-
 const capNoteStyle: CSSProperties = {
   fontSize: 10,
   fontStyle: "italic",
   color: PALETTE.uiTextDim,
   marginTop: 4,
-};
-
-const prestigeButtonStyle: CSSProperties = {
-  marginTop: 8,
-  padding: "7px 10px",
-  borderRadius: 7,
-  border: `1px solid ${PALETTE.gem}`,
-  background: "rgba(200,138,255,0.1)",
-  color: PALETTE.uiText,
-  fontWeight: 700,
-  fontSize: 11.5,
-  width: "100%",
-};
-
-const insufficientStyle: CSSProperties = {
-  fontSize: 10,
-  color: PALETTE.danger,
-  marginTop: 5,
-  textAlign: "center",
 };
 
 const permanentHintStyle: CSSProperties = {
@@ -421,21 +385,6 @@ const currentGemsRowStyle: CSSProperties = {
   fontSize: 10.5,
   color: PALETTE.uiTextDim,
   marginTop: 4,
-};
-
-const progressBarTrackStyle: CSSProperties = {
-  width: "100%",
-  height: 5,
-  borderRadius: 3,
-  background: "rgba(255,255,255,0.08)",
-  overflow: "hidden",
-  marginTop: 5,
-};
-
-const progressBarFillStyle: CSSProperties = {
-  height: "100%",
-  background: PALETTE.gem,
-  borderRadius: 3,
 };
 
 const rewardRowStyle: CSSProperties = {

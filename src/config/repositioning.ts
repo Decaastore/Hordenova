@@ -1,3 +1,5 @@
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
+
 /**
  * BALANCEAMENTO DEFINITIVO spec section 6 — Tower Repositioning.
  *
@@ -19,3 +21,5 @@ export const FREE_REPOSITIONS_PER_DAY = 1;
 
 /** Gems cost for every repositioning beyond the day's free one. Matches the task's own reference point (200 Gems ~= R$10 at 1000 Gems = R$49.90) — no separate price, no token, no parallel currency. */
 export const REPOSITION_GEM_COST = 200;
+/** GEMS ECONOMY v2 — dual price derived from the cost above (config/gemsEconomy.ts's own methodology). */
+export const REPOSITION_GEM_PRICE: DualGemPrice = dualGemPrice(REPOSITION_GEM_COST);

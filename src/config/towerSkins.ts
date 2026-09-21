@@ -1,4 +1,5 @@
 import type { TowerType } from "./towerStats";
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
 
 /**
  * TOWER SKIN SYSTEM v3 — "REVISÃO PROFISSIONAL: TORRES + SKINS + GAMEPLAY
@@ -165,6 +166,18 @@ export const TOWER_SKIN_TIER_PRICES: Record<TowerSkinTier, number> = {
   PREMIUM: 800,
   PRESTIGE: 0,
 };
+
+/**
+ * GEMS ECONOMY v2 — every commercial skin gets a dual price: `gemCost`
+ * above stays the exact, unchanged 💎 PURCHASED price (Purchased-Gems
+ * players see zero change), and 🔒 FREE = PURCHASED x 1.5 (config/
+ * gemsEconomy.ts's own methodology). For PREMIUM (800), that's exactly the
+ * user's own worked example: 1,200 Free / 800 Purchased — preserved
+ * verbatim, not silently changed.
+ */
+export function getTowerSkinDualPrice(def: Pick<TowerSkinDefinition, "gemCost">): DualGemPrice {
+  return dualGemPrice(def.gemCost);
+}
 
 export interface TowerSkinDefinition {
   id: string;

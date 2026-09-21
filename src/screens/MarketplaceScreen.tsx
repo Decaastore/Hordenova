@@ -10,9 +10,12 @@ import {
   getActiveAuctionListings,
   getMyAuctionListings,
   getPriceHistoryForItemDefinition,
+  getTradeUnlockPrice,
   placeDemoBid,
   refreshMarketplace,
+  unlockTrade,
 } from "@/engine/MarketplaceService";
+import { DualGemPriceButtons } from "@/ui/DualGemPriceButtons";
 import { canListItemForAuction } from "@/engine/AuctionManager";
 import { getCurrentBidAmount, type AuctionListing } from "@/entities/Auction";
 import { getItemDefinition, type ItemCategory } from "@/config/itemDefinitions";
@@ -144,14 +147,35 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
           <p style={heroTaglineStyle}>{t("marketplace.hero.tagline")}</p>
           <div style={heroRowStyle}>
             <div style={gemsBadgeStyle}>
-              {t("hud.gems")}: <strong>{save.gems.toLocaleString()}</strong>
+              {t("hud.purchasedGems")}: <strong>{save.purchasedGems.toLocaleString()}</strong>
             </div>
-            <button onClick={() => setCreating(true)} style={createCtaStyle}>
-              {t("marketplace.create.title")}
-            </button>
+            {save.tradeUnlocked && (
+              <button onClick={() => setCreating(true)} style={createCtaStyle}>
+                {t("marketplace.create.title")}
+              </button>
+            )}
           </div>
         </div>
 
+        {!save.tradeUnlocked ? (
+          <div style={tradeLockedBoxStyle}>
+            <div style={tradeLockedTitleStyle}>{t("marketplace.trade.lockedTitle")}</div>
+            <p style={tradeLockedExplainerStyle}>{t("marketplace.trade.lockedExplainer")}</p>
+            <p style={tradeLockedExplainerStyle}>
+              {t("marketplace.trade.unlockPrompt", { free: getTradeUnlockPrice().free, purchased: getTradeUnlockPrice().purchased })}
+            </p>
+            <DualGemPriceButtons
+              price={getTradeUnlockPrice()}
+              freeBalance={save.freeGems}
+              purchasedBalance={save.purchasedGems}
+              onPay={(currency) => {
+                unlockTrade(currency);
+                setRefreshTick((n) => n + 1);
+              }}
+            />
+          </div>
+        ) : (
+          <>
         <div style={tabRowStyle}>
           <TabButton active={tab === "BROWSE"} label={t("marketplace.tabs.browse")} onClick={() => setTab("BROWSE")} />
           <TabButton active={tab === "MY_MARKET"} label={t("marketplace.tabs.myMarket")} onClick={() => setTab("MY_MARKET")} />
@@ -231,13 +255,15 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
             }}
           />
         )}
+          </>
+        )}
       </div>
 
       {selectedListing && (
         <AuctionDetailModal
           listing={selectedListing}
           nowMs={nowMs}
-          gemsBalance={save.gems}
+          purchasedGemsBalance={save.purchasedGems}
           priceHistory={getPriceHistoryForItemDefinition(selectedListing.itemDefinitionId)}
           onClose={() => setSelectedAuctionId(null)}
           onPlaceDemoBid={(amount) => {
@@ -251,7 +277,7 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
       {creating && (
         <CreateAuctionModal
           eligibleItems={eligibleItems}
-          gemsBalance={save.gems}
+          purchasedGemsBalance={save.purchasedGems}
           onClose={() => setCreating(false)}
           onCreate={(instanceId, minBid, durationHours) => {
             const result = createAuctionListingForItem(instanceId, minBid, durationHours);
@@ -369,6 +395,31 @@ const createCtaStyle: CSSProperties = {
   fontSize: 12,
   letterSpacing: 0.6,
   cursor: "pointer",
+};
+
+const tradeLockedBoxStyle: CSSProperties = {
+  maxWidth: 480,
+  margin: "0 auto 24px",
+  padding: "20px 24px",
+  borderRadius: 14,
+  border: `1px solid ${PALETTE.gem}`,
+  background: "rgba(200,138,255,0.06)",
+  textAlign: "center",
+};
+
+const tradeLockedTitleStyle: CSSProperties = {
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 18,
+  fontWeight: 800,
+  color: PALETTE.uiAccentBright,
+  marginBottom: 8,
+};
+
+const tradeLockedExplainerStyle: CSSProperties = {
+  fontSize: 11.5,
+  color: PALETTE.uiTextDim,
+  lineHeight: 1.6,
+  marginBottom: 10,
 };
 
 const tabRowStyle: CSSProperties = {

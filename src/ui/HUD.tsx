@@ -65,9 +65,17 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
          */}
         <Stat
           icon={<GemIcon color={PALETTE.gem} />}
-          label={t("hud.gems")}
-          value={String(hud.gems)}
+          label={t("hud.freeGems")}
+          value={String(hud.freeGems)}
           valueColor={PALETTE.gem}
+          title={t("gems.freeExplainer")}
+        />
+        <Stat
+          icon={<GemIcon color={PALETTE.gem} />}
+          label={t("hud.purchasedGems")}
+          value={String(hud.purchasedGems)}
+          valueColor={PALETTE.gem}
+          title={t("gems.purchasedExplainer")}
         />
         {hud.gemShards > 0 && (
           <Stat

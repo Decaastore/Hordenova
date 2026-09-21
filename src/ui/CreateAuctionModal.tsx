@@ -12,7 +12,8 @@ import type { CreateListingResult } from "@/engine/MarketplaceService";
 
 interface CreateAuctionModalProps {
   eligibleItems: readonly ItemInstance[];
-  gemsBalance: number;
+  /** GEMS ECONOMY v2 — the Marketplace listing fee is Purchased-Gems-ONLY; this is never the Free Gems balance. */
+  purchasedGemsBalance: number;
   onClose: () => void;
   onCreate: (instanceId: string, minBid: number, durationHours: AuctionDurationHours) => CreateListingResult;
 }
@@ -20,7 +21,7 @@ interface CreateAuctionModalProps {
 type Step = "PICK" | "CONFIGURE";
 
 /** CREATE AUCTION flow — spec section 17: item, minimum bid, duration selector (12/24/48/72h), fee/total display, and the mandatory "your item will be locked" notice BEFORE confirmation. */
-export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCreate }: CreateAuctionModalProps) {
+export function CreateAuctionModal({ eligibleItems, purchasedGemsBalance, onClose, onCreate }: CreateAuctionModalProps) {
   const { t } = useLanguage();
   const [step, setStep] = useState<Step>("PICK");
   const [selected, setSelected] = useState<ItemInstance | null>(null);
@@ -34,7 +35,7 @@ export function CreateAuctionModal({ eligibleItems, gemsBalance, onClose, onCrea
   const floor = def ? getAuctionMinBid(def.rarity) : 0;
   const fee = def ? getAuctionListingFee(def.rarity) : 0;
   const minBid = minBidInput !== null ? Number(minBidInput) : floor;
-  const canAffordFee = gemsBalance >= fee;
+  const canAffordFee = purchasedGemsBalance >= fee;
   const validMinBid = Number.isFinite(minBid) && minBid >= floor;
 
   return (

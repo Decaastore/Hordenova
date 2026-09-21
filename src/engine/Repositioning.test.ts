@@ -10,8 +10,12 @@ import { syncSeasonIfNeeded } from "./AscensionManager";
 /**
  * BALANCEAMENTO DEFINITIVO spec section 6/13 — real-GameEngine tests for
  * Tower Repositioning: 1 free swap/move per day, resets daily (day-index,
- * not a stored boolean — see DailyClock.ts), 200 Gems after, never touches
- * Tower Level/Mastery/Specialization/ownership, survives reload/save-load.
+ * not a stored boolean — see DailyClock.ts), REPOSITION_GEM_COST Gems after
+ * (paid with the caller's explicit currency choice — GEMS ECONOMY v2),
+ * never touches Tower Level/Mastery/Specialization/ownership, survives
+ * reload/save-load. Every paid call in this file pays with PURCHASED Gems —
+ * the exact pre-existing, unchanged cost — so REPOSITION_GEM_COST stays the
+ * right anchor for every assertion here.
  */
 describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spec section 6/13", () => {
   const DAY0 = SEASON_EPOCH_MS + DAY_DURATION_MS * 100; // an arbitrary, stable "day 100"
@@ -27,7 +31,7 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
   });
 
   function setupTwoTowers(): GameEngine {
-    updateSave({ gold: 100_000, gems: 100_000, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 100_000, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
@@ -37,13 +41,13 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
 
   it("the first reposition of the day is free — no Gems spent", () => {
     const engine = setupTwoTowers();
-    const gemsBefore = engine.getHudSnapshot().gems;
+    const purchasedBefore = engine.getHudSnapshot().purchasedGems;
     expect(engine.getHudSnapshot().repositionFreeAvailable).toBe(true);
-    expect(engine.getRepositionCost()).toBe(0);
+    expect(engine.getRepositionPrice()).toEqual({ free: 0, purchased: 0 });
 
     const ok = engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[2]!.id);
     expect(ok).toBe(true);
-    expect(engine.getHudSnapshot().gems).toBe(gemsBefore);
+    expect(engine.getHudSnapshot().purchasedGems).toBe(purchasedBefore);
   });
 
   it("moving to an EMPTY slot relocates the tower; the destination slot was empty, so nothing else changes", () => {
@@ -83,7 +87,7 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
   });
 
   it("reposition NEVER touches Level, Mastery, or Specialization — swaps only slotId/position", () => {
-    updateSave({ gold: 100_000, gems: 100_000, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 100_000, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
@@ -105,31 +109,41 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
     }
   });
 
-  it("a SECOND reposition the same day costs REPOSITION_GEM_COST Gems and deducts them", () => {
+  it("a SECOND reposition the same day costs REPOSITION_GEM_COST Purchased Gems and deducts them", () => {
     const engine = setupTwoTowers();
     engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[2]!.id); // consumes the free one
 
     expect(engine.getHudSnapshot().repositionFreeAvailable).toBe(false);
-    expect(engine.getRepositionCost()).toBe(REPOSITION_GEM_COST);
+    expect(engine.getRepositionPrice().purchased).toBe(REPOSITION_GEM_COST);
 
-    const gemsBefore = engine.getHudSnapshot().gems;
-    const ok = engine.repositionTower(TOWER_SLOTS[2]!.id, TOWER_SLOTS[3]!.id);
+    const purchasedBefore = engine.getHudSnapshot().purchasedGems;
+    const ok = engine.repositionTower(TOWER_SLOTS[2]!.id, TOWER_SLOTS[3]!.id, "PURCHASED");
     expect(ok).toBe(true);
-    expect(engine.getHudSnapshot().gems).toBe(gemsBefore - REPOSITION_GEM_COST);
+    expect(engine.getHudSnapshot().purchasedGems).toBe(purchasedBefore - REPOSITION_GEM_COST);
   });
 
-  it("blocks (and spends nothing) when Gems are insufficient after the free use is spent", () => {
-    updateSave({ gold: 100_000, gems: REPOSITION_GEM_COST - 1, towerLoadout: [] });
+  it("blocks (and spends nothing) when no currency is given for a non-free reposition", () => {
+    const engine = setupTwoTowers();
+    engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[2]!.id); // spends the free one
+
+    const purchasedBefore = engine.getHudSnapshot().purchasedGems;
+    const ok = engine.repositionTower(TOWER_SLOTS[2]!.id, TOWER_SLOTS[3]!.id); // no currency chosen
+    expect(ok).toBe(false);
+    expect(engine.getHudSnapshot().purchasedGems).toBe(purchasedBefore);
+  });
+
+  it("blocks (and spends nothing) when Purchased Gems are insufficient after the free use is spent", () => {
+    updateSave({ gold: 100_000, purchasedGems: REPOSITION_GEM_COST - 1, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
     engine.placeTower(TOWER_SLOTS[1]!.id, "INFERNO");
     engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[2]!.id); // spends the free one
 
-    const gemsBefore = engine.getHudSnapshot().gems;
-    const ok = engine.repositionTower(TOWER_SLOTS[2]!.id, TOWER_SLOTS[3]!.id);
+    const purchasedBefore = engine.getHudSnapshot().purchasedGems;
+    const ok = engine.repositionTower(TOWER_SLOTS[2]!.id, TOWER_SLOTS[3]!.id, "PURCHASED");
     expect(ok).toBe(false);
-    expect(engine.getHudSnapshot().gems).toBe(gemsBefore);
+    expect(engine.getHudSnapshot().purchasedGems).toBe(purchasedBefore);
   });
 
   it("the free reposition resets the NEXT calendar day, and does not accumulate across multiple skipped days", () => {
@@ -149,7 +163,7 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
   });
 
   it("survives reload/save-load: a brand-new GameEngine instance reading the same save still sees the free use as spent for that same day", () => {
-    updateSave({ gold: 100_000, gems: 100_000, towerLoadout: [] });
+    updateSave({ gold: 100_000, purchasedGems: 100_000, towerLoadout: [] });
     const first = new GameEngine();
     first.startRun();
     first.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
@@ -163,12 +177,12 @@ describe("Tower Repositioning (real GameEngine) — BALANCEAMENTO DEFINITIVO spe
 
   it("rejects an unknown destination slot id, and a no-op fromSlotId===toSlotId, without spending anything", () => {
     const engine = setupTwoTowers();
-    const gemsBefore = engine.getHudSnapshot().gems;
+    const purchasedBefore = engine.getHudSnapshot().purchasedGems;
 
     expect(engine.repositionTower(TOWER_SLOTS[0]!.id, "not-a-real-slot")).toBe(false);
     expect(engine.repositionTower(TOWER_SLOTS[0]!.id, TOWER_SLOTS[0]!.id)).toBe(false);
     expect(engine.getHudSnapshot().repositionFreeAvailable).toBe(true);
-    expect(engine.getHudSnapshot().gems).toBe(gemsBefore);
+    expect(engine.getHudSnapshot().purchasedGems).toBe(purchasedBefore);
   });
 
   /**

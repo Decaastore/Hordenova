@@ -177,13 +177,15 @@ describe("Item Fusion (real GameEngine) — SISTEMA DE FUSÃO DE ITENS", () => {
     vi.spyOn(Math, "random").mockReturnValue(0); // success
     const engine = setup();
     const goldBefore = engine.getHudSnapshot().gold;
-    const gemsBefore = engine.getGemBalance();
+    const freeGemsBefore = engine.getFreeGemBalance();
+    const purchasedGemsBefore = engine.getPurchasedGemBalance();
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
     inject(engine, items);
 
     engine.attemptFusion(items.map((i) => i.instanceId));
     expect(engine.getHudSnapshot().gold).toBe(goldBefore);
-    expect(engine.getGemBalance()).toBe(gemsBefore);
+    expect(engine.getFreeGemBalance()).toBe(freeGemsBefore);
+    expect(engine.getPurchasedGemBalance()).toBe(purchasedGemsBefore);
   });
 
   it("persists across reload: a fresh GameEngine reading the same save sees the exact post-fusion inventory (correct persistence, no phantom re-creation)", () => {
