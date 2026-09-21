@@ -34,11 +34,17 @@ describe("GEMS ECONOMY v2 — dual currency (freeGems/purchasedGems)", () => {
   const SKIN_PRICE = dualGemPrice(PREMIUM_SKIN.gemCost);
 
   function setupTowerFor(skin: typeof PREMIUM_SKIN): GameEngine {
-    updateSave({ gold: 999_999, towerLoadout: [] });
+    // The tower must have already reached the skin's real unlockLevel
+    // (entities/Tower.ts's canPurchaseSkin gate) before a purchase is even
+    // eligible — seeding the loadout directly at that level avoids grinding
+    // Gold-funded level-ups just to exercise the Gems purchase flow itself.
+    const slot = TOWER_SLOTS[0]!;
+    updateSave({
+      gold: 999_999,
+      towerLoadout: [{ slotId: slot.id, type: skin.towerType, level: skin.unlockLevel }],
+    });
     const engine = new GameEngine();
     engine.startRun();
-    const slot = TOWER_SLOTS[0]!;
-    engine.placeTower(slot.id, skin.towerType);
     engine.selectTower(engine.getRenderSnapshot().towers[0]!.id);
     return engine;
   }
