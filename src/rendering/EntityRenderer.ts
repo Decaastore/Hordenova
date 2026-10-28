@@ -14,6 +14,7 @@ import type { LocomotionState } from "./biomeCreatures/helpers";
 import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
 import { drawEnemySprite, ensureEnemySpritesLoading, getEnemySprite, spriteHeadroom } from "./enemySprites";
 import { getTowerSprite, type LoadedTowerSprite } from "./towerSprites";
+import { drawEmbers, drawFire, drawSmokeColumn } from "./fireFx";
 
 /**
  * FASE 3 — real hit-reaction feedback (spec section 10), applied generically
@@ -398,10 +399,10 @@ function drawBakedTowerLive(
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     // Cold light breathing out of the orb — stronger at higher stages.
-    const r = 8 + stage * 0.9 + flare * 6;
+    const r = 8 + stage * 0.6 + flare * 6;
     const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, r);
-    g.addColorStop(0, `rgba(200,245,255,${0.45 + 0.2 * pulse + 0.35 * flare})`);
-    g.addColorStop(0.5, `rgba(90,200,255,${0.16 + 0.06 * stage * 0.5})`);
+    g.addColorStop(0, `rgba(200,245,255,${0.32 + 0.16 * pulse + 0.35 * flare})`);
+    g.addColorStop(0.5, `rgba(90,200,255,${0.12 + 0.015 * stage})`);
     g.addColorStop(1, "rgba(90,200,255,0)");
     ctx.fillStyle = g;
     ctx.beginPath();
@@ -479,8 +480,193 @@ function drawBakedTowerLive(
     );
     return;
   }
+
+  if (type === "IRONWOOD") {
+    const L = sprite.anchor("armL"), R = sprite.anchor("armR");
+    const rest = sprite.anchor("nockRest"), drawn = sprite.anchor("nockDrawn");
+    const tip = sprite.anchor("boltTip");
+    const flare = attackFlashMs < 160 ? 1 - attackFlashMs / 160 : 0;
+    if (L && R && rest && drawn && tip) {
+      // Bowstring draws back as the next shot nears; snaps forward on release.
+      const pull = flare > 0 ? 0 : Math.min(1, _readiness * 1.1);
+      const nx = rest.x + (drawn.x - rest.x) * pull;
+      const ny = rest.y + (drawn.y - rest.y) * pull;
+      ctx.strokeStyle = "rgba(230,220,190,0.9)";
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      ctx.moveTo(L.x, L.y);
+      ctx.lineTo(nx, ny);
+      ctx.lineTo(R.x, R.y);
+      ctx.stroke();
+      if (_readiness > 0.15 && flare === 0) {
+        // Loaded bolt resting in the groove, glowing with sap energy at the head.
+        ctx.strokeStyle = "#5a4024";
+        ctx.lineWidth = 1.1;
+        ctx.beginPath();
+        ctx.moveTo(nx, ny);
+        ctx.lineTo(tip.x, tip.y);
+        ctx.stroke();
+        ctx.fillStyle = theme.accent;
+        ctx.beginPath();
+        ctx.arc(tip.x, tip.y, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    const core = sprite.anchor("core");
+    if (core) {
+      const pulse = 0.5 + 0.5 * Math.sin(timeMs / 500);
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const r = 6 + stage * 0.7 + flare * 4;
+      const g = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, r);
+      g.addColorStop(0, `rgba(200,255,170,${0.25 + 0.15 * pulse + 0.4 * flare})`);
+      g.addColorStop(1, "rgba(120,255,90,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(core.x, core.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    const eyes = sprite.anchor("eyes");
+    if (eyes) {
+      ctx.fillStyle = `rgba(190,255,150,${0.7 + 0.3 * Math.sin(timeMs / 900)})`;
+      ctx.fillRect(eyes.x - 0.9, eyes.y, 0.6, 0.4);
+      ctx.fillRect(eyes.x + 0.3, eyes.y, 0.6, 0.4);
+    }
+    const banner = sprite.anchor("banner");
+    if (banner) {
+      const w = Math.sin(timeMs / 380) * 1.2;
+      ctx.fillStyle = theme.primary;
+      ctx.beginPath();
+      ctx.moveTo(banner.x, banner.y);
+      ctx.quadraticCurveTo(banner.x - 3, banner.y + 1 + w, banner.x - 6.5, banner.y + 0.5 + w * 1.6);
+      ctx.lineTo(banner.x - 6, banner.y + 5 + w * 1.4);
+      ctx.quadraticCurveTo(banner.x - 3, banner.y + 5.5 + w, banner.x, banner.y + 5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = theme.accent;
+      ctx.beginPath();
+      ctx.arc(banner.x - 3, banner.y + 2.8 + w * 0.8, 0.9, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    drawFloatingMotes(ctx, 0, (core?.y ?? -16) + 6, timeMs, 11, applySkinParticleStyle({ count: 2 + Math.min(stage, 4), spreadX: 16, spreadY: 26, color: "#bfff9a", periodMs: 4600, size: 0.8 }, skin?.particleStyle));
+    return;
+  }
+
+  if (type === "INFERNO") {
+    const mouth = sprite.anchor("mouth");
+    const flare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
+    if (mouth) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(mouth.x, mouth.y, 3.5, 2.9, 0, 0, Math.PI * 2);
+      ctx.clip();
+      const inner = ctx.createRadialGradient(mouth.x, mouth.y + 1, 0, mouth.x, mouth.y, 4);
+      inner.addColorStop(0, "rgba(255,240,180,1)");
+      inner.addColorStop(0.5, "rgba(255,140,40,1)");
+      inner.addColorStop(1, "rgba(120,20,0,1)");
+      ctx.fillStyle = inner;
+      ctx.fillRect(mouth.x - 4, mouth.y - 4, 8, 8);
+      drawFire(ctx, mouth.x, mouth.y + 2.6, timeMs, 0.42 + flare * 0.2, 19);
+      ctx.restore();
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const r = 9 + stage + flare * 9;
+      const g = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, r);
+      g.addColorStop(0, `rgba(255,150,60,${0.35 + 0.45 * flare})`);
+      g.addColorStop(1, "rgba(255,90,20,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(mouth.x, mouth.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+      if (flare > 0) drawFire(ctx, mouth.x, mouth.y + 3, timeMs, 0.6 + flare * 0.6, 23);
+    }
+    for (const key of ["smoke1", "smoke2"]) {
+      const a = sprite.anchor(key);
+      if (!a) continue;
+      drawSmokeColumn(ctx, a.x, a.y, timeMs, 0.38 + stage * 0.03, key.length * 7 + 3);
+      drawEmbers(ctx, a.x, a.y, timeMs, 2 + Math.floor(stage / 2), key.length * 5);
+    }
+    return;
+  }
+
+  if (type === "STORMCALLER") {
+    const orb = sprite.anchor("orb") ?? { x: 0, y: -34 };
+    const flare = attackFlashMs < 200 ? 1 - attackFlashMs / 200 : 0;
+    const charge = Math.min(1, _readiness);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const r = 7 + stage * 0.8 + charge * 3 + flare * 8;
+    const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, r);
+    g.addColorStop(0, `rgba(240,220,255,${0.5 + 0.3 * charge + 0.3 * flare})`);
+    g.addColorStop(0.5, "rgba(170,90,255,0.25)");
+    g.addColorStop(1, "rgba(170,90,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Crackling arcs from the orb to the copper rod tips.
+    const jag = (x0: number, y0: number, x1: number, y1: number, seed: number) => {
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      for (let k = 1; k <= 5; k++) {
+        const t = k / 5;
+        const n = Math.sin(seed * 12.9898 + k * 78.233 + Math.floor(timeMs / 70)) * 43758.5453;
+        const j = (n - Math.floor(n) - 0.5) * 3;
+        ctx.lineTo(x0 + (x1 - x0) * t + j, y0 + (y1 - y0) * t + j * 0.5);
+      }
+      ctx.stroke();
+    };
+    for (let i = 0; i < 6; i++) {
+      const rod = sprite.anchor(`rod${i}`);
+      if (!rod) continue;
+      const live = Math.sin(timeMs / 160 + i * 2.3) > 0.55 - charge * 0.6 || flare > 0;
+      if (!live) continue;
+      ctx.strokeStyle = `rgba(225,195,255,${0.55 + 0.4 * flare})`;
+      ctx.lineWidth = 0.6;
+      jag(orb.x, orb.y, rod.x, rod.y, i + 1);
+    }
+    // Stage 5+: sparks leaping between the tesla spikes on the dais.
+    for (let i = 0; i < 6; i++) {
+      const a = sprite.anchor(`spike${i}`);
+      const b = sprite.anchor(`spike${(i + 1) % 6}`);
+      if (!a || !b || Math.sin(timeMs / 230 + i * 1.7) < 0.75) continue;
+      ctx.strokeStyle = "rgba(210,170,255,0.6)";
+      ctx.lineWidth = 0.5;
+      jag(a.x, a.y, b.x, b.y, i + 11);
+    }
+    // Discharge: a bolt down through the pillar into the ground.
+    if (flare > 0) {
+      ctx.strokeStyle = `rgba(245,230,255,${flare})`;
+      ctx.lineWidth = 1.2;
+      jag(orb.x, orb.y, 0, 3, 31);
+    }
+    ctx.restore();
+    // Stage 4+: a small satellite orb circling the main one.
+    const sat = sprite.anchor("satellite");
+    if (sat) {
+      const a = timeMs / 900;
+      const x = sat.x + Math.cos(a) * 8;
+      const y = sat.y + Math.sin(a) * 3;
+      ctx.save();
+      ctx.globalAlpha = Math.sin(a) > -0.3 ? 1 : 0.5;
+      const sg = ctx.createRadialGradient(x, y, 0, x, y, 2.6);
+      sg.addColorStop(0, "rgba(255,240,255,1)");
+      sg.addColorStop(1, "rgba(170,90,255,0)");
+      ctx.fillStyle = sg;
+      ctx.beginPath();
+      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.beginPath();
+    ctx.ellipse(orb.x - 1.3, orb.y - 1.5, 1, 0.6, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   void level;
-  void theme;
 }
 
 function drawPlinth(ctx: CanvasRenderingContext2D): void {

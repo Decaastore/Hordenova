@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v50",
+    dateIso: "2026-10-28",
+    category: "TOWERS",
+    title: {
+      en: "All Four Towers Rebuilt in 3D",
+      ptBR: "As Quatro Torres Refeitas em 3D",
+    },
+    description: {
+      en: "Ironwood, Inferno, Frostborn and Stormcaller have been rebuilt as detailed 3D structures with real light, shadow and materials, keeping their familiar shapes. Each tower now has six visual stages (one every 10 levels) that get visibly grander as it levels up — the tower never gets bigger on screen, it gets richer. Stats are unchanged; skinned towers keep their current look for now.",
+      ptBR: "Ironwood, Inferno, Frostborn e Stormcaller foram refeitas como estruturas 3D detalhadas, com luz, sombra e materiais de verdade, mantendo os formatos que você já conhece. Cada torre agora tem seis estágios visuais (um a cada 10 níveis) que ficam visivelmente mais imponentes conforme ela sobe de nível — a torre nunca fica maior na tela, ela fica mais rica. Os atributos não mudaram; torres com skin continuam com o visual atual por enquanto.",
+    },
+    highlights: [
+      {
+        en: "Ironwood: a gnarled, iron-banded trunk with glowing sap veins and a ballista whose string visibly draws back before each shot; later stages add spikes, chains, bronze fittings, a war banner and an ancient crown of leaves.",
+        ptBR: "Ironwood: tronco retorcido com cintas de ferro, veios de seiva brilhando e uma balista cuja corda puxa para trás antes de cada tiro; os estágios seguintes trazem espinhos, correntes, peças de bronze, estandarte de guerra e uma coroa antiga de folhas.",
+      },
+      {
+        en: "Inferno: a riveted furnace with real fire roaring in its mouth, smoke and embers from the chimney, growing into a twin-chimney gilded furnace. Stormcaller: a banded stone pillar with copper lightning rods crackling to its storm orb, a satellite orb and tesla spikes at higher stages.",
+        ptBR: "Inferno: uma fornalha rebitada com fogo de verdade rugindo na boca, fumaça e brasas saindo da chaminé, até virar uma fornalha dourada de chaminé dupla. Stormcaller: pilar de pedra com para-raios de cobre estalando até o orbe de tempestade, com orbe satélite e espinhos de tesla nos estágios altos.",
+      },
+      {
+        en: "Frostborn: a slate obelisk holding an ice orb in iron claws, gaining ice crystals, glowing runes, orbiting runestones and finally a crown of ice.",
+        ptBR: "Frostborn: um obelisco de pedra segurando um orbe de gelo em garras de ferro, ganhando cristais de gelo, runas brilhando, pedras de runa girando em volta e, por fim, uma coroa de gelo.",
+      },
+    ],
+  },
+  {
     id: "v49",
     dateIso: "2026-10-28",
     category: "CONTENT",
