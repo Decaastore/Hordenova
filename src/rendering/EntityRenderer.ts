@@ -4315,15 +4315,20 @@ function drawInfernoFireball(
   progress: number,
   skin: TowerSkinDefinition | null = null,
 ): void {
-  const { from, to } = projectile;
+  let { from } = projectile;
+  const { to } = projectile;
   const accent = skin?.paletteOverride.accent ?? "#ffb35a";
   const primary = skin?.paletteOverride.primary ?? "#ff6a2e";
   // Special Attack (spec section 27) — "Firestorm": a visibly bigger,
   // slower-lofted fireball with a thicker ember trail, matching the much
   // larger burn radius it actually deals in CombatSystem's special block.
   const scale = projectile.isSpecial ? 1.9 : 1;
+  // Firestorm special: a meteor dropping from the sky onto the target
+  // instead of a lobbed shot from the tower (the explosion that follows is
+  // drawn by rendering/specialVfx.ts).
+  if (projectile.isSpecial) from = { x: to.x - 40, y: to.y - 150 };
   const dist = Math.hypot(to.x - from.x, to.y - from.y) || 1;
-  const arcHeight = Math.min(14, dist * 0.16) * (projectile.isSpecial ? 1.6 : 1);
+  const arcHeight = projectile.isSpecial ? 0 : Math.min(14, dist * 0.16);
   const midX = (from.x + to.x) / 2;
   const midY = (from.y + to.y) / 2 - arcHeight;
   const currentX = quadPoint(from.x, midX, to.x, progress);
@@ -4396,24 +4401,10 @@ function drawFrostbornBolt(
   // block), not a bolt travelling to one target — so instead of the normal
   // directional shard, this reads as an expanding ring of frost radiating
   // outward from the tower itself.
-  if (projectile.isSpecial) {
-    const maxRadius = 90;
-    const radius = maxRadius * Math.min(1, progress * 1.4);
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, 1 - progress) * 0.8;
-    ctx.strokeStyle = glowTint;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = Math.max(0, 1 - progress) * 0.35;
-    ctx.fillStyle = glowTint;
-    ctx.beginPath();
-    ctx.arc(from.x, from.y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-    return;
-  }
+  // The nova itself (sized to the tower's real range, with the ice-spike
+  // crown and frozen ground) is drawn by rendering/specialVfx.ts — the
+  // projectile has nothing of its own to show for this special.
+  if (projectile.isSpecial) return;
 
   const currentX = from.x + (to.x - from.x) * progress;
   const currentY = from.y + (to.y - from.y) * progress;

@@ -6,7 +6,7 @@ import type { TowerType } from "@/config/towerStats";
 import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
-import { getTowerStats } from "@/entities/Tower";
+import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
@@ -23,6 +23,9 @@ import {
 } from "./MapRenderer";
 import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower, getEnemyVfxProfile } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
+import { SpecialVfxLayer } from "./specialVfx";
+import { getTowerSpecialAtLevel } from "@/config/towerStats";
+import { INFERNO_SPECIAL } from "@/config/towerSpecials";
 import type { EnemyType } from "@/config/enemyStats";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { RunPhase } from "@/engine/types";
@@ -179,6 +182,11 @@ export function CanvasRenderer({
 
     let rafId: number;
     const vfx = new VfxManager();
+    // TOWER MAGIC VFX — see specialVfx.ts. `seenSpecialIds` makes each
+    // special projectile spawn its signature effect exactly once (rebuilt
+    // every frame from the live projectiles, so it never grows).
+    const specialVfx = new SpecialVfxLayer();
+    let seenSpecialIds = new Set<string>();
     let prevEnemies = new Map<string, PrevEnemyState>();
     let prevTowerLevels = new Map<string, number>();
     let prevTowerHp = new Map<string, number>();
@@ -297,6 +305,41 @@ export function CanvasRenderer({
       prevTowerHp = new Map(snapshot.towers.map((t) => [t.id, t.hp]));
       vfx.update(frameDt);
 
+      const liveSpecialIds = new Set<string>();
+      for (const projectile of snapshot.projectiles) {
+        if (!projectile.isSpecial) continue;
+        liveSpecialIds.add(projectile.id);
+        if (seenSpecialIds.has(projectile.id)) continue;
+        // The caster: nearest tower of the same type to the projectile's muzzle origin.
+        let caster = null as (typeof snapshot.towers)[number] | null;
+        let best = Infinity;
+        for (const t of snapshot.towers) {
+          if (t.type !== projectile.towerType) continue;
+          const d = distance(t.position, projectile.from);
+          if (d < best) {
+            best = d;
+            caster = t;
+          }
+        }
+        let radius = 0;
+        if (caster && projectile.towerType === "INFERNO") {
+          const special = getTowerSpecialAtLevel("INFERNO", caster.level, getEquippedSkinGameplayEffect(caster));
+          if (special.type === "INFERNO") radius = special.aoeRadius * INFERNO_SPECIAL.radiusMultiplier;
+        } else if (caster && projectile.towerType === "FROSTBORN") {
+          radius = getTowerStats(caster).range;
+        }
+        specialVfx.spawn({
+          type: projectile.towerType,
+          towerPosition: caster?.position ?? projectile.from,
+          from: projectile.from,
+          to: projectile.to,
+          chainTargets: projectile.chainTargets,
+          radius,
+        });
+      }
+      seenSpecialIds = liveSpecialIds;
+      specialVfx.update(frameDt);
+
       const { scale, offsetX, offsetY } = transformRef.current;
       const shake = vfx.getShakeOffset();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -336,6 +379,9 @@ export function CanvasRenderer({
           timestamp,
         );
       });
+
+      // Magic ground layer (rune circles, scorched crater, frozen ground) — under towers and enemies.
+      specialVfx.drawGround(ctx, timestamp);
 
       for (const tower of snapshot.towers) {
         const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
@@ -414,6 +460,8 @@ export function CanvasRenderer({
         if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
+      // Magic air layer (piercing lance, firestorm, frost nova, sky strikes) — over units, under damage numbers.
+      specialVfx.drawAir(ctx);
 
       // FASE 3 — death-collapse animations (spec section 11): drawn after
       // live enemies/projectiles so a fresh corpse never sits underneath

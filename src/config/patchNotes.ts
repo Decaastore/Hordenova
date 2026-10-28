@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v39",
+    dateIso: "2026-10-27",
+    category: "TOWERS",
+    title: {
+      en: "Every Tower's Special Attack Now Has Its Own Spell Effect",
+      ptBR: "A Magia de Cada Torre Agora Tem Seu Próprio Efeito Visual",
+    },
+    description: {
+      en: "Each tower's Special Attack used to look like a slightly bigger version of its normal shot. Now every one is a distinct spell you can recognize at a glance, and the effects cover exactly the area the attack really hits. Damage and timing are unchanged.",
+      ptBR: "A magia (Ataque Especial) de cada torre parecia só uma versão um pouco maior do tiro normal. Agora cada uma é um feitiço próprio, reconhecível de relance, e os efeitos cobrem exatamente a área que o ataque realmente atinge. Dano e tempo de recarga não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Ironwood — Piercing Shot: a golden lance tears straight through the target and keeps going, with a shockwave and armor shards where it punches through.",
+        ptBR: "Ironwood — Tiro Perfurante: uma lança dourada atravessa o alvo e segue em frente, com onda de choque e estilhaços de armadura no ponto do impacto.",
+      },
+      {
+        en: "Inferno — Firestorm: a meteor drops from the sky, a ring of fire sweeps out to the real blast radius, and a smouldering crater full of embers lingers.",
+        ptBR: "Inferno — Tempestade de Fogo: um meteoro cai do céu, um anel de fogo se espalha até o raio real da explosão e fica uma cratera ardendo em brasas.",
+      },
+      {
+        en: "Frostborn — Absolute Zero: a frost nova sweeps out to the tower's range, leaving frozen ground, a crown of ice spikes and a turning snowflake sigil for as long as the freeze lasts.",
+        ptBR: "Frostborn — Zero Absoluto: uma nova de gelo se expande até o alcance da torre, deixando o chão congelado, uma coroa de espinhos de gelo e um selo de floco de neve girando enquanto o congelamento dura.",
+      },
+      {
+        en: "Stormcaller — Chain Overload: lightning slams down from the sky onto every enemy in the chain, one after another, with electric shockwaves on the ground.",
+        ptBR: "Stormcaller — Sobrecarga em Cadeia: raios caem do céu sobre cada inimigo da corrente, um após o outro, com ondas elétricas no chão.",
+      },
+      {
+        en: "Whenever a tower casts its Special Attack, a rune circle in its color lights up under it.",
+        ptBR: "Sempre que uma torre lança sua magia, um círculo de runas na cor dela se acende sob a torre.",
+      },
+    ],
+  },
+  {
     id: "v38",
     dateIso: "2026-10-27",
     category: "INTERFACE",
