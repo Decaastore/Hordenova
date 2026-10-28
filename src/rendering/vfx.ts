@@ -62,6 +62,16 @@ interface Ring {
 }
 
 const MAX_FLOATING_TEXTS = 24;
+/** Of those, how many can be damage numbers (HIT/DOT) at once — see pushFloatingText's importance-based eviction. */
+const MAX_DAMAGE_TEXTS = 14;
+
+/** "-412", "-2939", but "-12.8K" / "-3.4M" once numbers get long, so late-wave hits stay short enough to read at a glance. */
+export function formatDamageAmount(amount: number): string {
+  const n = Math.round(amount);
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1)}M`;
+  if (n >= 10_000) return `${(n / 1000).toFixed(n >= 100_000 ? 0 : 1)}K`;
+  return String(n);
+}
 // CREATURE VFX & IMPACT PASS — bumped from 16: material hits/deaths now fire
 // for every creature (not just the Crawler proof piece), so a busy 30-50
 // enemy scene needs a bit more headroom. Still a hard, small cap — combined
@@ -209,8 +219,8 @@ export class VfxManager {
   }
 
   private fontSizeFor(kind: "HIT" | "DOT" | "OTHER", isCrit: boolean): number {
-    if (kind === "DOT") return 10;
-    return isCrit ? 17 : 13;
+    if (kind === "DOT") return 11;
+    return isCrit ? 20 : 14;
   }
 
   /**
@@ -241,7 +251,7 @@ export class VfxManager {
       if (existing) {
         existing.amount += amount;
         existing.isCrit = existing.isCrit || isCrit;
-        existing.text = `-${Math.round(existing.amount)}`;
+        existing.text = `-${formatDamageAmount(existing.amount)}`;
         existing.color = this.colorFor(kind, existing.isCrit);
         existing.fontSizePx = this.fontSizeFor(kind, existing.isCrit);
         existing.x = position.x + offsetX;
@@ -255,7 +265,7 @@ export class VfxManager {
     this.pushFloatingText({
       x: position.x + offsetX,
       y: position.y - 12 + offsetY,
-      text: `-${Math.round(amount)}`,
+      text: `-${formatDamageAmount(amount)}`,
       color: this.colorFor(kind, isCrit),
       remainingMs: totalMs,
       totalMs,
@@ -571,8 +581,47 @@ export class VfxManager {
   }
 
   private pushFloatingText(entry: FloatingText): void {
+    if (entry.kind !== "OTHER") this.declutter(entry);
     this.floatingTexts.push(entry);
+    // VISUAL POLISH (fase 260 feedback) — a clumped horde used to produce a
+    // wall of overlapping numbers. Damage numbers now have their own, lower
+    // on-screen budget, and when it's exceeded the LEAST important one (the
+    // smallest non-crit amount) is dropped instead of simply the oldest, so
+    // the big hits and crits are the ones that stay readable.
+    const damageTexts = this.floatingTexts.filter((t) => t.kind !== "OTHER");
+    if (damageTexts.length > MAX_DAMAGE_TEXTS) {
+      let weakest: FloatingText | null = null;
+      for (const t of damageTexts) {
+        if (t === entry) continue;
+        const score = t.amount * (t.isCrit ? 4 : 1);
+        if (!weakest || score < weakest.amount * (weakest.isCrit ? 4 : 1)) weakest = t;
+      }
+      if (weakest) this.floatingTexts.splice(this.floatingTexts.indexOf(weakest), 1);
+    }
     if (this.floatingTexts.length > MAX_FLOATING_TEXTS) this.floatingTexts.shift();
+  }
+
+  /**
+   * Nudges a new damage number out of any still-young number it would
+   * overlap (enemies walking in a tight clump all get hit at once), by
+   * stacking it upward and slightly sideways — so every number in a burst
+   * stays individually legible instead of printing on top of each other.
+   */
+  private declutter(entry: FloatingText): void {
+    const w = entry.text.length * entry.fontSizePx * 0.6;
+    const h = entry.fontSizePx * 1.05;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      const blocker = this.floatingTexts.find((t) => {
+        if (t.kind === "OTHER" || t.remainingMs < t.totalMs * 0.35) return false;
+        const tw = t.text.length * t.fontSizePx * 0.6;
+        const th = t.fontSizePx * 1.05;
+        return Math.abs(t.x - entry.x) < (w + tw) / 2 && Math.abs(t.y - entry.y) < (h + th) / 2;
+      });
+      if (!blocker) return;
+      // Always strictly upward (plus a 1px gap) so the same blocker can never be re-found and the loop always makes progress.
+      entry.y = Math.min(entry.y, blocker.y - (blocker.fontSizePx * 1.05 + h) / 2 - 1);
+      entry.x += (attempt % 2 === 0 ? 1 : -1) * w * 0.12;
+    }
   }
 
   private pushBurst(entry: Burst): void {
@@ -666,13 +715,22 @@ export class VfxManager {
       const alphaMul = t.kind === "DOT" ? 0.85 : 1;
       ctx.save();
       ctx.globalAlpha = Math.min(1, (1 - progress) * 1.6) * alphaMul;
-      ctx.font = `bold ${t.fontSizePx}px system-ui, sans-serif`;
+      ctx.font = `800 ${t.fontSizePx}px system-ui, sans-serif`;
       ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.lineJoin = "round";
       ctx.translate(t.x, t.y - eased * rise);
       ctx.scale(pop, pop);
-      ctx.lineWidth = t.kind === "DOT" ? 2 : 3;
-      ctx.strokeStyle = "rgba(10,8,5,0.85)";
+      // VISUAL POLISH — thick dark outline (3 -> 4.5px) so numbers stay
+      // legible over glowing effects and bright terrain; crits get a warm
+      // halo on top so they read as the "big moment" they are.
+      ctx.lineWidth = t.kind === "DOT" ? 3 : 4.5;
+      ctx.strokeStyle = "rgba(8,5,3,0.92)";
       ctx.strokeText(t.text, 0, 0);
+      if (t.isCrit && t.kind === "HIT") {
+        ctx.shadowColor = "rgba(255,190,60,0.85)";
+        ctx.shadowBlur = 8;
+      }
       ctx.fillStyle = t.color;
       ctx.fillText(t.text, 0, 0);
       ctx.restore();

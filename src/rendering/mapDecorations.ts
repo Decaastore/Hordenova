@@ -31,7 +31,9 @@ export type DecorationKind =
   | "GRASS"
   | "FLOWER"
   | "WATER"
-  | "TORCH";
+  | "TORCH"
+  /** Glowing ground crack in the biome's accent color (lava seams, frost fractures) — 2D-only, drawn flat on the terrain. */
+  | "FISSURE";
 
 export interface Decoration {
   kind: DecorationKind;
@@ -90,6 +92,7 @@ const DECORATION_FOOTPRINT_RADIUS: Record<DecorationKind, number> = {
   FLOWER: 5,
   WATER: 38,
   TORCH: 8,
+  FISSURE: 24,
 };
 
 function isClearOfPlayArea(point: Vector2, footprint: number): boolean {
@@ -125,6 +128,7 @@ const ALL_DECORATION_KINDS: readonly DecorationKind[] = [
   "FLOWER",
   "WATER",
   "TORCH",
+  "FISSURE",
 ];
 
 /** Deterministic string hash — turns a biome id into its own seed offset so two biomes never draw from the same point in the rng stream (e.g. two biomes that both skip TREE would otherwise generate byte-identical ROCK positions with the shared base seed). */
@@ -132,6 +136,39 @@ function hashSeed(id: string): number {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) | 0;
   return h;
+}
+
+/** Kinds that gather into clusters (outcrops, thickets, crystal beds) instead of spreading evenly. */
+const CLUSTERED_KINDS: ReadonlySet<DecorationKind> = new Set(["ROCK", "CRYSTAL", "GRASS", "FLOWER", "ROOT", "TREE", "RUIN"]);
+const CLUSTER_ANCHOR_COUNT = 7;
+const CLUSTER_SPREAD = 46;
+
+/** Cluster centers, each the more-peripheral of two random candidates — so clusters lean toward the map edges and frame the play area. */
+function pickClusterAnchors(rng: () => number): Vector2[] {
+  const cx = WORLD_SIZE.width / 2;
+  const cy = WORLD_SIZE.height / 2;
+  const peripheral = (p: Vector2) => Math.abs(p.x - cx) / cx + Math.abs(p.y - cy) / cy;
+  const anchors: Vector2[] = [];
+  for (let i = 0; i < CLUSTER_ANCHOR_COUNT; i++) {
+    const a = { x: rng() * WORLD_SIZE.width, y: rng() * WORLD_SIZE.height };
+    const b = { x: rng() * WORLD_SIZE.width, y: rng() * WORLD_SIZE.height };
+    anchors.push(peripheral(a) >= peripheral(b) ? a : b);
+  }
+  return anchors;
+}
+
+function samplePlacement(kind: DecorationKind, rng: () => number, anchors: readonly Vector2[]): Vector2 {
+  if (CLUSTERED_KINDS.has(kind) && rng() < 0.75) {
+    const anchor = anchors[Math.floor(rng() * anchors.length)]!;
+    // Approximate gaussian (sum of uniforms) around the anchor.
+    const gx = (rng() + rng() + rng() - 1.5) * CLUSTER_SPREAD * 1.4;
+    const gy = (rng() + rng() + rng() - 1.5) * CLUSTER_SPREAD;
+    return {
+      x: Math.max(0, Math.min(WORLD_SIZE.width, anchor.x + gx)),
+      y: Math.max(0, Math.min(WORLD_SIZE.height, anchor.y + gy)),
+    };
+  }
+  return { x: rng() * WORLD_SIZE.width, y: rng() * WORLD_SIZE.height };
 }
 
 function generate(biome: BiomeDefinition): Decoration[] {
@@ -142,18 +179,25 @@ function generate(biome: BiomeDefinition): Decoration[] {
     ALL_DECORATION_KINDS.map((kind) => [kind, biome.decorationWeights[kind] ?? 0]),
   ) as Record<DecorationKind, number>;
 
+  // VISUAL POLISH (fase 260 feedback) — "parece confete": every kind used
+  // to be sprinkled uniformly across the whole map, so small props read as
+  // noise competing with the combat. Most props now gather into a handful
+  // of per-biome clusters biased toward the map's outer margins (natural
+  // rock outcrops / thickets framing the play area), leaving breathing room
+  // where the fighting happens. Torches line the trail instead of floating
+  // in random spots. Still fully deterministic per biome.
+  const anchors = pickClusterAnchors(rng);
+
   (Object.entries(counts) as [DecorationKind, number][]).forEach(([kind, count]) => {
     let placed = 0;
     let attempts = 0;
-    while (placed < count && attempts < count * 40) {
+    while (placed < count && attempts < count * 60) {
       attempts++;
-      const point: Vector2 = {
-        x: rng() * WORLD_SIZE.width,
-        y: rng() * WORLD_SIZE.height,
-      };
+      const point = samplePlacement(kind, rng, anchors);
       const scale = 0.7 + rng() * 0.9;
       const footprint = DECORATION_FOOTPRINT_RADIUS[kind] * scale;
       if (!isClearOfPlayArea(point, footprint)) continue;
+      if (kind === "TORCH" && distanceToPolyline(point, ENEMY_PATH) > MIN_DISTANCE_FROM_PATH + footprint + 34) continue;
       if (overlapsExistingDecoration(point, footprint, decorations)) continue;
 
       decorations.push({

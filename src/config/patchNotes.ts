@@ -70,6 +70,49 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v38",
+    dateIso: "2026-10-27",
+    category: "INTERFACE",
+    title: {
+      en: "Visual Polish — Sharper Attacks, Readable Damage, Living Volcanic Wastes",
+      ptBR: "Polimento Visual — Ataques com Mais Impacto, Dano Legível e Terras Vulcânicas Vivas",
+    },
+    description: {
+      en: "A visual pass on the battlefield. Tower attacks no longer look like thin lines crossing the map, damage numbers stop piling on top of each other, the map now fills the whole screen, and the Volcanic Wastes finally look volcanic. Gameplay, damage and balance are unchanged — this is purely how the battle looks.",
+      ptBR: "Uma passada visual no campo de batalha. Os ataques das torres não parecem mais linhas finas cruzando o mapa, os números de dano param de se empilhar uns sobre os outros, o mapa agora preenche a tela inteira e as Terras Vulcânicas finalmente parecem vulcânicas. Jogabilidade, dano e balanceamento não mudaram — é só a aparência da batalha.",
+    },
+    highlights: [
+      {
+        en: "Every tower's attack has real body and glow: Ironwood fires bolts with a short glowing tail, Inferno's fireballs are bigger with an ember trail, Frostborn's ice shards leave a frost streak, and Stormcaller's lightning is thick, branching and bright. Every hit lands with a flash.",
+        ptBR: "O ataque de cada torre agora tem corpo e brilho: a Ironwood dispara virotes com um rastro curto e brilhante, as bolas de fogo da Inferno estão maiores e soltam brasas, os estilhaços da Frostborn deixam um rastro de gelo e o raio da Stormcaller é grosso, ramificado e intenso. Todo acerto termina com um clarão.",
+      },
+      {
+        en: "Damage numbers have a thick outline, stack neatly instead of overlapping when a whole group gets hit, show big numbers short (12.8K), and when the screen gets crowded the biggest hits and crits are the ones kept.",
+        ptBR: "Os números de dano têm contorno grosso, se empilham organizados em vez de se sobrepor quando um grupo inteiro é atingido, mostram números grandes de forma curta (12.8K) e, quando a tela fica cheia, os maiores acertos e críticos são os que permanecem.",
+      },
+      {
+        en: "Volcanic Wastes: glowing lava fissures, self-lit lava pools, torches standing upright along the trail (they used to lie sideways and look like flying arrows), and scenery grouped into outcrops instead of scattered like confetti.",
+        ptBR: "Terras Vulcânicas: fendas de lava brilhando, poças de lava com luz própria, tochas em pé ao longo da trilha (antes ficavam deitadas e pareciam flechas voando) e cenário agrupado em formações em vez de espalhado como confete.",
+      },
+      {
+        en: "Frozen Tundra: deeper, colder ice tones instead of a washed-out pastel lilac, plus glowing frost fractures in the ice.",
+        ptBR: "Tundra Congelada: tons de gelo mais profundos e frios no lugar do lilás pastel desbotado, além de rachaduras de gelo brilhantes.",
+      },
+      {
+        en: "The trail lost its dashed 'road marking' line and now has a darkened edge with a faint glow, so it stands out from the ground in every biome.",
+        ptBR: "A trilha perdeu a linha tracejada de 'faixa de estrada' e agora tem bordas escurecidas com um brilho sutil, destacando-se do chão em todos os biomas.",
+      },
+      {
+        en: "No more empty bars beside the map: the terrain continues to the edges of the screen.",
+        ptBR: "Sem mais faixas vazias ao lado do mapa: o terreno continua até as bordas da tela.",
+      },
+      {
+        en: "Enemies are drawn about 25% larger, Brutes no longer appear as a black blob, and tower level badges are smaller and dimmer until you select the tower.",
+        ptBR: "Os inimigos aparecem cerca de 25% maiores, os Brutos não aparecem mais como uma mancha preta e os indicadores de nível das torres ficaram menores e mais discretos até você selecionar a torre.",
+      },
+    ],
+  },
+  {
     id: "v37",
     dateIso: "2026-09-21",
     category: "SYSTEMS",

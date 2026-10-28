@@ -31,10 +31,15 @@ export interface Enemy3DDefinition {
  * live, not all at once.
  */
 export const ENEMY_3D_REGISTRY: Partial<Record<EnemyType, Enemy3DDefinition>> = {
-  BRUTE: {
-    Component: BruteCreature,
-    localHeight: 1.65,
-    worldHeight: 26,
-    shadowRadiusRatio: 0.3,
-  },
+  // VISUAL POLISH (fase 260 feedback) — BRUTE's 3D pilot is switched OFF:
+  // in the real game's lighting its dark materials render as a near-solid
+  // black blob (the reported "coisa preta" on enemies), clashing with every
+  // other creature's 2D art. Leaving the type out of this registry makes
+  // Enemy3DLayer skip it and BRUTE falls back to its normal 2D sprite — the
+  // exact fallback contract this registry was designed around. The entry
+  // below is kept (commented) so re-enabling after a lighting pass is one line.
+  // BRUTE: { Component: BruteCreature, localHeight: 1.65, worldHeight: 26, shadowRadiusRatio: 0.3 },
 };
+
+/** Kept referenced so the pilot's import (and its tree-shaken module) stays wired for an easy re-enable. */
+export const DISABLED_3D_PILOTS = { BRUTE: BruteCreature } as const;

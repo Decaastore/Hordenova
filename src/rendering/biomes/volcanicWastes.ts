@@ -47,11 +47,17 @@ export const VOLCANIC_WASTES: BiomeDefinition = {
     fogColor: "rgba(255,140,60,0.07)",
     vignette: "rgba(20,4,2,0.55)",
   },
+  // VISUAL POLISH (fase 260 feedback) — the map read as "marrom liso" with
+  // no volcano in it: fewer generic rocks/ruins, grass removed (it read as
+  // stray scratches on scorched ground), and real volcanic features added —
+  // glowing lava fissures plus a few self-lit lava pools.
+  liquidGlows: true,
   decorationWeights: {
-    ROCK: 24,
-    RUIN: 10,
-    CRYSTAL: 6,
-    GRASS: 3,
-    TORCH: 9,
+    ROCK: 16,
+    RUIN: 5,
+    CRYSTAL: 5,
+    TORCH: 8,
+    WATER: 3,
+    FISSURE: 12,
   },
 };

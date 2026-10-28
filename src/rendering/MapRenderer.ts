@@ -32,7 +32,17 @@ function hashPoint(x: number, y: number, seed: number): number {
   return n - Math.floor(n);
 }
 
-export function drawBackground(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+/** The world-space rectangle actually visible on screen (can extend past WORLD_SIZE on screens whose aspect ratio isn't 5:3 — the letterbox margins). */
+export interface VisibleBounds {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+const WORLD_BOUNDS: VisibleBounds = { x0: 0, y0: 0, x1: WORLD_SIZE.width, y1: WORLD_SIZE.height };
+
+export function drawBackground(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, bounds: VisibleBounds = WORLD_BOUNDS): void {
   const p = biome.palette;
   const gradient = ctx.createLinearGradient(0, 0, 0, WORLD_SIZE.height);
   gradient.addColorStop(0, p.skyTop);
@@ -40,18 +50,17 @@ export function drawBackground(ctx: CanvasRenderingContext2D, biome: BiomeDefini
   gradient.addColorStop(0.55, p.groundBase);
   gradient.addColorStop(1, p.groundShadowed);
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+  // Fills the whole visible area (letterbox margins included), not just the world rectangle, so there are never empty bars beside the map.
+  ctx.fillRect(bounds.x0, bounds.y0, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
 
   // Irregular ground-tone blotches, deterministic per-cell — this is what
   // stops the terrain from reading as a flat color swatch.
   const cell = 70;
-  const cols = Math.ceil(WORLD_SIZE.width / cell);
-  const rows = Math.ceil(WORLD_SIZE.height / cell);
   const blotchColors = [p.groundAccentA, p.groundAccentB, p.groundShadowed];
   ctx.save();
   ctx.globalAlpha = 0.22;
-  for (let cy = 0; cy < rows; cy++) {
-    for (let cx = 0; cx < cols; cx++) {
+  for (let cy = Math.floor(bounds.y0 / cell); cy < Math.ceil(bounds.y1 / cell); cy++) {
+    for (let cx = Math.floor(bounds.x0 / cell); cx < Math.ceil(bounds.x1 / cell); cx++) {
       const h = hashPoint(cx, cy, 4.1);
       if (h < 0.42) continue;
       const color = blotchColors[Math.floor(h * blotchColors.length) % blotchColors.length]!;
@@ -90,7 +99,7 @@ function drawTreeline(ctx: CanvasRenderingContext2D, yOffset: number, color: str
   ctx.restore();
 }
 
-export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
+export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, bounds: VisibleBounds = WORLD_BOUNDS): void {
   const cx = WORLD_SIZE.width / 2;
   const cy = WORLD_SIZE.height / 2;
   const radius = Math.max(WORLD_SIZE.width, WORLD_SIZE.height) * 0.78;
@@ -98,7 +107,8 @@ export function drawVignette(ctx: CanvasRenderingContext2D, biome: BiomeDefiniti
   gradient.addColorStop(0, "rgba(0,0,0,0)");
   gradient.addColorStop(1, biome.palette.vignette);
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+  // Covers the full visible area so the darkening continues smoothly into the letterbox margins instead of stopping in a hard seam at the world edge.
+  ctx.fillRect(bounds.x0, bounds.y0, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,7 +139,12 @@ export function drawDecorations(
     ctx.save();
     ctx.translate(deco.position.x, deco.position.y);
     if (deco.kind !== "WATER") {
-      ctx.rotate(deco.rotation);
+      // VISUAL POLISH (fase 260 feedback) — torches were spun to a random
+      // angle like every other prop, so a pole+brazier+flame lying sideways
+      // read as an arrow flying across the map. Torches now always stand
+      // upright and crystals only lean a little.
+      if (deco.kind === "CRYSTAL") ctx.rotate((deco.rotation / Math.PI - 1) * 0.35);
+      else if (deco.kind !== "TORCH") ctx.rotate(deco.rotation);
       ctx.scale(deco.scale, deco.scale);
     }
 
@@ -161,9 +176,70 @@ export function drawDecorations(
       case "TORCH":
         drawTorch(ctx, timeMs, biome);
         break;
+      case "FISSURE":
+        drawFissure(ctx, deco, timeMs, biome);
+        break;
     }
     ctx.restore();
   }
+}
+
+/**
+ * FISSURE — a glowing crack in the ground (lava seam in Volcanic Wastes,
+ * frost fracture in Frozen Tundra): a dark split in the terrain with the
+ * biome's accent light bleeding out of it and slowly breathing. The shape
+ * is a deterministic jagged main crack with two side branches derived from
+ * the decoration's own variant, so every fissure differs but never changes
+ * between frames.
+ */
+function drawFissure(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: number, biome: BiomeDefinition): void {
+  const p = biome.palette;
+  const seed = deco.variant * 13.7 + deco.position.x * 0.31 + deco.position.y * 0.17;
+  const length = 46;
+  const main: Vector2[] = [];
+  const steps = 7;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    main.push({ x: -length / 2 + t * length, y: (hashPoint(i, 1, seed) - 0.5) * 9 * Math.sin(t * Math.PI) });
+  }
+  const branches: Vector2[][] = [];
+  for (let b = 0; b < 2; b++) {
+    const start = main[2 + b * 3]!;
+    const dir = b === 0 ? -1 : 1;
+    const branch: Vector2[] = [start];
+    for (let i = 1; i <= 3; i++) {
+      branch.push({ x: start.x + i * 4 + (hashPoint(b, i, seed) - 0.5) * 4, y: start.y + dir * i * 4.5 });
+    }
+    branches.push(branch);
+  }
+  const all = [main, ...branches];
+  const stroke = (pts: Vector2[]) => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0]!.x, pts[0]!.y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
+    ctx.stroke();
+  };
+  const breathe = 0.75 + 0.25 * Math.sin(timeMs / 900 + seed);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  // Scorched/darkened lip around the crack.
+  ctx.strokeStyle = hexToRgba(p.rockDark, 0.38);
+  ctx.lineWidth = 5;
+  all.forEach(stroke);
+  // Light bleeding out of it.
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba(p.accentGlow, 0.18 * breathe);
+  ctx.lineWidth = 9;
+  stroke(main);
+  ctx.strokeStyle = hexToRgba(p.accentGlow, 0.55 * breathe);
+  ctx.lineWidth = 2.4;
+  all.forEach(stroke);
+  ctx.strokeStyle = hexToRgba(p.accentWarm, 0.8 * breathe);
+  ctx.lineWidth = 0.9;
+  stroke(main);
+  ctx.restore();
 }
 
 export function drawTree(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition): void {
@@ -392,6 +468,44 @@ function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: 
   ctx.beginPath();
   ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  if (biome.liquidGlows) {
+    // Self-lit liquid (lava): a hot additive halo that slowly breathes, and
+    // a brighter molten center — no white water ripples or lily pad.
+    const breathe = 0.8 + 0.2 * Math.sin(timeMs / 1100 + deco.position.x);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const halo = ctx.createRadialGradient(0, 0, radiusY * 0.4, 0, 0, radiusX * 1.5);
+    halo.addColorStop(0, hexToRgba(p.accentGlow, 0.35 * breathe));
+    halo.addColorStop(1, hexToRgba(p.accentGlow, 0));
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radiusX * 1.5, radiusY * 1.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    const core = ctx.createRadialGradient(0, 0, 0, 0, 0, radiusX * 0.7);
+    core.addColorStop(0, hexToRgba(p.accentWarm, 0.7 * breathe));
+    core.addColorStop(1, hexToRgba(p.accentWarm, 0));
+    ctx.fillStyle = core;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radiusX * 0.7, radiusY * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    // Thin dark cooling-crust seams drifting slowly across the surface
+    // (slender arcs, not round spots — round blobs read as cartoon toppings).
+    ctx.strokeStyle = hexToRgba(p.rockDark, 0.5);
+    ctx.lineCap = "round";
+    ctx.lineWidth = 1.6;
+    for (let i = 0; i < 3; i++) {
+      const a = timeMs / 14000 + i * 2.1 + deco.variant;
+      const sx = Math.cos(a) * radiusX * 0.45;
+      const sy = Math.sin(a) * radiusY * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(sx - 7, sy);
+      ctx.quadraticCurveTo(sx, sy - 3 + i, sx + 7, sy + 1);
+      ctx.stroke();
+    }
+    return;
+  }
 
   ctx.strokeStyle = "rgba(255,255,255,0.22)";
   ctx.lineWidth = 1.2;
@@ -627,12 +741,28 @@ export function drawPath(
   const fill = buildOrganicRoad(path, PATH_VISUAL_WIDTH, 0, ROAD_SEED);
   if (!skipFill) fillRibbon(ctx, fill.left, fill.right);
 
-  // Worn centerline rut, following the same curve.
+  // VISUAL POLISH (fase 260 feedback) — the centerline used to be a dashed
+  // stroke, which read as a highway lane marking. It's now a soft,
+  // continuous worn band (wide + faint, then a narrower brighter core), and
+  // the trail gets a darkened lip plus a faint accent-colored edge light so
+  // it separates clearly from the surrounding ground in every biome.
   ctx.strokeStyle = p.roadRut;
-  ctx.lineWidth = 2.4;
-  ctx.setLineDash([9, 13]);
+  ctx.globalAlpha = 0.22;
+  ctx.lineWidth = 16;
   strokeSmoothedCenterline(ctx, fill.smoothed);
-  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+
+  ctx.strokeStyle = hexToRgba(p.roadEdge, 0.7);
+  ctx.lineWidth = 3.2;
+  strokeSmoothedCenterline(ctx, fill.left);
+  strokeSmoothedCenterline(ctx, fill.right);
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgba(p.accentGlow, 0.16);
+  ctx.lineWidth = 1.4;
+  strokeSmoothedCenterline(ctx, fill.left);
+  strokeSmoothedCenterline(ctx, fill.right);
+  ctx.restore();
 
   drawRoadSurfaceDetail(ctx, fill, biome);
   drawRoadEdgeGrowth(ctx, fill, biome);

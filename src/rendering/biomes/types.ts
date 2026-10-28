@@ -85,4 +85,6 @@ export interface BiomeDefinition {
   atmosphere: AtmosphereKind;
   /** How many of each decoration kind to scatter — a biome can omit a kind entirely (e.g. no WATER in a desert). */
   decorationWeights: Partial<Record<DecorationKind, number>>;
+  /** When true, WATER pools are drawn as a self-lit liquid (lava, glowing ooze) — an additive glow halo and a slow pulse instead of a reflective water surface. */
+  liquidGlows?: boolean;
 }

@@ -340,21 +340,26 @@ export function drawTower(
   // stays legible against a light-colored ground tile without needing to
   // make the badge itself any bigger — it's meant to stay secondary to the
   // tower/weapon, never competing with them for attention.
+  // VISUAL POLISH (fase 260 feedback) — a bright badge on every tower read
+  // as clutter across the whole map. It's now smaller and dimmed, and only
+  // returns to full size/brightness on the selected tower.
   ctx.save();
-  ctx.translate(tower.position.x + 18 * visualScale, tower.position.y + 19 * visualScale);
+  ctx.translate(tower.position.x + 17 * visualScale, tower.position.y + 18 * visualScale);
+  const badgeR = selected ? 7 : 5.6;
+  ctx.globalAlpha = selected ? 1 : 0.62;
   ctx.beginPath();
-  ctx.arc(0.4, 0.6, 7, 0, Math.PI * 2);
+  ctx.arc(0.4, 0.6, badgeR, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(0,0,0,0.35)";
   ctx.fill();
   ctx.beginPath();
-  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  ctx.arc(0, 0, badgeR, 0, Math.PI * 2);
   ctx.fillStyle = "rgba(35,23,14,0.92)";
   ctx.fill();
   ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1.2;
+  ctx.lineWidth = selected ? 1.2 : 0.8;
   ctx.stroke();
   ctx.fillStyle = "#fdf6e8";
-  ctx.font = "bold 9px system-ui, sans-serif";
+  ctx.font = `bold ${selected ? 9 : 7}px system-ui, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String(stats.level), 0, 0.5);
@@ -2848,6 +2853,8 @@ export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstan
 /** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
 /** Local hex->rgba helper (mirrors MapRenderer.ts's own private one) — only used for CHEFE MAIOR's per-biome aura tint below. */
 function hexToRgbaLocal(hex: string, alpha: number): string {
+  // Only #rrggbb is convertible; anything else (an rgba() string from a skin palette) is passed through as-is rather than producing NaN colors.
+  if (hex.length !== 7 || hex[0] !== "#") return hex;
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
   const b = parseInt(hex.slice(5, 7), 16);
@@ -4264,12 +4271,25 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
       break;
   }
 
+  // Impact stamp — VISUAL POLISH: a soft additive flash that blooms in as
+  // the shot lands (was a flat solid dot sitting on the target from frame 1).
   ctx.save();
+  const landing = progress > 0.75 ? (progress - 0.75) / 0.25 : 0;
+  if (landing > 0) {
+    const flashR = (projectile.isSpecial ? 16 : 9) * (0.6 + landing * 0.6);
+    const flash = ctx.createRadialGradient(projectile.to.x, projectile.to.y, 0, projectile.to.x, projectile.to.y, flashR);
+    flash.addColorStop(0, "rgba(255,255,255,0.75)");
+    flash.addColorStop(0.35, hexToRgbaLocal(theme.accent, 0.55));
+    flash.addColorStop(1, hexToRgbaLocal(theme.accent, 0));
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = Math.sin(landing * Math.PI);
+    ctx.fillStyle = flash;
+    ctx.beginPath();
+    ctx.arc(projectile.to.x, projectile.to.y, flashR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
+  }
   ctx.globalAlpha = Math.max(1 - progress * 1.4, 0);
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.arc(projectile.to.x, projectile.to.y, projectile.isSpecial ? 8 : 4, 0, Math.PI * 2);
-  ctx.fill();
   // Special Attack (spec section 27): an extra ring stamp at impact so a
   // special always reads as visibly bigger than a normal hit, even for
   // towers whose own impact dot barely changes size.
@@ -4312,27 +4332,42 @@ function drawInfernoFireball(
   // Ember trail: a handful of fading dots along the path just behind the
   // fireball's current position — reads as heat streaming off it in flight.
   ctx.save();
-  for (let i = 1; i <= (projectile.isSpecial ? 7 : 4); i++) {
-    const trailT = Math.max(0, progress - i * 0.05);
+  ctx.globalCompositeOperation = "lighter";
+  const emberCount = projectile.isSpecial ? 9 : 6;
+  for (let i = 1; i <= emberCount; i++) {
+    const trailT = Math.max(0, progress - i * 0.035);
     const tx = quadPoint(from.x, midX, to.x, trailT);
     const ty = quadPoint(from.y, midY, to.y, trailT);
-    ctx.globalAlpha = Math.max(0, 0.5 - i * 0.11);
+    ctx.globalAlpha = Math.max(0, 0.7 - i * 0.1);
     ctx.fillStyle = i % 2 === 0 ? accent : primary;
     ctx.beginPath();
-    ctx.arc(tx, ty, (2.6 - i * 0.25) * scale, 0, Math.PI * 2);
+    ctx.arc(tx, ty, Math.max(0.6, 4.2 - i * 0.5) * scale, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 
   // The fireball itself: hot white core, orange corona — retinted to the
   // equipped skin's own accent/primary (e.g. toxic green, solar white).
+  // VISUAL POLISH (fase 260 feedback) — radius 3.6 -> 6 plus an additive
+  // outer corona, so the shot reads at real zoom instead of a speck.
   ctx.save();
-  const impactGrow = progress > 0.88 ? (progress - 0.88) / 0.12 : 0;
-  const radius = (3.6 + impactGrow * 5) * scale;
+  const impactGrow = progress > 0.85 ? (progress - 0.85) / 0.15 : 0;
+  const radius = (6 + impactGrow * 9) * scale;
+  ctx.globalCompositeOperation = "lighter";
+  const corona = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, radius * 2.2);
+  corona.addColorStop(0, hexToRgbaLocal(primary, 0.45));
+  corona.addColorStop(1, hexToRgbaLocal(primary, 0));
+  ctx.fillStyle = corona;
+  ctx.globalAlpha = 1 - impactGrow * 0.6;
+  ctx.beginPath();
+  ctx.arc(currentX, currentY, radius * 2.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
   const coreGrad = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, radius);
-  coreGrad.addColorStop(0, "#fff4d8");
-  coreGrad.addColorStop(0.4, accent);
-  coreGrad.addColorStop(1, "rgba(255,106,46,0)");
+  coreGrad.addColorStop(0, "#fff8e6");
+  coreGrad.addColorStop(0.35, accent);
+  coreGrad.addColorStop(0.75, primary);
+  coreGrad.addColorStop(1, hexToRgbaLocal(primary, 0));
   ctx.fillStyle = coreGrad;
   ctx.globalAlpha = 1 - impactGrow * 0.5;
   ctx.beginPath();
@@ -4383,22 +4418,52 @@ function drawFrostbornBolt(
   const currentX = from.x + (to.x - from.x) * progress;
   const currentY = from.y + (to.y - from.y) * progress;
 
-  // Freezing trail: a thin, fading crystalline line behind the bolt.
+  // Freezing trail — VISUAL POLISH (fase 260 feedback): used to be a thin
+  // line from the tower all the way to the bolt (read as a debug ray). Now
+  // a short, tapering frost streak behind the shard plus a few crystal
+  // flecks, additive so it glows cold against the dark ground.
+  const trailT0 = Math.max(0, progress - 0.2);
+  const tailX = from.x + (to.x - from.x) * trailT0;
+  const tailY = from.y + (to.y - from.y) * trailT0;
   ctx.save();
-  ctx.strokeStyle = "rgba(190,240,255,0.55)";
-  ctx.lineWidth = 1.6;
-  ctx.globalAlpha = 1 - progress * 0.3;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  const streak = ctx.createLinearGradient(tailX, tailY, currentX, currentY);
+  streak.addColorStop(0, hexToRgbaLocal(glowTint, 0));
+  streak.addColorStop(1, hexToRgbaLocal(glowTint, 0.7));
+  ctx.strokeStyle = streak;
+  ctx.lineWidth = 3.4;
   ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
+  ctx.moveTo(tailX, tailY);
   ctx.lineTo(currentX, currentY);
   ctx.stroke();
+  ctx.fillStyle = hexToRgbaLocal(glowTint, 0.8);
+  for (let i = 1; i <= 3; i++) {
+    const ft = Math.max(0, progress - i * 0.06);
+    const side = i % 2 === 0 ? 1 : -1;
+    const fx = from.x + (to.x - from.x) * ft - ((to.y - from.y) / (Math.hypot(to.x - from.x, to.y - from.y) || 1)) * 2.2 * side;
+    const fy = from.y + (to.y - from.y) * ft + ((to.x - from.x) / (Math.hypot(to.x - from.x, to.y - from.y) || 1)) * 2.2 * side;
+    ctx.globalAlpha = 0.8 - i * 0.2;
+    ctx.beginPath();
+    ctx.arc(fx, fy, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const halo = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 10);
+  halo.addColorStop(0, hexToRgbaLocal(glowTint, 0.6));
+  halo.addColorStop(1, hexToRgbaLocal(glowTint, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(currentX, currentY, 10, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
-  // The bolt itself: a small elongated shard oriented along its travel direction.
+  // The bolt itself: an elongated shard oriented along its travel direction (1.8x the old size).
   const angle = Math.atan2(to.y - from.y, to.x - from.x);
   ctx.save();
   ctx.translate(currentX, currentY);
   ctx.rotate(angle);
+  ctx.scale(1.8, 1.8);
   const shardGrad = ctx.createLinearGradient(-5, 0, 3, 0);
   shardGrad.addColorStop(0, "rgba(220,249,255,0)");
   shardGrad.addColorStop(1, accent);
@@ -4418,12 +4483,21 @@ function drawFrostbornBolt(
     const t = (progress - 0.85) / 0.15;
     ctx.save();
     ctx.globalAlpha = 1 - t;
+    ctx.globalCompositeOperation = "lighter";
+    const flash = ctx.createRadialGradient(to.x, to.y, 0, to.x, to.y, 14);
+    flash.addColorStop(0, hexToRgbaLocal(glowTint, 0.55));
+    flash.addColorStop(1, hexToRgbaLocal(glowTint, 0));
+    ctx.fillStyle = flash;
+    ctx.beginPath();
+    ctx.arc(to.x, to.y, 14, 0, Math.PI * 2);
+    ctx.fill();
     ctx.strokeStyle = glowTint;
-    ctx.lineWidth = 1.2;
-    const shardCount = 5;
+    ctx.lineWidth = 2;
+    ctx.lineCap = "round";
+    const shardCount = 6;
     for (let i = 0; i < shardCount; i++) {
-      const a = (i / shardCount) * Math.PI * 2;
-      const r = 2 + t * 7;
+      const a = (i / shardCount) * Math.PI * 2 + 0.3;
+      const r = 3 + t * 11;
       ctx.beginPath();
       ctx.moveTo(to.x, to.y);
       ctx.lineTo(to.x + Math.cos(a) * r, to.y + Math.sin(a) * r);
@@ -4455,18 +4529,50 @@ function drawStormcallerBolt(
   // longer chain the CombatSystem special block actually resolves.
   const scale = projectile.isSpecial ? 2.2 : 1;
 
-  ctx.save();
-  ctx.strokeStyle = projectile.isSpecial ? "#f4faff" : theme.primary;
-  ctx.lineWidth = 2.2 * (0.5 + flashFade * 0.5) * scale;
-  ctx.globalAlpha = flashFade;
-  ctx.shadowColor = theme.glow;
-  ctx.shadowBlur = 6 * scale;
-
-  drawJaggedBolt(ctx, projectile.from, projectile.to);
+  // VISUAL POLISH (fase 260 feedback) — one jagged path per segment is
+  // generated per frame and stroked in three passes (wide additive glow,
+  // colored body, white-hot core) so the bolt has real thickness and
+  // energy instead of reading as a single thin line. Each segment also
+  // throws one short fork branch.
+  const segmentsToDraw: { a: { x: number; y: number }; b: { x: number; y: number } }[] = [
+    { a: projectile.from, b: projectile.to },
+  ];
   let originForChain = projectile.to;
   for (const target of projectile.chainTargets) {
-    drawJaggedBolt(ctx, originForChain, target);
+    segmentsToDraw.push({ a: originForChain, b: target });
     originForChain = target;
+  }
+  const paths = segmentsToDraw.map(({ a, b }) => jaggedBoltPoints(a, b));
+  const widthMul = (0.55 + flashFade * 0.45) * scale;
+
+  ctx.save();
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.globalAlpha = flashFade;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.strokeStyle = hexToRgbaLocal(theme.primary, 0.42);
+  ctx.lineWidth = 9 * widthMul;
+  for (const pts of paths) strokePolyline(ctx, pts);
+  ctx.globalCompositeOperation = "source-over";
+  ctx.strokeStyle = projectile.isSpecial ? "#f4faff" : theme.primary;
+  ctx.lineWidth = 3.4 * widthMul;
+  for (const pts of paths) strokePolyline(ctx, pts);
+  ctx.strokeStyle = "#f6f1ff";
+  ctx.lineWidth = 1.1 * widthMul;
+  for (const pts of paths) strokePolyline(ctx, pts);
+  // Forks: one short side-branch per segment, off a random interior point.
+  ctx.strokeStyle = theme.primary;
+  ctx.lineWidth = 1.3 * widthMul;
+  for (const pts of paths) {
+    if (pts.length < 4) continue;
+    const base = pts[1 + Math.floor(Math.random() * (pts.length - 3))]!;
+    const fa = Math.random() * Math.PI * 2;
+    const fl = 6 + Math.random() * 8;
+    ctx.beginPath();
+    ctx.moveTo(base.x, base.y);
+    ctx.lineTo(base.x + Math.cos(fa) * fl * 0.5 + (Math.random() - 0.5) * 3, base.y + Math.sin(fa) * fl * 0.5 + (Math.random() - 0.5) * 3);
+    ctx.lineTo(base.x + Math.cos(fa) * fl, base.y + Math.sin(fa) * fl);
+    ctx.stroke();
   }
   ctx.restore();
 
@@ -4492,25 +4598,28 @@ function drawStormcallerBolt(
   }
 }
 
-function drawJaggedBolt(
-  ctx: CanvasRenderingContext2D,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): void {
-  const segments = 5;
+/** Jagged lightning polyline between two points — re-randomized every frame for an authentic crackle. Segment count scales with distance so long bolts stay jagged instead of stretching into straight lines. */
+function jaggedBoltPoints(from: { x: number; y: number }, to: { x: number; y: number }): { x: number; y: number }[] {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
-  const nx = -dy;
-  const ny = dx;
-  const len = Math.hypot(nx, ny) || 1;
-  ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
+  const len = Math.hypot(dx, dy) || 1;
+  const segments = Math.max(4, Math.min(12, Math.round(len / 14)));
+  const nx = -dy / len;
+  const ny = dx / len;
+  const points = [{ x: from.x, y: from.y }];
   for (let i = 1; i < segments; i++) {
     const t = i / segments;
-    const jitter = (Math.random() - 0.5) * 6;
-    ctx.lineTo(from.x + dx * t + (nx / len) * jitter, from.y + dy * t + (ny / len) * jitter);
+    const jitter = (Math.random() - 0.5) * 11;
+    points.push({ x: from.x + dx * t + nx * jitter, y: from.y + dy * t + ny * jitter });
   }
-  ctx.lineTo(to.x, to.y);
+  points.push({ x: to.x, y: to.y });
+  return points;
+}
+
+function strokePolyline(ctx: CanvasRenderingContext2D, points: readonly { x: number; y: number }[]): void {
+  ctx.beginPath();
+  ctx.moveTo(points[0]!.x, points[0]!.y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i]!.x, points[i]!.y);
   ctx.stroke();
 }
 
@@ -4548,22 +4657,39 @@ function drawIronwoodArrow(
   const tangentY = 2 * (1 - progress) * (midY - from.y) + 2 * progress * (to.y - midY);
   const angle = Math.atan2(tangentY, tangentX);
 
+  // VISUAL POLISH (fase 260 feedback) — the trail used to be a thin line
+  // drawn all the way back to the tower, which at real zoom read as a
+  // debug ray crossing the map. It is now a short comet tail covering only
+  // the last stretch of the flight, thicker and additive so it glows.
+  const trailStart = Math.max(0, progress - 0.22);
+  const trailSteps = 6;
   ctx.save();
-  const trailGradient = ctx.createLinearGradient(from.x, from.y, currentX, currentY);
-  trailGradient.addColorStop(0, hexToRgbaLocal(trailColor, 0));
-  trailGradient.addColorStop(1, projectile.isSpecial ? "rgba(255,236,180,0.85)" : hexToRgbaLocal(trailColor, 0.6));
-  ctx.strokeStyle = trailGradient;
-  ctx.lineWidth = 1.4 * scale;
+  ctx.globalCompositeOperation = "lighter";
+  ctx.lineCap = "round";
+  for (let i = 0; i < trailSteps; i++) {
+    const t0 = trailStart + ((progress - trailStart) * i) / trailSteps;
+    const t1 = trailStart + ((progress - trailStart) * (i + 1)) / trailSteps;
+    const k = (i + 1) / trailSteps;
+    ctx.strokeStyle = projectile.isSpecial ? `rgba(255,236,180,${0.75 * k})` : hexToRgbaLocal(trailColor, 0.55 * k);
+    ctx.lineWidth = (0.8 + 2.4 * k) * scale;
+    ctx.beginPath();
+    ctx.moveTo(quadPoint(from.x, midX, to.x, t0), quadPoint(from.y, midY, to.y, t0));
+    ctx.lineTo(quadPoint(from.x, midX, to.x, t1), quadPoint(from.y, midY, to.y, t1));
+    ctx.stroke();
+  }
+  const headGlow = ctx.createRadialGradient(currentX, currentY, 0, currentX, currentY, 9 * scale);
+  headGlow.addColorStop(0, hexToRgbaLocal(trailColor, 0.55));
+  headGlow.addColorStop(1, hexToRgbaLocal(trailColor, 0));
+  ctx.fillStyle = headGlow;
   ctx.beginPath();
-  ctx.moveTo(from.x, from.y);
-  ctx.quadraticCurveTo(midX, midY, currentX, currentY);
-  ctx.stroke();
+  ctx.arc(currentX, currentY, 9 * scale, 0, Math.PI * 2);
+  ctx.fill();
   ctx.restore();
 
   ctx.save();
   ctx.translate(currentX, currentY);
   ctx.rotate(angle);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * 1.6, scale * 1.6);
   ctx.strokeStyle = "#5a3f22";
   ctx.lineWidth = 1.2;
   ctx.lineCap = "round";

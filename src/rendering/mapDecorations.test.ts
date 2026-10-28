@@ -31,6 +31,7 @@ const FOOTPRINT: Record<Decoration["kind"], number> = {
   FLOWER: 5,
   WATER: 38,
   TORCH: 8,
+  FISSURE: 24,
 };
 
 describe("mapDecorations — Floating Islands water duplication/overlap bug fix", () => {

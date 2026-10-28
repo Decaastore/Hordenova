@@ -29,6 +29,8 @@ import type { RunPhase } from "@/engine/types";
 import type { DecorationKind } from "./mapDecorations";
 
 const SLOT_HIT_RADIUS = 22;
+/** Global on-screen size multiplier for every enemy body (see the enemy draw loop). */
+const ENEMY_DISPLAY_SCALE = 1.25;
 const TOWER_HIT_RADIUS = 20;
 
 /**
@@ -301,8 +303,17 @@ export function CanvasRenderer({
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.setTransform(scale, 0, 0, scale, offsetX + shake.x * scale, offsetY + shake.y * scale);
 
+      // Visible world-space rectangle (letterbox margins included) — lets the
+      // background and vignette fill the whole screen instead of leaving
+      // empty bars beside the map on non-5:3 screens.
+      const visibleBounds = {
+        x0: -offsetX / scale,
+        y0: -offsetY / scale,
+        x1: (canvas.width - offsetX) / scale,
+        y1: (canvas.height - offsetY) / scale,
+      };
       const worldLayerOn = worldLayerActiveRef.current;
-      if (!worldLayerOn) drawBackground(ctx, biome);
+      if (!worldLayerOn) drawBackground(ctx, biome, visibleBounds);
       drawDecorations(ctx, biome, timestamp, worldLayerOn ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
       drawPath(ctx, ENEMY_PATH, biome, worldLayerOn);
       // ROLLBACK NOTE — this used to pass `worldLayerOn` as `skipCastleBody`
@@ -378,7 +389,10 @@ export function CanvasRenderer({
         if (enemy.boss) drawBossAura(ctx, enemy, timestamp, bossColor);
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = ARCHETYPE_VISUAL_SCALE[enemy.type] ?? 1;
-        const scale = enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale;
+        // VISUAL POLISH (fase 260 feedback) — regular creatures read as tiny
+        // specks next to the towers, so every tier renders ~25% larger; the
+        // relative hierarchy (regular < elite < mini-boss < boss) is kept.
+        const scale = ENEMY_DISPLAY_SCALE * (enemy.boss ? (enemy.boss.isMainBoss ? 1.9 : 1.4) : enemy.elite ? 1.3 : archetypeScale);
         const smoothedAngle = headingState.get(enemy.id);
         const rawAngleNow = Math.atan2(enemy.direction.y, enemy.direction.x);
         const turnRate =
@@ -437,7 +451,7 @@ export function CanvasRenderer({
 
       drawFog(ctx, biome, timestamp);
       drawAmbientParticles(ctx, biome, timestamp);
-      drawVignette(ctx, biome);
+      drawVignette(ctx, biome, visibleBounds);
 
       rafId = requestAnimationFrame(draw);
     };
@@ -604,7 +618,7 @@ export function detectVfxEvents(
         const isMainBoss = lastSeen.boss?.isMainBoss === true;
         const totalMs = lastSeen.boss ? (isMainBoss ? DEATH_ANIM_MS_BOSS : DEATH_ANIM_MS_MINIBOSS) : DEATH_ANIM_MS_REGULAR;
         const archetypeScale = ARCHETYPE_VISUAL_SCALE[prev.type] ?? 1;
-        const scale = lastSeen.boss ? (isMainBoss ? 1.9 : 1.4) : lastSeen.elite ? 1.3 : archetypeScale;
+        const scale = ENEMY_DISPLAY_SCALE * (lastSeen.boss ? (isMainBoss ? 1.9 : 1.4) : lastSeen.elite ? 1.3 : archetypeScale);
         deathAnimations.push({
           enemy: lastSeen,
           scale,

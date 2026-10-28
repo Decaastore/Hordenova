@@ -54,8 +54,16 @@ export function parseBiomeColor(css: string): THREE.Color {
   return new THREE.Color(css);
 }
 
-const GRID_COLS = 90;
-const GRID_ROWS = 54;
+// VISUAL POLISH (fase 260 feedback) — the ground used to cover exactly the
+// WORLD_SIZE rectangle, so on any screen whose aspect ratio differs from
+// 1000x600 the letterbox margins around the map showed as flat empty bars.
+// The ground now extends well past every edge (same ~11-unit cell size),
+// so the terrain simply continues to the edges of the screen; the 2D
+// vignette (drawn over the full visible area) darkens it naturally.
+const GROUND_MARGIN_X = 600;
+const GROUND_MARGIN_Y = 360;
+const GRID_COLS = 90 + Math.round((GROUND_MARGIN_X * 2) / (1000 / 90));
+const GRID_ROWS = 54 + Math.round((GROUND_MARGIN_Y * 2) / (600 / 54));
 
 /**
  * Ground mesh grid, built in the SAME "local unscaled ground" space as
@@ -78,9 +86,9 @@ export function buildGroundGeometry(palette: BiomePalette): THREE.BufferGeometry
   const tmp = new THREE.Color();
 
   for (let j = 0; j <= GRID_ROWS; j++) {
-    const worldY = (j / GRID_ROWS) * WORLD_SIZE.height;
+    const worldY = -GROUND_MARGIN_Y + (j / GRID_ROWS) * (WORLD_SIZE.height + GROUND_MARGIN_Y * 2);
     for (let i = 0; i <= GRID_COLS; i++) {
-      const worldX = (i / GRID_COLS) * WORLD_SIZE.width;
+      const worldX = -GROUND_MARGIN_X + (i / GRID_COLS) * (WORLD_SIZE.width + GROUND_MARGIN_X * 2);
       const elevation = terrainElevationAt(worldX, worldY);
       const [lx, , lz] = worldToLocalGround({ x: worldX, y: worldY });
       positions.push(lx, elevation, lz);
