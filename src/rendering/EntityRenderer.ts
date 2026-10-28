@@ -2809,7 +2809,7 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
       const puffRadius = 3.5 * intensity * (1 - phase);
       if (puffRadius <= 0.2) continue;
       const dist = 8 + phase * 5;
-      ctx.globalAlpha = ambientAlpha * 0.35 * (1 - phase);
+      ctx.globalAlpha = ambientAlpha * 0.18 * (1 - phase);
       ctx.fillStyle = "#c9b892";
       ctx.beginPath();
       ctx.arc(behindX * dist, behindY * dist + 4, puffRadius, 0, Math.PI * 2);
@@ -2902,11 +2902,13 @@ const ORIGINAL_ROSTER_SHADOW: Record<string, { radiusX: number; radiusY: number;
   DISABLER: { radiusX: 9.5, radiusY: 4, opacity: 0.3 },
 };
 
+// VISIBILITY PASS — the big flat pale discs these used to be covered whole
+// crowds of creatures; footfalls are now small, soft dust only for heavy
+// creatures and up.
 const FOOTSTEP_PARAMS: Partial<Record<CreatureWeightClass, { radius: number; alpha: number; strideLength: number }>> = {
-  MEDIUM: { radius: 5.5, alpha: 0.5, strideLength: 14 },
-  HEAVY: { radius: 8.5, alpha: 0.6, strideLength: 20 },
-  MINIBOSS: { radius: 13, alpha: 0.66, strideLength: 26 },
-  BOSS: { radius: 18, alpha: 0.7, strideLength: 32 },
+  HEAVY: { radius: 4.5, alpha: 0.26, strideLength: 20 },
+  MINIBOSS: { radius: 7, alpha: 0.3, strideLength: 26 },
+  BOSS: { radius: 10, alpha: 0.34, strideLength: 32 },
 };
 // VISUAL POLISH PASS — lightened from the first cut's darker, muddier tones
 // (e.g. CHARRED #5c4a3c), which sat at nearly the same luminance as most
@@ -2988,7 +2990,10 @@ function drawFootstepVfx(
     const py = behindY * behindDist + sideY * sideDist;
     ctx.save();
     ctx.globalAlpha = ambientAlpha * params.alpha * (1 - localPhase) * locomotion.speedRatio;
-    ctx.fillStyle = tint;
+    const dust = ctx.createRadialGradient(px, py, 0, px, py, puffRadius);
+    dust.addColorStop(0, tint);
+    dust.addColorStop(1, "rgba(0,0,0,0)");
+    ctx.fillStyle = dust;
     ctx.beginPath();
     ctx.arc(px, py, puffRadius, 0, Math.PI * 2);
     ctx.fill();
@@ -3160,19 +3165,25 @@ export function drawEnemy(
   ctx.restore();
 
   const paintedSprite = !enemy.boss && getEnemySprite(enemy.type) !== undefined;
+  // Status cues that never box the creature in: frost settling at its feet
+  // when slowed, small flames licking up from the ground when burning.
   if (enemy.slow && !paintedSprite) {
-    ctx.strokeStyle = "rgba(150,220,255,0.8)";
-    ctx.lineWidth = 1.5;
+    const frost = ctx.createRadialGradient(0, 7, 0, 0, 7, 12);
+    frost.addColorStop(0, "rgba(170,225,255,0.35)");
+    frost.addColorStop(1, "rgba(170,225,255,0)");
+    ctx.fillStyle = frost;
     ctx.beginPath();
-    ctx.arc(0, 0, 14, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.ellipse(0, 7, 12, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(230,248,255,0.85)";
+    for (let i = 0; i < 4; i++) {
+      const a = timeMs / 900 + i * 1.6;
+      ctx.fillRect(Math.cos(a) * 8 - 0.5, 6 + Math.sin(a) * 2.5 - 0.5, 1, 1);
+    }
   }
   if (enemy.burn && !paintedSprite) {
-    ctx.strokeStyle = "rgba(255,150,60,0.85)";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, 12, 0, Math.PI * 2);
-    ctx.stroke();
+    drawFire(ctx, -3, 8, timeMs, 0.22, 7);
+    drawFire(ctx, 4, 8, timeMs, 0.18, 9);
   }
 
   ctx.restore();
@@ -3204,6 +3215,9 @@ export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstan
     drawEliteHpBar(ctx, enemy);
     return;
   }
+  // VISIBILITY PASS — a full-health creature doesn't need a bar; a crowd of
+  // full green bars was pure clutter over the creatures themselves.
+  if (enemy.hp >= enemy.maxHp) return;
   if (enemy.type === "CRAWLER") drawHpBarPremium(ctx, enemy);
   else drawHpBar(ctx, enemy);
 }

@@ -63,7 +63,9 @@ interface Ring {
 
 const MAX_FLOATING_TEXTS = 24;
 /** Of those, how many can be damage numbers (HIT/DOT) at once — see pushFloatingText's importance-based eviction. */
-const MAX_DAMAGE_TEXTS = 14;
+const MAX_DAMAGE_TEXTS = 8;
+/** How far above the hit point (world units) a damage number appears — clear of the creature's body. */
+const DAMAGE_TEXT_LIFT = 22;
 
 /** "-412", "-2939", but "-12.8K" / "-3.4M" once numbers get long, so late-wave hits stay short enough to read at a glance. */
 export function formatDamageAmount(amount: number): string {
@@ -219,8 +221,10 @@ export class VfxManager {
   }
 
   private fontSizeFor(kind: "HIT" | "DOT" | "OTHER", isCrit: boolean): number {
-    if (kind === "DOT") return 11;
-    return isCrit ? 20 : 14;
+    // VISIBILITY PASS — numbers used to be big enough to bury the creature
+    // they belong to in a crowd; they're now compact and float above the head.
+    if (kind === "DOT") return 8;
+    return isCrit ? 14 : 10;
   }
 
   /**
@@ -255,16 +259,16 @@ export class VfxManager {
         existing.color = this.colorFor(kind, existing.isCrit);
         existing.fontSizePx = this.fontSizeFor(kind, existing.isCrit);
         existing.x = position.x + offsetX;
-        existing.y = position.y - 12 + offsetY;
+        existing.y = position.y - DAMAGE_TEXT_LIFT + offsetY;
         existing.remainingMs = existing.totalMs;
         return;
       }
     }
 
-    const totalMs = kind === "DOT" ? 550 : isCrit ? 750 : 650;
+    const totalMs = kind === "DOT" ? 450 : isCrit ? 650 : 520;
     this.pushFloatingText({
       x: position.x + offsetX,
-      y: position.y - 12 + offsetY,
+      y: position.y - DAMAGE_TEXT_LIFT + offsetY,
       text: `-${formatDamageAmount(amount)}`,
       color: this.colorFor(kind, isCrit),
       remainingMs: totalMs,
@@ -665,10 +669,10 @@ export class VfxManager {
       ctx.globalAlpha = 1 - progress;
 
       if (burst.hotCore) {
-        drawMagicCore(ctx, burst.x, burst.y, (1 - progress) * 16, burst.color);
+        drawMagicCore(ctx, burst.x, burst.y, (1 - progress) * 7, burst.color);
       }
 
-      const traveled = progress * 18;
+      const traveled = progress * 12;
       for (const p of burst.particles) {
         const dist = traveled * (p.speed / 40);
         const dirX = Math.cos(p.angle);
@@ -685,7 +689,7 @@ export class VfxManager {
         const midY = burst.y + dirY * midDist + perpY * (p.curve * midDist * 0.35);
 
         ctx.strokeStyle = burst.color;
-        ctx.lineWidth = burst.lineWidth ?? 1.4;
+        ctx.lineWidth = (burst.lineWidth ?? 1.4) * 0.7;
         ctx.beginPath();
         ctx.moveTo(burst.x, burst.y);
         ctx.quadraticCurveTo(midX, midY, px, py);
@@ -693,7 +697,7 @@ export class VfxManager {
 
         ctx.fillStyle = burst.hotCore ? "#fff6dd" : burst.color;
         ctx.beginPath();
-        ctx.arc(px, py, burst.dotRadius ?? 1.8, 0, Math.PI * 2);
+        ctx.arc(px, py, (burst.dotRadius ?? 1.8) * 0.7, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
@@ -711,8 +715,8 @@ export class VfxManager {
       // distance so they read as a lighter, secondary signal next to a
       // full tower hit.
       const eased = 1 - Math.pow(1 - progress, 3);
-      const rise = t.kind === "DOT" ? 20 : 28;
-      const alphaMul = t.kind === "DOT" ? 0.85 : 1;
+      const rise = t.kind === "DOT" ? 9 : 14;
+      const alphaMul = t.kind === "DOT" ? 0.75 : t.isCrit ? 1 : 0.9;
       ctx.save();
       ctx.globalAlpha = Math.min(1, (1 - progress) * 1.6) * alphaMul;
       ctx.font = `800 ${t.fontSizePx}px system-ui, sans-serif`;
@@ -724,12 +728,12 @@ export class VfxManager {
       // VISUAL POLISH — thick dark outline (3 -> 4.5px) so numbers stay
       // legible over glowing effects and bright terrain; crits get a warm
       // halo on top so they read as the "big moment" they are.
-      ctx.lineWidth = t.kind === "DOT" ? 3 : 4.5;
+      ctx.lineWidth = t.kind === "DOT" ? 2.2 : t.isCrit ? 3.4 : 2.8;
       ctx.strokeStyle = "rgba(8,5,3,0.92)";
       ctx.strokeText(t.text, 0, 0);
       if (t.isCrit && t.kind === "HIT") {
         ctx.shadowColor = "rgba(255,190,60,0.85)";
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 5;
       }
       ctx.fillStyle = t.color;
       ctx.fillText(t.text, 0, 0);

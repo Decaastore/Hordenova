@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v52",
+    dateIso: "2026-10-28",
+    category: "INTERFACE",
+    title: {
+      en: "Clearer Battlefield: Effects No Longer Hide Enemies",
+      ptBR: "Campo de Batalha Mais Limpo: Efeitos Não Escondem Mais os Inimigos",
+    },
+    description: {
+      en: "Combat feedback used to pile up on top of the creatures — big damage numbers, pale dust discs under every step and a health bar over every enemy. It's all been toned down so you can always see what's coming down the road. No gameplay changes.",
+      ptBR: "Os efeitos de combate se empilhavam em cima dos bichos — números de dano grandes, discos claros de poeira a cada passo e uma barra de vida em cima de todo inimigo. Tudo foi suavizado para você sempre enxergar o que está vindo pela estrada. Nada mudou na jogabilidade.",
+    },
+    highlights: [
+      {
+        en: "Damage numbers are smaller, appear above the creature's head instead of on its body, fade faster, and fewer are shown at once (crits still stand out).",
+        ptBR: "Os números de dano estão menores, aparecem acima da cabeça do bicho em vez de em cima do corpo, somem mais rápido e aparecem menos ao mesmo tempo (os críticos continuam se destacando).",
+      },
+      {
+        en: "Health bars only appear once an enemy has taken damage; elites and bosses keep theirs. Footstep dust is now a small soft puff, and only for heavy creatures.",
+        ptBR: "A barra de vida só aparece depois que o inimigo leva dano; elites e chefes continuam com a deles. A poeira dos passos agora é um sopro pequeno e suave, e só nos bichos pesados.",
+      },
+      {
+        en: "Hit flashes are smaller, and the rings drawn around slowed or burning enemies are replaced by frost at their feet and small flames licking up from the ground.",
+        ptBR: "Os clarões de impacto estão menores, e os anéis em volta de inimigos lentos ou pegando fogo viraram gelo nos pés e pequenas chamas subindo do chão.",
+      },
+    ],
+  },
+  {
     id: "v51",
     dateIso: "2026-10-28",
     category: "TOWERS",
