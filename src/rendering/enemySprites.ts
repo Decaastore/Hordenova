@@ -38,14 +38,29 @@ interface SpriteDef {
   bobAmp: number;
   /** Forward lean while moving, radians. */
   lean: number;
+  /** Whole-body side-to-side sway, fraction of width (the wave that runs down the body, head lagging behind). */
+  sway: number;
+  /** Opposite-phase swing of the two halves of the upper body (arms/shoulders, or front/back of a beast), fraction of width. */
+  limbSwing: number;
+  /** Weight shift: the two halves rise and fall alternately, fraction of height. */
+  weightShift: number;
+  /** Head nod (top of the sprite, delayed behind the step), fraction of height. */
+  headNod: number;
 }
 
 const SPRITE_DEFS: Partial<Record<EnemyType, SpriteDef>> = {
-  CRAWLER: { file: "crawler.png", worldHeight: 21, stride: 13, legSplit: 0.55, legSkew: 0.28, bobAmp: 0.9, lean: 0.03 },
-  RUNNER: { file: "runner.png", worldHeight: 27, stride: 24, legSplit: 0.5, legSkew: 0.32, bobAmp: 1.6, lean: 0.07 },
-  BRUTE: { file: "brute.png", worldHeight: 30, stride: 20, legSplit: 0.68, legSkew: 0.16, bobAmp: 1.3, lean: 0.03 },
-  SHIELDBEARER: { file: "shieldbearer.png", worldHeight: 29, stride: 17, legSplit: 0.72, legSkew: 0.18, bobAmp: 1.0, lean: 0.03 },
+  // Insect: little sway, strong alternating rise/fall of front vs back (tripod gait feel).
+  CRAWLER: { file: "crawler.png", worldHeight: 21, stride: 11, legSplit: 0.55, legSkew: 0.42, bobAmp: 1.2, lean: 0.04, sway: 0.02, limbSwing: 0.02, weightShift: 0.045, headNod: 0.02 },
+  // Sprinter: big bob, strong forward lean, body undulates hard.
+  RUNNER: { file: "runner.png", worldHeight: 27, stride: 22, legSplit: 0.5, legSkew: 0.5, bobAmp: 2.2, lean: 0.09, sway: 0.035, limbSwing: 0.03, weightShift: 0.04, headNod: 0.035 },
+  // Heavy biped: shoulders/fists swing opposite to the legs, weight rolls side to side, head nods late.
+  BRUTE: { file: "brute.png", worldHeight: 30, stride: 19, legSplit: 0.66, legSkew: 0.34, bobAmp: 1.8, lean: 0.05, sway: 0.03, limbSwing: 0.055, weightShift: 0.035, headNod: 0.03 },
+  // Marching biped behind a shield: steady march, shield arm swings less, body rocks.
+  SHIELDBEARER: { file: "shieldbearer.png", worldHeight: 29, stride: 16, legSplit: 0.7, legSkew: 0.34, bobAmp: 1.5, lean: 0.04, sway: 0.028, limbSwing: 0.035, weightShift: 0.03, headNod: 0.03 },
 };
+
+/** How high a foot lifts while it swings forward, as a fraction of the sprite's height. */
+const LEG_LIFT = 0.045;
 
 /** Where the sprite's feet sit relative to the enemy's position (fraction of its height below the anchor point). */
 const FOOT_ANCHOR = 0.36;
@@ -158,25 +173,89 @@ export function drawEnemySprite(
   const step = Math.sin(phase);
   const bob = -Math.abs(step) * def.bobAmp * gait;
   const breathe = Math.sin(timeMs / 520) * 0.018 * (1 - gait);
-  const squash = Math.cos(phase * 2) * 0.035 * gait;
-  const rock = Math.sin(phase) * 0.035 * gait;
+  const squash = Math.cos(phase * 2) * 0.05 * gait;
+  const rock = Math.sin(phase) * 0.06 * gait;
 
   const top = -h * (1 - FOOT_ANCHOR);
   const split = def.legSplit;
   const splitY = top + h * split;
 
+  // Legs are drawn as TWO independent halves (left/right of the image) in
+  // opposite phase — one foot swings forward and lifts while the other
+  // pushes back on the ground — so it reads as real alternating steps, not
+  // the whole lower body sliding as one piece. They're drawn first, from a
+  // little above the hip line, so the body slice drawn over them hides the
+  // joint.
+  const legTop = Math.max(0, split - 0.06);
+  const legSrcY = ih * legTop;
+  const legSrcH = ih * (1 - legTop);
+  const legDstY = top + h * legTop;
+  const legDstH = h * (1 - legTop);
+  const hipY = splitY;
+  const drawLegs = (src: CanvasImageSource) => {
+    for (let side = 0; side < 2; side++) {
+      const p = phase + side * Math.PI;
+      const swing = Math.sin(p) * def.legSkew * gait;
+      const lift = -Math.max(0, Math.cos(p)) * LEG_LIFT * h * gait;
+      const sx = side === 0 ? 0 : iw / 2 - 1;
+      const sw = iw / 2 + 1;
+      const dx = side === 0 ? -w / 2 : -0.5;
+      const dw = w / 2 + 0.5;
+      ctx.save();
+      ctx.translate(0, hipY);
+      ctx.transform(1, 0, swing, 1, 0, 0);
+      ctx.translate(0, lift - hipY);
+      ctx.drawImage(src, sx, legSrcY, sw, legSrcH, dx, legDstY, dw, legDstH);
+      ctx.restore();
+    }
+  };
+  // WHOLE-BODY MOTION — the body is drawn as a grid of horizontal bands,
+  // each split into a left and a right half, and every cell gets its own
+  // offset so the entire creature moves, not just its feet:
+  // - sway: a side-to-side wave travelling down the body, with the top
+  //   (head) lagging behind the hips — follow-through,
+  // - limb swing: the two halves of the upper body swing in OPPOSITE phase
+  //   to the legs (arms/shoulders, or front/back of a beast),
+  // - weight shift: the left and right halves rise and fall alternately as
+  //   the weight moves from one foot to the other,
+  // - head nod: the top of the sprite dips a beat after each footfall.
+  // Cells overlap by a pixel so no seams open up between them.
+  // The grid's columns get a CONTINUOUS offset across the body's width
+  // (left edge one way, right edge the other, smoothly in between), so the
+  // body bends and twists without ever tearing apart at a seam.
+  const BANDS = 6;
+  const COLS = 6;
+  const drawBody = (src: CanvasImageSource) => {
+    const sinP = Math.sin(phase);
+    for (let b = 0; b < BANDS; b++) {
+      const t0 = (b / BANDS) * split;
+      const t1 = ((b + 1) / BANDS) * split;
+      const t = (t0 + t1) / 2 / Math.max(0.01, split); // 0 = top of the head, 1 = hips
+      const sway = Math.sin(phase - (1 - t) * 1.1) * def.sway * w * gait;
+      const nod = t < 0.3 ? Math.cos(phase * 2 - 0.9) * def.headNod * h * gait * (1 - t / 0.3) : 0;
+      const limbWeight = Math.sin(Math.min(1, t) * Math.PI);
+      const sy = ih * t0;
+      const sh = ih * (t1 - t0) + 1;
+      const baseDy = top + h * t0 + nod;
+      const dh = h * (t1 - t0) + 0.6;
+      for (let c = 0; c < COLS; c++) {
+        const u = (c + 0.5) / COLS;
+        const k = Math.cos(u * Math.PI); // +1 at the left edge, -1 at the right edge, smooth in between
+        const swing = sinP * k * def.limbSwing * w * gait * limbWeight;
+        const shift = -sinP * k * def.weightShift * h * gait * (0.4 + 0.6 * t);
+        const sx = (iw * c) / COLS;
+        const sw = iw / COLS + 1;
+        const dx = -w / 2 + (w * c) / COLS + sway + swing;
+        const dw = w / COLS + 0.6;
+        ctx.drawImage(src, sx, sy, sw, sh, dx, baseDy + shift, dw, dh);
+      }
+    }
+  };
   const drawSlices = (src: CanvasImageSource, alpha: number) => {
     if (alpha <= 0) return;
     ctx.globalAlpha = alpha;
-    // Body slice (bobs and rocks with the stride).
-    ctx.drawImage(src, 0, 0, iw, ih * split + 1, -w / 2, top, w, h * split + 0.6);
-    // Legs slice — swings from the hips.
-    ctx.save();
-    ctx.translate(0, splitY);
-    ctx.transform(1, 0, step * def.legSkew * gait, 1, 0, 0);
-    ctx.translate(0, -splitY);
-    ctx.drawImage(src, 0, ih * split, iw, ih * (1 - split), -w / 2, splitY, w, h * (1 - split));
-    ctx.restore();
+    drawLegs(src);
+    drawBody(src);
   };
 
   ctx.save();

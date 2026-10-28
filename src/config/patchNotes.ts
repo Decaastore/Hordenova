@@ -83,6 +83,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
+        en: "The whole body moves, not just the feet: the head bobs a beat behind each step, shoulders and arms swing against the legs and the weight rolls from side to side.",
+        ptBR: "O corpo inteiro se mexe, não só os pés: a cabeça acompanha cada passo com um leve atraso, ombros e braços balançam no contratempo das pernas e o peso passa de um lado para o outro.",
+      },
+      {
         en: "The walk follows each creature's real speed: slowed enemies visibly trudge, frozen ones stop dead.",
         ptBR: "A passada acompanha a velocidade real de cada criatura: inimigos lentos andam arrastados e os congelados param na hora.",
       },
