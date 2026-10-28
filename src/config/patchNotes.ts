@@ -83,12 +83,12 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
-        en: "Ancient Forest: spiky moss blobs, swamp frogs, mushroom kings and leaf sprites. Volcanic Wastes: ember demons, fire drakes and magma-capped crawlers.",
-        ptBR: "Floresta Antiga: bolhas espinhosas de musgo, sapos do pântano, reis-cogumelo e espíritos de folha. Terras Vulcânicas: demônios em brasa, dragõezinhos de fogo e rastejantes de magma.",
+        en: "Ancient Forest: swamp toads, moss raptors, mushroom kings and leaf sprites. Volcanic Wastes: ember demons, fire drakes and magma crawlers.",
+        ptBR: "Floresta Antiga: sapos do pântano, raptores de musgo, reis-cogumelo e espíritos de folha. Terras Vulcânicas: demônios em brasa, dragõezinhos de fogo e rastejantes de magma.",
       },
       {
-        en: "Frozen Tundra: yetis and frost-bitten wraiths. Cursed Desert: cactus walkers, sand raptors and desert spirits. Dark Ruins: skull orcs, shadow ninjas and bone ghosts. Abyss: void demons, deep-sea horrors and abyssal squids.",
-        ptBR: "Tundra Congelada: yetis e espectros congelados. Deserto Amaldiçoado: cactos andantes, raptores da areia e espíritos do deserto. Ruínas Sombrias: orcs de caveira, ninjas das sombras e fantasmas de osso. Abismo: demônios do vazio, horrores das profundezas e lulas abissais.",
+        en: "Frozen Tundra: yetis, frost orcs, ice raptors and frozen wraiths. Cursed Desert: sand toads, cactus walkers, sand raptors and desert spirits. Dark Ruins: ghouls, skull orcs, shadow ninjas and bone ghosts. Abyss: void demons, deep-sea horrors and abyssal squids.",
+        ptBR: "Tundra Congelada: yetis, orcs de gelo, raptores do gelo e espectros congelados. Deserto Amaldiçoado: sapos da areia, cactos andantes, raptores da areia e espíritos do deserto. Ruínas Sombrias: carniçais, orcs de caveira, ninjas das sombras e fantasmas de osso. Abismo: demônios do vazio, horrores das profundezas e lulas abissais.",
       },
       {
         en: "Each biome's creatures are only downloaded when you reach it, so the game doesn't get heavier to load.",
