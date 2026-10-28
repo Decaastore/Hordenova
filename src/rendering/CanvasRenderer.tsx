@@ -461,7 +461,7 @@ export function CanvasRenderer({
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
       // Magic air layer (piercing lance, firestorm, frost nova, sky strikes) — over units, under damage numbers.
-      specialVfx.drawAir(ctx);
+      specialVfx.drawAir(ctx, timestamp);
 
       // FASE 3 — death-collapse animations (spec section 11): drawn after
       // live enemies/projectiles so a fresh corpse never sits underneath

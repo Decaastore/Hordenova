@@ -109,7 +109,7 @@ export class SpecialVfxLayer {
       ...cast,
       ageMs: 0,
       totalMs: reduced ? REDUCED_LIFETIME_MS[cast.type] : LIFETIME_MS[cast.type],
-      seeds: Array.from({ length: 24 }, () => Math.random()),
+      seeds: Array.from({ length: 96 }, () => Math.random()),
       reduced,
     });
     if (this.casts.length > MAX_ACTIVE) this.casts.shift();
@@ -127,22 +127,25 @@ export class SpecialVfxLayer {
   /** Under towers/enemies: rune circles, scorched crater, frozen ground. */
   drawGround(ctx: CanvasRenderingContext2D, timeMs: number): void {
     for (const c of this.casts) {
-      drawRuneCircle(ctx, c, timeMs);
+      // Fire and ice announce themselves with their own element at the
+      // tower (flame flare / frost burst, see drawFirestorm/drawAbsoluteZero)
+      // instead of a geometric rune ring.
+      if (c.type === "IRONWOOD" || c.type === "STORMCALLER") drawRuneCircle(ctx, c, timeMs);
       if (c.reduced) continue;
       if (c.type === "INFERNO") drawScorch(ctx, c, timeMs);
-      else if (c.type === "FROSTBORN") drawFrostGround(ctx, c, timeMs);
+      else if (c.type === "FROSTBORN") drawFrostGround(ctx, c);
     }
   }
 
-  /** Over towers/enemies: beams, explosions, nova rings, sky strikes. */
-  drawAir(ctx: CanvasRenderingContext2D): void {
+  /** Over towers/enemies: beams, fire, ice, sky strikes. */
+  drawAir(ctx: CanvasRenderingContext2D, timeMs = 0): void {
     for (const c of this.casts) {
       switch (c.type) {
         case "IRONWOOD":
           drawPiercingShot(ctx, c);
           break;
         case "INFERNO":
-          drawFirestorm(ctx, c);
+          drawFirestorm(ctx, c, timeMs);
           break;
         case "FROSTBORN":
           drawAbsoluteZero(ctx, c);
@@ -278,113 +281,152 @@ function drawPiercingShot(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
 // ---------------------------------------------------------------------------
 // INFERNO — Firestorm
+//
+// Reworked (feedback: "não apenas esse círculo piscando") — no geometric
+// rings: the blast is built from billowing fire puffs that cool from white
+// to orange to dark smoke as they rise, plus real flames licking up from
+// the ground all across the blast area.
 // ---------------------------------------------------------------------------
 
+/** Flame silhouette (teardrop with a flickering tip) rising from (x,y). */
+function drawFlame(ctx: CanvasRenderingContext2D, x: number, y: number, height: number, width: number, sway: number, alpha: number): void {
+  if (height <= 0.5 || alpha <= 0) return;
+  const g = ctx.createLinearGradient(x, y, x, y - height);
+  g.addColorStop(0, `rgba(255,90,20,${0.85 * alpha})`);
+  g.addColorStop(0.45, `rgba(255,170,60,${0.8 * alpha})`);
+  g.addColorStop(1, `rgba(255,240,170,0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x - width, y);
+  ctx.bezierCurveTo(x - width * 1.1, y - height * 0.45, x - width * 0.3 + sway, y - height * 0.7, x + sway * 1.4, y - height);
+  ctx.bezierCurveTo(x + width * 0.3 + sway, y - height * 0.7, x + width * 1.1, y - height * 0.45, x + width, y);
+  ctx.closePath();
+  ctx.fill();
+  // Hot inner core.
+  const core = ctx.createLinearGradient(x, y, x, y - height * 0.6);
+  core.addColorStop(0, `rgba(255,236,160,${0.9 * alpha})`);
+  core.addColorStop(1, "rgba(255,236,160,0)");
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.moveTo(x - width * 0.45, y);
+  ctx.quadraticCurveTo(x + sway * 0.6, y - height * 0.55, x + width * 0.45, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
 function drawScorch(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
-  const appear = span(c.ageMs, 140, 320);
-  const fade = 1 - span(c.ageMs, c.totalMs * 0.45, c.totalMs);
+  const appear = span(c.ageMs, 120, 300);
+  const fade = 1 - span(c.ageMs, c.totalMs * 0.5, c.totalMs);
   const alpha = appear * fade * 0.8;
   if (alpha <= 0) return;
-  // Smaller than the blast itself — a mark where it landed, not a second blast area.
-  const R = c.radius * 0.5;
+  const R = c.radius * 0.45;
   ctx.save();
   ctx.translate(c.to.x, c.to.y);
   ctx.scale(1, 0.7);
   const crater = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-  crater.addColorStop(0, `rgba(18,6,2,${0.55 * alpha})`);
-  crater.addColorStop(0.7, `rgba(40,12,4,${0.35 * alpha})`);
+  crater.addColorStop(0, `rgba(18,6,2,${0.5 * alpha})`);
   crater.addColorStop(1, "rgba(40,12,4,0)");
   ctx.fillStyle = crater;
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.fill();
-  // Glowing embers smouldering in the crater.
   ctx.globalCompositeOperation = "lighter";
-  for (let i = 0; i < 7; i++) {
+  for (let i = 0; i < 6; i++) {
     const a = c.seeds[i]! * Math.PI * 2;
-    const d = Math.sqrt(c.seeds[i + 12]!) * R * 0.85;
+    const d = Math.sqrt(c.seeds[i + 12]!) * R * 0.8;
     const flicker = 0.55 + 0.45 * Math.sin(timeMs / 90 + i * 1.7);
-    ctx.fillStyle = rgba(i % 3 === 0 ? "#ffd27a" : "#ff6a2e", 0.8 * alpha * flicker);
+    ctx.fillStyle = `rgba(255,140,50,${0.8 * alpha * flicker})`;
     ctx.beginPath();
-    ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 1.4 + (i % 3) * 0.5, 0, Math.PI * 2);
+    ctx.arc(Math.cos(a) * d, Math.sin(a) * d, 1.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();
 }
 
-function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
+function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
   const R = c.radius;
   const { x, y } = c.to;
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
+  const life = c.totalMs;
 
-  // Detonation flash.
-  const flash = 1 - span(c.ageMs, 0, 260);
+  ctx.save();
+
+  // Flame flare at the casting tower — the "spell cast" beat, in fire.
+  const flare = 1 - span(c.ageMs, 0, 380);
+  if (flare > 0) {
+    ctx.globalCompositeOperation = "lighter";
+    drawFlame(ctx, c.from.x, c.from.y + 6, 26 * (1 - flare * 0.4), 6, Math.sin(timeMs / 60) * 2, flare);
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Short hot flash at the point of impact.
+  const flash = 1 - span(c.ageMs, 0, 180);
   if (flash > 0) {
-    const fr = R * (0.35 + (1 - flash) * 0.4);
+    ctx.globalCompositeOperation = "lighter";
+    const fr = R * 0.45;
     const g = ctx.createRadialGradient(x, y, 0, x, y, fr);
-    g.addColorStop(0, `rgba(255,250,230,${0.9 * flash})`);
-    g.addColorStop(0.4, `rgba(255,190,90,${0.7 * flash})`);
+    g.addColorStop(0, `rgba(255,248,220,${0.85 * flash})`);
+    g.addColorStop(0.5, `rgba(255,170,70,${0.5 * flash})`);
     g.addColorStop(1, "rgba(255,106,46,0)");
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(x, y, fr, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalCompositeOperation = "source-over";
   }
 
-  // Ring of fire sweeping out to the real blast radius.
-  const sweep = span(c.ageMs, 0, Math.min(520, c.totalMs));
-  if (sweep > 0 && sweep < 1) {
-    const rr = easeOut(sweep) * R;
-    ctx.strokeStyle = `rgba(255,120,40,${0.75 * (1 - sweep)})`;
-    ctx.lineWidth = 10 * (1 - sweep) + 1;
-    ctx.beginPath();
-    ctx.ellipse(x, y, rr, rr * 0.7, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(255,220,140,${0.9 * (1 - sweep)})`;
-    ctx.lineWidth = 2.2 * (1 - sweep) + 0.4;
-    ctx.stroke();
-  }
-
-  // Flame tongues bursting outward.
-  const tongues = span(c.ageMs, 30, 520);
-  if (!c.reduced && tongues > 0 && tongues < 1) {
-    for (let i = 0; i < 8; i++) {
-      const a = (i / 8) * Math.PI * 2 + c.seeds[i]! * 0.4;
-      const reach = easeOut(tongues) * R * (0.55 + c.seeds[i + 10]! * 0.35);
-      const tx = x + Math.cos(a) * reach;
-      const ty = y + Math.sin(a) * reach * 0.7;
-      // Elongated flame streak pointing outward along its own direction.
-      const size = (8 + c.seeds[i]! * 5) * (1 - tongues * 0.7);
-      ctx.save();
-      ctx.translate(tx, ty);
-      ctx.rotate(Math.atan2(Math.sin(a) * 0.7, Math.cos(a)));
-      ctx.scale(2.4, 0.7);
-      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-      g.addColorStop(0, `rgba(255,224,140,${0.9 * (1 - tongues)})`);
-      g.addColorStop(0.5, `rgba(255,120,40,${0.6 * (1 - tongues)})`);
-      g.addColorStop(1, "rgba(255,90,30,0)");
+  // Billowing fireball: puffs burst outward and upward, cooling from
+  // white-hot to orange to dark smoke.
+  const puffCount = c.reduced ? 7 : 16;
+  for (let i = 0; i < puffCount; i++) {
+    const delay = c.seeds[i]! * 90;
+    const t = span(c.ageMs, delay, delay + life * 0.8);
+    if (t <= 0 || t >= 1) continue;
+    const a = c.seeds[i + 16]! * Math.PI * 2;
+    const reach = easeOut(t) * R * (0.25 + c.seeds[i + 32]! * 0.45);
+    const px = x + Math.cos(a) * reach;
+    const py = y + Math.sin(a) * reach * 0.6 - easeOut(t) * (18 + c.seeds[i + 48]! * 22);
+    const size = (7 + c.seeds[i + 64]! * 8) * (0.6 + easeOut(t) * 1.1);
+    if (t < 0.45) {
+      // Burning phase — additive fire.
+      const heat = 1 - t / 0.45;
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(px, py, 0, px, py, size);
+      g.addColorStop(0, `rgba(255,${200 + Math.round(50 * heat)},${110 + Math.round(120 * heat)},${0.75})`);
+      g.addColorStop(0.55, `rgba(255,${100 + Math.round(60 * heat)},30,0.5)`);
+      g.addColorStop(1, "rgba(200,40,10,0)");
       ctx.fillStyle = g;
       ctx.beginPath();
-      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      ctx.arc(px, py, size, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
+    } else {
+      // Smoke phase — dark, soft, fading as it rises.
+      const smoke = (1 - t) / 0.55;
+      ctx.globalCompositeOperation = "source-over";
+      const g = ctx.createRadialGradient(px, py, 0, px, py, size);
+      g.addColorStop(0, `rgba(48,30,24,${0.42 * smoke})`);
+      g.addColorStop(1, "rgba(48,30,24,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
-  // Embers drifting up from the crater for the rest of its life.
-  const drift = span(c.ageMs, 300, c.totalMs);
-  if (!c.reduced && drift > 0 && drift < 1) {
-    for (let i = 0; i < 5; i++) {
-      const local = (drift * 2.2 + c.seeds[i]!) % 1;
-      const a = c.seeds[i + 8]! * Math.PI * 2;
-      const d = c.seeds[i + 16]! * R * 0.6;
-      const ex = x + Math.cos(a) * d + Math.sin(local * 6 + i) * 3;
-      const ey = y + Math.sin(a) * d * 0.7 - local * 34;
-      ctx.fillStyle = `rgba(255,170,70,${0.8 * (1 - local) * (1 - drift)})`;
-      ctx.beginPath();
-      ctx.arc(ex, ey, 1.3, 0, Math.PI * 2);
-      ctx.fill();
+  // Flames licking up from the ground across the whole blast area —
+  // "everything nearby burns". Flames nearer the impact ignite first.
+  if (!c.reduced) {
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 9; i++) {
+      const dist = Math.sqrt(c.seeds[i + 80]!) * R * 0.85;
+      const a = c.seeds[i + 70]! * Math.PI * 2;
+      const fx = x + Math.cos(a) * dist;
+      const fy = y + Math.sin(a) * dist * 0.65;
+      const delay = (dist / Math.max(1, R)) * 220;
+      const t = span(c.ageMs, delay, delay + life * 0.6);
+      if (t <= 0 || t >= 1) continue;
+      const h = (18 + c.seeds[i + 40]! * 14) * Math.sin(t * Math.PI);
+      const sway = Math.sin(timeMs / 70 + i * 2.3) * 2.6;
+      drawFlame(ctx, fx, fy, h, 5 + c.seeds[i + 50]! * 2.5, sway, 1 - t * 0.3);
     }
   }
   ctx.restore();
@@ -392,101 +434,175 @@ function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
 // ---------------------------------------------------------------------------
 // FROSTBORN — Absolute Zero
+//
+// Reworked (feedback: "não apenas esse círculo piscando") — no rings: frost
+// cracks race outward through the ground from the tower, ice crystals burst
+// up out of the ground as the cold reaches them, a low cold mist rolls out
+// and snow swirls through it, then the crystals shatter and melt away.
 // ---------------------------------------------------------------------------
 
-function drawFrostGround(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
-  // ANTI-CLUTTER — no filled disc any more (it covered the tower's whole
-  // range for seconds): just a faint frost rim that fades out quickly, a
-  // few frost flecks, and the small snowflake sigil at the tower's feet.
+function drawFrostGround(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   const R = c.radius;
-  const reach = easeOut(span(c.ageMs, 0, 420));
-  const fade = 1 - span(c.ageMs, 350, c.totalMs);
-  if (fade <= 0 || reach <= 0) return;
-  const r = R * reach;
+  const reach = easeOut(span(c.ageMs, 0, 380));
+  const fade = 1 - span(c.ageMs, c.totalMs * 0.45, c.totalMs);
+  if (reach <= 0 || fade <= 0) return;
   const { x, y } = c.towerPosition;
 
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  ctx.strokeStyle = `rgba(170,236,255,${0.35 * fade})`;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.fillStyle = `rgba(220,250,255,${0.55 * fade})`;
-  for (let i = 0; i < 8; i++) {
-    const a = c.seeds[i]! * Math.PI * 2;
-    const d = (0.55 + c.seeds[(i + 7) % 24]! * 0.45) * r;
-    ctx.beginPath();
-    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 0.9 + (i % 3) * 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.translate(x, y + 8);
-  ctx.scale(1, 0.55);
-  ctx.rotate(timeMs / 2400);
-  ctx.strokeStyle = `rgba(190,245,255,${0.7 * fade})`;
-  ctx.lineWidth = 1.3;
   ctx.lineCap = "round";
-  const s = 20 * reach;
-  for (let i = 0; i < 6; i++) {
+  ctx.lineJoin = "round";
+  ctx.globalCompositeOperation = "lighter";
+  // Frost cracks spreading outward through the ground, with side branches.
+  const cracks = 7;
+  for (let k = 0; k < cracks; k++) {
+    const base = (k / cracks) * Math.PI * 2 + c.seeds[k]! * 0.6;
+    const len = R * (0.55 + c.seeds[k + 8]! * 0.35) * reach;
+    const pts: Vector2[] = [{ x, y }];
+    const steps = 6;
+    for (let i = 1; i <= steps; i++) {
+      const t = i / steps;
+      const wobble = (c.seeds[(k * 6 + i) % 96]! - 0.5) * 0.22;
+      pts.push({ x: x + Math.cos(base + wobble) * len * t, y: y + Math.sin(base + wobble) * len * t * 0.75 });
+    }
+    const stroke = (width: number, color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.beginPath();
+      ctx.moveTo(pts[0]!.x, pts[0]!.y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i]!.x, pts[i]!.y);
+      ctx.stroke();
+    };
+    // Soft, pale frost veins (kept dimmer than lightning so they never read as a Stormcaller bolt).
+    stroke(5, `rgba(120,200,235,${0.1 * fade})`);
+    stroke(1, `rgba(225,248,255,${0.42 * fade})`);
+    // Two short side branches off each crack.
+    for (let b = 0; b < 2; b++) {
+      const from = pts[2 + b * 2]!;
+      const ba = base + (b === 0 ? 0.8 : -0.8);
+      const bl = 8 + c.seeds[k + 20 + b]! * 8;
+      ctx.strokeStyle = `rgba(215,246,255,${0.32 * fade})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(from.x + Math.cos(ba) * bl, from.y + Math.sin(ba) * bl * 0.75);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/** A cluster of 3 ice shards bursting up out of the ground at (x,y). */
+function drawIceCluster(ctx: CanvasRenderingContext2D, x: number, y: number, scale: number, seedA: number, seedB: number, alpha: number): void {
+  if (scale <= 0.02 || alpha <= 0) return;
+  const shards = [
+    { dx: 0, h: 15, w: 3.6, tilt: (seedA - 0.5) * 0.3 },
+    { dx: -4.5, h: 9 + seedB * 4, w: 2.8, tilt: -0.45 - seedA * 0.2 },
+    { dx: 4.5, h: 8 + seedA * 5, w: 2.6, tilt: 0.4 + seedB * 0.25 },
+  ];
+  for (const sh of shards) {
     ctx.save();
-    ctx.rotate((i / 6) * Math.PI * 2);
+    ctx.translate(x + sh.dx * scale, y);
+    ctx.rotate(sh.tilt);
+    const h = sh.h * scale;
+    const w = sh.w * scale;
+    const g = ctx.createLinearGradient(0, 0, 0, -h);
+    g.addColorStop(0, `rgba(120,200,235,${0.85 * alpha})`);
+    g.addColorStop(1, `rgba(240,253,255,${0.95 * alpha})`);
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(s, 0);
-    ctx.moveTo(s * 0.55, 0);
-    ctx.lineTo(s * 0.75, -s * 0.2);
-    ctx.moveTo(s * 0.55, 0);
-    ctx.lineTo(s * 0.75, s * 0.2);
+    ctx.moveTo(-w, 0);
+    ctx.lineTo(-w * 0.6, -h * 0.7);
+    ctx.lineTo(0, -h);
+    ctx.lineTo(w * 0.6, -h * 0.7);
+    ctx.lineTo(w, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Facet highlight.
+    ctx.strokeStyle = `rgba(255,255,255,${0.7 * alpha})`;
+    ctx.lineWidth = 0.7;
+    ctx.beginPath();
+    ctx.moveTo(-w * 0.15, -h * 0.1);
+    ctx.lineTo(0, -h * 0.92);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(70,150,190,${0.6 * alpha})`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(-w, 0);
+    ctx.lineTo(-w * 0.6, -h * 0.7);
+    ctx.lineTo(0, -h);
+    ctx.lineTo(w * 0.6, -h * 0.7);
+    ctx.lineTo(w, 0);
     ctx.stroke();
     ctx.restore();
   }
-  ctx.restore();
 }
 
 function drawAbsoluteZero(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   const R = c.radius;
   const { x, y } = c.towerPosition;
-  const sweep = span(c.ageMs, 0, Math.min(420, c.totalMs));
-  const fade = 1 - span(c.ageMs, c.totalMs * 0.5, c.totalMs);
+  const life = c.totalMs;
   ctx.save();
-  ctx.globalCompositeOperation = "lighter";
 
-  // The nova front itself.
-  if (sweep < 1) {
-    const rr = easeOut(sweep) * R;
-    ctx.strokeStyle = `rgba(200,248,255,${0.85 * (1 - sweep)})`;
-    ctx.lineWidth = 8 * (1 - sweep) + 1;
+  // Frost burst at the tower — the "spell cast" beat, in ice.
+  const burst = 1 - span(c.ageMs, 0, 420);
+  if (burst > 0) {
+    ctx.globalCompositeOperation = "lighter";
+    const g = ctx.createRadialGradient(c.from.x, c.from.y, 0, c.from.x, c.from.y, 22);
+    g.addColorStop(0, `rgba(235,252,255,${0.8 * burst})`);
+    g.addColorStop(1, "rgba(140,220,255,0)");
+    ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(x, y, rr, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.strokeStyle = `rgba(255,255,255,${1 - sweep})`;
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // Crown of ice spikes left standing at the edge of the freeze.
-  if (fade <= 0 || c.reduced) return;
-  ctx.save();
-  const spikes = 12;
-  for (let i = 0; i < spikes; i++) {
-    const a = (i / spikes) * Math.PI * 2 + c.seeds[i]! * 0.15;
-    const grow = easeOut(span(c.ageMs, 300 + c.seeds[i]! * 120, 520 + c.seeds[i]! * 120));
-    if (grow <= 0) continue;
-    const h = (6 + c.seeds[i]! * 6) * grow * fade;
-    const bx = x + Math.cos(a) * R;
-    const by = y + Math.sin(a) * R;
-    ctx.fillStyle = `rgba(214,248,255,${0.85 * fade})`;
-    ctx.strokeStyle = `rgba(120,200,235,${0.8 * fade})`;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(bx - 2.6, by);
-    ctx.lineTo(bx + 2.6, by);
-    ctx.lineTo(bx + (c.seeds[i]! - 0.5) * 3, by - h);
-    ctx.closePath();
+    ctx.arc(c.from.x, c.from.y, 22, 0, Math.PI * 2);
     ctx.fill();
-    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+  }
+
+  // Cold mist rolling outward, low over the ground.
+  const mistCount = c.reduced ? 5 : 9;
+  for (let i = 0; i < mistCount; i++) {
+    const t = span(c.ageMs, c.seeds[i]! * 80, life * 0.9);
+    if (t <= 0 || t >= 1) continue;
+    const a = (i / mistCount) * Math.PI * 2 + c.seeds[i + 10]! * 0.5;
+    const d = easeOut(t) * R * (0.55 + c.seeds[i + 20]! * 0.35);
+    const mx = x + Math.cos(a) * d;
+    const my = y + Math.sin(a) * d * 0.7;
+    const mr = 14 + easeOut(t) * 14;
+    const g = ctx.createRadialGradient(mx, my, 0, mx, my, mr);
+    g.addColorStop(0, `rgba(200,236,255,${0.22 * Math.sin(t * Math.PI)})`);
+    g.addColorStop(1, "rgba(200,236,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.ellipse(mx, my, mr, mr * 0.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Ice crystals bursting up out of the ground as the cold reaches them,
+  // then cracking apart and melting away.
+  if (!c.reduced) {
+    const clusters = 12;
+    for (let i = 0; i < clusters; i++) {
+      const dist = (0.3 + Math.sqrt(c.seeds[i + 30]!) * 0.7) * R * 0.92;
+      const a = c.seeds[i + 45]! * Math.PI * 2;
+      const cx = x + Math.cos(a) * dist;
+      const cy = y + Math.sin(a) * dist * 0.75;
+      const appearAt = (dist / Math.max(1, R)) * 340;
+      const grow = easeOut(span(c.ageMs, appearAt, appearAt + 140));
+      const melt = span(c.ageMs, life * 0.55 + c.seeds[i + 60]! * 150, life);
+      drawIceCluster(ctx, cx, cy, grow * (0.75 + c.seeds[i + 75]! * 0.5) * (1 - melt * 0.4), c.seeds[i]!, c.seeds[i + 1]!, 1 - melt);
+    }
+  }
+
+  // Snow swirling outward through the mist.
+  ctx.globalCompositeOperation = "lighter";
+  const flakes = c.reduced ? 6 : 16;
+  for (let i = 0; i < flakes; i++) {
+    const t = span(c.ageMs, 0, life);
+    const a = c.seeds[i + 50]! * Math.PI * 2 + t * 1.6;
+    const d = easeOut(t) * R * (0.3 + c.seeds[i + 80]! * 0.7);
+    ctx.fillStyle = `rgba(240,252,255,${0.85 * (1 - t)})`;
+    ctx.beginPath();
+    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d * 0.7 - t * 10, 1 + (i % 3) * 0.4, 0, Math.PI * 2);
+    ctx.fill();
   }
   ctx.restore();
 }
