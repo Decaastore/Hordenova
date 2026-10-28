@@ -13,6 +13,7 @@ import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
 import type { LocomotionState } from "./biomeCreatures/helpers";
 import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
 import { drawEnemySprite, ensureEnemySpritesLoading, getEnemySprite, spriteHeadroom } from "./enemySprites";
+import { getTowerSprite, type LoadedTowerSprite } from "./towerSprites";
 
 /**
  * FASE 3 — real hit-reaction feedback (spec section 10), applied generically
@@ -302,9 +303,15 @@ export function drawTower(
   ctx.translate(tower.position.x, tower.position.y);
   ctx.scale(visualScale, visualScale);
 
-  if (tower.type !== "IRONWOOD") drawPlinth(ctx);
+  // Pre-rendered 3D body when one exists for this type/skin/stage (see
+  // towerSprites.ts); otherwise the original vector tower below.
+  const sprite = getTowerSprite(tower.type, tower.equippedSkinId, visualStage);
+  if (sprite) {
+    ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
+    drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin);
+  } else if (tower.type !== "IRONWOOD") drawPlinth(ctx);
 
-  switch (tower.type) {
+  if (!sprite) switch (tower.type) {
     case "IRONWOOD":
       drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage, skin);
       break;
@@ -365,6 +372,115 @@ export function drawTower(
   ctx.textBaseline = "middle";
   ctx.fillText(String(stats.level), 0, 0.5);
   ctx.restore();
+}
+
+/**
+ * Live effects on top of a pre-rendered tower body: everything that moves or
+ * reacts (glowing cores, orbiting runestones, rising frost motes, the
+ * attack flare) stays animated in 2D at the bake's own anchor points.
+ */
+function drawBakedTowerLive(
+  ctx: CanvasRenderingContext2D,
+  type: TowerInstance["type"],
+  sprite: LoadedTowerSprite,
+  theme: (typeof TOWER_THEME)[TowerInstance["type"]],
+  level: number,
+  stage: number,
+  timeMs: number,
+  attackFlashMs: number,
+  _readiness: number,
+  skin: TowerSkinDefinition | null,
+): void {
+  if (type === "FROSTBORN") {
+    const orb = sprite.anchor("orb") ?? { x: 0, y: -30 };
+    const flare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
+    const pulse = 0.5 + 0.5 * Math.sin(timeMs / 650);
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    // Cold light breathing out of the orb — stronger at higher stages.
+    const r = 8 + stage * 0.9 + flare * 6;
+    const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, r);
+    g.addColorStop(0, `rgba(200,245,255,${0.45 + 0.2 * pulse + 0.35 * flare})`);
+    g.addColorStop(0.5, `rgba(90,200,255,${0.16 + 0.06 * stage * 0.5})`);
+    g.addColorStop(1, "rgba(90,200,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    // Frost swirling inside the orb.
+    for (let i = 0; i < 3; i++) {
+      const a = timeMs / (700 + i * 180) + i * 2.1;
+      ctx.fillStyle = `rgba(235,252,255,${0.55 + 0.3 * flare})`;
+      ctx.beginPath();
+      ctx.arc(orb.x + Math.cos(a) * 2.2, orb.y + Math.sin(a) * 1.6, 0.7, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    // Ice shards flung out on each shot.
+    if (flare > 0) {
+      ctx.strokeStyle = `rgba(220,248,255,${flare})`;
+      ctx.lineWidth = 0.8;
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + 0.3;
+        const d0 = 4 + (1 - flare) * 6;
+        const d1 = d0 + 4 * flare;
+        ctx.beginPath();
+        ctx.moveTo(orb.x + Math.cos(a) * d0, orb.y + Math.sin(a) * d0);
+        ctx.lineTo(orb.x + Math.cos(a) * d1, orb.y + Math.sin(a) * d1);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+    // Specular glint on the orb's lit side.
+    ctx.fillStyle = "rgba(255,255,255,0.75)";
+    ctx.beginPath();
+    ctx.ellipse(orb.x - 1.4, orb.y - 1.6, 1.1, 0.7, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Stage 4+: runestones orbiting the obelisk (dimmer while passing behind it).
+    const ro = sprite.anchor("runeOrbit");
+    if (ro && stage >= 4) {
+      const n = stage >= 6 ? 4 : 3;
+      for (let i = 0; i < n; i++) {
+        const a = timeMs / 1500 + (i / n) * Math.PI * 2;
+        const x = ro.x + Math.cos(a) * 10;
+        const y = ro.y + Math.sin(a) * 4 + Math.sin(timeMs / 600 + i) * 0.8;
+        const front = Math.sin(a) > -0.2;
+        ctx.save();
+        ctx.globalAlpha = front ? 1 : 0.45;
+        ctx.translate(x, y);
+        ctx.fillStyle = "#3a4458";
+        ctx.beginPath();
+        ctx.moveTo(0, -3);
+        ctx.lineTo(1.6, 0);
+        ctx.lineTo(0, 3);
+        ctx.lineTo(-1.6, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = `rgba(126,230,255,${0.7 + 0.3 * pulse})`;
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(0, -1.8);
+        ctx.lineTo(0, 1.8);
+        ctx.moveTo(-0.8, -0.4);
+        ctx.lineTo(0.8, 0.4);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+    // Snowflakes rising past the spire.
+    drawFloatingMotes(
+      ctx,
+      0,
+      orb.y + 10,
+      timeMs,
+      37,
+      applySkinParticleStyle({ count: 3 + Math.min(stage, 5), spreadX: 14, spreadY: 34, color: "#eafcff", periodMs: 5200, size: 0.9 }, skin?.particleStyle),
+    );
+    return;
+  }
+  void level;
+  void theme;
 }
 
 function drawPlinth(ctx: CanvasRenderingContext2D): void {
