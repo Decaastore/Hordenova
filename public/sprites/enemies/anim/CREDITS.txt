@@ -1,0 +1,5 @@
+Animated enemy sprite sheets in this folder are rendered from 3D models by Quaternius (https://quaternius.com):
+- Bestiary - Dungeon Monsters Kit (Quaternius Asset License v1.0 — use in games allowed, no credit required; the raw assets may not be redistributed as assets)
+- Universal Animation Library (CC0)
+- Ultimate Monsters (CC0)
+Only rendered 2D frames ship with the game; the source models are not included.

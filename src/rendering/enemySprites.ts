@@ -53,8 +53,6 @@ const SPRITE_DEFS: Partial<Record<EnemyType, SpriteDef>> = {
   CRAWLER: { file: "crawler.png", worldHeight: 21, stride: 11, legSplit: 0.55, legSkew: 0.42, bobAmp: 1.2, lean: 0.04, sway: 0.02, limbSwing: 0.02, weightShift: 0.045, headNod: 0.02 },
   // Sprinter: big bob, strong forward lean, body undulates hard.
   RUNNER: { file: "runner.png", worldHeight: 27, stride: 22, legSplit: 0.5, legSkew: 0.5, bobAmp: 2.2, lean: 0.09, sway: 0.035, limbSwing: 0.03, weightShift: 0.04, headNod: 0.035 },
-  // Heavy biped: shoulders/fists swing opposite to the legs, weight rolls side to side, head nods late.
-  BRUTE: { file: "brute.png", worldHeight: 30, stride: 19, legSplit: 0.66, legSkew: 0.34, bobAmp: 1.8, lean: 0.05, sway: 0.03, limbSwing: 0.055, weightShift: 0.035, headNod: 0.03 },
   // Marching biped behind a shield: steady march, shield arm swings less, body rocks.
   SHIELDBEARER: { file: "shieldbearer.png", worldHeight: 29, stride: 16, legSplit: 0.7, legSkew: 0.34, bobAmp: 1.5, lean: 0.04, sway: 0.028, limbSwing: 0.035, weightShift: 0.03, headNod: 0.03 },
 };
@@ -65,13 +63,55 @@ const LEG_LIFT = 0.045;
 /** Where the sprite's feet sit relative to the enemy's position (fraction of its height below the anchor point). */
 const FOOT_ANCHOR = 0.36;
 
-interface LoadedSprite {
-  def: SpriteDef;
-  image: HTMLImageElement;
-  /** Pre-tinted copies for status effects (null if offscreen canvas isn't available). */
-  ice: HTMLCanvasElement | null;
-  fire: HTMLCanvasElement | null;
+/**
+ * ANIMATED SHEETS — real frame-by-frame animation baked from rigged,
+ * animated 3D monsters (Quaternius "Bestiary" + "Universal Animation
+ * Library" and "Ultimate Monsters", both free for commercial use) into
+ * sprite sheets in public/sprites/enemies/anim/. Each sheet has 3 rows —
+ * side, front (walking toward the camera) and back (walking away), all
+ * facing right; the game mirrors for left — and `frames` columns of one
+ * full walk/flight cycle. Unlike the painted sprites above (one picture
+ * deformed procedurally), these are genuine animations: every limb, the
+ * head and the torso move like a real walk. Takes priority over SPRITE_DEFS.
+ */
+interface SheetDef {
+  file: string;
+  frames: number;
+  /** Visible creature height on screen, world units (before the caller's scale). */
+  worldHeight: number;
+  /** World units travelled per full animation cycle (keeps feet from sliding). */
+  stride: number;
+  /** Fliers: how high above the ground shadow the body floats, world units. */
+  hover?: number;
 }
+
+/** Fraction of a sheet cell (from the top) where the creature's top and feet land — fixed by the baker's tight framing. */
+const SHEET_TOP = 0.02;
+const SHEET_FOOT = 0.98;
+
+const SHEET_DEFS: Partial<Record<EnemyType, SheetDef>> = {
+  BRUTE: { file: "anim/brute_walk.png", frames: 12, worldHeight: 33, stride: 30 },
+  REGENERATOR: { file: "anim/regenerator_walk.png", frames: 12, worldHeight: 27, stride: 24 },
+  DISABLER: { file: "anim/disabler_walk.png", frames: 12, worldHeight: 25, stride: 26, hover: 6 },
+  SWARMLING: { file: "anim/swarmling_walk.png", frames: 12, worldHeight: 24, stride: 9, hover: 7 },
+};
+
+type LoadedSprite =
+  | {
+      kind: "painted";
+      def: SpriteDef;
+      image: HTMLImageElement;
+      /** Pre-tinted copies for status effects (null if offscreen canvas isn't available). */
+      ice: HTMLCanvasElement | null;
+      fire: HTMLCanvasElement | null;
+    }
+  | {
+      kind: "sheet";
+      def: SheetDef;
+      image: HTMLImageElement;
+      ice: HTMLCanvasElement | null;
+      fire: HTMLCanvasElement | null;
+    };
 
 const loaded = new Map<EnemyType, LoadedSprite>();
 let loadingStarted = false;
@@ -98,18 +138,20 @@ export function ensureEnemySpritesLoading(): void {
   if (loadingStarted || typeof Image === "undefined") return;
   loadingStarted = true;
   const base = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
-  for (const [type, def] of Object.entries(SPRITE_DEFS) as [EnemyType, SpriteDef][]) {
+  const load = (type: EnemyType, file: string, make: (image: HTMLImageElement) => LoadedSprite) => {
     const image = new Image();
     image.decoding = "async";
-    image.onload = () => {
-      loaded.set(type, {
-        def,
-        image,
-        ice: tinted(image, "rgba(150,225,255,0.9)"),
-        fire: tinted(image, "rgba(255,120,30,0.9)"),
-      });
-    };
-    image.src = `${base}sprites/enemies/${def.file}`;
+    image.onload = () => loaded.set(type, make(image));
+    image.src = `${base}sprites/enemies/${file}`;
+  };
+  const ICE = "rgba(150,225,255,0.9)";
+  const FIRE = "rgba(255,120,30,0.9)";
+  for (const [type, def] of Object.entries(SHEET_DEFS) as [EnemyType, SheetDef][]) {
+    load(type, def.file, (image) => ({ kind: "sheet", def, image, ice: tinted(image, ICE), fire: tinted(image, FIRE) }));
+  }
+  for (const [type, def] of Object.entries(SPRITE_DEFS) as [EnemyType, SpriteDef][]) {
+    if (SHEET_DEFS[type]) continue;
+    load(type, def.file, (image) => ({ kind: "painted", def, image, ice: tinted(image, ICE), fire: tinted(image, FIRE) }));
   }
 }
 
@@ -119,7 +161,12 @@ export function getEnemySprite(type: EnemyType): LoadedSprite | undefined {
 
 /** Types that have painted art (whether or not it has finished loading). */
 export function hasEnemySpriteArt(type: EnemyType): boolean {
-  return SPRITE_DEFS[type] !== undefined;
+  return SPRITE_DEFS[type] !== undefined || SHEET_DEFS[type] !== undefined;
+}
+
+/** True when the type uses a real frame-by-frame animated sheet (not a single painted picture). */
+export function hasAnimatedSheet(type: EnemyType): boolean {
+  return SHEET_DEFS[type] !== undefined;
 }
 
 /**
@@ -128,6 +175,8 @@ export function hasEnemySpriteArt(type: EnemyType): boolean {
  * HP bar sit just above the creature's head instead of overlapping it.
  */
 export function spriteHeadroom(type: EnemyType, scale: number): number | null {
+  const sheet = SHEET_DEFS[type];
+  if (sheet) return (sheet.worldHeight * (1 - FOOT_ANCHOR) + (sheet.hover ?? 0)) * scale;
   const def = SPRITE_DEFS[type];
   if (!def) return null;
   return def.worldHeight * (1 - FOOT_ANCHOR) * scale + def.bobAmp * scale;
@@ -161,6 +210,10 @@ export function drawEnemySprite(
   timeMs: number,
   status: { slowPercent: number; burning: boolean },
 ): void {
+  if (sprite.kind === "sheet") {
+    drawSheetSprite(ctx, sprite, enemyId, angle, locomotion, timeMs, status);
+    return;
+  }
   const { def, image } = sprite;
   const iw = image.naturalWidth;
   const ih = image.naturalHeight;
@@ -275,5 +328,60 @@ export function drawEnemySprite(
   if (status.burning && sprite.fire) {
     drawSlices(sprite.fire, 0.18 + 0.12 * Math.sin(timeMs / 70));
   }
+  ctx.restore();
+}
+
+// View memory per enemy (side / front / back) with hysteresis, so a creature
+// walking along a gentle diagonal doesn't flicker between views.
+const viewMemory = new Map<string, 0 | 1 | 2>();
+
+function viewFor(enemyId: string, angle: number): 0 | 1 | 2 {
+  const dy = Math.sin(angle); // +down the screen (toward the camera)
+  let v = viewMemory.get(enemyId) ?? (dy > 0.45 ? 1 : dy < -0.45 ? 2 : 0);
+  if (dy > 0.55) v = 1;
+  else if (dy < -0.55) v = 2;
+  else if (Math.abs(dy) < 0.3) v = 0;
+  if (viewMemory.size > 600) viewMemory.clear();
+  viewMemory.set(enemyId, v);
+  return v;
+}
+
+function drawSheetSprite(
+  ctx: CanvasRenderingContext2D,
+  sprite: Extract<LoadedSprite, { kind: "sheet" }>,
+  enemyId: string,
+  angle: number,
+  locomotion: LocomotionState,
+  timeMs: number,
+  status: { slowPercent: number; burning: boolean },
+): void {
+  const { def, image } = sprite;
+  const cell = image.naturalHeight / 3;
+  const visible = SHEET_FOOT - SHEET_TOP;
+  const cellWorld = def.worldHeight / visible;
+  const facing = facingFor(enemyId, angle);
+  const view = viewFor(enemyId, angle);
+
+  // Frame from distance actually travelled: feet plant instead of sliding,
+  // slowed enemies animate slower, frozen ones hold their pose.
+  const cycle = (((locomotion.distance / def.stride) % 1) + 1) % 1;
+  const frame = Math.floor(cycle * def.frames) % def.frames;
+  const sx = frame * cell;
+  const sy = view * cell;
+
+  const hover = def.hover ? def.hover + Math.sin(timeMs / 380 + enemyId.length) * 1.2 : 0;
+  const footY = def.worldHeight * FOOT_ANCHOR - hover;
+  const dy = footY - cellWorld * SHEET_FOOT;
+
+  ctx.save();
+  ctx.scale(facing, 1);
+  const blit = (src: CanvasImageSource, alpha: number) => {
+    if (alpha <= 0) return;
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(src, sx, sy, cell, cell, -cellWorld / 2, dy, cellWorld, cellWorld);
+  };
+  blit(image, 1);
+  if (status.slowPercent > 0 && sprite.ice) blit(sprite.ice, status.slowPercent >= 1 ? 0.55 : 0.28);
+  if (status.burning && sprite.fire) blit(sprite.fire, 0.18 + 0.12 * Math.sin(timeMs / 70));
   ctx.restore();
 }

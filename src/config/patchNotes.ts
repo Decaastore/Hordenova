@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v41",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Brutes, Regenerators, Disablers and Swarmlings Now Truly Animated",
+      ptBR: "Brutos, Regeneradores, Desativadores e Enxames Agora com Animação de Verdade",
+    },
+    description: {
+      en: "Four enemy types now use real frame-by-frame animation instead of a single picture: every limb, the head and the body move with each step or wingbeat, and they turn to show their side, face or back depending on where they're heading. Stats are unchanged.",
+      ptBR: "Quatro tipos de inimigo agora usam animação quadro a quadro de verdade em vez de uma imagem só: braços, pernas, cabeça e corpo se mexem a cada passo ou batida de asa, e eles viram de lado, de frente ou de costas conforme a direção em que andam. Os atributos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Brute: a red horned demon with a spiked club. Regenerator: a hunched green brute. Disabler: a floating shadow wraith. Swarmling: a buzzing armored bee.",
+        ptBR: "Bruto: um demônio vermelho com chifres e clava cravejada. Regenerador: um brutamontes verde e corcunda. Desativador: um espectro sombrio flutuante. Enxame: uma abelha blindada zumbindo.",
+      },
+      {
+        en: "Steps follow real movement speed, so feet don't slide; slowed enemies move in slow motion and frozen ones hold their pose.",
+        ptBR: "Os passos acompanham a velocidade real, então os pés não deslizam; inimigos lentos se movem em câmera lenta e os congelados ficam parados na pose.",
+      },
+    ],
+  },
+  {
     id: "v40",
     dateIso: "2026-10-27",
     category: "CONTENT",
