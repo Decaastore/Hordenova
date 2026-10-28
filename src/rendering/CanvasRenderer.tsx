@@ -12,6 +12,7 @@ import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
+import { emergenceProgress } from "./riftPortal";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -19,6 +20,7 @@ import {
   drawFog,
   drawPath,
   drawPathEndpoints,
+  getPortalAnchor,
   drawRangeCircle,
   drawSlot,
   drawVignette,
@@ -235,6 +237,7 @@ export function CanvasRenderer({
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
 
     const gateHomePosition = ENEMY_PATH[ENEMY_PATH.length - 1]!;
+    const portalAnchor = getPortalAnchor(ENEMY_PATH);
 
     const draw = (timestamp: number) => {
       const frameDt = lastFrameTimestamp === null ? 16 : Math.min(timestamp - lastFrameTimestamp, 100);
@@ -377,7 +380,9 @@ export function CanvasRenderer({
       // 3D castle has been rolled back per user direction, so the 2D
       // fortress always draws its full body again — omitted here, which
       // keeps the parameter at its default (false).
-      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent);
+      const emergingIds: string[] = [];
+      for (const e of snapshot.enemies) if (emergenceProgress(e.distanceTraveled) < 1) emergingIds.push(e.id);
+      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       TOWER_SLOTS.forEach((slot, index) => {
@@ -465,7 +470,22 @@ export function CanvasRenderer({
         // debuff-ring feedback in this pilot — a disclosed, known
         // limitation (see rendering3d/'s report), not an oversight.
         if (!hidden3DEnemyIds?.current?.has(enemy.id)) {
-          drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+          const rise = emergenceProgress(enemy.distanceTraveled);
+          if (rise < 1) {
+            // Climbing out of the rift: drawn at the rift's centre, rising
+            // up from below and growing to full size as it pulls itself out.
+            const k = rise * rise * (3 - 2 * rise);
+            const shown = { ...enemy, position: portalAnchor };
+            ctx.save();
+            ctx.globalAlpha = 0.25 + 0.75 * k;
+            ctx.translate(portalAnchor.x, portalAnchor.y + (1 - k) * 8);
+            ctx.scale(0.55 + 0.45 * k, 0.4 + 0.6 * k);
+            ctx.translate(-portalAnchor.x, -portalAnchor.y);
+            drawEnemy(ctx, shown, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+            ctx.restore();
+          } else {
+            drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+          }
         }
         // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself
         // (unlike drawBossAura's glow-behind treatment), reading the same
@@ -508,7 +528,7 @@ export function CanvasRenderer({
       // their OWN pass, after every projectile/particle/damage-number, so
       // they're never momentarily hidden underneath one (see
       // EntityRenderer.drawEnemyHpBar's own doc comment).
-      for (const enemy of snapshot.enemies) drawEnemyHpBar(ctx, enemy);
+      for (const enemy of snapshot.enemies) if (emergenceProgress(enemy.distanceTraveled) >= 1) drawEnemyHpBar(ctx, enemy);
 
       if (!drawRealisticAtmosphere(ctx, biome, timestamp, visibleBounds)) {
         drawFog(ctx, biome, timestamp);

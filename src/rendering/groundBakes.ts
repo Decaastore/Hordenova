@@ -5,7 +5,7 @@ import type { VisibleBounds } from "./MapRenderer";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 /** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
-const BAKE_VERSION = 3;
+const BAKE_VERSION = 4;
 /** Slot index (index % 6) whose baked platform is the glowing rune altar — see MapRenderer's slot style order. */
 const ALTAR_SLOT_STYLE_INDEX = 4;
 

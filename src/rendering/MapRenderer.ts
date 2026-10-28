@@ -1,5 +1,6 @@
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
-import { distance, type Vector2 } from "@/utils/geometry";
+import { distance, getPointAtDistance, type Vector2 } from "@/utils/geometry";
+import { drawRiftPortal, PORTAL_PATH_DISTANCE } from "./riftPortal";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
@@ -959,6 +960,11 @@ const ENDPOINT_INSET = 130;
  * itself there too, from the SAME `ENEMY_PATH`-derived math — never a
  * second, independently-guessed castle position.
  */
+/** Where the enemies' rift sits: on the road itself, PORTAL_PATH_DISTANCE units in from its start. */
+export function getPortalAnchor(path: readonly Vector2[]): Vector2 {
+  return getPointAtDistance(path, PORTAL_PATH_DISTANCE).position;
+}
+
 export function getFortressAnchor(path: readonly Vector2[]): { position: Vector2; facingDir: Vector2 } {
   const end = path[path.length - 1]!;
   const prev = path[path.length - 2]!;
@@ -984,11 +990,17 @@ export function drawPathEndpoints(
    * any test) is pixel-identical to before this param existed.
    */
   skipCastleBody = false,
+  /**
+   * Gameplay only: draw the ground rift enemies climb out of (at the road's
+   * start, see riftPortal.ts) instead of the classic floating portal.
+   */
+  rift?: { emergingIds: readonly string[]; rimBaked: boolean },
 ): void {
   if (path.length < 2) return;
   const start = path[0]!;
   const startDir = normalize(path[1]!.x - start.x, path[1]!.y - start.y);
-  drawMagicPortal(ctx, { x: start.x + startDir.x * ENDPOINT_INSET, y: start.y + startDir.y * ENDPOINT_INSET }, timeMs);
+  if (rift) drawRiftPortal(ctx, getPortalAnchor(path), biome, timeMs, rift.emergingIds, rift.rimBaked);
+  else drawMagicPortal(ctx, { x: start.x + startDir.x * ENDPOINT_INSET, y: start.y + startDir.y * ENDPOINT_INSET }, timeMs);
 
   const { position: fortressPos } = getFortressAnchor(path);
   drawFortress(ctx, fortressPos, biome, timeMs, 1, 0, hpPercent, null, skipCastleBody);

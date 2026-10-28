@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v49",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Enemies Now Climb Out of a Rift",
+      ptBR: "Os Inimigos Agora Saem de uma Fenda",
+    },
+    description: {
+      en: "The floating portal has been replaced by a rift torn open in the ground right where the road begins. Enemies no longer walk in from off-screen past the portal: each one climbs out of the rift, growing to full size as it pulls itself out, with a burst of sparks and dust. Enemy timing, paths and stats are unchanged.",
+      ptBR: "O portal flutuante foi trocado por uma fenda aberta no chão, bem onde a estrada começa. Os inimigos não entram mais pela borda da tela passando pelo portal: cada um sai de dentro da fenda, crescendo até o tamanho normal enquanto se arrasta para fora, com uma explosão de faíscas e poeira. O ritmo, o caminho e os atributos dos inimigos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "A swirling void with light rising out of it, chunks of rock orbiting above and arcs of energy crackling to its rim — it flares up every time something comes through.",
+        ptBR: "Um vórtice girando com luz subindo de dentro, pedaços de rocha flutuando em volta e raios de energia estalando até a borda — ele se acende toda vez que algo atravessa.",
+      },
+      {
+        en: "In the six original biomes the rift sits in a scorched crater ringed by standing stones with glowing violet runes, and the road now starts at the rift.",
+        ptBR: "Nos seis biomas originais a fenda fica numa cratera queimada cercada por pedras em pé com runas violeta brilhando, e a estrada agora começa na fenda.",
+      },
+    ],
+  },
+  {
     id: "v48",
     dateIso: "2026-10-28",
     category: "CONTENT",
