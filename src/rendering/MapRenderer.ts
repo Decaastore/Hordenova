@@ -7,6 +7,7 @@ import { PALETTE } from "./theme";
 import { drawEnergyCrack, drawFloatingMotes, rimHighlight } from "./lighting";
 import type { AtmosphereKind, BiomeDefinition } from "./biomes";
 import { getMapDecorations, type Decoration, type DecorationKind } from "./mapDecorations";
+import { castleAnchor, castleSpriteOrigin, CASTLE_SPRITE_SIZE, getCastleSprite } from "./castleSprites";
 
 /**
  * Pure drawing helpers — world-space coordinates in, pixels on screen out
@@ -1016,6 +1017,20 @@ export function drawFortress(
   ctx.translate(position.x, position.y);
   ctx.scale(scale, scale);
 
+  // REALISTIC CASTLE (castleSprites.ts) — the rendered 3D fortress for this
+  // biome and damage tier, with every animated element drawn live on top.
+  // Falls back to the original hand-drawn fortress below while the image is
+  // loading (or wherever images can't load).
+  const castleTier = getCastleHpTier(hpPercent);
+  const castleImage = skipBody ? undefined : getCastleSprite(biome.id, castleTier);
+  if (castleImage) {
+    drawRealisticCastle(ctx, castleImage, castleTier, biome, p.accentGlow, timeMs, windIntensity, hpPercent);
+    ctx.restore();
+    return {
+      torches: [castleAnchor("keepWindow", castleTier), castleAnchor("torchL", castleTier), castleAnchor("torchR", castleTier), castleAnchor("core", castleTier)],
+    };
+  }
+
   if (!skipBody) {
   // Stone platform the fortress stands on, with roots breaking through cracks.
   ctx.fillStyle = "rgba(8,8,3,0.4)";
@@ -1285,6 +1300,253 @@ export function drawFortress(
  * drawFortress's own translate+scale block, so coordinates here are local
  * fortress space, matching every other draw call in that function.
  */
+function drawRealisticCastle(
+  ctx: CanvasRenderingContext2D,
+  image: HTMLImageElement,
+  tier: number,
+  biome: BiomeDefinition,
+  accent: string,
+  timeMs: number,
+  windIntensity: number,
+  hpPercent: number,
+): void {
+  const o = castleSpriteOrigin();
+  // Ground shadow so the mound sits on the terrain.
+  ctx.fillStyle = "rgba(0,0,0,0.32)";
+  ctx.beginPath();
+  ctx.ellipse(0, 16, 70, 17, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.drawImage(image, o.x, o.y, CASTLE_SPRITE_SIZE, CASTLE_SPRITE_SIZE);
+
+  const A = (name: string) => castleAnchor(name, tier);
+  const damage = Math.max(0, 1 - hpPercent);
+
+  // Windows: soft warm flicker over the baked lit windows.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const [name, phase] of [
+    ["keepWindow", 0],
+    ["towerWindowL", 1.7],
+    ["towerWindowR", 3.1],
+  ] as const) {
+    if (tier >= 3 && name === "towerWindowL") continue;
+    const w = A(name);
+    const f = 0.5 + 0.5 * Math.sin(timeMs / 420 + phase) * Math.sin(timeMs / 170 + phase * 2);
+    const g = ctx.createRadialGradient(w.x, w.y, 0, w.x, w.y, 7);
+    g.addColorStop(0, `rgba(255,180,90,${0.22 + 0.18 * f})`);
+    g.addColorStop(1, "rgba(255,180,90,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, 7, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Gate torches: real little flames on the iron brackets + a light pool.
+  for (const [name, phase] of [
+    ["torchL", 0],
+    ["torchR", 2.3],
+  ] as const) {
+    const t = A(name);
+    const flick = Math.sin(timeMs / 90 + phase) * 0.8 + Math.sin(timeMs / 37 + phase) * 0.4;
+    const glow = ctx.createRadialGradient(t.x, t.y, 0, t.x, t.y, 16);
+    glow.addColorStop(0, "rgba(255,170,80,0.42)");
+    glow.addColorStop(1, "rgba(255,140,60,0)");
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, 16, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,150,50,0.9)";
+    ctx.beginPath();
+    ctx.moveTo(t.x - 1.8, t.y);
+    ctx.quadraticCurveTo(t.x - 2 + flick, t.y - 4, t.x + flick * 0.6, t.y - 7.5);
+    ctx.quadraticCurveTo(t.x + 2 + flick, t.y - 4, t.x + 1.8, t.y);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = "rgba(255,240,180,0.95)";
+    ctx.beginPath();
+    ctx.ellipse(t.x, t.y - 1.6, 0.9, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Keystone crystal — the castle's magic core, pulsing in the biome's accent
+  // color and flaring brighter the more damage the castle has taken.
+  const core = A("core");
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 700);
+  const haloR = 6 + pulse * 1.5;
+  const halo = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, haloR);
+  halo.addColorStop(0, hexToRgba(accent, 0.45 + damage * 0.15));
+  halo.addColorStop(1, hexToRgba(accent, 0));
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(core.x, core.y, haloR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Waving banners on the real flag poles.
+  drawBanner(ctx, A("bannerKeep").x - 2, A("bannerKeep").y + 4, biome, timeMs, 1.15, 0, windIntensity);
+  drawBanner(ctx, A("bannerGate").x - 2, A("bannerGate").y + 4, biome, timeMs, 0.85, 0.5, windIntensity);
+  if (tier < 3) drawBanner(ctx, A("bannerTowerL").x - 2, A("bannerTowerL").y + 4, biome, timeMs, 0.9, -0.3, windIntensity);
+  drawBanner(ctx, A("bannerTowerR").x - 2, A("bannerTowerR").y + 4, biome, timeMs, 0.9, 0.3, windIntensity);
+
+  // Magic motes drifting around the keep.
+  const keep = A("keepWindow");
+  drawFloatingMotes(ctx, keep.x, keep.y - 6, timeMs, 61, { count: 6, spreadX: 26, spreadY: 50, color: accent, periodMs: 4600, size: 1.2 });
+
+  // Live damage on top of the baked damage (cracks / broken tower / fallen
+  // roof are in the image): real fire, smoke columns, rising embers and
+  // crumbling stone — never a flat tinted circle.
+  if (tier >= 2) {
+    // Dust and pebbles crumbling off the walls.
+    drawCrumble(ctx, A("bannerGate"), timeMs, tier >= 3 ? 3 : 1, 11);
+    if (tier >= 3) drawCrumble(ctx, A("towerWindowR"), timeMs, 2, 29);
+  }
+  if (tier >= 3) {
+    const towerTop = A("bannerTowerL");
+    drawSmokeColumn(ctx, towerTop.x, towerTop.y - 2, timeMs, tier >= 4 ? 1.35 : 1, 3);
+    drawFire(ctx, towerTop.x, towerTop.y + 2, timeMs, tier >= 4 ? 1.3 : 0.9, 5);
+    drawEmbers(ctx, towerTop.x, towerTop.y, timeMs, tier >= 4 ? 12 : 6, 7);
+  }
+  if (tier >= 4) {
+    const keepWin = A("keepWindow");
+    drawSmokeColumn(ctx, keepWin.x, keepWin.y - 4, timeMs, 1.1, 17);
+    drawFire(ctx, keepWin.x, keepWin.y + 1, timeMs, 1, 23);
+    drawEmbers(ctx, keepWin.x, keepWin.y - 2, timeMs, 8, 31);
+    const gate = A("bannerGate");
+    drawFire(ctx, gate.x - 7, gate.y + 3, timeMs, 0.7, 41);
+    drawFire(ctx, gate.x + 7, gate.y + 3, timeMs, 0.6, 43);
+    drawEmbers(ctx, gate.x, gate.y, timeMs, 6, 47);
+    // The keystone crystal flickers unstably, crackling with its own light.
+    const c = A("core");
+    const unstable = Math.max(0, Math.sin(timeMs / 47) * Math.sin(timeMs / 113));
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = hexToRgba(accent, 0.5 + 0.5 * unstable);
+    ctx.lineWidth = 0.9;
+    for (let k = 0; k < 3; k++) {
+      const a = timeMs / 400 + k * 2.1;
+      ctx.beginPath();
+      ctx.moveTo(c.x, c.y);
+      ctx.lineTo(c.x + Math.cos(a) * 4 + Math.sin(timeMs / 30 + k) * 1.5, c.y + Math.sin(a) * 4);
+      ctx.lineTo(c.x + Math.cos(a + 0.4) * 8, c.y + Math.sin(a + 0.4) * 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+}
+
+/** Seeded 0..1 noise from an integer-ish input. */
+function n01(v: number): number {
+  const x = Math.sin(v * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+/** Layered, flickering flames rooted at (x,y): dark-red outer tongues, orange body, yellow-white core, plus a warm light pool. */
+function drawFire(ctx: CanvasRenderingContext2D, x: number, y: number, timeMs: number, size: number, seed: number): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const pool = ctx.createRadialGradient(x, y - 4 * size, 0, x, y - 4 * size, 22 * size);
+  pool.addColorStop(0, "rgba(255,140,50,0.28)");
+  pool.addColorStop(1, "rgba(255,100,30,0)");
+  ctx.fillStyle = pool;
+  ctx.beginPath();
+  ctx.arc(x, y - 4 * size, 22 * size, 0, Math.PI * 2);
+  ctx.fill();
+  const tongues = 5;
+  const layers: [string, string, number, number][] = [
+    ["rgba(200,40,10,0.55)", "rgba(200,40,10,0)", 1.0, 1.0],
+    ["rgba(255,120,30,0.75)", "rgba(255,150,40,0)", 0.75, 0.8],
+    ["rgba(255,230,150,0.9)", "rgba(255,240,190,0)", 0.42, 0.55],
+  ];
+  for (const [c0, c1, wMul, hMul] of layers) {
+    for (let k = 0; k < tongues; k++) {
+      const off = (k - (tongues - 1) / 2) * 2.6 * size;
+      const t = timeMs / (90 + n01(seed + k) * 60) + n01(seed * 3 + k) * 6;
+      const h = (9 + 6 * Math.abs(Math.sin(t)) + 4 * n01(seed + k * 7)) * size * hMul * (1 - Math.abs(off) / (10 * size));
+      if (h <= 1) continue;
+      const w = 2.4 * size * wMul;
+      const sway = Math.sin(t * 1.7) * 1.8 * size;
+      const g = ctx.createLinearGradient(x + off, y, x + off, y - h);
+      g.addColorStop(0, c0);
+      g.addColorStop(1, c1);
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x + off - w, y);
+      ctx.bezierCurveTo(x + off - w, y - h * 0.4, x + off + sway - w * 0.4, y - h * 0.7, x + off + sway, y - h);
+      ctx.bezierCurveTo(x + off + sway + w * 0.4, y - h * 0.7, x + off + w, y - h * 0.4, x + off + w, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+/** A rising, widening, drifting smoke column made of soft puffs. */
+function drawSmokeColumn(ctx: CanvasRenderingContext2D, x: number, y: number, timeMs: number, size: number, seed: number): void {
+  ctx.save();
+  const puffs = 9;
+  for (let i = 0; i < puffs; i++) {
+    const cycle = (timeMs / 3400 + i / puffs + n01(seed + i) * 0.05) % 1;
+    const drift = cycle * cycle * 26 * size + Math.sin(timeMs / 1300 + i + seed) * 3;
+    const px = x + drift;
+    const py = y - cycle * 70 * size;
+    const r = (4 + cycle * 14) * size;
+    const a = Math.sin(cycle * Math.PI) * 0.42;
+    const shade = 30 + Math.round(cycle * 50);
+    const g = ctx.createRadialGradient(px, py, 0, px, py, r);
+    g.addColorStop(0, `rgba(${shade},${shade - 4},${shade - 8},${a})`);
+    g.addColorStop(1, `rgba(${shade},${shade - 4},${shade - 8},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Bright embers spiralling up out of a fire. */
+function drawEmbers(ctx: CanvasRenderingContext2D, x: number, y: number, timeMs: number, count: number, seed: number): void {
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < count; i++) {
+    const life = 1600 + n01(seed + i) * 1400;
+    const cycle = ((timeMs + n01(seed * 5 + i) * life) % life) / life;
+    const ex = x + (n01(seed + i * 3) - 0.5) * 12 + Math.sin(timeMs / 260 + i) * 4 * cycle;
+    const ey = y - cycle * (40 + n01(seed + i * 9) * 30);
+    const a = (1 - cycle) * (0.6 + 0.4 * Math.sin(timeMs / 60 + i));
+    ctx.fillStyle = `rgba(255,${150 + Math.round(80 * (1 - cycle))},60,${Math.max(0, a)})`;
+    ctx.beginPath();
+    ctx.arc(ex, ey, 0.8 + (1 - cycle) * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/** Grit and small stones periodically breaking off a wall and falling, with a little dust puff where they land. */
+function drawCrumble(ctx: CanvasRenderingContext2D, from: Vector2, timeMs: number, count: number, seed: number): void {
+  ctx.save();
+  for (let i = 0; i < count; i++) {
+    const period = 2600 + n01(seed + i) * 2200;
+    const phase = ((timeMs + n01(seed * 2 + i) * period) % period) / period;
+    if (phase > 0.45) continue;
+    const t = phase / 0.45;
+    const sx = from.x + (n01(seed + i * 5) - 0.5) * 18;
+    const fall = 16 + n01(seed + i * 11) * 14;
+    const py = from.y + t * t * fall;
+    ctx.fillStyle = "rgba(70,62,54,0.9)";
+    ctx.beginPath();
+    ctx.arc(sx, py, 0.9 + n01(seed + i) * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    if (t > 0.85) {
+      const d = (t - 0.85) / 0.15;
+      ctx.fillStyle = `rgba(150,140,125,${0.35 * (1 - d)})`;
+      ctx.beginPath();
+      ctx.ellipse(sx, from.y + fall, 2 + d * 5, 1 + d * 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
 function drawFortressDamageOverlay(ctx: CanvasRenderingContext2D, timeMs: number, hpPercent: number): void {
   const tier = getCastleHpTier(hpPercent);
   if (tier === 1) return; // 100-75%: mostly intact, no overlay needed.
@@ -1348,27 +1610,13 @@ function drawFortressDamageOverlay(ctx: CanvasRenderingContext2D, timeMs: number
 
   if (tier === 3) return;
 
-  // Tier 4 (25-1%): critical — fire licking from the broken tower, a
-  // pulsing danger-red rim light across the whole structure, more debris.
+  // Tier 4 (25-1%): critical — real flames and embers from the broken tower
+  // and the keep, plus more debris (no flat tinted overlay).
+  drawFire(ctx, -38, -24, timeMs, 1.1, 5);
+  drawEmbers(ctx, -38, -28, timeMs, 10, 7);
+  drawFire(ctx, 4, -52, timeMs, 0.8, 23);
+  drawSmokeColumn(ctx, 4, -58, timeMs, 1, 17);
   ctx.save();
-  const flicker = 0.5 + 0.5 * Math.sin(timeMs / 130);
-  const fireGradient = ctx.createRadialGradient(-38, -26, 0, -38, -26, 14);
-  fireGradient.addColorStop(0, `rgba(255,150,60,${0.7 * flicker})`);
-  fireGradient.addColorStop(1, "rgba(255,90,30,0)");
-  ctx.fillStyle = fireGradient;
-  ctx.beginPath();
-  ctx.arc(-38, -26, 14, 0, Math.PI * 2);
-  ctx.fill();
-
-  if (tier >= 4) {
-    ctx.globalAlpha = 0.16 + 0.1 * flicker;
-    ctx.fillStyle = "#ff2e2e";
-    ctx.beginPath();
-    ctx.ellipse(0, -30, 62, 90, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
   ctx.fillStyle = "rgba(20,16,12,0.85)";
   ctx.beginPath();
   ctx.moveTo(30, -6);

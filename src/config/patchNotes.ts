@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v43",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "A Real Castle That Crumbles As You Lose",
+      ptBR: "Um Castelo de Verdade Que Desmorona Conforme Você Perde",
+    },
+    description: {
+      en: "The castle you defend has been rebuilt as a detailed stone fortress — a keep, two round towers, a gatehouse with an iron portcullis and its magic crystal — dressed to match each biome. As it takes damage it visibly falls apart, with real fire, smoke and falling stone instead of a red flashing glow.",
+      ptBR: "O castelo que você defende foi refeito como uma fortaleza de pedra detalhada — torre principal, duas torres redondas, portaria com grade de ferro e o seu cristal mágico — com o visual de cada bioma. Conforme leva dano ele vai se desfazendo à vista, com fogo de verdade, fumaça e pedras caindo no lugar do brilho vermelho piscando.",
+    },
+    highlights: [
+      {
+        en: "Each biome dresses the castle its own way: moss in the forest, snow in the tundra, sand dunes in the desert, glowing lava cracks in the volcano, ruin and void in the darker lands.",
+        ptBR: "Cada bioma veste o castelo do seu jeito: musgo na floresta, neve na tundra, dunas no deserto, rachaduras de lava no vulcão, ruína e vazio nas terras mais sombrias.",
+      },
+      {
+        en: "Four damage stages: cracks first, then the left tower breaks and starts smoking, and when it's critical the keep and gatehouse catch fire, embers rise and stones crumble off the walls.",
+        ptBR: "Quatro estágios de dano: primeiro rachaduras, depois a torre esquerda quebra e começa a soltar fumaça, e no crítico a torre principal e a portaria pegam fogo, brasas sobem e pedras se soltam das muralhas.",
+      },
+      {
+        en: "Living details: waving banners, flickering windows and gate torches, and the crystal glowing in the biome's color.",
+        ptBR: "Detalhes vivos: bandeiras tremulando, janelas e tochas do portão piscando, e o cristal brilhando na cor do bioma.",
+      },
+    ],
+  },
+  {
     id: "v42",
     dateIso: "2026-10-28",
     category: "CONTENT",
