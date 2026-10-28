@@ -1790,6 +1790,10 @@ function styleForSlot(index: number): PlatformStyle {
 }
 
 const PLATFORM_RADIUS = 15;
+/** Build platform footprint (matches the baked ground's platforms): towers draw their own base centred ~4.5 units below the slot point, in a slightly oblique view. */
+const SLOT_BASE_OFFSET_Y = 4.5;
+const SLOT_BASE_RX = 21;
+const SLOT_BASE_RY = 13;
 
 export function drawSlot(
   ctx: CanvasRenderingContext2D,
@@ -1807,6 +1811,11 @@ export function drawSlot(
   ctx.translate(slot.position.x, slot.position.y);
 
   if (!platformBaked) {
+    // Same footprint as the baked platforms: an oblique ellipse centred just
+    // below the slot point, right under where every tower draws its base.
+    ctx.save();
+    ctx.translate(0, SLOT_BASE_OFFSET_Y);
+    ctx.scale(SLOT_BASE_RX / PLATFORM_RADIUS, SLOT_BASE_RY / PLATFORM_RADIUS);
     ctx.fillStyle = "rgba(10,10,4,0.3)";
     ctx.beginPath();
     ctx.ellipse(0, 4, PLATFORM_RADIUS + 3, (PLATFORM_RADIUS + 3) * 0.42, 0, 0, Math.PI * 2);
@@ -1818,6 +1827,7 @@ export function drawSlot(
     else if (style === "RUIN") drawRuinPlatform(ctx, biome);
     else if (style === "ALTAR") drawAltarPlatform(ctx, biome, timeMs);
     else drawElevatedPlatform(ctx, biome);
+    ctx.restore();
   }
 
   if (!occupied && highlighted) {
@@ -1825,7 +1835,7 @@ export function drawSlot(
     ctx.lineWidth = 2;
     ctx.setLineDash([4, 4]);
     ctx.beginPath();
-    ctx.arc(0, 0, PLATFORM_RADIUS + 6, 0, Math.PI * 2);
+    ctx.ellipse(0, SLOT_BASE_OFFSET_Y, SLOT_BASE_RX + 4, SLOT_BASE_RY + 3, 0, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
   }

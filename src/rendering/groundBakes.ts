@@ -5,7 +5,7 @@ import type { VisibleBounds } from "./MapRenderer";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 /** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
-const BAKE_VERSION = 2;
+const BAKE_VERSION = 3;
 /** Slot index (index % 6) whose baked platform is the glowing rune altar — see MapRenderer's slot style order. */
 const ALTAR_SLOT_STYLE_INDEX = 4;
 
@@ -118,7 +118,7 @@ function glowRegions(biome: BiomeDefinition): { x: number; y: number; r: number;
         phase: i * 1.37 + d.position.x * 0.01,
       }));
     TOWER_SLOTS.forEach((slot, i) => {
-      if (i % 6 === ALTAR_SLOT_STYLE_INDEX) regions!.push({ x: slot.position.x, y: slot.position.y, r: 20, phase: i * 2.1 });
+      if (i % 6 === ALTAR_SLOT_STYLE_INDEX) regions!.push({ x: slot.position.x, y: slot.position.y + 4.5, r: 30, phase: i * 2.1 });
     });
     glowRegionCache.set(biome.id, regions);
   }

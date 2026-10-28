@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v47",
+    dateIso: "2026-10-28",
+    category: "FIXES",
+    title: {
+      en: "Towers Now Stand Right on Their Platforms",
+      ptBR: "Torres Agora Ficam Certinhas em Cima das Bases",
+    },
+    description: {
+      en: "Towers used to sit slightly off their build platforms, with the base of the tower and the platform not lining up. The platforms have been reshaped and moved to sit exactly under each tower's base, so every tower visibly stands on its platform. Where you can build is unchanged.",
+      ptBR: "As torres ficavam um pouco deslocadas das bases, com o pé da torre e a base desalinhados. As bases foram redesenhadas e reposicionadas para ficar exatamente embaixo do pé de cada torre, então toda torre aparece em pé em cima da sua base. Os lugares onde dá para construir não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Platforms are now slightly wider ovals that match the tower's base, leaving a visible rim of stone, wood or earth around it.",
+        ptBR: "As bases agora são ovais um pouco mais largas, no formato do pé da torre, deixando aparecer uma borda de pedra, madeira ou terra em volta.",
+      },
+      {
+        en: "The dashed highlight shown when choosing where to build follows the same new shape.",
+        ptBR: "O contorno tracejado que aparece na hora de escolher onde construir segue o mesmo formato novo.",
+      },
+    ],
+  },
+  {
     id: "v46",
     dateIso: "2026-10-28",
     category: "CONTENT",
