@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v46",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Real Tower Platforms, Torches and Crystals",
+      ptBR: "Bases de Torre, Tochas e Cristais de Verdade",
+    },
+    description: {
+      en: "In the six original biomes, the spots where you build towers are now real platforms set into the ground instead of flat circles. Torches and crystals across every map have been redrawn too. Where you can build hasn't changed.",
+      ptBR: "Nos seis biomas originais, os lugares onde você constrói torres agora são bases de verdade encaixadas no terreno, no lugar dos círculos chapados. As tochas e os cristais de todos os mapas também foram redesenhados. Os lugares onde dá para construir continuam os mesmos.",
+    },
+    highlights: [
+      {
+        en: "Six kinds of platform: cut stone with a carved rune ring, a broken old ruin, a timber deck with iron bands, a rune altar that glows in the biome's colour, a clearing ringed with stones, and a raised mound.",
+        ptBR: "Seis tipos de base: pedra lavrada com um anel de runas entalhado, uma ruína antiga quebrada, um deck de madeira com cintas de ferro, um altar de runas que brilha na cor do bioma, uma clareira cercada de pedras e um monte elevado.",
+      },
+      {
+        en: "Torches are now timber posts with iron braziers, burning with real flames, embers and a thin trail of smoke, and lighting the ground around them.",
+        ptBR: "As tochas agora são postes de madeira com braseiros de ferro, com chamas de verdade, brasas e um fio de fumaça, iluminando o chão em volta.",
+      },
+      {
+        en: "Crystals are now clusters of faceted prisms breaking out of the rock, glowing softly from inside with an occasional glint.",
+        ptBR: "Os cristais agora são aglomerados de prismas facetados saindo da rocha, com um brilho suave por dentro e um reflexo de vez em quando.",
+      },
+    ],
+  },
+  {
     id: "v45",
     dateIso: "2026-10-28",
     category: "CONTENT",

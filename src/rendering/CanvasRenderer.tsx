@@ -388,6 +388,7 @@ export function CanvasRenderer({
           pendingTowerTypeRef.current !== null,
           biome,
           timestamp,
+          groundBake !== null,
         );
       });
 

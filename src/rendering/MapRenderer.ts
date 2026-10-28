@@ -4,7 +4,7 @@ import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
-import { drawEnergyCrack, drawFloatingMotes, rimHighlight } from "./lighting";
+import { drawEnergyCrack, drawFloatingMotes } from "./lighting";
 import type { AtmosphereKind, BiomeDefinition } from "./biomes";
 import { getMapDecorations, type Decoration, type DecorationKind } from "./mapDecorations";
 import { castleAnchor, castleSpriteOrigin, CASTLE_SPRITE_SIZE, getCastleSprite } from "./castleSprites";
@@ -163,7 +163,7 @@ export function drawDecorations(
         drawRuinDecor(ctx, biome);
         break;
       case "CRYSTAL":
-        drawCrystalDecor(ctx, timeMs, biome);
+        drawCrystalCluster(ctx, deco, timeMs, biome);
         break;
       case "GRASS":
         drawGrassTuft(ctx, biome);
@@ -175,7 +175,7 @@ export function drawDecorations(
         drawWaterPond(ctx, deco, timeMs, biome);
         break;
       case "TORCH":
-        drawTorch(ctx, timeMs, biome);
+        drawBrazierTorch(ctx, deco, timeMs, biome);
         break;
       case "FISSURE":
         drawFissure(ctx, deco, timeMs, biome);
@@ -330,87 +330,6 @@ function drawRuinDecor(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): v
   ctx.fill();
 }
 
-/**
- * TERRAIN + DECORATION VISUAL REWORK — silhouette-before-glow (spec section
- * 3/5): the previous halo (r=28, up to 0.45 alpha) was big and bright enough
- * to visually wash out the crystal's own contact shadow, reading as "a green
- * glow" rather than "a crystal sitting on the ground." Shape now comes
- * first — a real contact shadow, a buried base wedge the crystal visibly
- * emerges from, and a second darker facet so more than one crystal FACE
- * reads at a glance — with the glow trimmed down to a genuinely subtle
- * emission that no longer competes with any of that.
- */
-function drawCrystalDecor(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
-  const color = biome.palette.accentGlow;
-  const pulse = 0.6 + 0.4 * Math.sin(timeMs / 900);
-
-  ctx.fillStyle = "rgba(10,10,4,0.32)";
-  ctx.beginPath();
-  ctx.ellipse(0, 6, 7, 2.6, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.globalAlpha = pulse;
-  const glow = ctx.createRadialGradient(0, -2, 0, 0, -2, 15);
-  glow.addColorStop(0, hexToRgba(color, 0.32));
-  glow.addColorStop(1, hexToRgba(color, 0));
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(0, -2, 15, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // Buried base — the crystal visibly emerges from the ground instead of
-  // hovering above its own shadow.
-  ctx.fillStyle = biome.palette.rockDark;
-  ctx.beginPath();
-  ctx.moveTo(-4, 6);
-  ctx.lineTo(4, 6);
-  ctx.lineTo(2, 3);
-  ctx.lineTo(-2, 3);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(0, -14);
-  ctx.lineTo(5, -2);
-  ctx.lineTo(2, 5);
-  ctx.lineTo(-2, 5);
-  ctx.lineTo(-5, -2);
-  ctx.closePath();
-  ctx.fill();
-  // A second, darker facet on the shadow-facing side — the concrete "mais
-  // de uma face" fix, not just one flat diamond.
-  ctx.fillStyle = "rgba(0,0,0,0.18)";
-  ctx.beginPath();
-  ctx.moveTo(0, -14);
-  ctx.lineTo(5, -2);
-  ctx.lineTo(2, 5);
-  ctx.lineTo(0, 3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = "rgba(255,255,255,0.55)";
-  ctx.beginPath();
-  ctx.moveTo(0, -14);
-  ctx.lineTo(2, -2);
-  ctx.lineTo(0, 5);
-  ctx.lineTo(-2, 5);
-  ctx.closePath();
-  ctx.fill();
-  rimHighlight(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(-5, -2);
-      ctx.lineTo(0, -14);
-    },
-    "#ffffff",
-    0.9,
-    0.5,
-  );
-}
-
 function drawGrassTuft(ctx: CanvasRenderingContext2D, biome: BiomeDefinition): void {
   ctx.strokeStyle = biome.palette.vegetationPrimary;
   ctx.lineWidth = 1.5;
@@ -526,69 +445,225 @@ function drawWaterPond(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: 
 }
 
 /**
- * TERRAIN + DECORATION VISUAL REWORK — the halo used to be big enough
- * (r=22, 0.55 alpha) and drawn AFTER the pole to sit on top of it, so the
- * torch read as "an orange blob" with a barely-visible stick inside it
- * rather than a physical object. Fix, in the brief's own order: (1) the
- * glow is now a small, restrained pool of ground light drawn BEHIND every
- * physical part; (2) added the "recipiente" (a real brazier bowl) the fire
- * sits inside instead of floating directly off the bare pole tip, so the
- * torch reads as pole+brazier+fire even with the glow mentally switched off.
+ * Standing torch: a timber post with iron bands and a forged brazier, lit
+ * from the same side as the baked ground and castle, burning with the same
+ * layered fire, embers and smoke as the castle (never a flat glow blob).
  */
-function drawTorch(ctx: CanvasRenderingContext2D, timeMs: number, biome: BiomeDefinition): void {
-  ctx.fillStyle = "rgba(10,10,4,0.32)";
+function drawBrazierTorch(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: number, biome: BiomeDefinition): void {
+  const seed = deco.variant * 7 + Math.round(deco.position.x * 0.37 + deco.position.y * 0.11);
+  // Shadow cast up-right on the ground, plus the warm pool of light the fire throws.
+  ctx.save();
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
   ctx.beginPath();
-  ctx.ellipse(0, 13, 4.4, 2.1, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  const flicker = Math.sin(timeMs / 130) * 1.4;
-
-  // A small, controlled pool of light on the ground — not the object itself.
-  const glow = ctx.createRadialGradient(0, 4, 0, 0, 4, 13);
-  glow.addColorStop(0, "rgba(255,176,74,0.32)");
-  glow.addColorStop(0.65, "rgba(255,176,74,0.12)");
-  glow.addColorStop(1, "rgba(255,176,74,0)");
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(0, 4, 13, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Pole — a real support the brazier sits on top of.
-  ctx.fillStyle = biome.palette.rockDark;
-  ctx.fillRect(-1.6, -3, 3.2, 16);
-  ctx.fillStyle = "rgba(255,255,255,0.14)";
-  ctx.fillRect(-1.6, -3, 1, 16);
-
-  // Brazier — the "recipiente" the fire physically sits inside.
-  ctx.fillStyle = biome.palette.rockDark;
-  ctx.beginPath();
-  ctx.moveTo(-4, -3);
-  ctx.lineTo(4, -3);
-  ctx.lineTo(2.6, -6.5);
-  ctx.lineTo(-2.6, -6.5);
+  ctx.moveTo(-2, 13);
+  ctx.lineTo(9, 2);
+  ctx.lineTo(11, 3.5);
+  ctx.lineTo(2, 14);
   ctx.closePath();
   ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.4)";
-  ctx.lineWidth = 0.8;
+  ctx.globalCompositeOperation = "lighter";
+  const flick = 0.85 + 0.15 * Math.sin(timeMs / 90 + seed) * Math.sin(timeMs / 37 + seed * 2);
+  const pool = ctx.createRadialGradient(0, 10, 0, 0, 10, 26);
+  pool.addColorStop(0, `rgba(255,150,60,${0.26 * flick})`);
+  pool.addColorStop(1, "rgba(255,120,40,0)");
+  ctx.fillStyle = pool;
   ctx.beginPath();
-  ctx.moveTo(-4, -3);
-  ctx.lineTo(4, -3);
+  ctx.ellipse(0, 10, 26, 16, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Stone footing.
+  ctx.fillStyle = biome.palette.rockDark;
+  ctx.beginPath();
+  ctx.ellipse(0, 13, 4.2, 1.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = hexToRgba(biome.palette.rock, 0.85);
+  ctx.beginPath();
+  ctx.ellipse(-0.8, 12.4, 3.2, 1.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Timber post: lit on the left, shadowed on the right, slight taper.
+  const post = ctx.createLinearGradient(-1.8, 0, 1.8, 0);
+  post.addColorStop(0, "#8a6a44");
+  post.addColorStop(0.45, "#5a4028");
+  post.addColorStop(1, "#24180e");
+  ctx.fillStyle = post;
+  ctx.beginPath();
+  ctx.moveTo(-1.9, 12.5);
+  ctx.lineTo(-1.4, -3);
+  ctx.lineTo(1.4, -3);
+  ctx.lineTo(1.9, 12.5);
+  ctx.closePath();
+  ctx.fill();
+  // Firelight catching the top of the post.
+  ctx.fillStyle = `rgba(255,170,80,${0.35 * flick})`;
+  ctx.fillRect(-1.4, -3, 2.8, 3);
+  // Iron bands.
+  ctx.fillStyle = "#2a2a2c";
+  for (const y of [1.5, 8]) ctx.fillRect(-1.8, y, 3.6, 1);
+
+  // Forged brazier bowl with a rim highlight.
+  const bowl = ctx.createLinearGradient(-4.5, 0, 4.5, 0);
+  bowl.addColorStop(0, "#5a5654");
+  bowl.addColorStop(0.5, "#2e2c2c");
+  bowl.addColorStop(1, "#121112");
+  ctx.fillStyle = bowl;
+  ctx.beginPath();
+  ctx.moveTo(-4.6, -6.6);
+  ctx.lineTo(4.6, -6.6);
+  ctx.lineTo(2.4, -2.6);
+  ctx.lineTo(-2.4, -2.6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = "#1a1818";
+  ctx.beginPath();
+  ctx.ellipse(0, -6.6, 4.6, 1.3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Glowing coals inside the bowl.
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = `rgba(255,110,30,${0.75 * flick})`;
+  ctx.beginPath();
+  ctx.ellipse(0, -6.5, 3.6, 0.9, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = "rgba(255,200,140,0.35)";
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(-4.6, -6.6);
+  ctx.lineTo(-2.4, -2.6);
   ctx.stroke();
 
-  ctx.fillStyle = biome.palette.accentWarm;
+  drawFire(ctx, 0, -6.4, timeMs, 0.5, seed);
+  drawEmbers(ctx, 0, -10, timeMs, 3, seed + 3);
+  drawSmokeColumn(ctx, 0, -16, timeMs, 0.28, seed + 5);
+}
+
+/**
+ * Crystal outcrop: a cluster of faceted prisms breaking out of the ground,
+ * each with a lit face, a shadowed face and a bright edge, glowing from
+ * inside in the biome's accent colour (slow breathing + a rare glint at a
+ * tip). The ground glow stays small so the shape always reads first.
+ */
+function drawCrystalCluster(ctx: CanvasRenderingContext2D, deco: Decoration, timeMs: number, biome: BiomeDefinition): void {
+  const color = biome.palette.accentGlow;
+  const seed = deco.variant * 13 + Math.round(deco.position.x * 0.41 + deco.position.y * 0.23);
+  const rnd = (k: number) => {
+    const x = Math.sin((seed + k) * 127.1 + 311.7) * 43758.5453;
+    return x - Math.floor(x);
+  };
+  const breathe = 0.65 + 0.35 * Math.sin(timeMs / 1400 + seed);
+
+  ctx.fillStyle = "rgba(0,0,0,0.3)";
   ctx.beginPath();
-  ctx.moveTo(-3, -5.5);
-  ctx.quadraticCurveTo(-3 + flicker, -12, 0, -18);
-  ctx.quadraticCurveTo(3 - flicker, -12, 3, -5.5);
+  ctx.ellipse(3, 5.5, 9, 3, -0.25, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const pool = ctx.createRadialGradient(0, 4, 0, 0, 4, 14);
+  pool.addColorStop(0, hexToRgba(color, 0.22 * breathe));
+  pool.addColorStop(1, hexToRgba(color, 0));
+  ctx.fillStyle = pool;
+  ctx.beginPath();
+  ctx.ellipse(0, 4, 14, 8, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Prisms, back to front: [x offset, height, width, lean]
+  const n = 3 + Math.floor(rnd(1) * 3);
+  const prisms: [number, number, number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const main = i === Math.floor(n / 2);
+    prisms.push([(i - (n - 1) / 2) * 3.2 + (rnd(i + 10) - 0.5) * 1.5, main ? 15 + rnd(i) * 3 : 6 + rnd(i + 20) * 7, main ? 3.4 : 2 + rnd(i + 30) * 1.2, (i - (n - 1) / 2) * 0.22 + (rnd(i + 40) - 0.5) * 0.15]);
+  }
+  prisms.sort((a, b) => a[1] - b[1]);
+  for (const [px, ph, pw, lean] of prisms) {
+    ctx.save();
+    ctx.translate(px, 4);
+    ctx.rotate(lean);
+    const tipY = -ph;
+    // Lit (left) face.
+    const lit = ctx.createLinearGradient(0, 0, 0, tipY);
+    lit.addColorStop(0, hexToRgba(color, 0.55));
+    lit.addColorStop(1, hexToRgba("#ffffff", 0.85));
+    ctx.fillStyle = lit;
+    ctx.beginPath();
+    ctx.moveTo(-pw, 0);
+    ctx.lineTo(-pw, tipY + pw * 1.8);
+    ctx.lineTo(0, tipY);
+    ctx.lineTo(0, 0.6);
+    ctx.closePath();
+    ctx.fill();
+    // Shadowed (right) face.
+    const dark = ctx.createLinearGradient(0, 0, 0, tipY);
+    dark.addColorStop(0, "rgba(10,8,20,0.9)");
+    dark.addColorStop(1, hexToRgba(color, 0.7));
+    ctx.fillStyle = dark;
+    ctx.beginPath();
+    ctx.moveTo(0, 0.6);
+    ctx.lineTo(0, tipY);
+    ctx.lineTo(pw, tipY + pw * 1.8);
+    ctx.lineTo(pw, 0);
+    ctx.closePath();
+    ctx.fill();
+    // Inner glow breathing up the core.
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = hexToRgba(color, 0.35 * breathe);
+    ctx.lineWidth = pw * 0.7;
+    ctx.beginPath();
+    ctx.moveTo(0, -1);
+    ctx.lineTo(0, tipY + pw * 1.6);
+    ctx.stroke();
+    ctx.globalCompositeOperation = "source-over";
+    // Bright ridge edge.
+    ctx.strokeStyle = "rgba(255,255,255,0.75)";
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, tipY);
+    ctx.stroke();
+    ctx.restore();
+  }
+  // Rocky base the crystals break out of.
+  ctx.fillStyle = biome.palette.rockDark;
+  ctx.beginPath();
+  ctx.moveTo(-8, 5);
+  ctx.lineTo(-5, 2.5);
+  ctx.lineTo(-1, 3.6);
+  ctx.lineTo(3, 2.4);
+  ctx.lineTo(7.5, 4.2);
+  ctx.lineTo(6, 6.4);
+  ctx.lineTo(-6, 6.6);
   ctx.closePath();
   ctx.fill();
-  ctx.fillStyle = "#ffe08a";
+  ctx.fillStyle = hexToRgba(biome.palette.rock, 0.7);
   ctx.beginPath();
-  ctx.moveTo(-1.4, -6.5);
-  ctx.quadraticCurveTo(-1.4 + flicker * 0.6, -11, 0, -14);
-  ctx.quadraticCurveTo(1.4 - flicker * 0.6, -11, 1.4, -6.5);
+  ctx.moveTo(-7, 4.6);
+  ctx.lineTo(-5, 3);
+  ctx.lineTo(-2, 4);
+  ctx.lineTo(-4, 5.2);
   ctx.closePath();
   ctx.fill();
+
+  // A rare glint travelling across the tallest tip.
+  const cycle = ((timeMs + seed * 397) % 5200) / 5200;
+  if (cycle < 0.08) {
+    const a = Math.sin((cycle / 0.08) * Math.PI);
+    const tall = prisms[prisms.length - 1]!;
+    const gx = tall[0] + Math.sin(tall[3]) * tall[1];
+    const gy = 4 - Math.cos(tall[3]) * tall[1] + 1;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(255,255,255,${0.9 * a})`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(gx - 3 * a, gy);
+    ctx.lineTo(gx + 3 * a, gy);
+    ctx.moveTo(gx, gy - 3 * a);
+    ctx.lineTo(gx, gy + 3 * a);
+    ctx.stroke();
+    ctx.restore();
+  }
 }
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -1724,22 +1799,26 @@ export function drawSlot(
   highlighted: boolean,
   biome: BiomeDefinition,
   timeMs: number,
+  /** True when the platform is already painted into the biome's baked ground (only the highlight ring is drawn live). */
+  platformBaked = false,
 ): void {
   const style = styleForSlot(index);
   ctx.save();
   ctx.translate(slot.position.x, slot.position.y);
 
-  ctx.fillStyle = "rgba(10,10,4,0.3)";
-  ctx.beginPath();
-  ctx.ellipse(0, 4, PLATFORM_RADIUS + 3, (PLATFORM_RADIUS + 3) * 0.42, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (!platformBaked) {
+    ctx.fillStyle = "rgba(10,10,4,0.3)";
+    ctx.beginPath();
+    ctx.ellipse(0, 4, PLATFORM_RADIUS + 3, (PLATFORM_RADIUS + 3) * 0.42, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-  if (style === "CLEARING") drawClearingPlatform(ctx, biome);
-  else if (style === "STONE") drawStonePlatform(ctx, biome);
-  else if (style === "WOOD") drawWoodPlatform(ctx);
-  else if (style === "RUIN") drawRuinPlatform(ctx, biome);
-  else if (style === "ALTAR") drawAltarPlatform(ctx, biome, timeMs);
-  else drawElevatedPlatform(ctx, biome);
+    if (style === "CLEARING") drawClearingPlatform(ctx, biome);
+    else if (style === "STONE") drawStonePlatform(ctx, biome);
+    else if (style === "WOOD") drawWoodPlatform(ctx);
+    else if (style === "RUIN") drawRuinPlatform(ctx, biome);
+    else if (style === "ALTAR") drawAltarPlatform(ctx, biome, timeMs);
+    else drawElevatedPlatform(ctx, biome);
+  }
 
   if (!occupied && highlighted) {
     ctx.strokeStyle = "rgba(255,210,87,0.9)";

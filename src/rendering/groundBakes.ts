@@ -2,6 +2,12 @@ import type { BiomeDefinition } from "./biomes";
 import type { DecorationKind } from "./mapDecorations";
 import { getMapDecorations } from "./mapDecorations";
 import type { VisibleBounds } from "./MapRenderer";
+import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+
+/** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
+const BAKE_VERSION = 2;
+/** Slot index (index % 6) whose baked platform is the glowing rune altar — see MapRenderer's slot style order. */
+const ALTAR_SLOT_STYLE_INDEX = 4;
 
 /**
  * Pre-rendered ("baked") ground for a biome: the whole terrain — ground
@@ -11,7 +17,8 @@ import type { VisibleBounds } from "./MapRenderer";
  * parts, black elsewhere) that is added on top with a slow pulse so lava
  * still breathes. When a biome has a bake, the 2D ground/road/static-scenery
  * drawing and the 3D terrain layer both stand down for it; anything animated
- * (torches, crystals, the portal, the castle, slots) still draws live.
+ * (torches, crystals, the portal, the castle) still draws live. The tower
+ * build platforms are baked in too; only their highlight ring is live.
  *
  * Images live in public/sprites/ground/ and load lazily the first time the
  * biome is shown; until then the old drawing is used.
@@ -46,8 +53,8 @@ const GROUND_BAKES: Record<string, GroundBakeDef> = {
   ANCIENT_FOREST: bake("ancient_forest", ["TREE", "ROCK", "ROOT", "RUIN", "GRASS", "FLOWER", "WATER"], "regions"),
   VOLCANIC_WASTES: bake("volcanic_wastes", ["ROCK", "RUIN", "FISSURE", "WATER"], "regions"),
   FROZEN_TUNDRA: bake("frozen_tundra", ["ROCK", "RUIN", "GRASS", "FISSURE"], "regions"),
-  CURSED_DESERT: bake("cursed_desert", ["ROCK", "RUIN", "GRASS"]),
-  DARK_RUINS: bake("dark_ruins", ["ROCK", "RUIN", "GRASS"]),
+  CURSED_DESERT: bake("cursed_desert", ["ROCK", "RUIN", "GRASS"], "regions"),
+  DARK_RUINS: bake("dark_ruins", ["ROCK", "RUIN", "GRASS"], "regions"),
   ABYSS: bake("abyss", ["ROCK", "RUIN"], "global"),
 };
 
@@ -64,7 +71,7 @@ function loadImage(src: string, onLoad: () => void): HTMLImageElement {
   const img = new Image();
   img.decoding = "async";
   img.onload = onLoad;
-  img.src = `${import.meta.env.BASE_URL}${src}`;
+  img.src = `${import.meta.env.BASE_URL}${src}?v=${BAKE_VERSION}`;
   return img;
 }
 
@@ -110,6 +117,9 @@ function glowRegions(biome: BiomeDefinition): { x: number; y: number; r: number;
         r: (d.kind === "WATER" ? 34 * 1.7 : 46 * 0.75) * d.scale,
         phase: i * 1.37 + d.position.x * 0.01,
       }));
+    TOWER_SLOTS.forEach((slot, i) => {
+      if (i % 6 === ALTAR_SLOT_STYLE_INDEX) regions!.push({ x: slot.position.x, y: slot.position.y, r: 20, phase: i * 2.1 });
+    });
     glowRegionCache.set(biome.id, regions);
   }
   return regions;
