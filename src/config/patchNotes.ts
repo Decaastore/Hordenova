@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v42",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Every Biome Now Has Its Own Creatures",
+      ptBR: "Cada Bioma Agora Tem Suas Próprias Criaturas",
+    },
+    description: {
+      en: "The first six biomes used to send the same eight monsters at you. Now each one has its own creature for every enemy type, fitting the place you're fighting in — all with real walk and flight animations. Each enemy type keeps exactly the same abilities and stats; only the creature changes.",
+      ptBR: "Os seis primeiros biomas mandavam os mesmos oito monstros. Agora cada um tem a sua própria criatura para cada tipo de inimigo, combinando com o lugar onde você está lutando — todas com animação real de caminhada e voo. Cada tipo de inimigo mantém exatamente as mesmas habilidades e atributos; só a criatura muda.",
+    },
+    highlights: [
+      {
+        en: "Ancient Forest: spiky moss blobs, swamp frogs, mushroom kings and leaf sprites. Volcanic Wastes: ember demons, fire drakes and magma-capped crawlers.",
+        ptBR: "Floresta Antiga: bolhas espinhosas de musgo, sapos do pântano, reis-cogumelo e espíritos de folha. Terras Vulcânicas: demônios em brasa, dragõezinhos de fogo e rastejantes de magma.",
+      },
+      {
+        en: "Frozen Tundra: yetis and frost-bitten wraiths. Cursed Desert: cactus walkers, sand raptors and desert spirits. Dark Ruins: skull orcs, shadow ninjas and bone ghosts. Abyss: void demons, deep-sea horrors and abyssal squids.",
+        ptBR: "Tundra Congelada: yetis e espectros congelados. Deserto Amaldiçoado: cactos andantes, raptores da areia e espíritos do deserto. Ruínas Sombrias: orcs de caveira, ninjas das sombras e fantasmas de osso. Abismo: demônios do vazio, horrores das profundezas e lulas abissais.",
+      },
+      {
+        en: "Each biome's creatures are only downloaded when you reach it, so the game doesn't get heavier to load.",
+        ptBR: "As criaturas de cada bioma só são baixadas quando você chega nele, então o jogo não fica mais pesado para carregar.",
+      },
+    ],
+  },
+  {
     id: "v41",
     dateIso: "2026-10-28",
     category: "CONTENT",

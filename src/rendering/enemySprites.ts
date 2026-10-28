@@ -1,5 +1,6 @@
 import type { EnemyType } from "@/config/enemyStats";
 import type { LocomotionState } from "./biomeCreatures/helpers";
+import { BIOME_ENEMY_SHEETS } from "./biomeEnemySheets";
 
 /**
  * PAINTED ENEMY SPRITES — hand-painted creature art (generated for
@@ -116,6 +117,50 @@ type LoadedSprite =
 const loaded = new Map<EnemyType, LoadedSprite>();
 let loadingStarted = false;
 
+/**
+ * PER-BIOME CREATURES — each of the first six biomes has its own animated
+ * creature for every core archetype (BIOME_ENEMY_SHEETS). The renderer
+ * tells us which biome is on screen; only THAT biome's sheets are loaded
+ * (lazily, the first time it's shown), so the player never downloads
+ * creatures for biomes they haven't reached. Until a biome's sheet has
+ * loaded, the generic sprite above is used — never a blank enemy.
+ */
+let activeBiome: string | null = null;
+const biomeLoaded = new Map<string, LoadedSprite>();
+const biomeRequested = new Set<string>();
+
+function assetBase(): string {
+  return (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
+}
+
+export function setSpriteBiome(biomeId: string): void {
+  if (activeBiome === biomeId) return;
+  activeBiome = biomeId;
+  if (biomeRequested.has(biomeId) || typeof Image === "undefined") return;
+  biomeRequested.add(biomeId);
+  const entries = BIOME_ENEMY_SHEETS[biomeId];
+  if (!entries) return;
+  for (const [type, entry] of Object.entries(entries) as [EnemyType, (typeof entries)[EnemyType] & object][]) {
+    const image = new Image();
+    image.decoding = "async";
+    image.onload = () => {
+      const def: SheetDef = { file: entry.file, frames: entry.frames, worldHeight: entry.worldHeight, stride: entry.stride, hover: entry.hover };
+      biomeLoaded.set(`${biomeId}:${type}`, {
+        kind: "sheet",
+        def,
+        image,
+        ice: tinted(image, "rgba(150,225,255,0.9)"),
+        fire: tinted(image, "rgba(255,120,30,0.9)"),
+      });
+    };
+    image.src = `${assetBase()}sprites/enemies/${entry.file}`;
+  }
+}
+
+function activeBiomeEntry(type: EnemyType) {
+  return activeBiome ? BIOME_ENEMY_SHEETS[activeBiome]?.[type] : undefined;
+}
+
 function tinted(image: HTMLImageElement, color: string): HTMLCanvasElement | null {
   try {
     const c = document.createElement("canvas");
@@ -156,6 +201,10 @@ export function ensureEnemySpritesLoading(): void {
 }
 
 export function getEnemySprite(type: EnemyType): LoadedSprite | undefined {
+  if (activeBiome) {
+    const biomeSprite = biomeLoaded.get(`${activeBiome}:${type}`);
+    if (biomeSprite) return biomeSprite;
+  }
   return loaded.get(type);
 }
 
@@ -175,7 +224,7 @@ export function hasAnimatedSheet(type: EnemyType): boolean {
  * HP bar sit just above the creature's head instead of overlapping it.
  */
 export function spriteHeadroom(type: EnemyType, scale: number): number | null {
-  const sheet = SHEET_DEFS[type];
+  const sheet = (activeBiome && biomeLoaded.has(`${activeBiome}:${type}`) ? activeBiomeEntry(type) : undefined) ?? SHEET_DEFS[type];
   if (sheet) return (sheet.worldHeight * (1 - FOOT_ANCHOR) + (sheet.hover ?? 0)) * scale;
   const def = SPRITE_DEFS[type];
   if (!def) return null;

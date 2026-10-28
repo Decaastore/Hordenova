@@ -24,6 +24,7 @@ import {
 import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower, getEnemyVfxProfile } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import { SpecialVfxLayer } from "./specialVfx";
+import { setSpriteBiome } from "./enemySprites";
 import { getTowerSpecialAtLevel } from "@/config/towerStats";
 import { INFERNO_SPECIAL } from "@/config/towerSpecials";
 import type { EnemyType } from "@/config/enemyStats";
@@ -243,6 +244,7 @@ export function CanvasRenderer({
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
       const biome = getBiome(snapshot.biomeId);
+      setSpriteBiome(biome.id);
       // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA — Gold feedback fix): Gold
       // gain no longer spawns a world-space canvas popup here — it read as
       // "behind/near the castle" because its spawn position was always a
