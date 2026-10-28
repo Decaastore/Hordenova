@@ -19,6 +19,8 @@ import type { VisibleBounds } from "./MapRenderer";
 interface GroundBakeDef {
   ground: string;
   emissive?: string;
+  /** How the emissive layer pulses: per lava/ice/water region, or the whole map breathing slowly (glowing veins everywhere). */
+  glow: "none" | "regions" | "global";
   /** World-space rectangle the image covers (larger than the 1000x600 world so letterbox margins are filled too). */
   x0: number;
   y0: number;
@@ -28,16 +30,25 @@ interface GroundBakeDef {
   bakedKinds: readonly DecorationKind[];
 }
 
+const EXTENT = { x0: -200, y0: -120, x1: 1200, y1: 720 } as const;
+
+function bake(file: string, bakedKinds: DecorationKind[], glow: GroundBakeDef["glow"] = "none"): GroundBakeDef {
+  return {
+    ground: `sprites/ground/${file}.webp`,
+    emissive: glow === "none" ? undefined : `sprites/ground/${file}_glow.webp`,
+    glow,
+    ...EXTENT,
+    bakedKinds,
+  };
+}
+
 const GROUND_BAKES: Record<string, GroundBakeDef> = {
-  VOLCANIC_WASTES: {
-    ground: "sprites/ground/volcanic_wastes.webp",
-    emissive: "sprites/ground/volcanic_wastes_glow.webp",
-    x0: -200,
-    y0: -120,
-    x1: 1200,
-    y1: 720,
-    bakedKinds: ["ROCK", "RUIN", "FISSURE", "WATER"],
-  },
+  ANCIENT_FOREST: bake("ancient_forest", ["TREE", "ROCK", "ROOT", "RUIN", "GRASS", "FLOWER", "WATER"], "regions"),
+  VOLCANIC_WASTES: bake("volcanic_wastes", ["ROCK", "RUIN", "FISSURE", "WATER"], "regions"),
+  FROZEN_TUNDRA: bake("frozen_tundra", ["ROCK", "RUIN", "GRASS", "FISSURE"], "regions"),
+  CURSED_DESERT: bake("cursed_desert", ["ROCK", "RUIN", "GRASS"]),
+  DARK_RUINS: bake("dark_ruins", ["ROCK", "RUIN", "GRASS"]),
+  ABYSS: bake("abyss", ["ROCK", "RUIN"], "global"),
 };
 
 export interface LoadedGroundBake {
@@ -124,6 +135,12 @@ export function drawBakedGround(
   const sy = emissive.naturalHeight / h;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
+  if (def.glow === "global") {
+    ctx.globalAlpha = 0.1 + 0.3 * (0.5 + 0.5 * Math.sin(timeMs / 2100) * (0.7 + 0.3 * Math.sin(timeMs / 730)));
+    ctx.drawImage(emissive, def.x0, def.y0, w, h);
+    ctx.restore();
+    return;
+  }
   for (const g of glowRegions(biome)) {
     // Slow, uneven breathing: two incommensurate sines so it never looks like a metronome.
     const pulse = 0.5 + 0.5 * Math.sin(timeMs / 1300 + g.phase) * (0.7 + 0.3 * Math.sin(timeMs / 470 + g.phase * 2));

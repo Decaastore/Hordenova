@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v45",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Realistic Ground in Every Original Biome",
+      ptBR: "Chão Realista em Todos os Biomas Originais",
+    },
+    description: {
+      en: "After the Volcanic Wastes, the other five original biomes have been repainted with realistic terrain, each with its own road and scenery and lit from the same side as the castle. The road layout and how enemies walk are unchanged.",
+      ptBR: "Depois das Terras Vulcânicas, os outros cinco biomas originais também foram repintados com terreno realista, cada um com sua estrada e seu cenário, e com a luz vindo do mesmo lado do castelo. O traçado da estrada e o caminho dos inimigos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Ancient Forest: grass, moss and fallen leaves, a dirt trail, ponds, and a real wood of trees around the battlefield that casts shadows across the ground.",
+        ptBR: "Floresta Antiga: grama, musgo e folhas caídas, trilha de terra, lagos e uma mata de verdade em volta do campo de batalha, com as árvores fazendo sombra no chão.",
+      },
+      {
+        en: "Frozen Tundra: wind-carved snow, ice patches, a trampled, footprinted track and frost fractures glowing icy blue. Cursed Desert: dunes with ripple marks, dry scrub and an old road of half-buried paving slabs.",
+        ptBR: "Tundra Congelada: neve moldada pelo vento, placas de gelo, uma trilha pisoteada cheia de pegadas e fendas de gelo com brilho azul. Deserto Amaldiçoado: dunas com marcas do vento, arbustos secos e uma estrada antiga de lajes meio enterradas.",
+      },
+      {
+        en: "Dark Ruins: dark earth and dead grass with an old, broken cobblestone road. Abyss: dark stone split by violet veins that slowly pulse.",
+        ptBR: "Ruínas Sombrias: terra escura e grama morta, com uma estrada antiga de paralelepípedos quebrados. Abismo: pedra escura rachada por veios violeta que pulsam devagar.",
+      },
+    ],
+  },
+  {
     id: "v44",
     dateIso: "2026-10-28",
     category: "CONTENT",
