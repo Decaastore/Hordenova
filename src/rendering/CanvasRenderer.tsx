@@ -10,6 +10,7 @@ import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
+import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -356,9 +357,19 @@ export function CanvasRenderer({
         y1: (canvas.height - offsetY) / scale,
       };
       const worldLayerOn = worldLayerActiveRef.current;
-      if (!worldLayerOn) drawBackground(ctx, biome, visibleBounds);
-      drawDecorations(ctx, biome, timestamp, worldLayerOn ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
-      drawPath(ctx, ENEMY_PATH, biome, worldLayerOn);
+      // Baked ground (terrain + road + static scenery pre-rendered with real
+      // light/shadow) replaces the live ground/road/scenery drawing for the
+      // biomes that have one; the 3D terrain layer stands down for them too.
+      const groundBake = getGroundBake(biome.id);
+      if (groundBake) {
+        drawBakedGround(ctx, groundBake, biome, visibleBounds, timestamp);
+        drawDecorations(ctx, biome, timestamp, groundBake.skipKinds);
+      } else {
+        const world3dTerrain = worldLayerOn && !hasGroundBake(biome.id);
+        if (!world3dTerrain) drawBackground(ctx, biome, visibleBounds);
+        drawDecorations(ctx, biome, timestamp, world3dTerrain ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
+        drawPath(ctx, ENEMY_PATH, biome, world3dTerrain);
+      }
       // ROLLBACK NOTE — this used to pass `worldLayerOn` as `skipCastleBody`
       // so the 2D fortress body would hide whenever the 3D world layer's
       // now-removed `TestCastleLayer` was standing in for it (FASE 3). That

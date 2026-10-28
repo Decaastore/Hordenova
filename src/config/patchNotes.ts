@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v44",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Volcanic Wastes Gets Real Ground",
+      ptBR: "Terras Vulcânicas Ganham Chão de Verdade",
+    },
+    description: {
+      en: "The Volcanic Wastes map has been repainted with realistic terrain: dark volcanic rock, gravel and ash, with light and shadow coming from the same side as the castle. The enemy road is now a worn dirt trail sunk into the ground instead of a flat painted strip. The road itself and how enemies walk are unchanged.",
+      ptBR: "O mapa das Terras Vulcânicas foi repintado com terreno realista: rocha vulcânica escura, cascalho e cinzas, com luz e sombra vindo do mesmo lado do castelo. A estrada dos inimigos agora é uma trilha de terra batida afundada no terreno, em vez de uma faixa chapada. O traçado da estrada e o caminho dos inimigos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Rocks and ruins are now real faceted stones and cut blocks that cast shadows on the ground.",
+        ptBR: "Rochas e ruínas agora são pedras com faces e blocos de verdade, que fazem sombra no chão.",
+      },
+      {
+        en: "Lava cracks glow from deep inside dark fissures, and lava pools have a dark cooling crust with glowing seams that slowly breathe, each at its own pace.",
+        ptBR: "As fendas de lava brilham lá do fundo de rachaduras escuras, e as poças de lava têm uma crosta escura com rachaduras incandescentes que pulsam devagar, cada uma no seu ritmo.",
+      },
+      {
+        en: "No extra loading weight: the new ground is a single image downloaded only when you reach this biome.",
+        ptBR: "Sem peso extra no carregamento: o chão novo é uma única imagem, baixada só quando você chega neste bioma.",
+      },
+    ],
+  },
+  {
     id: "v43",
     dateIso: "2026-10-28",
     category: "CONTENT",

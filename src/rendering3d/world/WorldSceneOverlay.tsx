@@ -4,6 +4,7 @@ import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
 import { WorldTerrain } from "./WorldTerrain";
 import { cameraPosition, computeScreenTransform } from "../enemyProjection";
+import { hasGroundBake } from "@/rendering/groundBakes";
 
 /** Same manual orthographic-frustum rig as `rendering3d/Enemy3DOverlay.tsx`'s `CameraRig` — kept as its own small copy (not shared) so this layer and the enemy overlay stay independently mountable/removable while both use the identical tilt, matching camera math (`enemyProjection.ts` is the single source of truth for the numbers either rig uses). */
 function CameraRig() {
@@ -78,6 +79,9 @@ export function WorldSceneOverlay({ engine }: { engine: GameEngine }) {
     }, 1000);
     return () => clearInterval(interval);
   }, [engine]);
+
+  // Biomes with a pre-rendered ground don't need the live 3D terrain at all.
+  if (hasGroundBake(biomeId)) return null;
 
   return (
     <div style={{ position: "absolute", inset: 0, zIndex: -1, pointerEvents: "none" }}>
