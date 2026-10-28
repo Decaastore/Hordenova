@@ -88,7 +88,7 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
       },
       {
         en: "Inferno — Firestorm: a meteor drops from the sky, a ring of fire sweeps out to the real blast radius, and a brief smouldering mark of embers is left behind.",
-        ptBR: "Inferno — Tempestade de Fogo: um meteoro cai do céu, um anel de fogo se espalha até o raio real da explosão e fica uma cratera ardendo em brasas.",
+        ptBR: "Inferno — Tempestade de Fogo: um meteoro cai do céu, um anel de fogo se espalha até o raio real da explosão e deixa por um instante uma marca em brasas.",
       },
       {
         en: "Frostborn — Absolute Zero: a frost nova sweeps out to the tower's range and leaves a brief crown of ice spikes and a turning snowflake sigil.",
