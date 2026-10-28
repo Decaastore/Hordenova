@@ -778,6 +778,9 @@ function SpecializationSection({
 /** L1/L20/L40/L60 — the fixed evolution checkpoints the preview scrubber lets a player jump to, matching the tower's real visual-stage milestones without ever touching the tower's actual (Season-scoped) level. */
 const SKIN_PREVIEW_LEVELS: readonly number[] = [1, 20, 40, 60];
 
+const PREVIEW_PX = 150;
+const PREVIEW_ZOOM = 1.55;
+
 function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstance; skinId: string | null; previewLevel: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -786,9 +789,10 @@ function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstan
     const ctx = canvas?.getContext("2d");
     if (!canvas || !ctx) return;
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = 108 * dpr;
-    canvas.height = 108 * dpr;
-    ctx.scale(dpr, dpr);
+    canvas.width = PREVIEW_PX * dpr;
+    canvas.height = PREVIEW_PX * dpr;
+    // Shown bigger than in-game so the skin's details actually sell it.
+    ctx.scale(dpr * PREVIEW_ZOOM, dpr * PREVIEW_ZOOM);
     // PREVIEW-ONLY OBJECT — never the real tower, never mutated back into
     // engine state. `level` here overrides ONLY what gets drawn (via
     // drawTower's own visualStage lookup); it never touches the account's
@@ -797,10 +801,17 @@ function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstan
     // pure renderer that never calls getTowerStats/getTowerSpecialAtLevel —
     // see entities/Tower.ts's getTowerStats doc comment for the other half
     // of this guarantee (why equipping for real is the only path in).
-    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, level: previewLevel, position: { x: 54, y: 78 } };
+    const view = PREVIEW_PX / PREVIEW_ZOOM;
+    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, level: previewLevel, position: { x: view / 2, y: view * 0.72 } };
     let raf = 0;
     const loop = (t: number) => {
-      ctx.clearRect(0, 0, 108, 108);
+      ctx.clearRect(0, 0, view, view);
+      // Soft pedestal light under the tower.
+      const spot = ctx.createRadialGradient(view / 2, view * 0.76, 0, view / 2, view * 0.76, view * 0.5);
+      spot.addColorStop(0, "rgba(255,236,200,0.16)");
+      spot.addColorStop(1, "rgba(255,236,200,0)");
+      ctx.fillStyle = spot;
+      ctx.fillRect(0, 0, view, view);
       drawTower(ctx, previewTower, false, t);
       raf = requestAnimationFrame(loop);
     };
@@ -811,7 +822,7 @@ function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstan
   return (
     <canvas
       ref={canvasRef}
-      style={{ width: 108, height: 108, borderRadius: 8, background: "rgba(0,0,0,0.28)", border: `1px solid ${PALETTE.uiPanelBorder}` }}
+      style={{ width: PREVIEW_PX, height: PREVIEW_PX, borderRadius: 8, background: "radial-gradient(circle at 50% 70%, rgba(60,48,36,0.55), rgba(0,0,0,0.35))", border: `1px solid ${PALETTE.uiPanelBorder}` }}
     />
   );
 }

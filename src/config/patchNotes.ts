@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v51",
+    dateIso: "2026-10-28",
+    category: "TOWERS",
+    title: {
+      en: "Every Tower Skin Rebuilt — Now Truly Unique",
+      ptBR: "Todas as Skins de Torre Refeitas — Agora Únicas de Verdade",
+    },
+    description: {
+      en: "All 24 tower skins have been rebuilt in 3D from the ground up. Each one is now its own structure with its own materials, signature pieces and glowing effects in its colour — not a recoloured tower — and each still evolves through the six visual stages as the tower levels up. Prices, gameplay effects and ownership are unchanged: if you already own a skin, it's yours in its new form.",
+      ptBR: "As 24 skins de torre foram refeitas em 3D do zero. Cada uma agora é uma estrutura própria, com materiais próprios, peças exclusivas e efeitos brilhando na sua cor — não é mais uma torre só recolorida — e cada uma continua evoluindo pelos seis estágios visuais conforme a torre sobe de nível. Preços, efeitos de jogo e posse não mudaram: se você já tem uma skin, ela é sua na forma nova.",
+    },
+    highlights: [
+      {
+        en: "Ironwood: Warden of the Abyss coils void tendrils around a petrified trunk with a burning violet eye; Celestial Warden has feathered golden wings and a halo; Arcane Engine runs on gears, pistons and cyan conduits; Ancient Hunter mounts an antlered beast skull with trophies; Ironclad Juggernaut is armour-plated with a spiked ram.",
+        ptBR: "Ironwood: Guardião do Abismo enrola tentáculos do vazio num tronco petrificado com um olho violeta ardendo; Guardião Celestial tem asas douradas de penas e auréola; Motor Arcano funciona com engrenagens, pistões e condutos ciano; Caçador Ancestral leva um crânio de fera com chifres e troféus; Colosso Blindado é coberto de placas com um aríete de espinhos.",
+      },
+      {
+        en: "Inferno: a horned demon furnace with a fanged maw, a smouldering volcanic colossus, a steam forge with gauges and valves, a golden sun furnace ringed with corona rays, and a corroded plague furnace with bubbling toxic vats — each burning with its own colour of fire.",
+        ptBR: "Inferno: uma fornalha demoníaca com chifres e boca cheia de presas, um colosso vulcânico fumegante, uma forja a vapor com manômetros e válvulas, uma fornalha solar dourada cercada de raios e uma fornalha da peste corroída com tonéis tóxicos borbulhando — cada uma queimando com fogo da sua cor.",
+      },
+      {
+        en: "Frostborn: a moss-grown ancient guardian ringed by standing stones, black void-frost with hanging icicles, a floating arcane crystal array, celestial white marble under a waving aurora, and a glacial warlord in ice armour with a crest of blades. Stormcaller: void shards, thunder insulators, celestial halos and wings, hovering rune rods and spiralling wind blades.",
+        ptBR: "Frostborn: um guardião ancestral coberto de musgo e cercado de pedras em pé, gelo do vazio negro com pingentes pendurados, um conjunto de cristais arcanos flutuando, mármore branco celestial sob uma aurora ondulando e um senhor da guerra glacial com armadura de gelo e crista de lâminas. Stormcaller: estilhaços do vazio, isoladores de trovão, auréolas e asas celestiais, hastes de runa flutuando e lâminas de vento em espiral.",
+      },
+      {
+        en: "The four Prestige Ascendant skins are now black and gold royalty with gilded crowns. The skin preview in the tower panel is also bigger, so you can see every detail before buying.",
+        ptBR: "As quatro skins Prestígio Ascendente agora são realeza em preto e dourado, com coroas douradas. A prévia de skin no painel da torre também ficou maior, para você ver cada detalhe antes de comprar.",
+      },
+    ],
+  },
+  {
     id: "v50",
     dateIso: "2026-10-28",
     category: "TOWERS",

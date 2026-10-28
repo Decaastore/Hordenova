@@ -392,6 +392,13 @@ function drawBakedTowerLive(
   _readiness: number,
   skin: TowerSkinDefinition | null,
 ): void {
+  // A skin recolours every live effect with its own accent; the base towers keep their signature colours.
+  const tint = (base: readonly [number, number, number], lighten = 0): string => {
+    const hex = skin?.paletteOverride.accent;
+    if (!hex) return `${base[0]},${base[1]},${base[2]}`;
+    const c = [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)].map((v) => Math.round(v + (255 - v) * lighten));
+    return `${c[0]},${c[1]},${c[2]}`;
+  };
   if (type === "FROSTBORN") {
     const orb = sprite.anchor("orb") ?? { x: 0, y: -30 };
     const flare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
@@ -401,9 +408,9 @@ function drawBakedTowerLive(
     // Cold light breathing out of the orb — stronger at higher stages.
     const r = 8 + stage * 0.6 + flare * 6;
     const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, r);
-    g.addColorStop(0, `rgba(200,245,255,${0.32 + 0.16 * pulse + 0.35 * flare})`);
-    g.addColorStop(0.5, `rgba(90,200,255,${0.12 + 0.015 * stage})`);
-    g.addColorStop(1, "rgba(90,200,255,0)");
+    g.addColorStop(0, `rgba(${tint([200, 245, 255], 0.55)},${0.32 + 0.16 * pulse + 0.35 * flare})`);
+    g.addColorStop(0.5, `rgba(${tint([90, 200, 255])},${0.12 + 0.015 * stage})`);
+    g.addColorStop(1, `rgba(${tint([90, 200, 255])},0)`);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2);
@@ -411,14 +418,14 @@ function drawBakedTowerLive(
     // Frost swirling inside the orb.
     for (let i = 0; i < 3; i++) {
       const a = timeMs / (700 + i * 180) + i * 2.1;
-      ctx.fillStyle = `rgba(235,252,255,${0.55 + 0.3 * flare})`;
+      ctx.fillStyle = `rgba(${tint([235, 252, 255], 0.7)},${0.55 + 0.3 * flare})`;
       ctx.beginPath();
       ctx.arc(orb.x + Math.cos(a) * 2.2, orb.y + Math.sin(a) * 1.6, 0.7, 0, Math.PI * 2);
       ctx.fill();
     }
     // Ice shards flung out on each shot.
     if (flare > 0) {
-      ctx.strokeStyle = `rgba(220,248,255,${flare})`;
+      ctx.strokeStyle = `rgba(${tint([220, 248, 255], 0.6)},${flare})`;
       ctx.lineWidth = 0.8;
       for (let i = 0; i < 8; i++) {
         const a = (i / 8) * Math.PI * 2 + 0.3;
@@ -458,7 +465,7 @@ function drawBakedTowerLive(
         ctx.closePath();
         ctx.fill();
         ctx.globalCompositeOperation = "lighter";
-        ctx.strokeStyle = `rgba(126,230,255,${0.7 + 0.3 * pulse})`;
+        ctx.strokeStyle = `rgba(${tint([126, 230, 255], 0.3)},${0.7 + 0.3 * pulse})`;
         ctx.lineWidth = 0.6;
         ctx.beginPath();
         ctx.moveTo(0, -1.8);
@@ -468,6 +475,25 @@ function drawBakedTowerLive(
         ctx.stroke();
         ctx.restore();
       }
+    }
+    // Celestial skins: a slow aurora ribbon waving above the crown.
+    const au = sprite.anchor("aurora");
+    if (au) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let band = 0; band < 3; band++) {
+        ctx.strokeStyle = `rgba(${band === 1 ? "160,255,220" : band === 2 ? "200,170,255" : "150,220,255"},${0.22 + 0.1 * Math.sin(timeMs / 900 + band)})`;
+        ctx.lineWidth = 2.2 - band * 0.5;
+        ctx.beginPath();
+        for (let k = 0; k <= 12; k++) {
+          const x = au.x - 14 + (k / 12) * 28;
+          const y = au.y - 4 - band * 2.2 + Math.sin(timeMs / 700 + k * 0.7 + band) * 2;
+          if (k === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
     }
     // Snowflakes rising past the spire.
     drawFloatingMotes(
@@ -519,8 +545,8 @@ function drawBakedTowerLive(
       ctx.globalCompositeOperation = "lighter";
       const r = 6 + stage * 0.7 + flare * 4;
       const g = ctx.createRadialGradient(core.x, core.y, 0, core.x, core.y, r);
-      g.addColorStop(0, `rgba(200,255,170,${0.25 + 0.15 * pulse + 0.4 * flare})`);
-      g.addColorStop(1, "rgba(120,255,90,0)");
+      g.addColorStop(0, `rgba(${tint([200, 255, 170], 0.5)},${0.25 + 0.15 * pulse + 0.4 * flare})`);
+      g.addColorStop(1, `rgba(${tint([120, 255, 90])},0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(core.x, core.y, r, 0, Math.PI * 2);
@@ -529,7 +555,7 @@ function drawBakedTowerLive(
     }
     const eyes = sprite.anchor("eyes");
     if (eyes) {
-      ctx.fillStyle = `rgba(190,255,150,${0.7 + 0.3 * Math.sin(timeMs / 900)})`;
+      ctx.fillStyle = `rgba(${tint([190, 255, 150], 0.4)},${0.7 + 0.3 * Math.sin(timeMs / 900)})`;
       ctx.fillRect(eyes.x - 0.9, eyes.y, 0.6, 0.4);
       ctx.fillRect(eyes.x + 0.3, eyes.y, 0.6, 0.4);
     }
@@ -562,25 +588,38 @@ function drawBakedTowerLive(
       ctx.ellipse(mouth.x, mouth.y, 3.5, 2.9, 0, 0, Math.PI * 2);
       ctx.clip();
       const inner = ctx.createRadialGradient(mouth.x, mouth.y + 1, 0, mouth.x, mouth.y, 4);
-      inner.addColorStop(0, "rgba(255,240,180,1)");
-      inner.addColorStop(0.5, "rgba(255,140,40,1)");
-      inner.addColorStop(1, "rgba(120,20,0,1)");
+      inner.addColorStop(0, `rgba(${tint([255, 240, 180], 0.75)},1)`);
+      inner.addColorStop(0.5, `rgba(${tint([255, 140, 40])},1)`);
+      inner.addColorStop(1, "rgba(30,6,2,1)");
       ctx.fillStyle = inner;
       ctx.fillRect(mouth.x - 4, mouth.y - 4, 8, 8);
-      drawFire(ctx, mouth.x, mouth.y + 2.6, timeMs, 0.42 + flare * 0.2, 19);
+      const flame = skin ? ([`rgba(${tint([200, 40, 10])},0.55)`, `rgba(${tint([255, 120, 30], 0.35)},0.75)`, `rgba(${tint([255, 230, 150], 0.8)},0.9)`] as const) : undefined;
+      drawFire(ctx, mouth.x, mouth.y + 2.6, timeMs, 0.42 + flare * 0.2, 19, flame);
       ctx.restore();
       ctx.save();
       ctx.globalCompositeOperation = "lighter";
       const r = 9 + stage + flare * 9;
       const g = ctx.createRadialGradient(mouth.x, mouth.y, 0, mouth.x, mouth.y, r);
-      g.addColorStop(0, `rgba(255,150,60,${0.35 + 0.45 * flare})`);
-      g.addColorStop(1, "rgba(255,90,20,0)");
+      g.addColorStop(0, `rgba(${tint([255, 150, 60])},${0.35 + 0.45 * flare})`);
+      g.addColorStop(1, `rgba(${tint([255, 90, 20])},0)`);
       ctx.fillStyle = g;
       ctx.beginPath();
       ctx.arc(mouth.x, mouth.y, r, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
-      if (flare > 0) drawFire(ctx, mouth.x, mouth.y + 3, timeMs, 0.6 + flare * 0.6, 23);
+      if (flare > 0) drawFire(ctx, mouth.x, mouth.y + 3, timeMs, 0.6 + flare * 0.6, 23, flame);
+    }
+    for (const key of ["vat1", "vat2", "steam"]) {
+      const a = sprite.anchor(key);
+      if (!a) continue;
+      // Toxic bubbles / venting steam rising from the skin's own vents.
+      for (let i = 0; i < 4; i++) {
+        const k = ((timeMs / 1600 + i / 4 + key.length * 0.13) % 1 + 1) % 1;
+        ctx.fillStyle = `rgba(${tint([230, 240, 245], 0.4)},${(1 - k) * 0.55})`;
+        ctx.beginPath();
+        ctx.arc(a.x + Math.sin(timeMs / 400 + i) * 1.5, a.y - k * 12, 0.7 + k * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     for (const key of ["smoke1", "smoke2"]) {
       const a = sprite.anchor(key);
@@ -599,9 +638,9 @@ function drawBakedTowerLive(
     ctx.globalCompositeOperation = "lighter";
     const r = 7 + stage * 0.8 + charge * 3 + flare * 8;
     const g = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, r);
-    g.addColorStop(0, `rgba(240,220,255,${0.5 + 0.3 * charge + 0.3 * flare})`);
-    g.addColorStop(0.5, "rgba(170,90,255,0.25)");
-    g.addColorStop(1, "rgba(170,90,255,0)");
+    g.addColorStop(0, `rgba(${tint([240, 220, 255], 0.6)},${0.5 + 0.3 * charge + 0.3 * flare})`);
+    g.addColorStop(0.5, `rgba(${tint([170, 90, 255])},0.25)`);
+    g.addColorStop(1, `rgba(${tint([170, 90, 255])},0)`);
     ctx.fillStyle = g;
     ctx.beginPath();
     ctx.arc(orb.x, orb.y, r, 0, Math.PI * 2);
@@ -623,7 +662,7 @@ function drawBakedTowerLive(
       if (!rod) continue;
       const live = Math.sin(timeMs / 160 + i * 2.3) > 0.55 - charge * 0.6 || flare > 0;
       if (!live) continue;
-      ctx.strokeStyle = `rgba(225,195,255,${0.55 + 0.4 * flare})`;
+      ctx.strokeStyle = `rgba(${tint([225, 195, 255], 0.5)},${0.55 + 0.4 * flare})`;
       ctx.lineWidth = 0.6;
       jag(orb.x, orb.y, rod.x, rod.y, i + 1);
     }
@@ -632,13 +671,13 @@ function drawBakedTowerLive(
       const a = sprite.anchor(`spike${i}`);
       const b = sprite.anchor(`spike${(i + 1) % 6}`);
       if (!a || !b || Math.sin(timeMs / 230 + i * 1.7) < 0.75) continue;
-      ctx.strokeStyle = "rgba(210,170,255,0.6)";
+      ctx.strokeStyle = `rgba(${tint([210, 170, 255], 0.4)},0.6)`;
       ctx.lineWidth = 0.5;
       jag(a.x, a.y, b.x, b.y, i + 11);
     }
     // Discharge: a bolt down through the pillar into the ground.
     if (flare > 0) {
-      ctx.strokeStyle = `rgba(245,230,255,${flare})`;
+      ctx.strokeStyle = `rgba(${tint([245, 230, 255], 0.7)},${flare})`;
       ctx.lineWidth = 1.2;
       jag(orb.x, orb.y, 0, 3, 31);
     }
@@ -652,8 +691,8 @@ function drawBakedTowerLive(
       ctx.save();
       ctx.globalAlpha = Math.sin(a) > -0.3 ? 1 : 0.5;
       const sg = ctx.createRadialGradient(x, y, 0, x, y, 2.6);
-      sg.addColorStop(0, "rgba(255,240,255,1)");
-      sg.addColorStop(1, "rgba(170,90,255,0)");
+      sg.addColorStop(0, `rgba(${tint([255, 240, 255], 0.7)},1)`);
+      sg.addColorStop(1, `rgba(${tint([170, 90, 255])},0)`);
       ctx.fillStyle = sg;
       ctx.beginPath();
       ctx.arc(x, y, 2.6, 0, Math.PI * 2);

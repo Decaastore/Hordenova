@@ -105,6 +105,582 @@ export const TOWER_SPRITES: Record<string, Record<string, Record<number, TowerSp
           ]
         }
       }
+    },
+    "FROSTBORN_ANCIENT_GUARDIAN": {
+      "1": {
+        file: "towers/frostborn/frostborn_ancient_guardian_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_ancient_guardian_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_ancient_guardian_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_ancient_guardian_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_ancient_guardian_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_ancient_guardian_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "FROSTBORN_VOID_FROST": {
+      "1": {
+        file: "towers/frostborn/frostborn_void_frost_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_void_frost_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_void_frost_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_void_frost_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_void_frost_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_void_frost_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "FROSTBORN_ARCANE_CRYSTAL": {
+      "1": {
+        file: "towers/frostborn/frostborn_arcane_crystal_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_arcane_crystal_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_arcane_crystal_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_arcane_crystal_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_arcane_crystal_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_arcane_crystal_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "FROSTBORN_CELESTIAL_ICE": {
+      "1": {
+        file: "towers/frostborn/frostborn_celestial_ice_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "aurora": [
+            0.5,
+            0.2231
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_celestial_ice_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "aurora": [
+            0.5,
+            0.2231
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_celestial_ice_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "aurora": [
+            0.5,
+            0.2231
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_celestial_ice_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "aurora": [
+            0.5,
+            0.2231
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_celestial_ice_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "aurora": [
+            0.5,
+            0.199
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_celestial_ice_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "aurora": [
+            0.5,
+            0.199
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "FROSTBORN_GLACIAL_WARLORD": {
+      "1": {
+        file: "towers/frostborn/frostborn_glacial_warlord_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_glacial_warlord_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_glacial_warlord_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_glacial_warlord_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_glacial_warlord_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_glacial_warlord_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "FROSTBORN_PRESTIGE_ASCENDANT": {
+      "1": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2931
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4825
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/frostborn/frostborn_prestige_ascendant_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.2691
+          ],
+          "runeOrbit": [
+            0.5,
+            0.4584
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
     }
   },
   "IRONWOOD": {
@@ -339,6 +915,1398 @@ export const TOWER_SPRITES: Record<string, Record<string, Record<number, TowerSp
           ]
         }
       }
+    },
+    "IRONWOOD_WARDEN_OF_THE_ABYSS": {
+      "1": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_warden_of_the_abyss_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "IRONWOOD_CELESTIAL_WARDEN": {
+      "1": {
+        file: "towers/ironwood/ironwood_celestial_warden_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_celestial_warden_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_celestial_warden_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_celestial_warden_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_celestial_warden_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_celestial_warden_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "IRONWOOD_ARCANE_ENGINE": {
+      "1": {
+        file: "towers/ironwood/ironwood_arcane_engine_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_arcane_engine_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_arcane_engine_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_arcane_engine_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_arcane_engine_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_arcane_engine_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "IRONWOOD_ANCIENT_HUNTER": {
+      "1": {
+        file: "towers/ironwood/ironwood_ancient_hunter_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_ancient_hunter_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_ancient_hunter_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_ancient_hunter_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_ancient_hunter_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_ancient_hunter_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "IRONWOOD_IRONCLAD_JUGGERNAUT": {
+      "1": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_ironclad_juggernaut_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "IRONWOOD_PRESTIGE_ASCENDANT": {
+      "1": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_1.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_2.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_3.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_4.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_5.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/ironwood/ironwood_prestige_ascendant_6.webp",
+        anchors: {
+          "core": [
+            0.4852,
+            0.5584
+          ],
+          "armL": [
+            0.3349,
+            0.2977
+          ],
+          "armR": [
+            0.6799,
+            0.3506
+          ],
+          "nockRest": [
+            0.4933,
+            0.3809
+          ],
+          "nockDrawn": [
+            0.5108,
+            0.3377
+          ],
+          "boltTip": [
+            0.4698,
+            0.439
+          ],
+          "eyes": [
+            0.5054,
+            0.3138
+          ],
+          "banner": [
+            0.4595,
+            0.2123
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
     }
   },
   "INFERNO": {
@@ -434,6 +2402,750 @@ export const TOWER_SPRITES: Record<string, Record<string, Record<number, TowerSp
       },
       "6": {
         file: "towers/inferno/base_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_ASHEN_TYRANT": {
+      "1": {
+        file: "towers/inferno/inferno_ashen_tyrant_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_ashen_tyrant_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_ashen_tyrant_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_ashen_tyrant_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_ashen_tyrant_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_ashen_tyrant_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_VOLCANIC_COLOSSUS": {
+      "1": {
+        file: "towers/inferno/inferno_volcanic_colossus_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_volcanic_colossus_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_volcanic_colossus_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_volcanic_colossus_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_volcanic_colossus_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_volcanic_colossus_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_INDUSTRIAL_FORGE": {
+      "1": {
+        file: "towers/inferno/inferno_industrial_forge_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_industrial_forge_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_industrial_forge_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_industrial_forge_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_industrial_forge_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_industrial_forge_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "steam": [
+            0.3753,
+            0.5158
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_SOLAR_ASCENDANT": {
+      "1": {
+        file: "towers/inferno/inferno_solar_ascendant_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_solar_ascendant_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_solar_ascendant_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_solar_ascendant_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_solar_ascendant_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_solar_ascendant_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_PLAGUE_FURNACE": {
+      "1": {
+        file: "towers/inferno/inferno_plague_furnace_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_plague_furnace_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_plague_furnace_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_plague_furnace_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_plague_furnace_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_plague_furnace_6.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "vat1": [
+            0.3552,
+            0.6071
+          ],
+          "vat2": [
+            0.6146,
+            0.6557
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "INFERNO_PRESTIGE_ASCENDANT": {
+      "1": {
+        file: "towers/inferno/inferno_prestige_ascendant_1.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/inferno/inferno_prestige_ascendant_2.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.4039
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/inferno/inferno_prestige_ascendant_3.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/inferno/inferno_prestige_ascendant_4.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/inferno/inferno_prestige_ascendant_5.webp",
+        anchors: {
+          "mouth": [
+            0.4805,
+            0.6193
+          ],
+          "smoke1": [
+            0.5738,
+            0.3601
+          ],
+          "smoke2": [
+            0.4498,
+            0.3739
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/inferno/inferno_prestige_ascendant_6.webp",
         anchors: {
           "mouth": [
             0.4805,
@@ -640,6 +3352,1578 @@ export const TOWER_SPRITES: Record<string, Record<string, Record<number, TowerSp
       },
       "6": {
         file: "towers/stormcaller/base_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5716,
+            0.2323
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_VOID": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_void_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_void_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_void_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_void_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_void_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_void_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5716,
+            0.2323
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_THUNDER": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_thunder_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_thunder_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_thunder_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_thunder_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_thunder_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_thunder_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5,
+            0.1749
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.5787,
+            0.6244
+          ],
+          "spike1": [
+            0.369,
+            0.5922
+          ],
+          "spike2": [
+            0.4213,
+            0.4632
+          ],
+          "spike3": [
+            0.631,
+            0.4953
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_CELESTIAL": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_celestial_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_celestial_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_celestial_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_celestial_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_celestial_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_celestial_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5716,
+            0.2323
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_ARCANE": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_arcane_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_arcane_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_arcane_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_arcane_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_arcane_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_arcane_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5716,
+            0.2323
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_TEMPEST": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_tempest_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_tempest_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_tempest_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_tempest_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_tempest_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_tempest_6.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.2774
+          ],
+          "rod1": [
+            0.4836,
+            0.2911
+          ],
+          "rod2": [
+            0.4284,
+            0.2599
+          ],
+          "rod3": [
+            0.4448,
+            0.2148
+          ],
+          "rod4": [
+            0.5164,
+            0.201
+          ],
+          "rod5": [
+            0.5716,
+            0.2323
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      }
+    },
+    "STORMCALLER_PRESTIGE_ASCENDANT": {
+      "1": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_1.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "2": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_2.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4284,
+            0.2927
+          ],
+          "rod2": [
+            0.5164,
+            0.2339
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "3": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_3.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "4": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_4.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "5": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_5.webp",
+        anchors: {
+          "orb": [
+            0.5,
+            0.3172
+          ],
+          "rod0": [
+            0.5552,
+            0.3102
+          ],
+          "rod1": [
+            0.4687,
+            0.3209
+          ],
+          "rod2": [
+            0.4255,
+            0.2736
+          ],
+          "rod3": [
+            0.4852,
+            0.2336
+          ],
+          "rod4": [
+            0.5654,
+            0.2563
+          ],
+          "satellite": [
+            0.5,
+            0.3172
+          ],
+          "spike0": [
+            0.6685,
+            0.6222
+          ],
+          "spike1": [
+            0.5479,
+            0.6991
+          ],
+          "spike2": [
+            0.3794,
+            0.6732
+          ],
+          "spike3": [
+            0.3315,
+            0.5705
+          ],
+          "spike4": [
+            0.4521,
+            0.4936
+          ],
+          "spike5": [
+            0.6206,
+            0.5194
+          ],
+          "base": [
+            0.5,
+            0.6861
+          ]
+        }
+      },
+      "6": {
+        file: "towers/stormcaller/stormcaller_prestige_ascendant_6.webp",
         anchors: {
           "orb": [
             0.5,

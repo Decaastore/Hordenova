@@ -10,7 +10,16 @@ export function n01(v: number): number {
 }
 
 /** Layered, flickering flames rooted at (x,y): dark-red outer tongues, orange body, yellow-white core, plus a warm light pool. */
-export function drawFire(ctx: CanvasRenderingContext2D, x: number, y: number, timeMs: number, size: number, seed: number): void {
+export function drawFire(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  timeMs: number,
+  size: number,
+  seed: number,
+  /** Optional [outer, body, core] flame colours (rgba strings) for non-orange fire. */
+  palette?: readonly [string, string, string],
+): void {
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   const pool = ctx.createRadialGradient(x, y - 4 * size, 0, x, y - 4 * size, 22 * size);
@@ -21,11 +30,18 @@ export function drawFire(ctx: CanvasRenderingContext2D, x: number, y: number, ti
   ctx.arc(x, y - 4 * size, 22 * size, 0, Math.PI * 2);
   ctx.fill();
   const tongues = 5;
-  const layers: [string, string, number, number][] = [
-    ["rgba(200,40,10,0.55)", "rgba(200,40,10,0)", 1.0, 1.0],
-    ["rgba(255,120,30,0.75)", "rgba(255,150,40,0)", 0.75, 0.8],
-    ["rgba(255,230,150,0.9)", "rgba(255,240,190,0)", 0.42, 0.55],
-  ];
+  const transparent = (c: string) => c.replace(/,[\d.]+\)$/, ",0)");
+  const layers: [string, string, number, number][] = palette
+    ? [
+        [palette[0], transparent(palette[0]), 1.0, 1.0],
+        [palette[1], transparent(palette[1]), 0.75, 0.8],
+        [palette[2], transparent(palette[2]), 0.42, 0.55],
+      ]
+    : [
+        ["rgba(200,40,10,0.55)", "rgba(200,40,10,0)", 1.0, 1.0],
+        ["rgba(255,120,30,0.75)", "rgba(255,150,40,0)", 0.75, 0.8],
+        ["rgba(255,230,150,0.9)", "rgba(255,240,190,0)", 0.42, 0.55],
+      ];
   for (const [c0, c1, wMul, hMul] of layers) {
     for (let k = 0; k < tongues; k++) {
       const off = (k - (tongues - 1) / 2) * 2.6 * size;
