@@ -190,3 +190,6 @@ export const STATUS_COLORS = {
  * contact shadows are cast toward its opposite.
  */
 export const LIGHT_DIRECTION = { x: -0.55, y: -0.83 } as const;
+
+/** Global on-screen size multiplier for every enemy body (regular creatures read as specks next to the towers without it). Shared by CanvasRenderer's enemy pass and EntityRenderer's HP-bar placement above painted sprites. */
+export const ENEMY_DISPLAY_SCALE = 1.25;

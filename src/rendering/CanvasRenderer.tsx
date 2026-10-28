@@ -7,7 +7,7 @@ import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
-import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE } from "./theme";
+import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
 import {
@@ -32,8 +32,6 @@ import type { RunPhase } from "@/engine/types";
 import type { DecorationKind } from "./mapDecorations";
 
 const SLOT_HIT_RADIUS = 22;
-/** Global on-screen size multiplier for every enemy body (see the enemy draw loop). */
-const ENEMY_DISPLAY_SCALE = 1.25;
 const TOWER_HIT_RADIUS = 20;
 
 /**

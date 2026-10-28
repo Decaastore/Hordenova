@@ -5,13 +5,14 @@ import type { ProjectileInstance } from "@/entities/Projectile";
 import { getTowerStats } from "@/entities/Tower";
 import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
 import { getTowerSkinDefinition, type SkinMaterialFinish, type SkinParticleStyle, type TowerSkinDefinition } from "@/config/towerSkins";
-import { ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
+import { ENEMY_DISPLAY_SCALE, ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
 import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
 import type { LocomotionState } from "./biomeCreatures/helpers";
 import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
+import { drawEnemySprite, ensureEnemySpritesLoading, getEnemySprite, spriteHeadroom } from "./enemySprites";
 
 /**
  * FASE 3 — real hit-reaction feedback (spec section 10), applied generically
@@ -2659,6 +2660,9 @@ export function getEnemyVfxProfile(enemy: EnemyInstance): CreatureVfxProfile {
   return enemy.boss ? getBossVfxProfile(enemy.boss.bossId, enemy.boss.isMainBoss) : getCreatureVfxProfile(enemy.type);
 }
 
+/** Same scale CanvasRenderer draws enemies at — used only to place HP bars above painted sprites' heads. */
+const ENEMY_SPRITE_RENDER_SCALE = ENEMY_DISPLAY_SCALE;
+
 export function drawEnemy(
   ctx: CanvasRenderingContext2D,
   enemy: EnemyInstance,
@@ -2762,7 +2766,19 @@ export function drawEnemy(
     } else {
       drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
     }
+  } else if (getEnemySprite(enemy.type)) {
+    // PAINTED ENEMY SPRITES — hand-painted art with procedural walk
+    // animation (see enemySprites.ts). The art is a side view, so it is
+    // drawn back in unrotated space and mirrors to face its direction
+    // instead of spinning with the path; the hit recoil applied above in
+    // the rotated frame still pushes it back along its travel axis.
+    ctx.rotate(-angle);
+    drawEnemySprite(ctx, getEnemySprite(enemy.type)!, enemy.id, angle, locomotion, timeMs, {
+      slowPercent: enemy.slow?.percent ?? 0,
+      burning: !!enemy.burn,
+    });
   } else {
+    ensureEnemySpritesLoading();
     const customEnemy = NEW_ENEMY_RENDERERS[enemy.type];
     if (customEnemy) {
       customEnemy(ctx, theme, timeMs, hitFlashMs, locomotion);
@@ -2802,14 +2818,15 @@ export function drawEnemy(
   if (hitReact > 0) ctx.filter = "none";
   ctx.restore();
 
-  if (enemy.slow) {
+  const paintedSprite = !enemy.boss && getEnemySprite(enemy.type) !== undefined;
+  if (enemy.slow && !paintedSprite) {
     ctx.strokeStyle = "rgba(150,220,255,0.8)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(0, 0, 14, 0, Math.PI * 2);
     ctx.stroke();
   }
-  if (enemy.burn) {
+  if (enemy.burn && !paintedSprite) {
     ctx.strokeStyle = "rgba(255,150,60,0.85)";
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -2954,7 +2971,8 @@ function drawHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): void {
   const hpRatio = Math.max(enemy.hp / enemy.maxHp, 0);
   const barWidth = radius * 2.2;
   const barX = enemy.position.x - barWidth / 2;
-  const barY = enemy.position.y - radius - 8;
+  const headroom = spriteHeadroom(enemy.type, ENEMY_SPRITE_RENDER_SCALE);
+  const barY = enemy.position.y - (headroom !== null && getEnemySprite(enemy.type) ? headroom + 5 : radius + 8);
   ctx.fillStyle = "rgba(0,0,0,0.5)";
   ctx.fillRect(barX, barY, barWidth, 4);
   ctx.fillStyle = hpRatio > 0.4 ? "#7be07b" : "#e05a5a";
@@ -2973,7 +2991,8 @@ function drawHpBarPremium(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): 
   const barWidth = radius * 2.4;
   const barHeight = 4.2;
   const barX = enemy.position.x - barWidth / 2;
-  const barY = enemy.position.y - radius - 9;
+  const premiumHeadroom = spriteHeadroom(enemy.type, ENEMY_SPRITE_RENDER_SCALE);
+  const barY = enemy.position.y - (premiumHeadroom !== null && getEnemySprite(enemy.type) ? premiumHeadroom + 5 : radius + 9);
   const fillColor =
     hpRatio > 0.6 ? STATUS_COLORS.hpHealthy : hpRatio > 0.3 ? STATUS_COLORS.hpWounded : STATUS_COLORS.hpCritical;
 
@@ -3020,7 +3039,8 @@ function drawEliteHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance): vo
   const barWidth = radius * 2.6;
   const barHeight = 5.5;
   const barX = enemy.position.x - barWidth / 2;
-  const barY = enemy.position.y - radius - 10;
+  const eliteHeadroom = spriteHeadroom(enemy.type, ENEMY_SPRITE_RENDER_SCALE * 1.3);
+  const barY = enemy.position.y - (eliteHeadroom !== null && getEnemySprite(enemy.type) ? eliteHeadroom + 6 : radius + 10);
   const fillColor =
     hpRatio > 0.6 ? STATUS_COLORS.hpHealthy : hpRatio > 0.3 ? STATUS_COLORS.hpWounded : STATUS_COLORS.hpCritical;
   const r = barHeight / 2;

@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v40",
+    dateIso: "2026-10-27",
+    category: "CONTENT",
+    title: {
+      en: "New Hand-Painted Art for Crawlers, Runners, Brutes and Shieldbearers",
+      ptBR: "Nova Arte Pintada para Rastejantes, Corredores, Brutos e Portadores de Escudo",
+    },
+    description: {
+      en: "The four creatures you face most in the early game no longer look like placeholder shapes: each one now has its own hand-painted art, and they actually walk — legs stepping, bodies bobbing and leaning into their stride, turning to face where they're going. Their stats are unchanged.",
+      ptBR: "As quatro criaturas que você mais enfrenta no começo do jogo não parecem mais formas provisórias: cada uma ganhou arte pintada própria, e elas andam de verdade — pernas dando passos, corpo balançando e inclinando na passada, virando para o lado para onde estão indo. Os atributos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "The walk follows each creature's real speed: slowed enemies visibly trudge, frozen ones stop dead.",
+        ptBR: "A passada acompanha a velocidade real de cada criatura: inimigos lentos andam arrastados e os congelados param na hora.",
+      },
+      {
+        en: "Freeze and burn now tint the creature itself (icy blue / flickering orange) instead of drawing a ring around it.",
+        ptBR: "Congelamento e queimadura agora tingem a própria criatura (azul gelo / laranja tremulando) em vez de desenhar um anel em volta dela.",
+      },
+      {
+        en: "Health bars sit just above each creature's head.",
+        ptBR: "As barras de vida ficam logo acima da cabeça de cada criatura.",
+      },
+    ],
+  },
+  {
     id: "v39",
     dateIso: "2026-10-27",
     category: "TOWERS",
