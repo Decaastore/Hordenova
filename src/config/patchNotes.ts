@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v48",
+    dateIso: "2026-10-28",
+    category: "CONTENT",
+    title: {
+      en: "Living Weather in the Original Biomes",
+      ptBR: "Clima Vivo nos Biomas Originais",
+    },
+    description: {
+      en: "The six original biomes now have a light, living atmosphere: soft cloud shadows drift slowly across the battlefield, a thin mist hangs at the edges of the map, and each biome has its own weather. It's kept sparse so it never gets in the way of the fight.",
+      ptBR: "Os seis biomas originais agora têm uma atmosfera leve e viva: sombras de nuvem passam devagar pelo campo de batalha, uma névoa fina fica nas bordas do mapa e cada bioma tem o seu próprio clima. Tudo é discreto, para nunca atrapalhar a luta.",
+    },
+    highlights: [
+      {
+        en: "Ancient Forest: leaves tumbling down on the breeze and floating pollen. Volcanic Wastes: falling ash and embers rising on the heat.",
+        ptBR: "Floresta Antiga: folhas caindo e girando com a brisa e pólen flutuando. Terras Vulcânicas: cinzas caindo e brasas subindo com o calor.",
+      },
+      {
+        en: "Frozen Tundra: snow falling at different depths. Cursed Desert: fine sand blown low across the ground in gusts.",
+        ptBR: "Tundra Congelada: neve caindo em várias profundidades. Deserto Amaldiçoado: areia fina soprada rente ao chão em rajadas.",
+      },
+      {
+        en: "Dark Ruins: dust motes catching the light. Abyss: glowing violet motes slowly rising, with a darker mist at the edges.",
+        ptBR: "Ruínas Sombrias: partículas de poeira brilhando na luz. Abismo: pontos violeta brilhantes subindo devagar, com uma névoa mais escura nas bordas.",
+      },
+    ],
+  },
+  {
     id: "v47",
     dateIso: "2026-10-28",
     category: "FIXES",

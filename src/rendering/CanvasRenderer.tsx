@@ -11,6 +11,7 @@ import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } fro
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
+import { drawRealisticAtmosphere } from "./atmosphere";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -509,8 +510,10 @@ export function CanvasRenderer({
       // EntityRenderer.drawEnemyHpBar's own doc comment).
       for (const enemy of snapshot.enemies) drawEnemyHpBar(ctx, enemy);
 
-      drawFog(ctx, biome, timestamp);
-      drawAmbientParticles(ctx, biome, timestamp);
+      if (!drawRealisticAtmosphere(ctx, biome, timestamp, visibleBounds)) {
+        drawFog(ctx, biome, timestamp);
+        drawAmbientParticles(ctx, biome, timestamp);
+      }
       drawVignette(ctx, biome, visibleBounds);
 
       rafId = requestAnimationFrame(draw);
