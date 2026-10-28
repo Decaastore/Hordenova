@@ -87,12 +87,12 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Ironwood — Tiro Perfurante: uma lança dourada atravessa o alvo e segue em frente, com onda de choque e estilhaços de armadura no ponto do impacto.",
       },
       {
-        en: "Inferno — Firestorm: a meteor drops from the sky, a ring of fire sweeps out to the real blast radius, and a smouldering crater full of embers lingers.",
+        en: "Inferno — Firestorm: a meteor drops from the sky, a ring of fire sweeps out to the real blast radius, and a brief smouldering mark of embers is left behind.",
         ptBR: "Inferno — Tempestade de Fogo: um meteoro cai do céu, um anel de fogo se espalha até o raio real da explosão e fica uma cratera ardendo em brasas.",
       },
       {
-        en: "Frostborn — Absolute Zero: a frost nova sweeps out to the tower's range, leaving frozen ground, a crown of ice spikes and a turning snowflake sigil for as long as the freeze lasts.",
-        ptBR: "Frostborn — Zero Absoluto: uma nova de gelo se expande até o alcance da torre, deixando o chão congelado, uma coroa de espinhos de gelo e um selo de floco de neve girando enquanto o congelamento dura.",
+        en: "Frostborn — Absolute Zero: a frost nova sweeps out to the tower's range and leaves a brief crown of ice spikes and a turning snowflake sigil.",
+        ptBR: "Frostborn — Zero Absoluto: uma nova de gelo se expande até o alcance da torre e deixa por um instante uma coroa de espinhos de gelo e um floco de neve girando.",
       },
       {
         en: "Stormcaller — Chain Overload: lightning slams down from the sky onto every enemy in the chain, one after another, with electric shockwaves on the ground.",
@@ -101,6 +101,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
       {
         en: "Whenever a tower casts its Special Attack, a rune circle in its color lights up under it.",
         ptBR: "Sempre que uma torre lança sua magia, um círculo de runas na cor dela se acende sob a torre.",
+      },
+      {
+        en: "Built not to clutter the battlefield: every spell is a short, strong moment (gone in about a second), and when several fire at once the extra ones play a lighter version so the map stays readable.",
+        ptBR: "Feito para não poluir o campo de batalha: cada magia é um momento curto e forte (some em cerca de um segundo) e, quando várias disparam juntas, as extras aparecem numa versão mais leve para o mapa continuar legível.",
       },
     ],
   },

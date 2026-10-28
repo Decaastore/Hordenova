@@ -43,14 +43,40 @@ interface ActiveCast extends SpecialCast {
   totalMs: number;
   /** Per-cast random values fixed at spawn so the effect never jitters frame to frame. */
   seeds: number[];
+  /** True when the screen was already busy at cast time — only the core beat is drawn (see FULL_EFFECT_BUDGET). */
+  reduced: boolean;
 }
 
+/**
+ * ANTI-CLUTTER — kept deliberately short: the magic should be a strong
+ * MOMENT, not something that keeps covering the map afterwards. The first
+ * cut lingered up to 2.4s (frozen ground, ember crater), which with a full
+ * map of towers meant there was almost always a big effect sitting on the
+ * battlefield.
+ */
 const LIFETIME_MS: Record<TowerType, number> = {
-  IRONWOOD: 700,
-  INFERNO: 2400,
-  FROSTBORN: 2200,
-  STORMCALLER: 900,
+  IRONWOOD: 600,
+  INFERNO: 1300,
+  FROSTBORN: 1300,
+  STORMCALLER: 750,
 };
+
+/** Lifetime of the reduced (busy-screen) version of each magic. */
+const REDUCED_LIFETIME_MS: Record<TowerType, number> = {
+  IRONWOOD: 420,
+  INFERNO: 600,
+  FROSTBORN: 600,
+  STORMCALLER: 450,
+};
+
+/**
+ * ANTI-CLUTTER — at most this many magics play their FULL version at the
+ * same time. Any magic cast while the screen is already this busy plays a
+ * reduced version (rune circle + the core hit only — no lingering crater,
+ * frozen ground, shards or arcs), so a late-game map full of towers never
+ * turns into a wall of effects.
+ */
+const FULL_EFFECT_BUDGET = 3;
 
 const CAST_COLOR: Record<TowerType, string> = {
   IRONWOOD: "#ffd36a",
@@ -59,7 +85,7 @@ const CAST_COLOR: Record<TowerType, string> = {
   STORMCALLER: "#c08cff",
 };
 
-const MAX_ACTIVE = 12;
+const MAX_ACTIVE = 8;
 
 function rgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -77,11 +103,14 @@ export class SpecialVfxLayer {
   private casts: ActiveCast[] = [];
 
   spawn(cast: SpecialCast): void {
+    const fullActive = this.casts.filter((c) => !c.reduced).length;
+    const reduced = fullActive >= FULL_EFFECT_BUDGET;
     this.casts.push({
       ...cast,
       ageMs: 0,
-      totalMs: LIFETIME_MS[cast.type],
+      totalMs: reduced ? REDUCED_LIFETIME_MS[cast.type] : LIFETIME_MS[cast.type],
       seeds: Array.from({ length: 24 }, () => Math.random()),
+      reduced,
     });
     if (this.casts.length > MAX_ACTIVE) this.casts.shift();
   }
@@ -99,6 +128,7 @@ export class SpecialVfxLayer {
   drawGround(ctx: CanvasRenderingContext2D, timeMs: number): void {
     for (const c of this.casts) {
       drawRuneCircle(ctx, c, timeMs);
+      if (c.reduced) continue;
       if (c.type === "INFERNO") drawScorch(ctx, c, timeMs);
       else if (c.type === "FROSTBORN") drawFrostGround(ctx, c, timeMs);
     }
@@ -130,15 +160,15 @@ export class SpecialVfxLayer {
 // ---------------------------------------------------------------------------
 
 function drawRuneCircle(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
-  const life = Math.min(c.totalMs, 900);
+  const life = Math.min(c.totalMs, 600);
   if (c.ageMs > life) return;
   const appear = easeOut(span(c.ageMs, 0, 160));
   const fade = 1 - span(c.ageMs, life * 0.55, life);
-  const alpha = appear * fade;
+  const alpha = appear * fade * 0.85;
   if (alpha <= 0) return;
   const color = CAST_COLOR[c.type];
   const { x, y } = c.towerPosition;
-  const r = 24 + appear * 6;
+  const r = 20 + appear * 5;
 
   ctx.save();
   ctx.translate(x, y + 10);
@@ -191,7 +221,7 @@ function drawPiercingShot(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   const exit = { x: c.to.x + ux * 80, y: c.to.y + uy * 80 };
 
   const reach = easeOut(span(c.ageMs, 0, 90));
-  const fade = 1 - span(c.ageMs, 120, 520);
+  const fade = 1 - span(c.ageMs, 110, c.totalMs * 0.75);
   const headX = c.from.x + (exit.x - c.from.x) * reach;
   const headY = c.from.y + (exit.y - c.from.y) * reach;
 
@@ -214,7 +244,7 @@ function drawPiercingShot(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   }
 
   // Punch-through: shockwave ring + armor shards flying onward.
-  const hit = span(c.ageMs, 50, 600);
+  const hit = span(c.ageMs, 50, c.totalMs);
   if (hit > 0 && hit < 1) {
     const ringR = 6 + easeOut(hit) * 34;
     ctx.strokeStyle = rgba(color, 0.8 * (1 - hit));
@@ -226,7 +256,7 @@ function drawPiercingShot(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
     ctx.globalCompositeOperation = "source-over";
     ctx.fillStyle = rgba("#e8dcc0", 1 - hit);
     const base = Math.atan2(uy, ux);
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < (c.reduced ? 0 : 6); i++) {
       const a = base + (c.seeds[i]! - 0.5) * 1.6;
       const d = easeOut(hit) * (22 + c.seeds[i + 8]! * 28);
       const sx = c.to.x + Math.cos(a) * d;
@@ -252,10 +282,11 @@ function drawPiercingShot(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
 function drawScorch(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
   const appear = span(c.ageMs, 140, 320);
-  const fade = 1 - span(c.ageMs, c.totalMs * 0.55, c.totalMs);
-  const alpha = appear * fade;
+  const fade = 1 - span(c.ageMs, c.totalMs * 0.45, c.totalMs);
+  const alpha = appear * fade * 0.8;
   if (alpha <= 0) return;
-  const R = c.radius * 0.8;
+  // Smaller than the blast itself — a mark where it landed, not a second blast area.
+  const R = c.radius * 0.5;
   ctx.save();
   ctx.translate(c.to.x, c.to.y);
   ctx.scale(1, 0.7);
@@ -269,7 +300,7 @@ function drawScorch(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number
   ctx.fill();
   // Glowing embers smouldering in the crater.
   ctx.globalCompositeOperation = "lighter";
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 7; i++) {
     const a = c.seeds[i]! * Math.PI * 2;
     const d = Math.sqrt(c.seeds[i + 12]!) * R * 0.85;
     const flicker = 0.55 + 0.45 * Math.sin(timeMs / 90 + i * 1.7);
@@ -302,7 +333,7 @@ function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   }
 
   // Ring of fire sweeping out to the real blast radius.
-  const sweep = span(c.ageMs, 0, 520);
+  const sweep = span(c.ageMs, 0, Math.min(520, c.totalMs));
   if (sweep > 0 && sweep < 1) {
     const rr = easeOut(sweep) * R;
     ctx.strokeStyle = `rgba(255,120,40,${0.75 * (1 - sweep)})`;
@@ -316,10 +347,10 @@ function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   }
 
   // Flame tongues bursting outward.
-  const tongues = span(c.ageMs, 30, 700);
-  if (tongues > 0 && tongues < 1) {
-    for (let i = 0; i < 10; i++) {
-      const a = (i / 10) * Math.PI * 2 + c.seeds[i]! * 0.4;
+  const tongues = span(c.ageMs, 30, 520);
+  if (!c.reduced && tongues > 0 && tongues < 1) {
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + c.seeds[i]! * 0.4;
       const reach = easeOut(tongues) * R * (0.55 + c.seeds[i + 10]! * 0.35);
       const tx = x + Math.cos(a) * reach;
       const ty = y + Math.sin(a) * reach * 0.7;
@@ -343,8 +374,8 @@ function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
   // Embers drifting up from the crater for the rest of its life.
   const drift = span(c.ageMs, 300, c.totalMs);
-  if (drift > 0 && drift < 1) {
-    for (let i = 0; i < 8; i++) {
+  if (!c.reduced && drift > 0 && drift < 1) {
+    for (let i = 0; i < 5; i++) {
       const local = (drift * 2.2 + c.seeds[i]!) % 1;
       const a = c.seeds[i + 8]! * Math.PI * 2;
       const d = c.seeds[i + 16]! * R * 0.6;
@@ -364,47 +395,39 @@ function drawFirestorm(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 // ---------------------------------------------------------------------------
 
 function drawFrostGround(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
+  // ANTI-CLUTTER — no filled disc any more (it covered the tower's whole
+  // range for seconds): just a faint frost rim that fades out quickly, a
+  // few frost flecks, and the small snowflake sigil at the tower's feet.
   const R = c.radius;
   const reach = easeOut(span(c.ageMs, 0, 420));
-  const fade = 1 - span(c.ageMs, c.totalMs * 0.7, c.totalMs);
-  const alpha = fade;
-  if (alpha <= 0 || reach <= 0) return;
+  const fade = 1 - span(c.ageMs, 350, c.totalMs);
+  if (fade <= 0 || reach <= 0) return;
   const r = R * reach;
   const { x, y } = c.towerPosition;
 
   ctx.save();
-  // Frozen disc on the ground — additive cyan so it reads as cold light on
-  // any terrain (a plain translucent fill turned muddy grey on dark ground).
   ctx.globalCompositeOperation = "lighter";
-  const disc = ctx.createRadialGradient(x, y, r * 0.15, x, y, r);
-  disc.addColorStop(0, `rgba(60,150,200,${0.04 * alpha})`);
-  disc.addColorStop(0.8, `rgba(80,190,240,${0.08 * alpha})`);
-  disc.addColorStop(1, `rgba(150,230,255,${0.24 * alpha})`);
-  ctx.fillStyle = disc;
+  ctx.strokeStyle = `rgba(170,236,255,${0.35 * fade})`;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = `rgba(190,245,255,${0.6 * alpha})`;
-  ctx.lineWidth = 1.4;
   ctx.stroke();
-  // Frost flecks scattered across the frozen area.
-  ctx.fillStyle = `rgba(220,250,255,${0.7 * alpha})`;
-  for (let i = 0; i < 14; i++) {
+  ctx.fillStyle = `rgba(220,250,255,${0.55 * fade})`;
+  for (let i = 0; i < 8; i++) {
     const a = c.seeds[i]! * Math.PI * 2;
-    const d = Math.sqrt(c.seeds[(i + 7) % 24]!) * r * 0.95;
+    const d = (0.55 + c.seeds[(i + 7) % 24]! * 0.45) * r;
     ctx.beginPath();
-    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 0.9 + (i % 3) * 0.4, 0, Math.PI * 2);
+    ctx.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, 0.9 + (i % 3) * 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // Turning snowflake sigil at the tower's feet.
   ctx.translate(x, y + 8);
   ctx.scale(1, 0.55);
   ctx.rotate(timeMs / 2400);
-  ctx.strokeStyle = `rgba(190,245,255,${0.75 * alpha})`;
-  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = `rgba(190,245,255,${0.7 * fade})`;
+  ctx.lineWidth = 1.3;
   ctx.lineCap = "round";
-  const s = 26 * reach;
+  const s = 20 * reach;
   for (let i = 0; i < 6; i++) {
     ctx.save();
     ctx.rotate((i / 6) * Math.PI * 2);
@@ -424,8 +447,8 @@ function drawFrostGround(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: n
 function drawAbsoluteZero(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   const R = c.radius;
   const { x, y } = c.towerPosition;
-  const sweep = span(c.ageMs, 0, 420);
-  const fade = 1 - span(c.ageMs, c.totalMs * 0.6, c.totalMs);
+  const sweep = span(c.ageMs, 0, Math.min(420, c.totalMs));
+  const fade = 1 - span(c.ageMs, c.totalMs * 0.5, c.totalMs);
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
 
@@ -444,14 +467,14 @@ function drawAbsoluteZero(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   ctx.restore();
 
   // Crown of ice spikes left standing at the edge of the freeze.
-  if (fade <= 0) return;
+  if (fade <= 0 || c.reduced) return;
   ctx.save();
-  const spikes = 18;
+  const spikes = 12;
   for (let i = 0; i < spikes; i++) {
     const a = (i / spikes) * Math.PI * 2 + c.seeds[i]! * 0.15;
     const grow = easeOut(span(c.ageMs, 300 + c.seeds[i]! * 120, 520 + c.seeds[i]! * 120));
     if (grow <= 0) continue;
-    const h = (9 + c.seeds[i]! * 8) * grow * fade;
+    const h = (6 + c.seeds[i]! * 6) * grow * fade;
     const bx = x + Math.cos(a) * R;
     const by = y + Math.sin(a) * R;
     ctx.fillStyle = `rgba(214,248,255,${0.85 * fade})`;
@@ -492,7 +515,8 @@ function jagged(ctx: CanvasRenderingContext2D, from: Vector2, to: Vector2, amp: 
 
 function drawChainOverload(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
   const color = CAST_COLOR.STORMCALLER;
-  const points = [c.to, ...c.chainTargets];
+  // Busy screen: only the main target gets the sky strike, no chain arcs afterwards.
+  const points = c.reduced ? [c.to] : [c.to, ...c.chainTargets];
   ctx.save();
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
@@ -500,7 +524,7 @@ function drawChainOverload(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
   points.forEach((p, i) => {
     // Each strike lands a beat after the previous one, down the chain.
-    const t = span(c.ageMs, i * 55, i * 55 + 420);
+    const t = span(c.ageMs, i * 55, i * 55 + Math.min(420, c.totalMs - i * 55));
     if (t <= 0 || t >= 1) return;
     const strike = 1 - t;
     const sky = { x: p.x + (c.seeds[i]! - 0.5) * 30, y: p.y - 170 };
@@ -531,7 +555,7 @@ function drawChainOverload(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
 
   // Lingering arcs flickering along the chain after the main bolt.
   const linger = 1 - span(c.ageMs, 200, c.totalMs);
-  if (linger > 0 && points.length > 1 && Math.random() < 0.8) {
+  if (!c.reduced && linger > 0 && points.length > 1 && Math.random() < 0.6) {
     ctx.strokeStyle = rgba(color, 0.7 * linger);
     ctx.lineWidth = 1.4;
     for (let i = 0; i < points.length - 1; i++) jagged(ctx, points[i]!, points[i + 1]!, 9);
