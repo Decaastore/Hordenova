@@ -75,4 +75,54 @@ export const BIOME_ENEMY_SHEETS: Record<string, Partial<Record<EnemyType, BiomeS
     IRONCLAD: { file: "biomes/abyss/ironclad.webp", frames: 12, worldHeight: 29, stride: 26 },
     DISABLER: { file: "biomes/abyss/disabler.webp", frames: 12, worldHeight: 26, stride: 26, hover: 6 },
   },
+  DWARVEN_UNDERCITY: {
+    FORGECRAWLER: { file: "biomes/dwarven_undercity/forgecrawler.webp", frames: 12, worldHeight: 24, stride: 16 },
+    DEEPDELVER: { file: "biomes/dwarven_undercity/deepdelver.webp", frames: 12, worldHeight: 28, stride: 24 },
+    MAGMAJAW: { file: "biomes/dwarven_undercity/magmajaw.webp", frames: 12, worldHeight: 30, stride: 28 },
+  },
+  COLOSSUS_GRAVEYARD: {
+    BONE_STALKER: { file: "biomes/colossus_graveyard/bone_stalker.webp", frames: 12, worldHeight: 28, stride: 26 },
+    RIBCRAWLER: { file: "biomes/colossus_graveyard/ribcrawler.webp", frames: 12, worldHeight: 24, stride: 16 },
+    GRAVEWING: { file: "biomes/colossus_graveyard/gravewing.webp", frames: 12, worldHeight: 24, stride: 12, hover: 7 },
+  },
+  FLOATING_ISLES: {
+    CLOUDFANG: { file: "biomes/floating_isles/cloudfang.webp", frames: 12, worldHeight: 24, stride: 12, hover: 8 },
+    SKY_MANTA: { file: "biomes/floating_isles/sky_manta.webp", frames: 12, worldHeight: 26, stride: 12, hover: 8 },
+    STORM_TALON: { file: "biomes/floating_isles/storm_talon.webp", frames: 12, worldHeight: 24, stride: 12, hover: 8 },
+  },
+  LOST_SUN_TEMPLE: {
+    SUNSCARAB: { file: "biomes/lost_sun_temple/sunscarab.webp", frames: 12, worldHeight: 24, stride: 16 },
+    TEMPLE_GUARDIAN: { file: "biomes/lost_sun_temple/temple_guardian.webp", frames: 12, worldHeight: 30, stride: 28 },
+    SOLAR_SERPENT: { file: "biomes/lost_sun_temple/solar_serpent.webp", frames: 12, worldHeight: 26, stride: 36 },
+  },
+  CRYSTAL_SEA: {
+    SHARDCRAWLER: { file: "biomes/crystal_sea/shardcrawler.webp", frames: 12, worldHeight: 24, stride: 16 },
+    CRYSTAL_MAW: { file: "biomes/crystal_sea/crystal_maw.webp", frames: 12, worldHeight: 28, stride: 26 },
+    PRISM_WRAITH: { file: "biomes/crystal_sea/prism_wraith.webp", frames: 12, worldHeight: 24, stride: 12, hover: 7 },
+  },
+  ABYSSAL_FORTRESS: {
+    ABYSS_CRAWLER: { file: "biomes/abyssal_fortress/abyss_crawler.webp", frames: 12, worldHeight: 24, stride: 18 },
+    CHAINBOUND: { file: "biomes/abyssal_fortress/chainbound.webp", frames: 12, worldHeight: 30, stride: 26 },
+    VOID_BAT: { file: "biomes/abyssal_fortress/void_bat.webp", frames: 12, worldHeight: 22, stride: 10, hover: 8 },
+  },
+  ASHEN_VALLEY: {
+    ASH_HOUND: { file: "biomes/ashen_valley/ash_hound.webp", frames: 12, worldHeight: 24, stride: 30 },
+    PETRIFIED_STALKER: { file: "biomes/ashen_valley/petrified_stalker.webp", frames: 12, worldHeight: 28, stride: 26 },
+    CINDERWING: { file: "biomes/ashen_valley/cinderwing.webp", frames: 12, worldHeight: 24, stride: 12, hover: 8 },
+  },
+  MOON_GARDENS: {
+    MOONFANG: { file: "biomes/moon_gardens/moonfang.webp", frames: 12, worldHeight: 24, stride: 30 },
+    BLOOM_HORROR: { file: "biomes/moon_gardens/bloom_horror.webp", frames: 12, worldHeight: 28, stride: 24 },
+    LUNAMOTH: { file: "biomes/moon_gardens/lunamoth.webp", frames: 12, worldHeight: 24, stride: 10, hover: 8 },
+  },
+  DEFILED_CATHEDRAL: {
+    GRAVE_KNIGHT: { file: "biomes/defiled_cathedral/grave_knight.webp", frames: 12, worldHeight: 30, stride: 26 },
+    GARGOYLE_BEAST: { file: "biomes/defiled_cathedral/gargoyle_beast.webp", frames: 12, worldHeight: 28, stride: 26 },
+    BELL_WRAITH: { file: "biomes/defiled_cathedral/bell_wraith.webp", frames: 12, worldHeight: 24, stride: 12, hover: 7 },
+  },
+  LEVIATHAN_COAST: {
+    TIDE_RIPPER: { file: "biomes/leviathan_coast/tide_ripper.webp", frames: 12, worldHeight: 26, stride: 26 },
+    DEEPMAW: { file: "biomes/leviathan_coast/deepmaw.webp", frames: 12, worldHeight: 26, stride: 20 },
+    BONEFIN: { file: "biomes/leviathan_coast/bonefin.webp", frames: 12, worldHeight: 24, stride: 18 },
+  },
 };

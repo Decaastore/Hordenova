@@ -5,7 +5,7 @@ import type { VisibleBounds } from "./MapRenderer";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 /** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
-const BAKE_VERSION = 4;
+const BAKE_VERSION = 5;
 /** Slot index (index % 6) whose baked platform is the glowing rune altar — see MapRenderer's slot style order. */
 const ALTAR_SLOT_STYLE_INDEX = 4;
 
@@ -56,6 +56,17 @@ const GROUND_BAKES: Record<string, GroundBakeDef> = {
   CURSED_DESERT: bake("cursed_desert", ["ROCK", "RUIN", "GRASS"], "regions"),
   DARK_RUINS: bake("dark_ruins", ["ROCK", "RUIN", "GRASS"], "regions"),
   ABYSS: bake("abyss", ["ROCK", "RUIN"], "global"),
+  // 10-biome expansion
+  DWARVEN_UNDERCITY: bake("dwarven_undercity", ["ROCK", "RUIN"], "regions"),
+  COLOSSUS_GRAVEYARD: bake("colossus_graveyard", ["ROCK", "ROOT", "RUIN", "GRASS"], "regions"),
+  FLOATING_ISLES: bake("floating_isles", ["TREE", "ROCK", "GRASS", "FLOWER", "WATER"], "regions"),
+  LOST_SUN_TEMPLE: bake("lost_sun_temple", ["ROCK", "RUIN"], "regions"),
+  CRYSTAL_SEA: bake("crystal_sea", ["ROCK", "WATER"], "global"),
+  ABYSSAL_FORTRESS: bake("abyssal_fortress", ["ROCK", "RUIN"], "regions"),
+  ASHEN_VALLEY: bake("ashen_valley", ["ROCK", "ROOT", "RUIN", "GRASS"], "global"),
+  MOON_GARDENS: bake("moon_gardens", ["TREE", "ROOT", "GRASS", "FLOWER"], "global"),
+  DEFILED_CATHEDRAL: bake("defiled_cathedral", ["ROCK", "RUIN"], "regions"),
+  LEVIATHAN_COAST: bake("leviathan_coast", ["ROCK", "RUIN", "GRASS", "WATER"], "regions"),
 };
 
 export interface LoadedGroundBake {

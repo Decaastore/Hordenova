@@ -21,7 +21,21 @@ interface AtmosphereStyle {
   particles: ParticleKind[];
 }
 
-type ParticleKind = "LEAF" | "POLLEN" | "ASH" | "EMBER" | "SNOW" | "SAND" | "DUST" | "VOID_MOTE";
+type ParticleKind =
+  | "LEAF"
+  | "POLLEN"
+  | "ASH"
+  | "EMBER"
+  | "SNOW"
+  | "SAND"
+  | "DUST"
+  | "VOID_MOTE"
+  | "STEAM"
+  | "WIND"
+  | "GLINT"
+  | "SPORE"
+  | "SPRAY"
+  | "INCENSE";
 
 const STYLES: Record<string, AtmosphereStyle> = {
   ANCIENT_FOREST: { clouds: 0.3, mist: [200, 225, 190], mistAlpha: 0.16, particles: ["LEAF", "POLLEN"] },
@@ -30,6 +44,17 @@ const STYLES: Record<string, AtmosphereStyle> = {
   CURSED_DESERT: { clouds: 0.26, mist: [230, 200, 150], mistAlpha: 0.22, particles: ["SAND"] },
   DARK_RUINS: { clouds: 0.24, mist: [150, 160, 150], mistAlpha: 0.18, particles: ["DUST"] },
   ABYSS: { clouds: 0, mist: [60, 30, 100], mistAlpha: 0.3, particles: ["VOID_MOTE"] },
+  // 10-biome expansion
+  DWARVEN_UNDERCITY: { clouds: 0, mist: [90, 70, 50], mistAlpha: 0.28, particles: ["STEAM", "EMBER"] },
+  COLOSSUS_GRAVEYARD: { clouds: 0.26, mist: [200, 190, 165], mistAlpha: 0.2, particles: ["DUST"] },
+  FLOATING_ISLES: { clouds: 0.34, mist: [230, 240, 255], mistAlpha: 0.34, particles: ["WIND", "POLLEN"] },
+  LOST_SUN_TEMPLE: { clouds: 0.22, mist: [240, 210, 150], mistAlpha: 0.2, particles: ["DUST", "SAND"] },
+  CRYSTAL_SEA: { clouds: 0.18, mist: [150, 220, 240], mistAlpha: 0.24, particles: ["GLINT"] },
+  ABYSSAL_FORTRESS: { clouds: 0.16, mist: [40, 55, 70], mistAlpha: 0.4, particles: ["DUST"] },
+  ASHEN_VALLEY: { clouds: 0.26, mist: [120, 110, 100], mistAlpha: 0.3, particles: ["ASH", "EMBER"] },
+  MOON_GARDENS: { clouds: 0.14, mist: [90, 90, 160], mistAlpha: 0.26, particles: ["SPORE"] },
+  DEFILED_CATHEDRAL: { clouds: 0.12, mist: [80, 60, 100], mistAlpha: 0.3, particles: ["INCENSE", "DUST"] },
+  LEVIATHAN_COAST: { clouds: 0.3, mist: [190, 225, 230], mistAlpha: 0.3, particles: ["SPRAY", "WIND"] },
 };
 
 export function hasRealisticAtmosphere(biomeId: string): boolean {
@@ -205,6 +230,12 @@ const PARTICLE_SEEDS: Record<ParticleKind, Seed[]> = {
   SAND: seeds(26, 6),
   DUST: seeds(20, 7),
   VOID_MOTE: seeds(20, 8),
+  STEAM: seeds(14, 9),
+  WIND: seeds(18, 10),
+  GLINT: seeds(30, 11),
+  SPORE: seeds(26, 12),
+  SPRAY: seeds(22, 13),
+  INCENSE: seeds(10, 14),
 };
 
 const LEAF_COLORS = ["#6a7a2a", "#8a6a24", "#a05a1e", "#5a6a24"];
@@ -327,6 +358,113 @@ function drawParticles(ctx: CanvasRenderingContext2D, kind: ParticleKind, timeMs
         ctx.beginPath();
         ctx.arc(x, y, 0.8 * p.size, 0, Math.PI * 2);
         ctx.fill();
+      }
+      break;
+    }
+    case "STEAM": {
+      // Steam venting from below the streets: soft puffs rising and spreading.
+      for (const p of list) {
+        const life = 5 + p.speed * 3;
+        const k = ((t + p.phase * 4) % life) / life;
+        const x = wrapX(p.x + Math.sin(t * 0.6 + p.phase) * 6 + k * 14);
+        const y = wrapY(p.y - k * 60);
+        const r = 4 + k * 14;
+        const a = Math.sin(k * Math.PI) * 0.14;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+        g.addColorStop(0, `rgba(220,210,200,${a})`);
+        g.addColorStop(1, "rgba(220,210,200,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "WIND": {
+      // Long faint wind streaks sweeping across in gusts.
+      const gust = 0.5 + 0.5 * Math.sin(t * 0.4);
+      ctx.lineCap = "round";
+      for (const p of list) {
+        const x = wrapX(p.x + t * 130 * p.speed);
+        const y = wrapY(p.y + Math.sin(t + p.phase) * 4 + t * 12 * p.speed);
+        const len = 18 + 26 * p.size * gust;
+        ctx.strokeStyle = `rgba(245,250,255,${0.1 + 0.18 * gust})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.moveTo(x - len, y - len * 0.1);
+        ctx.quadraticCurveTo(x - len * 0.5, y - len * 0.02 + Math.sin(t * 3 + p.phase) * 2, x, y);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "GLINT": {
+      // Mineral facets catching the light: brief four-point sparkles.
+      ctx.globalCompositeOperation = "lighter";
+      for (const p of list) {
+        const flash = Math.pow(Math.max(0, Math.sin(t * 0.9 * p.speed + p.phase * 3)), 10);
+        if (flash < 0.05) continue;
+        const x = p.x, y = p.y;
+        const r = 2 + flash * 3.5 * p.size;
+        ctx.strokeStyle = `rgba(210,250,255,${flash})`;
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(x - r, y);
+        ctx.lineTo(x + r, y);
+        ctx.moveTo(x, y - r);
+        ctx.lineTo(x, y + r);
+        ctx.stroke();
+      }
+      break;
+    }
+    case "SPORE": {
+      // Luminous spores drifting upward, slowly breathing.
+      ctx.globalCompositeOperation = "lighter";
+      for (const p of list) {
+        const x = wrapX(p.x + Math.sin(t * 0.35 + p.phase) * 18);
+        const y = wrapY(p.y - t * 4 * p.speed);
+        const a = 0.18 + 0.32 * (0.5 + 0.5 * Math.sin(t * 0.9 + p.phase));
+        const r = 1.4 * p.size;
+        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3);
+        g.addColorStop(0, `rgba(200,190,255,${a})`);
+        g.addColorStop(1, "rgba(150,130,255,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, r * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "SPRAY": {
+      // Sea spray: fine droplets flung up and falling back in arcs.
+      for (const p of list) {
+        const life = 2.2 + p.speed;
+        const k = ((t + p.phase) % life) / life;
+        const x = wrapX(p.x + k * 40);
+        const y = p.y - Math.sin(k * Math.PI) * 26;
+        const a = Math.sin(k * Math.PI) * 0.5;
+        ctx.fillStyle = `rgba(230,250,255,${a})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 0.8 + p.size * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "INCENSE": {
+      // Thin wisps of incense smoke curling upward.
+      ctx.lineCap = "round";
+      for (const p of list) {
+        const baseX = p.x, baseY = wrapY(p.y);
+        ctx.strokeStyle = "rgba(190,170,210,0.12)";
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        for (let k = 0; k <= 10; k++) {
+          const f = k / 10;
+          const x = baseX + Math.sin(t * 0.7 + p.phase + f * 4) * 6 * f;
+          const y = baseY - f * 50;
+          if (k === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
       }
       break;
     }

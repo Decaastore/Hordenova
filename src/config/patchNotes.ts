@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v54",
+    dateIso: "2026-10-29",
+    category: "CONTENT",
+    title: {
+      en: "The 10 Expansion Biomes Get the Full Visual Overhaul",
+      ptBR: "Os 10 Biomas da Expansão Ganham a Reforma Visual Completa",
+    },
+    description: {
+      en: "Waves 131 to 330 now look as good as the first six biomes: realistic lit ground and roads, real tower platforms, the ground rift enemies climb out of, living weather — and every enemy in these biomes is now a fully animated creature instead of a flat drawing. Enemy stats and abilities are unchanged.",
+      ptBR: "As ondas 131 a 330 agora têm o mesmo visual dos seis primeiros biomas: chão e estradas realistas com luz e sombra, bases de torre de verdade, a fenda no chão de onde os inimigos saem, clima vivo — e todos os inimigos desses biomas agora são criaturas com animação de verdade, no lugar dos desenhos chapados. Os atributos e habilidades dos inimigos não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Each biome has its own ground and road: dwarven forge streets, a bone-strewn graveyard, grassy sky islands with ponds, a golden temple of paving slabs, crystal shores with glowing veins, a cold fortress, ash plains with smouldering cracks, moonlit gardens with glowing flowers, a cathedral's old cobblestones and a rocky sea coast.",
+        ptBR: "Cada bioma tem seu chão e sua estrada: ruas de forja anã, um cemitério cheio de ossos, ilhas no céu com grama e lagos, um templo dourado de lajes, praias de cristal com veios brilhando, uma fortaleza fria, planícies de cinza com rachaduras em brasa, jardins ao luar com flores brilhantes, os paralelepípedos velhos de uma catedral e uma costa rochosa.",
+      },
+      {
+        en: "Living weather per biome: rising forge steam and embers, settling bone dust, wind streaks and pollen high in the sky, temple dust, crystal glints, a heavy fortress mist, falling ash, drifting luminous spores, incense smoke and sea spray.",
+        ptBR: "Clima vivo em cada bioma: vapor e brasas das forjas, poeira de ossos assentando, rajadas de vento e pólen lá no alto, poeira do templo, reflexos de cristal, uma névoa pesada na fortaleza, cinzas caindo, esporos luminosos flutuando, fumaça de incenso e respingos do mar.",
+      },
+      {
+        en: "All 30 creatures of these biomes walk or fly with real full-body animation, coloured to match their home.",
+        ptBR: "As 30 criaturas desses biomas andam ou voam com animação de verdade do corpo inteiro, com as cores do lugar de onde vêm.",
+      },
+    ],
+  },
+  {
     id: "v53",
     dateIso: "2026-10-28",
     category: "TOWERS",
