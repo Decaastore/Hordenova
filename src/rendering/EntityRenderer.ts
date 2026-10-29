@@ -13,7 +13,7 @@ import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
 import type { LocomotionState } from "./biomeCreatures/helpers";
 import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
 import { drawEnemySprite, ensureEnemySpritesLoading, getEnemySprite, spriteHeadroom } from "./enemySprites";
-import { getTowerSprite, type LoadedTowerSprite } from "./towerSprites";
+import { getTowerAim, getTowerSprite, TOWER_VIEW_SIN_ELEV, type LoadedTowerSprite } from "./towerSprites";
 import { drawEmbers, drawFire, drawSmokeColumn } from "./fireFx";
 
 /**
@@ -309,7 +309,7 @@ export function drawTower(
   const sprite = getTowerSprite(tower.type, tower.equippedSkinId, visualStage);
   if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
-    drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin);
+    drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
   } else if (tower.type !== "IRONWOOD") drawPlinth(ctx);
 
   if (!sprite) switch (tower.type) {
@@ -391,6 +391,7 @@ function drawBakedTowerLive(
   attackFlashMs: number,
   _readiness: number,
   skin: TowerSkinDefinition | null,
+  towerId = "",
 ): void {
   // A skin recolours every live effect with its own accent; the base towers keep their signature colours.
   const tint = (base: readonly [number, number, number], lighten = 0): string => {
@@ -508,10 +509,39 @@ function drawBakedTowerLive(
   }
 
   if (type === "IRONWOOD") {
-    const L = sprite.anchor("armL"), R = sprite.anchor("armR");
-    const rest = sprite.anchor("nockRest"), drawn = sprite.anchor("nockDrawn");
-    const tip = sprite.anchor("boltTip");
     const flare = attackFlashMs < 160 ? 1 - attackFlashMs / 160 : 0;
+    // The ballista turret swivels to follow its target (heading set by the
+    // renderer from the tower's real current target) and kicks back on each shot.
+    const turret = sprite.turret;
+    const heading = getTowerAim(towerId) ?? Math.PI / 2;
+    let kickX = 0, kickY = 0;
+    if (turret) {
+      const recoil = attackFlashMs < 140 ? (1 - attackFlashMs / 140) * 1.8 : 0;
+      kickX = -Math.cos(heading) * recoil;
+      kickY = -Math.sin(heading) * recoil * TOWER_VIEW_SIN_ELEV;
+      const n = turret.frames;
+      const f = (((heading / (Math.PI * 2)) * n) % n + n) % n;
+      const i0 = Math.floor(f) % n;
+      const i1 = (i0 + 1) % n;
+      const k = f - Math.floor(f);
+      const fw = turret.image.naturalWidth / n;
+      const fh = turret.image.naturalHeight;
+      const o = sprite.origin;
+      ctx.drawImage(turret.image, i0 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
+      if (k > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = k;
+        ctx.drawImage(turret.image, i1 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
+        ctx.restore();
+      }
+    }
+    const ta = (name: string) => {
+      const p = turret ? turret.anchorAt(name, heading) : sprite.anchor(name);
+      return p ? { x: p.x + kickX, y: p.y + kickY } : null;
+    };
+    const L = ta("armL"), R = ta("armR");
+    const rest = ta("nockRest"), drawn = ta("nockDrawn");
+    const tip = ta("boltTip");
     if (L && R && rest && drawn && tip) {
       // Bowstring draws back as the next shot nears; snaps forward on release.
       const pull = flare > 0 ? 0 : Math.min(1, _readiness * 1.1);
@@ -553,7 +583,7 @@ function drawBakedTowerLive(
       ctx.fill();
       ctx.restore();
     }
-    const eyes = sprite.anchor("eyes");
+    const eyes = ta("eyes");
     if (eyes) {
       ctx.fillStyle = `rgba(${tint([190, 255, 150], 0.4)},${0.7 + 0.3 * Math.sin(timeMs / 900)})`;
       ctx.fillRect(eyes.x - 0.9, eyes.y, 0.6, 0.4);

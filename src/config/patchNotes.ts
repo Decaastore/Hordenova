@@ -70,6 +70,25 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v53",
+    dateIso: "2026-10-28",
+    category: "TOWERS",
+    title: {
+      en: "Ironwood's Ballista Now Tracks Its Target",
+      ptBR: "A Balista da Ironwood Agora Acompanha o Alvo",
+    },
+    description: {
+      en: "The Ironwood archer tower's ballista and its hooded operator now swivel on top of the trunk to follow the enemy the tower is actually shooting at, kick back with every shot, and slowly scan the road when nothing is in range. Works with every Ironwood skin. Targeting and damage are unchanged.",
+      ptBR: "A balista da torre arqueira Ironwood e o operador encapuzado agora giram em cima do tronco para acompanhar o inimigo em que a torre está atirando de verdade, recuam a cada disparo e ficam vigiando a estrada devagar quando não há nada no alcance. Funciona com todas as skins da Ironwood. A mira e o dano não mudaram.",
+    },
+    highlights: [
+      {
+        en: "Smooth turning in every direction, with the bowstring and the loaded bolt following the ballista as it rotates.",
+        ptBR: "Giro suave em todas as direções, com a corda e a flecha carregada acompanhando a balista enquanto ela gira.",
+      },
+    ],
+  },
+  {
     id: "v52",
     dateIso: "2026-10-28",
     category: "INTERFACE",

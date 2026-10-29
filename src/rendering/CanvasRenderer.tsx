@@ -13,6 +13,8 @@ import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
+import { getTowerAim, pruneTowerAims, setTowerAim, TOWER_VIEW_SIN_ELEV } from "./towerSprites";
+import { findPrimaryTarget } from "@/engine/CombatSystem";
 import {
   drawAmbientParticles,
   drawBackground,
@@ -159,6 +161,27 @@ const MAX_DEATH_ANIMATIONS = 14;
  * (damage numbers, death bursts, build/upgrade/gold feedback) with no
  * connection back to GameEngine.
  */
+/**
+ * Turns a turreted tower (Ironwood's ballista) towards the enemy it is really
+ * shooting at — the same "furthest along the path within range" pick the
+ * combat system uses — at a limited turn speed, so it visibly tracks its
+ * prey; with nothing in range it slowly scans back and forth. Purely visual.
+ */
+function updateTurretAim(tower: RenderSnapshot["towers"][number], enemies: readonly EnemyInstance[], timestamp: number, frameDt: number): void {
+  const target = findPrimaryTarget(tower.position, getTowerStats(tower).range, enemies);
+  const current = getTowerAim(tower.id) ?? Math.PI / 2;
+  let desired: number;
+  if (target) {
+    // Screen-space heading: ground dy is foreshortened by the oblique view.
+    desired = Math.atan2((target.position.y - tower.position.y) / TOWER_VIEW_SIN_ELEV, target.position.x - tower.position.x);
+  } else {
+    desired = current + Math.sin(timestamp / 2400 + tower.position.x) * 0.004 * frameDt;
+  }
+  const diff = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
+  const maxStep = (target ? 0.009 : 0.004) * frameDt;
+  setTowerAim(tower.id, current + Math.max(-maxStep, Math.min(maxStep, diff)));
+}
+
 export function CanvasRenderer({
   engine,
   pendingTowerType,
@@ -385,6 +408,7 @@ export function CanvasRenderer({
       drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
+      pruneTowerAims(new Set(snapshot.towers.map((t) => t.id)));
       TOWER_SLOTS.forEach((slot, index) => {
         drawSlot(
           ctx,
@@ -403,6 +427,7 @@ export function CanvasRenderer({
 
       for (const tower of snapshot.towers) {
         const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
+        if (tower.type === "IRONWOOD") updateTurretAim(tower, snapshot.enemies, timestamp, frameDt);
         // MUNDO 3D — FASE 3: the ONE tower `WorldGameplayTestLayer` is
         // currently rendering a 3D body for skips its 2D sprite here — the
         // range circle below is drawn unconditionally regardless, so
