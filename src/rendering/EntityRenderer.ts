@@ -376,40 +376,6 @@ export function drawTower(
 }
 
 /**
- * Draws a baked turret (the part that turns to face the tower's target) at
- * the tower's current heading, crossfading the two nearest baked headings,
- * pushed back along the aim by `recoil`. Returns an anchor lookup that
- * follows the turret (falls back to the body's anchors when untilted).
- */
-function drawTurret(ctx: CanvasRenderingContext2D, sprite: LoadedTowerSprite, towerId: string, recoil: number): (name: string) => { x: number; y: number } | null {
-  const turret = sprite.turret;
-  const heading = getTowerAim(towerId) ?? Math.PI / 2;
-  const kickX = -Math.cos(heading) * recoil;
-  const kickY = -Math.sin(heading) * recoil * TOWER_VIEW_SIN_ELEV;
-  if (turret) {
-    const n = turret.frames;
-    const f = (((heading / (Math.PI * 2)) * n) % n + n) % n;
-    const i0 = Math.floor(f) % n;
-    const i1 = (i0 + 1) % n;
-    const k = f - Math.floor(f);
-    const fw = turret.image.naturalWidth / n;
-    const fh = turret.image.naturalHeight;
-    const o = sprite.origin;
-    ctx.drawImage(turret.image, i0 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
-    if (k > 0.02) {
-      ctx.save();
-      ctx.globalAlpha *= k;
-      ctx.drawImage(turret.image, i1 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
-      ctx.restore();
-    }
-  }
-  return (name: string) => {
-    const p = (turret ? turret.anchorAt(name, heading) : null) ?? sprite.anchor(name);
-    return p ? { x: p.x + kickX, y: p.y + kickY } : null;
-  };
-}
-
-/**
  * Live effects on top of a pre-rendered tower body: everything that moves or
  * reacts (glowing cores, orbiting runestones, rising frost motes, the
  * attack flare) stays animated in 2D at the bake's own anchor points.
@@ -546,7 +512,33 @@ function drawBakedTowerLive(
     const flare = attackFlashMs < 160 ? 1 - attackFlashMs / 160 : 0;
     // The ballista turret swivels to follow its target (heading set by the
     // renderer from the tower's real current target) and kicks back on each shot.
-    const ta = drawTurret(ctx, sprite, towerId, attackFlashMs < 140 ? (1 - attackFlashMs / 140) * 1.8 : 0);
+    const turret = sprite.turret;
+    const heading = getTowerAim(towerId) ?? Math.PI / 2;
+    let kickX = 0, kickY = 0;
+    if (turret) {
+      const recoil = attackFlashMs < 140 ? (1 - attackFlashMs / 140) * 1.8 : 0;
+      kickX = -Math.cos(heading) * recoil;
+      kickY = -Math.sin(heading) * recoil * TOWER_VIEW_SIN_ELEV;
+      const n = turret.frames;
+      const f = (((heading / (Math.PI * 2)) * n) % n + n) % n;
+      const i0 = Math.floor(f) % n;
+      const i1 = (i0 + 1) % n;
+      const k = f - Math.floor(f);
+      const fw = turret.image.naturalWidth / n;
+      const fh = turret.image.naturalHeight;
+      const o = sprite.origin;
+      ctx.drawImage(turret.image, i0 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
+      if (k > 0.02) {
+        ctx.save();
+        ctx.globalAlpha = k;
+        ctx.drawImage(turret.image, i1 * fw, 0, fw, fh, o.x + kickX, o.y + kickY, o.size, o.size);
+        ctx.restore();
+      }
+    }
+    const ta = (name: string) => {
+      const p = turret ? turret.anchorAt(name, heading) : sprite.anchor(name);
+      return p ? { x: p.x + kickX, y: p.y + kickY } : null;
+    };
     const L = ta("armL"), R = ta("armR");
     const rest = ta("nockRest"), drawn = ta("nockDrawn");
     const tip = ta("boltTip");
@@ -618,10 +610,8 @@ function drawBakedTowerLive(
   }
 
   if (type === "INFERNO") {
+    const mouth = sprite.anchor("mouth");
     const flare = attackFlashMs < 220 ? 1 - attackFlashMs / 220 : 0;
-    // The furnace swings round to face its target and lurches back as it fires.
-    const ta = drawTurret(ctx, sprite, towerId, attackFlashMs < 180 ? (1 - attackFlashMs / 180) * 1.2 : 0);
-    const mouth = ta("mouth");
     if (mouth) {
       ctx.save();
       ctx.beginPath();
@@ -650,7 +640,7 @@ function drawBakedTowerLive(
       if (flare > 0) drawFire(ctx, mouth.x, mouth.y + 3, timeMs, 0.6 + flare * 0.6, 23, flame);
     }
     for (const key of ["vat1", "vat2", "steam"]) {
-      const a = ta(key);
+      const a = sprite.anchor(key);
       if (!a) continue;
       // Toxic bubbles / venting steam rising from the skin's own vents.
       for (let i = 0; i < 4; i++) {
@@ -662,7 +652,7 @@ function drawBakedTowerLive(
       }
     }
     for (const key of ["smoke1", "smoke2"]) {
-      const a = ta(key);
+      const a = sprite.anchor(key);
       if (!a) continue;
       drawSmokeColumn(ctx, a.x, a.y, timeMs, 0.38 + stage * 0.03, key.length * 7 + 3);
       drawEmbers(ctx, a.x, a.y, timeMs, 2 + Math.floor(stage / 2), key.length * 5);
@@ -671,9 +661,7 @@ function drawBakedTowerLive(
   }
 
   if (type === "STORMCALLER") {
-    // The crown of lightning rods leans towards its target.
-    const ta = drawTurret(ctx, sprite, towerId, 0);
-    const orb = ta("orb") ?? { x: 0, y: -34 };
+    const orb = sprite.anchor("orb") ?? { x: 0, y: -34 };
     const flare = attackFlashMs < 200 ? 1 - attackFlashMs / 200 : 0;
     const charge = Math.min(1, _readiness);
     ctx.save();
@@ -700,7 +688,7 @@ function drawBakedTowerLive(
       ctx.stroke();
     };
     for (let i = 0; i < 6; i++) {
-      const rod = ta(`rod${i}`);
+      const rod = sprite.anchor(`rod${i}`);
       if (!rod) continue;
       const live = Math.sin(timeMs / 160 + i * 2.3) > 0.55 - charge * 0.6 || flare > 0;
       if (!live) continue;
@@ -725,7 +713,7 @@ function drawBakedTowerLive(
     }
     ctx.restore();
     // Stage 4+: a small satellite orb circling the main one.
-    const sat = ta("satellite");
+    const sat = sprite.anchor("satellite");
     if (sat) {
       const a = timeMs / 900;
       const x = sat.x + Math.cos(a) * 8;

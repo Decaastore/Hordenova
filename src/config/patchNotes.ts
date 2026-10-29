@@ -70,25 +70,6 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
-    id: "v54",
-    dateIso: "2026-10-28",
-    category: "TOWERS",
-    title: {
-      en: "Inferno and Stormcaller Now Turn Toward Their Targets Too",
-      ptBR: "Inferno e Stormcaller Agora Também se Viram para o Alvo",
-    },
-    description: {
-      en: "Like Ironwood's ballista, the Inferno furnace now swings round on its platform to point its fire mouth at the enemy it's attacking and lurches back as it fires, and the Stormcaller's crown of lightning rods leans toward its target as its arcs crackle. Works with every skin. Targeting and damage are unchanged.",
-      ptBR: "Assim como a balista da Ironwood, a fornalha da Inferno agora gira na plataforma para apontar a boca de fogo para o inimigo que está atacando e dá um tranco para trás ao disparar, e a coroa de para-raios da Stormcaller se inclina na direção do alvo enquanto os raios estalam. Funciona com todas as skins. A mira e o dano não mudaram.",
-    },
-    highlights: [
-      {
-        en: "Each machine turns at its own pace: the heavy furnace lumbers round, the ballista snaps quickly onto its prey.",
-        ptBR: "Cada máquina gira no seu ritmo: a fornalha pesada vira devagar, a balista trava rápido na presa.",
-      },
-    ],
-  },
-  {
     id: "v53",
     dateIso: "2026-10-28",
     category: "TOWERS",
