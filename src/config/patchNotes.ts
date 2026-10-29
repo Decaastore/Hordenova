@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v58",
+    dateIso: "2026-10-29",
+    category: "INTERFACE",
+    title: {
+      en: "New Season, Ranking and News Pages",
+      ptBR: "Novas Páginas de Season, Ranking e Novidades",
+    },
+    description: {
+      en: "The Season, Ranking and News pages have been redesigned in the same style as the new Home screen and Wiki, with clearer layouts and more useful information on each one.",
+      ptBR: "As páginas de Season, Ranking e Novidades foram redesenhadas no mesmo estilo da nova tela inicial e da Wiki, com uma organização mais clara e mais informação útil em cada uma.",
+    },
+    highlights: [
+      {
+        en: "Season: the theme with art from its world, which day of the season it is, your season score, records and Prestige bonus, plus the full list of rewards the top five will earn this season.",
+        ptBR: "Season: o tema com a arte do seu mundo, em que dia da season você está, a sua pontuação, os recordes e o bônus de Prestígio, além da lista completa de recompensas que os cinco melhores vão ganhar nesta season.",
+      },
+      {
+        en: "The Season's Play button now says whether it starts a new run or continues the current one, and at which wave.",
+        ptBR: "O botão de jogar da Season agora diz se começa uma partida nova ou continua a atual, e em qual onda.",
+      },
+      {
+        en: "Ranking: a clean leaderboard table with each player's Prestige and best wave this season, and what each of the top five places earns.",
+        ptBR: "Ranking: uma tabela limpa com o Prestígio e a melhor onda de cada jogador nesta season, e o que cada uma das cinco primeiras posições ganha.",
+      },
+      {
+        en: "News: updates grouped by date, with a filter by category.",
+        ptBR: "Novidades: atualizações agrupadas por data, com filtro por categoria.",
+      },
+    ],
+  },
+  {
     id: "v57",
     dateIso: "2026-10-29",
     category: "INTERFACE",
