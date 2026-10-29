@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v56",
+    dateIso: "2026-10-29",
+    category: "INTERFACE",
+    title: {
+      en: "A New Home Screen",
+      ptBR: "Uma Nova Tela Inicial",
+    },
+    description: {
+      en: "The Home screen has been redesigned from top to bottom. Behind the title there is now a live battle on the real battlefield: high-level towers wearing different skins hold off each biome's own creatures, and the scene moves through eight of the phases on its own. Below it you'll find the four towers, all sixteen phases, the latest news and quick ways into the Season, the Ranking and the Wiki.",
+      ptBR: "A tela inicial foi redesenhada de cima a baixo. Atrás do título agora roda uma batalha ao vivo no campo de batalha de verdade: torres de nível alto com skins diferentes seguram as criaturas de cada bioma, e a cena passa sozinha por oito das fases. Mais abaixo estão as quatro torres, as dezesseis fases, as últimas novidades e atalhos para a Season, o Ranking e a Wiki.",
+    },
+    highlights: [
+      {
+        en: "Pick a phase yourself with the bars in the bottom-right corner of the opening scene.",
+        ptBR: "Escolha a fase você mesmo pelas barrinhas no canto inferior direito da cena de abertura.",
+      },
+      {
+        en: "Hover over a tower to watch it climb through its look from level 1 to 60.",
+        ptBR: "Passe o mouse sobre uma torre para ver o visual dela evoluir do nível 1 ao 60.",
+      },
+      {
+        en: "Your best wave, season best, Prestige and skin collection are shown right under the Play button.",
+        ptBR: "Sua melhor onda, a melhor da season, o Prestígio e a coleção de skins aparecem logo abaixo do botão de jogar.",
+      },
+      {
+        en: "Clicking Play now pushes the camera into the castle gate before the game opens.",
+        ptBR: "Ao clicar em jogar, a câmera agora avança até o portão do castelo antes do jogo abrir.",
+      },
+      {
+        en: "On phones, the top menu scrolls sideways so no link is cut off.",
+        ptBR: "No celular, o menu do topo rola para o lado e nenhum link fica cortado.",
+      },
+    ],
+  },
+  {
     id: "v55",
     dateIso: "2026-10-29",
     category: "SYSTEMS",

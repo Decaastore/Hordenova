@@ -13,7 +13,7 @@ import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
-import { getTowerAim, pruneTowerAims, setTowerAim, TOWER_VIEW_SIN_ELEV } from "./towerSprites";
+import { pruneTowerAims, steerTowerAim } from "./towerSprites";
 import { findPrimaryTarget } from "@/engine/CombatSystem";
 import {
   drawAmbientParticles,
@@ -169,17 +169,7 @@ const MAX_DEATH_ANIMATIONS = 14;
  */
 function updateTurretAim(tower: RenderSnapshot["towers"][number], enemies: readonly EnemyInstance[], timestamp: number, frameDt: number): void {
   const target = findPrimaryTarget(tower.position, getTowerStats(tower).range, enemies);
-  const current = getTowerAim(tower.id) ?? Math.PI / 2;
-  let desired: number;
-  if (target) {
-    // Screen-space heading: ground dy is foreshortened by the oblique view.
-    desired = Math.atan2((target.position.y - tower.position.y) / TOWER_VIEW_SIN_ELEV, target.position.x - tower.position.x);
-  } else {
-    desired = current + Math.sin(timestamp / 2400 + tower.position.x) * 0.004 * frameDt;
-  }
-  const diff = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
-  const maxStep = (target ? 0.009 : 0.004) * frameDt;
-  setTowerAim(tower.id, current + Math.max(-maxStep, Math.min(maxStep, diff)));
+  steerTowerAim(tower.id, tower.position, target?.position ?? null, timestamp, frameDt);
 }
 
 export function CanvasRenderer({

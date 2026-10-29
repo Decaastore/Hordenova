@@ -113,6 +113,10 @@ const linksStyle: CSSProperties = {
   display: "flex",
   alignItems: "center",
   gap: "clamp(12px, 2vw, 26px)",
+  // Narrow screens: the row scrolls sideways instead of cutting links off.
+  maxWidth: "100%",
+  overflowX: "auto",
+  scrollbarWidth: "none",
 };
 
 const linkStyle: CSSProperties = {

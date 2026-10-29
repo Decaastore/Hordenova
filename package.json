@@ -13,6 +13,7 @@
     "draft:novidades": "node scripts/draftNovidades.mjs"
   },
   "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.1.0",
     "@react-three/drei": "9.114.3",
     "@react-three/fiber": "8.17.10",
     "react": "^18.3.1",

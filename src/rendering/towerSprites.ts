@@ -27,6 +27,28 @@ export function pruneTowerAims(liveIds: ReadonlySet<string>): void {
   for (const id of towerAim.keys()) if (!liveIds.has(id)) towerAim.delete(id);
 }
 
+/**
+ * Turns a tower's turret toward `target` (or lets it idly scan when there is
+ * none) at a bounded turn rate. Shared by the battle renderer and the Home
+ * screen's live scene so both aim exactly the same way.
+ */
+export function steerTowerAim(
+  towerId: string,
+  from: { x: number; y: number },
+  target: { x: number; y: number } | null,
+  timestamp: number,
+  frameDt: number,
+): void {
+  const current = towerAim.get(towerId) ?? Math.PI / 2;
+  // Screen-space heading: ground dy is foreshortened by the oblique view.
+  const desired = target
+    ? Math.atan2((target.y - from.y) / TOWER_VIEW_SIN_ELEV, target.x - from.x)
+    : current + Math.sin(timestamp / 2400 + from.x) * 0.004 * frameDt;
+  const diff = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
+  const maxStep = (target ? 0.009 : 0.004) * frameDt;
+  towerAim.set(towerId, current + Math.max(-maxStep, Math.min(maxStep, diff)));
+}
+
 export interface LoadedTowerTurret {
   image: HTMLImageElement;
   frames: number;

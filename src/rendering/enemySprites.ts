@@ -136,6 +136,11 @@ function assetBase(): string {
 export function setSpriteBiome(biomeId: string): void {
   if (activeBiome === biomeId) return;
   activeBiome = biomeId;
+  preloadSpriteBiome(biomeId);
+}
+
+/** Starts loading a biome's creature sheets without switching to it (idempotent) — lets a scene warm up the next biome before cutting to it. */
+export function preloadSpriteBiome(biomeId: string): void {
   if (biomeRequested.has(biomeId) || typeof Image === "undefined") return;
   biomeRequested.add(biomeId);
   const entries = BIOME_ENEMY_SHEETS[biomeId];

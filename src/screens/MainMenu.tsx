@@ -1,566 +1,540 @@
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import "@fontsource/cormorant-garamond/600.css";
+import "@fontsource/cormorant-garamond/700.css";
 import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { PATCH_NOTES } from "@/config/patchNotes";
-import { PALETTE } from "@/rendering/theme";
+import { PHASES } from "@/config/phaseConfig";
+import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
-import { TrophyIcon, BookIcon, ScrollIcon, ShieldIcon } from "@/ui/icons";
-import { MenuBackground, TRANSITION_DURATION_MS } from "./MenuBackground";
+import { drawTower } from "@/rendering/EntityRenderer";
+import { createTowerInstance } from "@/entities/Tower";
+import { SCENE_DURATION_MS, SHOWCASE_PHASE_IDS, showcasePhase } from "@/rendering/homeDiorama";
+import { buildProfileFromSave, countOwnedSkins, TOTAL_TOWER_SKINS } from "@/profile/playerProfile";
+import { HomeDiorama } from "./HomeDiorama";
 import { audioManager } from "@/audio/AudioManager";
+
+/** How long the Play transition (camera push into the castle + fade) runs before `onStart` fires. */
+export const TRANSITION_DURATION_MS = 1500;
 
 interface MainMenuProps {
   onStart: () => void;
   onNavigate: (view: NavView) => void;
 }
 
+const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
+
 /**
- * Cinematic epic-fantasy title screen — bright forest, golden light,
- * imposing fortress, vibrant portal (art direction: colorful medieval
- * adventure, not dark-fantasy horror). Clicking PLAY doesn't cut straight
- * to the game: it surges the portal, pulls the scene's magic motes toward
- * it, flashes the screen, and gives the whole scene a small push-in zoom
- * before `onStart` fires — "entering the world of HORDENOVA" rather than
- * a plain screen swap.
+ * HOME — the game's front page. The hero IS the game: a live battle on the
+ * real battlefield (rendering/homeDiorama.ts) rotating through the phases,
+ * with the pitch and the Play button laid over its darker left side. Below
+ * the fold: the four towers (drawn by the real tower renderer), the sixteen
+ * phases, the latest Novidades entries (straight from PATCH_NOTES, so a new
+ * patch note shows up here with no extra work), the Season/Ranking/Wiki
+ * entry points and a footer. Clicking Play pushes the camera into the
+ * castle gate before `onStart` fires.
  */
 export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
-  const save = loadSave();
-  const [hover, setHover] = useState(false);
-  const [transitionAt, setTransitionAt] = useState<number | null>(null);
+  const save = useMemo(() => loadSave(), []);
   const { t, language } = useLanguage();
   const status = useMemo(() => getAscensionStatus(), []);
-  const latestPatch = PATCH_NOTES[0];
+  const skinsOwned = useMemo(() => countOwnedSkins(buildProfileFromSave(save, "")), [save]);
+  const [entering, setEntering] = useState(false);
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const towersRef = useRef<HTMLElement>(null);
+
+  // Scene rotation; picking a scene by hand restarts the timer.
+  useEffect(() => {
+    if (entering) return;
+    const id = window.setTimeout(() => setSceneIndex((i) => (i + 1) % SHOWCASE_PHASE_IDS.length), SCENE_DURATION_MS);
+    return () => window.clearTimeout(id);
+  }, [sceneIndex, entering]);
 
   const handlePlay = () => {
-    if (transitionAt !== null) return;
-    // Audio spec section 12: unlock synchronously inside the real click
-    // handler (not a later setTimeout callback) — this is exactly the
-    // user-gesture browsers require before allowing programmatic audio.
-    // Also resumes the music directly (belt-and-suspenders alongside the
-    // window-level gesture listener above): clicking PLAY must be enough
-    // on its own to release blocked audio, never require a separate click
-    // on the music control first.
+    if (entering) return;
+    // Unlock audio synchronously inside the real click (browsers require a
+    // user gesture) — clicking Play alone must be enough to start the music.
     audioManager.unlock();
     audioManager.playAmbientMusic();
-    setTransitionAt(performance.now());
+    setEntering(true);
     window.setTimeout(onStart, TRANSITION_DURATION_MS);
   };
 
+  const phase = showcasePhase(sceneIndex);
+  const phaseNumber = PHASES.indexOf(phase) + 1;
+  const themeName = t(`ascension.seasonThemes.${status.themeNameKey}` as TranslationKey);
+  const seasonScore = t("hud.phaseWaveValue", {
+    phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)),
+    onda: waveInPhase(Math.max(1, status.seasonBestWave)),
+  });
+  const news = PATCH_NOTES.slice(0, 3);
+
   return (
-    <div style={rootStyle}>
-      <style>{SCENE_KEYFRAMES}</style>
-      <div style={heroStyle}>
-        <div style={{ ...zoomWrapStyle, transform: transitionAt !== null ? "scale(1.4)" : "scale(1)" }}>
-          <MenuBackground transitionAt={transitionAt} />
-          <div style={scrimStyle} />
+    <div className="hn-home">
+      <style>{HOME_CSS}</style>
+
+      <section className={`hn-hero${entering ? " is-entering" : ""}`}>
+        <HomeDiorama sceneIndex={sceneIndex} entering={entering} />
+        <div className="hn-hero-shade" aria-hidden="true" />
+        <div className="hn-hero-flash" aria-hidden="true" />
+
+        <div className="hn-hero-nav">
+          <TopNav active="HOME" onNavigate={onNavigate} onPlay={handlePlay} />
         </div>
 
-        <div
-          style={{
-            ...flashStyle,
-            opacity: transitionAt !== null ? 1 : 0,
-          }}
-          aria-hidden="true"
-        />
+        <div className="hn-hero-copy">
+          <button className="hn-season-pill" onClick={() => onNavigate("SEASON")}>
+            <span className="hn-season-dot" aria-hidden="true" />
+            <span className="hn-season-live">{t("menu.seasonLive", { number: status.seasonNumber })}</span>
+            <span className="hn-season-meta">{t("menu.seasonEnds", { theme: themeName, time: formatDurationShort(status.timeRemainingMs) })}</span>
+          </button>
 
-        <div style={{ ...uiLayerStyle, opacity: transitionAt !== null ? 0 : 1 }}>
-          <div style={topNavWrapStyle}>
-            <TopNav active="HOME" onNavigate={onNavigate} onPlay={handlePlay} />
-          </div>
+          <h1 className="hn-wordmark">HORDENOVA</h1>
+          <p className="hn-tagline">{t("menu.subtitle")}</p>
+          <p className="hn-pitch">{t("menu.description")}</p>
 
-          <div style={contentStyle}>
-          <div style={titleBlockStyle}>
-            <div style={titleGlowStyle} aria-hidden="true" />
-            <div style={titleStyle}>HORDENOVA</div>
-            <div style={subtitleStyle}>{t("menu.subtitle")}</div>
-            <div style={descriptionStyle}>{t("menu.description")}</div>
-          </div>
-
-          <div style={playWrapStyle}>
-            <div style={playHaloStyle} aria-hidden="true" />
-            <div style={{ ...playHoverGlowStyle, opacity: hover ? 1 : 0 }} aria-hidden="true" />
-            <div
-              style={{
-                ...playEnergyRingStyle,
-                animationPlayState: hover ? "running" : "paused",
-                visibility: hover ? "visible" : "hidden",
-              }}
-              aria-hidden="true"
-            />
-            {PLAY_PARTICLE_ANGLES.map((angle, i) => (
-              <div
-                key={angle}
-                aria-hidden="true"
-                style={{
-                  ...playParticleStyle,
-                  transitionDelay: `${i * 35}ms`,
-                  transform: `translate(-50%, -50%) rotate(${angle}deg) translateX(${hover ? 16 : 74}px)`,
-                  opacity: hover ? 0.85 : 0,
-                }}
-              />
-            ))}
-            <button
-              onClick={handlePlay}
-              onMouseEnter={() => setHover(true)}
-              onMouseLeave={() => setHover(false)}
-              disabled={transitionAt !== null}
-              style={{
-                ...buttonStyle,
-                transform: hover ? "translateY(-2px) scale(1.05)" : "translateY(0) scale(1)",
-                boxShadow: hover ? buttonShadowHover : buttonShadow,
-              }}
-            >
-              <span style={buttonLabelStyle}>{t("menu.play")}</span>
-              <span
-                style={{
-                  ...shimmerStyle,
-                  animationPlayState: hover ? "running" : "paused",
-                  visibility: hover ? "visible" : "hidden",
-                }}
-                aria-hidden="true"
-              />
+          <div className="hn-cta-row">
+            <button className="hn-play" onClick={handlePlay} disabled={entering}>
+              {t("menu.play")}
+            </button>
+            <button className="hn-ghost" onClick={() => towersRef.current?.scrollIntoView({ behavior: "smooth" })}>
+              {t("menu.seeTowers")}
             </button>
           </div>
 
-          <div style={bestWaveStyle}>
-            <span style={{ opacity: 0.85 }}>{t("menu.bestWave")}</span>
-            <span style={bestWaveValueStyle}>{String(save.bestWave).padStart(2, "0")}</span>
-          </div>
-
-          <div style={scrollHintStyle} aria-hidden="true">
-            <span>{t("menu.scrollHint")}</span>
-            <span style={scrollHintArrowStyle}>▾</span>
-          </div>
-          </div>
+          <dl className="hn-stats">
+            <div>
+              <dt>{t("menu.bestWave")}</dt>
+              <dd>{String(save.bestWave).padStart(2, "0")}</dd>
+            </div>
+            <div>
+              <dt>{t("menu.statSeasonBest")}</dt>
+              <dd>{String(status.seasonBestWave).padStart(2, "0")}</dd>
+            </div>
+            <div>
+              <dt>{t("menu.statPrestige")}</dt>
+              <dd>{save.prestigeLevel}</dd>
+            </div>
+            <div>
+              <dt>{t("menu.statSkins")}</dt>
+              <dd>
+                {skinsOwned}
+                <small>/{TOTAL_TOWER_SKINS}</small>
+              </dd>
+            </div>
+          </dl>
         </div>
-      </div>
 
-      <div style={portalSectionStyle}>
-        <div style={portalGridStyle}>
-          <PortalCard
-            icon={<ShieldIcon size={22} color={PALETTE.uiAccentBright} />}
-            eyebrow={t("season.title", { number: status.seasonNumber })}
-            title={t(`ascension.seasonThemes.${status.themeNameKey}` as TranslationKey)}
-            body={t("season.endsIn", { time: formatDurationShort(status.timeRemainingMs) })}
-            cta={t("nav.season")}
-            onClick={() => onNavigate("SEASON")}
-            accent={PALETTE.gold}
-          />
-          <PortalCard
-            icon={<TrophyIcon size={22} color={PALETTE.gold} />}
-            eyebrow={t("nav.ranking")}
-            title={t("ranking.yourSeasonScore")}
-            body={t("hud.phaseWaveValue", {
-              phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)),
-              onda: waveInPhase(Math.max(1, status.seasonBestWave)),
+        <div className="hn-scene">
+          <div className="hn-scene-phase">{t("menu.scenePhase", { number: phaseNumber })}</div>
+          <div className="hn-scene-name">{t(`phases.${phase.i18nKey}.name` as TranslationKey)}</div>
+          <div className="hn-scene-tag">{t(`phases.${phase.i18nKey}.tagline` as TranslationKey)}</div>
+          <div className="hn-scene-dots">
+            {SHOWCASE_PHASE_IDS.map((id, i) => {
+              const p = showcasePhase(i);
+              const active = i === sceneIndex;
+              return (
+                <button
+                  key={id}
+                  className={`hn-scene-dot${active ? " is-active" : ""}`}
+                  onClick={() => setSceneIndex(i)}
+                  aria-label={t("menu.sceneShow", { name: t(`phases.${p.i18nKey}.name` as TranslationKey) })}
+                  aria-current={active}
+                >
+                  <span key={active ? `on-${sceneIndex}` : "off"} style={active ? { animationDuration: `${SCENE_DURATION_MS}ms` } : undefined} />
+                </button>
+              );
             })}
-            cta={t("ranking.title")}
-            onClick={() => onNavigate("RANKING")}
-            accent={PALETTE.gold}
-          />
-          <PortalCard
-            icon={<BookIcon size={22} color={PALETTE.uiAccentBright} />}
-            eyebrow={t("nav.wiki")}
-            title={t("menu.wikiLink")}
-            body={t("wiki.subtitle")}
-            cta={t("nav.wiki")}
-            onClick={() => onNavigate("WIKI")}
-            accent={PALETTE.uiAccent}
-          />
-          <PortalCard
-            icon={<ScrollIcon size={22} color={PALETTE.success} />}
-            eyebrow={latestPatch ? latestPatch.title[language] : t("nav.novidades")}
-            title={t("menu.novidadesLink")}
-            body={latestPatch ? latestPatch.description[language] : t("novidades.subtitle")}
-            cta={t("nav.novidades")}
-            onClick={() => onNavigate("NOVIDADES")}
-            accent={PALETTE.success}
-          />
+          </div>
         </div>
-      </div>
+      </section>
+
+      <main className="hn-body">
+        <section className="hn-section" ref={towersRef}>
+          <header className="hn-section-head">
+            <h2>{t("menu.towersTitle")}</h2>
+            <p>{t("menu.towersBody")}</p>
+          </header>
+          <div className="hn-towers">
+            {TOWER_TYPES.map((type) => (
+              <TowerShowcase key={type} type={type} />
+            ))}
+          </div>
+        </section>
+
+        <section className="hn-section">
+          <header className="hn-section-head">
+            <h2>{t("menu.worldsTitle")}</h2>
+            <p>{t("menu.worldsBody")}</p>
+          </header>
+          <ol className="hn-worlds">
+            {PHASES.map((p, i) => (
+              <li key={p.id} className="hn-world">
+                <div className="hn-world-img" style={{ backgroundImage: `url(${assetBase}sprites/ground/thumbs/${p.biomeId.toLowerCase()}.webp)` }} />
+                <div className="hn-world-text">
+                  <span className="hn-world-num">{i + 1}</span>
+                  <span className="hn-world-name">{t(`phases.${p.i18nKey}.name` as TranslationKey)}</span>
+                  <span className="hn-world-waves">{t("menu.worldWaves", { from: p.startWave, to: p.endWave })}</span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="hn-section hn-split">
+          <div className="hn-news">
+            <header className="hn-section-head is-compact">
+              <h2>{t("menu.newsTitle")}</h2>
+            </header>
+            <ul>
+              {news.map((entry) => (
+                <li key={entry.id}>
+                  <button className="hn-news-item" onClick={() => onNavigate("NOVIDADES")}>
+                    {entry.dateIso && <time dateTime={entry.dateIso}>{formatDate(entry.dateIso, language)}</time>}
+                    <span className="hn-news-title">{entry.title[language]}</span>
+                    <span className="hn-news-desc">{entry.description[language]}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button className="hn-link" onClick={() => onNavigate("NOVIDADES")}>
+              {t("menu.newsAll")}
+            </button>
+          </div>
+
+          <div className="hn-gates">
+            <div className="hn-gate is-season">
+              <h3>{t("menu.seasonLive", { number: status.seasonNumber })}</h3>
+              <p>{t("menu.seasonCardBody", { theme: themeName })}</p>
+              {status.seasonBestWave > 0 && <p>{t("menu.seasonCardBest", { score: seasonScore })}</p>}
+              <p className="hn-gate-time">{t("season.endsIn", { time: formatDurationShort(status.timeRemainingMs) })}</p>
+              <button className="hn-ghost" onClick={() => onNavigate("SEASON")}>
+                {t("menu.seasonCardCta")}
+              </button>
+            </div>
+            <div className="hn-gate">
+              <h3>{t("nav.ranking")}</h3>
+              <p>{t("menu.rankingCardBody")}</p>
+              <button className="hn-link" onClick={() => onNavigate("RANKING")}>
+                {t("menu.rankingCardCta")}
+              </button>
+            </div>
+            <div className="hn-gate">
+              <h3>{t("nav.wiki")}</h3>
+              <p>{t("wiki.subtitle")}</p>
+              <button className="hn-link" onClick={() => onNavigate("WIKI")}>
+                {t("menu.wikiCardCta")}
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="hn-footer">
+        <div>
+          <div className="hn-footer-mark">HORDENOVA</div>
+          <p>{t("menu.footerTagline")}</p>
+        </div>
+        <nav aria-label="HORDENOVA">
+          {(["SEASON", "RANKING", "MARKETPLACE", "WIKI", "NOVIDADES"] as const).map((view) => (
+            <button key={view} onClick={() => onNavigate(view)}>
+              {t(`nav.${view === "NOVIDADES" ? "novidades" : view.toLowerCase()}` as TranslationKey)}
+            </button>
+          ))}
+        </nav>
+        <p className="hn-footer-rights">{t("menu.footerRights", { year: new Date().getFullYear() })}</p>
+      </footer>
     </div>
   );
 }
 
-interface PortalCardProps {
-  icon: ReactNode;
-  eyebrow: string;
-  title: string;
-  body: string;
-  cta: string;
-  onClick: () => void;
-  accent: string;
+function formatDate(iso: string, language: string): string {
+  const d = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(language === "ptBR" ? "pt-BR" : "en-US", { day: "numeric", month: "short", year: "numeric" });
 }
 
-/** One tile in the below-the-fold portal grid — spec point 10: Season/Ranking/Wiki/Novidades must never be hidden, each gets a real teaser of live data plus a direct CTA into its own screen. */
-function PortalCard({ icon, eyebrow, title, body, cta, onClick, accent }: PortalCardProps) {
-  const [hover, setHover] = useState(false);
+/** Visual-stage levels (one per 10 levels) the preview climbs through on hover. */
+const STAGE_LEVELS = [1, 11, 21, 31, 41, 51, 60];
+const PREVIEW_W = 260;
+const PREVIEW_H = 250;
+const PREVIEW_ZOOM = 2.5;
+
+/** One tower column: the real tower art (climbing through its upgrade stages on hover), name, role, description. */
+function TowerShowcase({ type }: { type: TowerType }) {
+  const { t } = useLanguage();
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stage, setStage] = useState(STAGE_LEVELS.length - 1);
+  const [playing, setPlaying] = useState(false);
+  const level = STAGE_LEVELS[stage]!;
+
+  useEffect(() => {
+    if (!playing) return;
+    const id = window.setInterval(() => setStage((s) => (s + 1) % STAGE_LEVELS.length), 520);
+    return () => window.clearInterval(id);
+  }, [playing]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = PREVIEW_W * dpr;
+    canvas.height = PREVIEW_H * dpr;
+    const view = { w: PREVIEW_W / PREVIEW_ZOOM, h: PREVIEW_H / PREVIEW_ZOOM };
+    const tower = createTowerInstance("home-preview", type, { x: view.w / 2, y: view.h * 0.8 }, level);
+    let raf = 0;
+    const loop = (now: number) => {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.setTransform(dpr * PREVIEW_ZOOM, 0, 0, dpr * PREVIEW_ZOOM, 0, 0);
+      drawTower(ctx, tower, false, now);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [type, level]);
+
   return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        ...portalCardStyle,
-        borderColor: hover ? accent : PALETTE.uiPanelBorder,
-        transform: hover ? "translateY(-3px)" : "translateY(0)",
-        boxShadow: hover ? `0 10px 26px rgba(0,0,0,0.45), 0 0 0 1px ${accent}55` : "0 6px 16px rgba(0,0,0,0.35)",
+    <article
+      className="hn-tower"
+      tabIndex={0}
+      onPointerEnter={() => setPlaying(true)}
+      onPointerLeave={() => {
+        setPlaying(false);
+        setStage(STAGE_LEVELS.length - 1);
+      }}
+      onFocus={() => setPlaying(true)}
+      onBlur={() => {
+        setPlaying(false);
+        setStage(STAGE_LEVELS.length - 1);
       }}
     >
-      <div style={portalCardIconStyle}>{icon}</div>
-      <div style={{ ...portalCardEyebrowStyle, color: accent }}>{eyebrow}</div>
-      <div style={portalCardTitleStyle}>{title}</div>
-      <div style={portalCardBodyStyle}>{body}</div>
-      <div style={{ ...portalCardCtaStyle, color: accent }}>{cta} →</div>
-    </button>
+      <div className="hn-tower-stage">
+        <canvas ref={canvasRef} style={{ width: PREVIEW_W, height: PREVIEW_H }} aria-hidden="true" />
+        <span className="hn-tower-level">{t("menu.towerLevel", { level })}</span>
+      </div>
+      <h3>{t(`towers.${type}.name` as TranslationKey)}</h3>
+      <p className="hn-tower-role">{t(`towers.${type}.role` as TranslationKey)}</p>
+      <p className="hn-tower-desc">{t(`towers.${type}.description` as TranslationKey)}</p>
+    </article>
   );
 }
 
-const SCENE_KEYFRAMES = `
-@keyframes hordenova-play-halo {
-  0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
-  50% { opacity: 0.85; transform: translate(-50%, -50%) scale(1.1); }
+const HOME_CSS = `
+.hn-home {
+  --night: #110d09;
+  --night-2: #18120c;
+  --panel: #1f1810;
+  --line: rgba(232, 176, 75, 0.16);
+  --gold: #e8b04b;
+  --gold-hi: #f7dc9c;
+  --bone: #efe5d2;
+  --ash: #a8987f;
+  --display: "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: var(--night);
+  color: var(--bone);
+  scroll-behavior: smooth;
 }
-@keyframes hordenova-play-shimmer {
-  0% { transform: translateX(-120%) skewX(-18deg); }
-  100% { transform: translateX(220%) skewX(-18deg); }
+.hn-home button { font: inherit; color: inherit; }
+.hn-home :focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 3px; }
+
+/* ---------- hero ---------- */
+.hn-hero { position: relative; height: 100vh; min-height: 560px; overflow: hidden; }
+.hn-hero-shade {
+  position: absolute; inset: 0; pointer-events: none;
+  background:
+    linear-gradient(90deg, rgba(17,13,9,0.92) 0%, rgba(17,13,9,0.72) 28%, rgba(17,13,9,0.18) 55%, rgba(17,13,9,0) 70%),
+    linear-gradient(180deg, rgba(17,13,9,0.55) 0%, rgba(17,13,9,0) 16%, rgba(17,13,9,0) 70%, var(--night) 100%);
 }
-@keyframes hordenova-play-ring {
-  0% { transform: translate(-50%, -50%) scale(0.75); opacity: 0.8; }
-  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+.hn-hero-flash {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; z-index: 4;
+  background: radial-gradient(circle at 70% 70%, rgba(255,240,205,0.95), rgba(40,26,12,1) 75%);
+  transition: opacity ${TRANSITION_DURATION_MS}ms cubic-bezier(0.6, 0, 0.9, 0.5);
 }
-@keyframes hordenova-scroll-bounce {
-  0%, 100% { transform: translateY(0); opacity: 0.6; }
-  50% { transform: translateY(4px); opacity: 1; }
+.hn-hero.is-entering .hn-hero-flash { opacity: 1; }
+.hn-hero-nav { position: absolute; top: 0; left: 0; right: 0; z-index: 6; }
+.hn-hero-copy, .hn-scene { transition: opacity 300ms ease-out; }
+.hn-hero.is-entering .hn-hero-copy, .hn-hero.is-entering .hn-scene, .hn-hero.is-entering .hn-hero-nav { opacity: 0; pointer-events: none; }
+
+.hn-hero-copy {
+  position: absolute; z-index: 2;
+  left: clamp(20px, 6vw, 96px); bottom: clamp(48px, 11vh, 120px);
+  width: min(720px, calc(100% - 40px));
+}
+.hn-season-pill {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
+  padding: 7px 14px 7px 12px; margin-bottom: 22px;
+  background: rgba(24,18,12,0.7); border: 1px solid var(--line); border-radius: 999px;
+  font-size: 13px; cursor: pointer; text-align: left;
+  backdrop-filter: blur(6px);
+}
+.hn-season-pill:hover { border-color: rgba(232,176,75,0.5); }
+.hn-season-dot { width: 7px; height: 7px; border-radius: 50%; background: #7fd18b; box-shadow: 0 0 0 3px rgba(127,209,139,0.18); }
+.hn-season-live { font-weight: 600; color: var(--bone); }
+.hn-season-meta { color: var(--ash); }
+
+.hn-wordmark {
+  margin: 0; font-family: var(--display); font-weight: 700;
+  font-size: clamp(50px, 7.2vw, 112px); line-height: 0.9; letter-spacing: 0.035em;
+  background: linear-gradient(180deg, #fff4d6 0%, var(--gold-hi) 38%, var(--gold) 70%, #a8711f 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 0 rgba(60,34,8,0.9)) drop-shadow(0 12px 28px rgba(0,0,0,0.55));
+}
+.hn-tagline {
+  margin: 14px 0 0; font-family: var(--display); font-weight: 600; font-style: italic;
+  font-size: clamp(20px, 2.2vw, 28px); color: var(--gold-hi); letter-spacing: 0.01em;
+}
+.hn-pitch { margin: 10px 0 0; max-width: 46ch; font-size: clamp(14px, 1.2vw, 16px); line-height: 1.6; color: #d9cdb6; }
+
+.hn-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.hn-play {
+  position: relative; padding: 16px 34px; border-radius: 10px; cursor: pointer;
+  border: 1px solid #f2c873;
+  background: linear-gradient(180deg, #f6cf7a 0%, var(--gold) 55%, #c58a2c 100%);
+  color: #2b1906 !important; font-size: 16px !important; font-weight: 800; letter-spacing: 0.02em;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 10px 30px rgba(232,176,75,0.28), 0 2px 0 #7a4f14;
+  transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+}
+.hn-play:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 14px 36px rgba(232,176,75,0.4), 0 2px 0 #7a4f14; }
+.hn-play:active { transform: translateY(1px); }
+.hn-ghost {
+  padding: 15px 24px; border-radius: 10px; cursor: pointer;
+  background: rgba(24,18,12,0.55); border: 1px solid rgba(239,229,210,0.28);
+  font-size: 15px; font-weight: 600; backdrop-filter: blur(6px);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.hn-ghost:hover { border-color: rgba(239,229,210,0.6); background: rgba(40,30,18,0.7); }
+
+.hn-stats { display: flex; flex-wrap: wrap; gap: 0; margin: 34px 0 0; padding: 0; }
+.hn-stats > div { padding: 0 22px; border-left: 1px solid var(--line); }
+.hn-stats > div:first-child { padding-left: 0; border-left: none; }
+.hn-stats dt { font-size: 12px; color: var(--ash); }
+.hn-stats dd { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; color: var(--bone); font-variant-numeric: lining-nums tabular-nums; }
+.hn-stats dd small { font-size: 16px; color: var(--ash); font-weight: 600; }
+
+.hn-scene {
+  position: absolute; z-index: 2; right: clamp(20px, 4vw, 56px); bottom: clamp(36px, 7vh, 72px);
+  text-align: right; max-width: 320px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9), 0 0 18px rgba(0,0,0,0.6);
+}
+.hn-scene-phase { font-size: 12px; color: var(--gold-hi); }
+.hn-scene-name { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.1; }
+.hn-scene-tag { font-size: 13px; color: #d9cdb6; margin-top: 2px; }
+.hn-scene-dots { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+.hn-scene-dot { width: 28px; height: 14px; padding: 5px 0; background: none; border: none; cursor: pointer; }
+.hn-scene-dot span { display: block; height: 3px; border-radius: 2px; background: rgba(239,229,210,0.3); position: relative; overflow: hidden; }
+.hn-scene-dot:hover span { background: rgba(239,229,210,0.55); }
+.hn-scene-dot.is-active span::after {
+  content: ""; position: absolute; inset: 0; background: var(--gold-hi);
+  transform-origin: left; animation: hn-progress linear forwards; animation-duration: inherit;
+}
+@keyframes hn-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---------- body ---------- */
+.hn-body { position: relative; padding: 0 clamp(20px, 6vw, 96px); }
+.hn-section { max-width: 1200px; margin: 0 auto; padding: clamp(56px, 10vh, 112px) 0 0; }
+.hn-section-head { max-width: 640px; margin-bottom: 36px; }
+.hn-section-head.is-compact { margin-bottom: 18px; }
+.hn-section-head h2 { margin: 0; font-family: var(--display); font-weight: 700; font-size: clamp(32px, 3.6vw, 48px); line-height: 1.05; color: var(--bone); }
+.hn-section-head p { margin: 12px 0 0; font-size: 16px; line-height: 1.65; color: var(--ash); max-width: 60ch; }
+
+.hn-towers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 28px; }
+.hn-tower { outline: none; }
+.hn-tower-stage {
+  position: relative; display: flex; justify-content: center; align-items: flex-end;
+  height: 250px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(ellipse 60% 40% at 50% 78%, rgba(232,176,75,0.16), rgba(232,176,75,0) 70%);
+}
+.hn-tower-level { position: absolute; top: 4px; right: 0; font-size: 12px; color: var(--ash); font-variant-numeric: tabular-nums; }
+.hn-tower:hover .hn-tower-level, .hn-tower:focus-visible .hn-tower-level { color: var(--gold-hi); }
+.hn-tower h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; }
+.hn-tower-role { margin: 4px 0 0; font-size: 13px; color: var(--gold); }
+.hn-tower-desc { margin: 10px 0 0; font-size: 14px; line-height: 1.6; color: var(--ash); }
+
+.hn-worlds { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.hn-world { position: relative; aspect-ratio: 5 / 3; border-radius: 6px; overflow: hidden; background: var(--panel); }
+.hn-world-img { position: absolute; inset: 0; background-size: cover; background-position: center; transition: transform 600ms ease; }
+.hn-world:hover .hn-world-img { transform: scale(1.04); }
+.hn-world::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(17,13,9,0) 40%, rgba(17,13,9,0.92) 100%); }
+.hn-world-text { position: absolute; z-index: 1; left: 12px; right: 12px; bottom: 10px; display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: baseline; }
+.hn-world-num { grid-row: span 2; font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; color: var(--gold-hi); font-variant-numeric: lining-nums; }
+.hn-world-name { font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.1; }
+.hn-world-waves { font-size: 12px; color: var(--ash); }
+
+.hn-split { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 72px); }
+.hn-news ul { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.hn-news li { border-bottom: 1px solid var(--line); }
+.hn-news-item { display: grid; gap: 4px; width: 100%; padding: 18px 0; text-align: left; background: none; border: none; cursor: pointer; }
+.hn-news-item time { font-size: 12px; color: var(--ash); }
+.hn-news-title { font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.15; color: var(--bone); }
+.hn-news-item:hover .hn-news-title { color: var(--gold-hi); }
+.hn-news-desc { font-size: 14px; line-height: 1.6; color: var(--ash); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.hn-link { margin-top: 16px; padding: 0; background: none; border: none; cursor: pointer; color: var(--gold) !important; font-weight: 700; font-size: 14px; text-decoration: underline; text-decoration-color: rgba(232,176,75,0.4); text-underline-offset: 4px; }
+.hn-link:hover { color: var(--gold-hi) !important; text-decoration-color: var(--gold-hi); }
+
+.hn-gates { display: grid; gap: 0; align-content: start; }
+.hn-gate { padding: 22px 0; border-top: 1px solid var(--line); }
+.hn-gate:last-child { border-bottom: 1px solid var(--line); }
+.hn-gate h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 24px; }
+.hn-gate p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--ash); }
+.hn-gate .hn-link { margin-top: 12px; }
+.hn-gate.is-season {
+  padding: 24px; border: 1px solid rgba(232,176,75,0.35); border-radius: 10px; margin-bottom: 8px;
+  background: linear-gradient(160deg, rgba(232,176,75,0.12), rgba(232,176,75,0.02) 60%), var(--night-2);
+}
+.hn-gate.is-season + .hn-gate { border-top: none; }
+.hn-gate-time { color: var(--gold-hi) !important; }
+.hn-gate.is-season .hn-ghost { margin-top: 16px; padding: 11px 18px; font-size: 14px; }
+
+.hn-footer {
+  width: min(1200px, calc(100% - 2 * clamp(20px, 6vw, 96px))); margin: clamp(72px, 12vh, 128px) auto 0; padding: 32px 0 40px;
+  border-top: 1px solid var(--line);
+  display: grid; grid-template-columns: 1fr auto; gap: 18px 32px; align-items: start;
+}
+.hn-footer-mark { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.06em; color: var(--gold-hi); }
+.hn-footer p { margin: 6px 0 0; font-size: 13px; color: var(--ash); }
+.hn-footer nav { display: flex; flex-wrap: wrap; gap: 6px 22px; }
+.hn-footer nav button { padding: 4px 0; background: none; border: none; cursor: pointer; font-size: 14px; color: #d9cdb6; }
+.hn-footer nav button:hover { color: var(--gold-hi); }
+.hn-footer-rights { grid-column: 1 / -1; font-size: 12px !important; }
+
+@media (max-width: 1000px) {
+  .hn-towers { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 44px; }
+  .hn-worlds { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hn-split { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .hn-hero-shade {
+    background: linear-gradient(180deg, rgba(17,13,9,0.6) 0%, rgba(17,13,9,0.05) 22%, rgba(17,13,9,0.35) 45%, rgba(17,13,9,0.9) 70%, var(--night) 100%);
+  }
+  .hn-hero-copy { bottom: 40px; }
+  .hn-scene { top: 108px; bottom: auto; right: 16px; max-width: 60%; }
+  .hn-scene-tag { display: none; }
+  .hn-scene-name { font-size: 20px; }
+  .hn-stats > div { padding: 0 14px; }
+  .hn-stats dd { font-size: 24px; }
+  .hn-worlds { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .hn-world-num { font-size: 24px; }
+  .hn-world-name { font-size: 16px; }
+  .hn-footer { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .hn-towers { grid-template-columns: 1fr; }
+  .hn-cta-row > button { flex: 1 1 auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hn-home { scroll-behavior: auto; }
+  .hn-world-img, .hn-play, .hn-hero-flash { transition: none; }
+  .hn-scene-dot.is-active span::after { animation: none; transform: none; }
 }
 `;
-
-const PLAY_PARTICLE_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
-
-const rootStyle: CSSProperties = {
-  position: "relative",
-  width: "100%",
-  height: "100%",
-  overflowY: "auto",
-  overflowX: "hidden",
-  background: PALETTE.mapBackgroundFallback,
-};
-
-/** Full-viewport cinematic hero — exactly one screen tall, so MenuBackground's window-size-driven canvas sizing keeps working unchanged; the portal section lives entirely below it. */
-const heroStyle: CSSProperties = {
-  position: "relative",
-  width: "100%",
-  height: "100vh",
-  overflow: "hidden",
-  flexShrink: 0,
-};
-
-/** Overlays TopNav across the very top of the hero, above the cinematic background. */
-const topNavWrapStyle: CSSProperties = {
-  position: "absolute",
-  top: 0,
-  left: 0,
-  right: 0,
-  zIndex: 6,
-};
-
-const scrollHintStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 2,
-  fontSize: 9.5,
-  fontWeight: 700,
-  letterSpacing: 1.6,
-  textTransform: "uppercase",
-  color: PALETTE.uiTextDim,
-  opacity: 0.75,
-  marginTop: 4,
-};
-
-const scrollHintArrowStyle: CSSProperties = {
-  fontSize: 12,
-  animation: "hordenova-scroll-bounce 1.6s ease-in-out infinite",
-};
-
-/** Below-the-fold portal grid — spec point 10: Season/Ranking/Wiki/Novidades must be presented, never hidden. Continues the hero's dark tone so the page reads as one coherent site, not two stitched screens. */
-const portalSectionStyle: CSSProperties = {
-  position: "relative",
-  width: "100%",
-  padding: "clamp(28px, 6vh, 56px) clamp(20px, 6vw, 64px) clamp(48px, 8vh, 80px)",
-  boxSizing: "border-box",
-  background: "linear-gradient(180deg, #150f09 0%, #1c140c 100%)",
-};
-
-const portalGridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-  gap: "clamp(14px, 2vw, 22px)",
-  maxWidth: 1080,
-  margin: "0 auto",
-};
-
-const portalCardStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "flex-start",
-  gap: 6,
-  textAlign: "left",
-  padding: "18px 20px",
-  borderRadius: 14,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "linear-gradient(160deg, rgba(43,29,18,0.92), rgba(24,17,10,0.96))",
-  color: PALETTE.uiText,
-  cursor: "pointer",
-  transition: "transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease",
-};
-
-const portalCardIconStyle: CSSProperties = {
-  marginBottom: 4,
-};
-
-const portalCardEyebrowStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 800,
-  letterSpacing: 1.4,
-  textTransform: "uppercase",
-};
-
-const portalCardTitleStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 16,
-  fontWeight: 700,
-  color: PALETTE.uiAccentBright,
-};
-
-const portalCardBodyStyle: CSSProperties = {
-  fontSize: 11.5,
-  lineHeight: 1.5,
-  color: PALETTE.uiTextDim,
-  minHeight: "2.6em",
-};
-
-const portalCardCtaStyle: CSSProperties = {
-  marginTop: 6,
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: 0.8,
-  textTransform: "uppercase",
-};
-
-const zoomWrapStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  transformOrigin: "17% 74%",
-  transition: `transform ${TRANSITION_DURATION_MS}ms cubic-bezier(0.5, 0, 0.85, 0.4)`,
-};
-
-const flashStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  zIndex: 3,
-  pointerEvents: "none",
-  background: "radial-gradient(circle at 17% 74%, rgba(255,255,255,0.98), rgba(220,180,255,0.7) 40%, rgba(20,10,30,0.98) 100%)",
-  transition: `opacity ${TRANSITION_DURATION_MS}ms cubic-bezier(0.5, 0, 0.85, 0.4)`,
-};
-
-const uiLayerStyle: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  width: "100%",
-  height: "100%",
-  transition: "opacity 260ms ease-out",
-};
-
-const scrimStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background:
-    "linear-gradient(180deg, rgba(30,22,10,0.05) 0%, rgba(30,22,10,0.18) 55%, rgba(20,14,6,0.62) 100%)",
-};
-
-const contentStyle: CSSProperties = {
-  position: "relative",
-  width: "100%",
-  height: "100%",
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  justifyContent: "flex-end",
-  gap: "clamp(14px, 3vh, 26px)",
-  padding: "5vh 5vw 7vh",
-  boxSizing: "border-box",
-};
-
-const titleBlockStyle: CSSProperties = {
-  position: "relative",
-  textAlign: "center",
-  marginBottom: "clamp(8px, 2vh, 20px)",
-};
-
-const titleGlowStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  transform: "translate(-50%, -50%)",
-  width: "min(720px, 80vw)",
-  height: "min(320px, 40vh)",
-  background: "radial-gradient(ellipse at center, rgba(255,210,87,0.35), rgba(255,210,87,0) 70%)",
-  filter: "blur(6px)",
-  pointerEvents: "none",
-  zIndex: -1,
-};
-
-const titleStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: "clamp(44px, 9.5vw, 104px)",
-  fontWeight: 900,
-  letterSpacing: "clamp(4px, 1.2vw, 12px)",
-  lineHeight: 1,
-  backgroundImage: `linear-gradient(180deg, #fff6d8 0%, ${PALETTE.gold} 45%, #c9822a 100%)`,
-  backgroundClip: "text",
-  WebkitBackgroundClip: "text",
-  color: "transparent",
-  WebkitTextStroke: "2px #5a3410",
-  filter:
-    "drop-shadow(0 0 22px rgba(255,210,87,0.75)) drop-shadow(0 6px 10px rgba(40,20,0,0.6))",
-};
-
-const subtitleStyle: CSSProperties = {
-  marginTop: "clamp(8px, 1.6vh, 16px)",
-  fontSize: "clamp(11px, 1.6vw, 15px)",
-  fontWeight: 700,
-  letterSpacing: "clamp(2px, 0.6vw, 5px)",
-  color: PALETTE.uiText,
-  textShadow: "0 2px 6px rgba(20,12,0,0.85)",
-};
-
-/** A short, honest one-line pitch — spec: Home must sell the adventure, not just be a menu. */
-const descriptionStyle: CSSProperties = {
-  marginTop: "clamp(6px, 1.2vh, 12px)",
-  maxWidth: "min(520px, 80vw)",
-  marginLeft: "auto",
-  marginRight: "auto",
-  fontSize: "clamp(11px, 1.3vw, 13px)",
-  lineHeight: 1.5,
-  color: PALETTE.uiTextDim,
-  textShadow: "0 2px 6px rgba(20,12,0,0.85)",
-};
-
-const playWrapStyle: CSSProperties = {
-  position: "relative",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-};
-
-const playHaloStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  width: "min(520px, 60vw)",
-  height: "min(220px, 26vh)",
-  background: "radial-gradient(ellipse at center, rgba(255,210,87,0.45), rgba(255,210,87,0) 68%)",
-  animation: "hordenova-play-halo 2.6s ease-in-out infinite",
-  pointerEvents: "none",
-};
-
-/** A stronger glow that grows in on hover — separate from the always-on halo since that one is CSS-keyframe-driven and can't take an inline opacity override. */
-const playHoverGlowStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  transform: "translate(-50%, -50%)",
-  width: "min(620px, 72vw)",
-  height: "min(280px, 32vh)",
-  background: "radial-gradient(ellipse at center, rgba(255,225,140,0.55), rgba(255,210,87,0) 65%)",
-  transition: "opacity 260ms ease-out",
-  pointerEvents: "none",
-};
-
-/** A ring of energy expanding outward, looping only while hovered — the "pequena onda de energia". */
-const playEnergyRingStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  width: "min(340px, 42vw)",
-  height: "min(150px, 18vh)",
-  borderRadius: "50%",
-  border: "2px solid rgba(255,232,180,0.85)",
-  animation: "hordenova-play-ring 1.15s ease-out infinite",
-  transition: "opacity 200ms ease-out",
-  pointerEvents: "none",
-};
-
-/** Small motes converging on the button when hovered — the "partículas discretas convergindo". */
-const playParticleStyle: CSSProperties = {
-  position: "absolute",
-  left: "50%",
-  top: "50%",
-  width: 4,
-  height: 4,
-  borderRadius: "50%",
-  background: PALETTE.gold,
-  boxShadow: `0 0 6px ${PALETTE.gold}`,
-  transition: "transform 480ms ease-out, opacity 480ms ease-out",
-  pointerEvents: "none",
-};
-
-const buttonStyle: CSSProperties = {
-  position: "relative",
-  overflow: "hidden",
-  padding: "clamp(17px, 2.7vh, 24px) clamp(46px, 8vw, 76px)",
-  fontSize: "clamp(17px, 2.2vw, 22px)",
-  fontWeight: 800,
-  letterSpacing: "clamp(1.5px, 0.4vw, 3px)",
-  borderRadius: 16,
-  border: `2px solid #8a5a1f`,
-  background: `linear-gradient(180deg, #ffe9a0 0%, ${PALETTE.gold} 42%, #d98a2a 100%)`,
-  color: "#4a2a08",
-  cursor: "pointer",
-  transition: "transform 160ms ease, box-shadow 160ms ease",
-};
-
-const buttonLabelStyle: CSSProperties = {
-  position: "relative",
-  zIndex: 1,
-  textShadow: "0 1px 0 rgba(255,255,255,0.5)",
-};
-
-/** A diagonal light sweep across the PLAY button on hover — the "efeito de energia" the direction asked for. */
-const shimmerStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  background: "linear-gradient(100deg, transparent 40%, rgba(255,255,255,0.75) 50%, transparent 60%)",
-  animation: "hordenova-play-shimmer 1.1s ease-in-out infinite",
-  animationPlayState: "paused",
-  pointerEvents: "none",
-};
-
-const buttonShadow =
-  "inset 0 2px 0 rgba(255,255,255,0.55), inset 0 -3px 6px rgba(120,60,10,0.35), 0 0 20px rgba(255,210,87,0.55), 0 10px 24px rgba(30,15,0,0.45)";
-const buttonShadowHover =
-  "inset 0 2px 0 rgba(255,255,255,0.65), inset 0 -3px 6px rgba(120,60,10,0.35), 0 0 38px rgba(255,210,87,0.85), 0 14px 30px rgba(30,15,0,0.5)";
-
-const bestWaveStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 2,
-  fontSize: "clamp(9px, 1.1vw, 11px)",
-  letterSpacing: 2,
-  fontWeight: 700,
-  color: PALETTE.uiText,
-  textShadow: "0 2px 6px rgba(20,12,0,0.85)",
-};
-
-const bestWaveValueStyle: CSSProperties = {
-  fontSize: "clamp(14px, 1.8vw, 18px)",
-  fontWeight: 800,
-  color: PALETTE.gold,
-  letterSpacing: 1,
-  textShadow: "0 2px 6px rgba(20,12,0,0.85)",
-};
