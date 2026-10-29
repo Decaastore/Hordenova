@@ -178,7 +178,9 @@ function updateTurretAim(tower: RenderSnapshot["towers"][number], enemies: reado
     desired = current + Math.sin(timestamp / 2400 + tower.position.x) * 0.004 * frameDt;
   }
   const diff = Math.atan2(Math.sin(desired - current), Math.cos(desired - current));
-  const maxStep = (target ? 0.009 : 0.004) * frameDt;
+  // Heavier machines turn slower: the furnace lumbers, the ballista snaps round.
+  const turnRate = tower.type === "INFERNO" ? 0.0045 : tower.type === "STORMCALLER" ? 0.006 : 0.009;
+  const maxStep = (target ? turnRate : 0.004) * frameDt;
   setTowerAim(tower.id, current + Math.max(-maxStep, Math.min(maxStep, diff)));
 }
 
@@ -427,7 +429,7 @@ export function CanvasRenderer({
 
       for (const tower of snapshot.towers) {
         const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
-        if (tower.type === "IRONWOOD") updateTurretAim(tower, snapshot.enemies, timestamp, frameDt);
+        if (tower.type !== "FROSTBORN") updateTurretAim(tower, snapshot.enemies, timestamp, frameDt);
         // MUNDO 3D — FASE 3: the ONE tower `WorldGameplayTestLayer` is
         // currently rendering a 3D body for skips its 2D sprite here — the
         // range circle below is drawn unconditionally regardless, so
