@@ -261,7 +261,7 @@ function formatDate(iso: string, language: string): string {
 /** Visual-stage levels (one per 10 levels) the preview climbs through on hover. */
 const STAGE_LEVELS = [1, 11, 21, 31, 41, 51, 60];
 const PREVIEW_W = 260;
-const PREVIEW_H = 250;
+const PREVIEW_H = 290;
 const PREVIEW_ZOOM = 2.5;
 
 /** One tower column: the real tower art (climbing through its upgrade stages on hover), name, role, description. */
@@ -286,7 +286,7 @@ function TowerShowcase({ type }: { type: TowerType }) {
     canvas.width = PREVIEW_W * dpr;
     canvas.height = PREVIEW_H * dpr;
     const view = { w: PREVIEW_W / PREVIEW_ZOOM, h: PREVIEW_H / PREVIEW_ZOOM };
-    const tower = createTowerInstance("home-preview", type, { x: view.w / 2, y: view.h * 0.8 }, level);
+    const tower = createTowerInstance("home-preview", type, { x: view.w / 2, y: view.h * 0.64 }, level);
     let raf = 0;
     const loop = (now: number) => {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -452,8 +452,8 @@ const HOME_CSS = `
 .hn-tower { outline: none; }
 .hn-tower-stage {
   position: relative; display: flex; justify-content: center; align-items: flex-end;
-  height: 250px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
-  background: radial-gradient(ellipse 60% 40% at 50% 78%, rgba(232,176,75,0.16), rgba(232,176,75,0) 70%);
+  height: 290px; margin-bottom: 18px; border-bottom: 1px solid var(--line);
+  background: radial-gradient(ellipse 60% 36% at 50% 68%, rgba(232,176,75,0.16), rgba(232,176,75,0) 70%);
 }
 .hn-tower-level { position: absolute; top: 4px; right: 0; font-size: 12px; color: var(--ash); font-variant-numeric: tabular-nums; }
 .hn-tower:hover .hn-tower-level, .hn-tower:focus-visible .hn-tower-level { color: var(--gold-hi); }
