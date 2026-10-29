@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v55",
+    dateIso: "2026-10-29",
+    category: "SYSTEMS",
+    title: {
+      en: "Player Profiles in the Ranking",
+      ptBR: "Perfis de Jogador no Ranking",
+    },
+    description: {
+      en: "The Ranking now has a Season leaderboard, and every player in it has a profile you can open: their records and each of their four towers with a live preview, level, mastery, specialization, equipped items and the skins they own. For now only your own profile is listed — once HORDENOVA goes online, every player in the ranking will appear and you'll be able to open any of them.",
+      ptBR: "O Ranking agora tem uma lista da Season, e cada jogador nela tem um perfil que você pode abrir: os recordes dele e cada uma das quatro torres com prévia animada, nível, maestria, especialização, itens equipados e as skins que ele tem. Por enquanto só o seu perfil aparece — quando o HORDENOVA estiver online, todos os jogadores do ranking vão aparecer e você vai poder abrir o perfil de qualquer um.",
+    },
+    highlights: [
+      {
+        en: "Each tower is shown exactly as it looks in battle, with its level's visual stage and the equipped skin.",
+        ptBR: "Cada torre aparece exatamente como fica na batalha, com o estágio visual do nível e a skin equipada.",
+      },
+      {
+        en: "Choose the name other players will see in the ranking with \"Edit name\" on your own profile.",
+        ptBR: "Escolha o nome que os outros jogadores vão ver no ranking em \"Editar nome\", no seu próprio perfil.",
+      },
+    ],
+  },
+  {
     id: "v54",
     dateIso: "2026-10-29",
     category: "CONTENT",

@@ -1,4 +1,6 @@
-import { useMemo, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { PlayerProfilePanel } from "@/ui/PlayerProfilePanel";
+import { getProfileService, type LeaderboardEntry } from "@/profile/profileService";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { loadSave } from "@/engine/SaveSystem";
@@ -35,6 +37,21 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
   const prestigeNextPrice = getPrestigeUpgradeDualPrice(save.prestigeLevel);
   const prestigeTierLabel =
     t(`prestige.tiers.${prestigeTier.nameKey}` as TranslationKey) + (prestigeTier.cycle > 0 ? ` ${prestigeTier.cycle + 1}` : "");
+  const profiles = getProfileService();
+  const [openProfileId, setOpenProfileId] = useState<string | null>(null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null | "error">(null);
+  useEffect(() => {
+    let alive = true;
+    // Keep the player's own public snapshot fresh on the server (no-op offline).
+    void profiles.publishMyProfile().catch(() => undefined);
+    profiles
+      .getLeaderboard(50)
+      .then((rows) => alive && setLeaderboard(rows))
+      .catch(() => alive && setLeaderboard("error"));
+    return () => {
+      alive = false;
+    };
+  }, [openProfileId === null]);
 
   return (
     <div style={rootStyle}>
@@ -55,6 +72,35 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
             })}
           </div>
           <div style={scoreBasisStyle}>{t("ranking.scoreBasis")}</div>
+        </div>
+
+        <div style={leaderboardCardStyle}>
+          <div style={leaderboardHeaderStyle}>
+            <span style={leaderboardTitleStyle}>{t("profile.leaderboardTitle")}</span>
+            <button style={viewMineStyle} onClick={() => setOpenProfileId(profiles.getMyProfile().playerId)}>
+              {t("profile.viewMine")}
+            </button>
+          </div>
+          {leaderboard === null && <p style={honestNoteStyle}>{t("profile.leaderboardLoading")}</p>}
+          {leaderboard === "error" && <p style={honestNoteStyle}>{t("profile.leaderboardError")}</p>}
+          {Array.isArray(leaderboard) &&
+            leaderboard.map((row) => {
+              const isMe = row.playerId === save.playerId;
+              return (
+                <button key={row.playerId} style={{ ...leaderboardRowStyle, ...(isMe ? leaderboardRowMeStyle : null) }} onClick={() => setOpenProfileId(row.playerId)} title={t("profile.open")}>
+                  <span style={rankStyle}>#{row.rank}</span>
+                  <span style={rowNameStyle}>
+                    {row.displayName}
+                    {isMe && <span style={youTagStyle}>{t("profile.you")}</span>}
+                  </span>
+                  <span style={rowWaveStyle}>
+                    {t("hud.phaseWaveValue", { phase: phaseNumberFromWave(Math.max(1, row.seasonBestWave)), onda: waveInPhase(Math.max(1, row.seasonBestWave)) })}
+                  </span>
+                  <span style={rowOpenStyle}>›</span>
+                </button>
+              );
+            })}
+          {!profiles.online && <p style={honestNoteStyle}>{t("profile.leaderboardOfflineNote")}</p>}
         </div>
 
         <div style={positionCardStyle}>
@@ -95,6 +141,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
           <p style={tierLegendNoteStyle}>{t("ranking.tiersNote")}</p>
         </div>
       </div>
+      {openProfileId && <PlayerProfilePanel playerId={openProfileId} onClose={() => setOpenProfileId(null)} />}
     </div>
   );
 }
@@ -325,3 +372,48 @@ const tierLegendNoteStyle: CSSProperties = {
   lineHeight: 1.5,
   marginTop: 10,
 };
+
+const leaderboardCardStyle: CSSProperties = {
+  width: "100%",
+  padding: "14px 16px",
+  borderRadius: 12,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(30,20,12,0.7)",
+  boxSizing: "border-box",
+  display: "flex",
+  flexDirection: "column",
+  gap: 6,
+};
+const leaderboardHeaderStyle: CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 4 };
+const leaderboardTitleStyle: CSSProperties = { fontSize: 11, letterSpacing: 1.4, fontWeight: 800, textTransform: "uppercase", color: PALETTE.uiTextDim };
+const viewMineStyle: CSSProperties = {
+  padding: "6px 12px",
+  borderRadius: 8,
+  border: `1px solid ${PALETTE.gold}`,
+  background: "rgba(255,210,87,0.1)",
+  color: PALETTE.gold,
+  fontWeight: 800,
+  fontSize: 10.5,
+  letterSpacing: 0.8,
+  cursor: "pointer",
+};
+const leaderboardRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  width: "100%",
+  padding: "9px 12px",
+  borderRadius: 10,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(0,0,0,0.25)",
+  color: PALETTE.uiText,
+  cursor: "pointer",
+  textAlign: "left",
+  font: "inherit",
+};
+const leaderboardRowMeStyle: CSSProperties = { borderColor: PALETTE.gold, background: "rgba(255,210,87,0.07)" };
+const rankStyle: CSSProperties = { width: 36, fontFamily: "Georgia, serif", fontWeight: 800, color: PALETTE.gold };
+const rowNameStyle: CSSProperties = { flex: 1, minWidth: 0, fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+const youTagStyle: CSSProperties = { marginLeft: 8, fontSize: 9, fontWeight: 800, letterSpacing: 1, color: PALETTE.gold, border: `1px solid ${PALETTE.gold}`, borderRadius: 999, padding: "1px 6px" };
+const rowWaveStyle: CSSProperties = { fontSize: 12, color: PALETTE.uiTextDim, whiteSpace: "nowrap" };
+const rowOpenStyle: CSSProperties = { fontSize: 18, color: PALETTE.uiTextDim };
