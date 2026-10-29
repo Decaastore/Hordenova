@@ -11,8 +11,7 @@ import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
-import { drawTower } from "@/rendering/EntityRenderer";
-import { createTowerInstance } from "@/entities/Tower";
+import { TowerPortrait } from "@/ui/TowerPortrait";
 import { SCENE_DURATION_MS, SHOWCASE_PHASE_IDS, showcasePhase } from "@/rendering/homeDiorama";
 import { buildProfileFromSave, countOwnedSkins, TOTAL_TOWER_SKINS } from "@/profile/playerProfile";
 import { HomeDiorama } from "./HomeDiorama";
@@ -267,7 +266,6 @@ const PREVIEW_ZOOM = 2.5;
 /** One tower column: the real tower art (climbing through its upgrade stages on hover), name, role, description. */
 function TowerShowcase({ type }: { type: TowerType }) {
   const { t } = useLanguage();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stage, setStage] = useState(STAGE_LEVELS.length - 1);
   const [playing, setPlaying] = useState(false);
   const level = STAGE_LEVELS[stage]!;
@@ -278,26 +276,6 @@ function TowerShowcase({ type }: { type: TowerType }) {
     return () => window.clearInterval(id);
   }, [playing]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    canvas.width = PREVIEW_W * dpr;
-    canvas.height = PREVIEW_H * dpr;
-    const view = { w: PREVIEW_W / PREVIEW_ZOOM, h: PREVIEW_H / PREVIEW_ZOOM };
-    const tower = createTowerInstance("home-preview", type, { x: view.w / 2, y: view.h * 0.64 }, level);
-    let raf = 0;
-    const loop = (now: number) => {
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.setTransform(dpr * PREVIEW_ZOOM, 0, 0, dpr * PREVIEW_ZOOM, 0, 0);
-      drawTower(ctx, tower, false, now);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [type, level]);
 
   return (
     <article
@@ -315,7 +293,7 @@ function TowerShowcase({ type }: { type: TowerType }) {
       }}
     >
       <div className="hn-tower-stage">
-        <canvas ref={canvasRef} style={{ width: PREVIEW_W, height: PREVIEW_H }} aria-hidden="true" />
+        <TowerPortrait type={type} level={level} width={PREVIEW_W} height={PREVIEW_H} zoom={PREVIEW_ZOOM} baseY={0.64} />
         <span className="hn-tower-level">{t("menu.towerLevel", { level })}</span>
       </div>
       <h3>{t(`towers.${type}.name` as TranslationKey)}</h3>

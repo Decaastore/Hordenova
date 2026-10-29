@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v57",
+    dateIso: "2026-10-29",
+    category: "INTERFACE",
+    title: {
+      en: "A Rebuilt Wiki",
+      ptBR: "Uma Wiki Reconstruída",
+    },
+    description: {
+      en: "The Wiki has been rebuilt to match the new Home screen, and now shows the game's own art next to its numbers: towers drawn exactly as they look in battle, every creature from its real model, the castle at each stage of damage and the items' artwork. A search box finds any tower, specialization, skin, creature, boss, item or phase and jumps straight to it.",
+      ptBR: "A Wiki foi reconstruída no mesmo estilo da nova tela inicial e agora mostra a arte do próprio jogo ao lado dos números: torres desenhadas exatamente como ficam na batalha, cada criatura com o seu modelo real, o castelo em cada estágio de dano e a arte dos itens. Uma busca encontra qualquer torre, especialização, skin, criatura, chefe, item ou fase e leva direto até ela.",
+    },
+    highlights: [
+      {
+        en: "Towers: drag the level slider from 1 to 60 to see the tower's look change and its damage, attack speed, range and special stats at that level, plus its milestones, specializations and every skin with its price.",
+        ptBR: "Torres: arraste o nível de 1 a 60 para ver o visual da torre mudar e o dano, a velocidade de ataque, o alcance e os atributos especiais naquele nível, além dos marcos, das especializações e de todas as skins com o preço.",
+      },
+      {
+        en: "Bestiary: creatures grouped by phase with a phase filter, each one walking when you hover it; the eight original creatures show their version in each of the first six phases.",
+        ptBR: "Bestiário: criaturas agrupadas por fase, com filtro de fase, e cada uma anda quando você passa o mouse; as oito criaturas originais mostram a versão de cada uma das seis primeiras fases.",
+      },
+      {
+        en: "Bosses and mini-bosses now say which phase they belong to, explain their ability in plain words and show their item drops with chances.",
+        ptBR: "Chefes e mini-chefes agora dizem a que fase pertencem, explicam a habilidade em palavras simples e mostram os itens que derrubam, com as chances.",
+      },
+      {
+        en: "Items list which bosses drop them; Mastery shows the Gold cost of every tower side by side.",
+        ptBR: "Os itens mostram quais chefes os derrubam; a Maestria mostra o custo em Ouro de todas as torres lado a lado.",
+      },
+      {
+        en: "Fixed the Tower Mastery entry under Economy, which was showing a placeholder instead of its name and description.",
+        ptBR: "Corrigida a entrada de Maestria da Torre em Economia, que mostrava um texto provisório no lugar do nome e da descrição.",
+      },
+    ],
+  },
+  {
     id: "v56",
     dateIso: "2026-10-29",
     category: "INTERFACE",
