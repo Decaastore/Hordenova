@@ -8,16 +8,20 @@ interface TowerPaletteProps {
   gold: number;
   pendingTowerType: TowerType | null;
   onSelect: (type: TowerType | null) => void;
+  /** The map already holds the maximum number of towers — nothing more can be built. */
+  mapFull?: boolean;
+  mapFullLabel?: string;
 }
 
-export function TowerPalette({ gold, pendingTowerType, onSelect }: TowerPaletteProps) {
+export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel }: TowerPaletteProps) {
   const { t } = useLanguage();
   return (
     <div style={containerStyle}>
+      {mapFull && mapFullLabel && <div style={fullStyle}>{mapFullLabel}</div>}
       {TOWER_TYPES.map((type) => {
         const def = TOWER_DEFINITIONS[type];
         const theme = TOWER_THEME[type];
-        const affordable = gold >= def.buildCost;
+        const affordable = gold >= def.buildCost && !mapFull;
         const active = pendingTowerType === type;
         return (
           <button
@@ -78,4 +82,13 @@ const swatchStyle: CSSProperties = {
   height: 20,
   borderRadius: "50%",
   flexShrink: 0,
+};
+
+const fullStyle: CSSProperties = {
+  alignSelf: "center",
+  fontSize: 12,
+  fontWeight: 700,
+  color: PALETTE.uiTextDim,
+  padding: "0 6px",
+  whiteSpace: "nowrap",
 };

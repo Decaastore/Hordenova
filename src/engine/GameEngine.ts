@@ -8,7 +8,8 @@ import {
   type GameSpeed,
 } from "@/config/gameBalance";
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
-import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { getMapLayout, getSite, MAX_TOWERS_ON_MAP, setActiveMapLayout, type MapLayout } from "@/data/mapLayouts";
+import { autoArrange } from "./MapDeployment";
 import { isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
@@ -179,6 +180,10 @@ export interface HudSnapshot {
   pendingRouletteSpinWave: number | null;
   /** BALANCEAMENTO DEFINITIVO spec section 6 — whether the account's one free Tower Repositioning for TODAY (see engine/DailyClock.ts) is still available. false means the next reposition costs REPOSITION_GEM_COST Gems (config/repositioning.ts). */
   repositionFreeAvailable: boolean;
+  /** The map being played (data/mapLayouts.ts). */
+  mapLayoutId: string;
+  /** Towers currently on the map (at most MAX_TOWERS_ON_MAP). */
+  towerCount: number;
 }
 
 /**
@@ -229,6 +234,8 @@ export interface RenderSnapshot {
   projectiles: readonly ProjectileInstance[];
   selectedTowerId: string | null;
   biomeId: string;
+  /** The map being played — draw its road and sites (never derive them from biomeId alone). */
+  mapLayoutId: string;
 }
 
 function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
@@ -257,7 +264,9 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.pendingRouletteResult?.wave === b.pendingRouletteResult?.wave &&
     a.pendingRouletteResult?.rewardType === b.pendingRouletteResult?.rewardType &&
     a.pendingRouletteSpinWave === b.pendingRouletteSpinWave &&
-    a.repositionFreeAvailable === b.repositionFreeAvailable
+    a.repositionFreeAvailable === b.repositionFreeAvailable &&
+    a.mapLayoutId === b.mapLayoutId &&
+    a.towerCount === b.towerCount
   );
 }
 
@@ -281,6 +290,16 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
  */
 export class GameEngine {
   private phase: RunPhase = "PRE_RUN";
+  /**
+   * MAP LAYOUTS — the map the run is currently being played on (its road and
+   * build sites, see data/mapLayouts.ts). Follows the current wave's phase;
+   * see syncMapLayout() for what happens when it changes.
+   */
+  private layout: MapLayout = getMapLayout("ANCIENT_FOREST");
+  /** When true (the real game screen), moving onto a new map pauses in DEPLOY so the player can arrange towers; headless engines (tests, sims) just auto-arrange and keep going. */
+  private deployPauseEnabled = false;
+  /** What the run was about to do when DEPLOY interrupted it. */
+  private deployResumePhase: RunPhase | null = null;
   private speed: GameSpeed = GAME_SPEEDS[0];
   private gold = 0;
   private baseHp = RUN_START.baseHp;
@@ -476,6 +495,12 @@ export class GameEngine {
     this.unlockedSpecializationIds = Object.fromEntries(
       Object.entries(save.unlockedSpecializationIds).map(([type, ids]) => [type, [...(ids ?? [])]]),
     ) as Partial<Record<TowerType, SpecializationId[]>>;
+    // The saved loadout's slot ids belong to the map it was arranged on
+    // (pre-layout saves: the original map) — load that map first so every
+    // tower comes back exactly where it was; syncMapLayout() below then
+    // moves the run onto the current phase's map if that's a different one.
+    this.layout = getMapLayout(save.mapLayoutId ?? "ANCIENT_FOREST");
+    setActiveMapLayout(this.layout);
     this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.playerId = save.playerId;
@@ -535,6 +560,7 @@ export class GameEngine {
     }
 
     this.beginCurrentOrNextWave();
+    this.syncMapLayout();
     this.persist();
     this.notify();
   }
@@ -544,6 +570,7 @@ export class GameEngine {
     if (this.phase !== "OFFLINE_RETURN") return;
     this.offlineSummary = null;
     this.beginCurrentOrNextWave();
+    this.syncMapLayout();
     this.persist();
     this.notify();
   }
@@ -619,12 +646,14 @@ export class GameEngine {
 
   getAvailableSlotIds(): string[] {
     const occupied = new Set(this.towers.map((t) => t.slotId));
-    return TOWER_SLOTS.filter((slot) => !occupied.has(slot.id)).map((slot) => slot.id);
+    // Nothing is buildable once the map already holds MAX_TOWERS_ON_MAP towers.
+    if (this.towers.length >= MAX_TOWERS_ON_MAP) return [];
+    return this.layout.sites.filter((slot) => !occupied.has(slot.id)).map((slot) => slot.id);
   }
 
   /** Towers as the center of progression (spec section 3): allowed during active combat AND while PROGRESSION_STOPPED, since that's exactly when the player is expected to change their build. */
   private canModifyLoadout(): boolean {
-    return this.phase === "RUNNING" || this.phase === "WAVE_TRANSITION" || this.phase === "PROGRESSION_STOPPED";
+    return this.phase === "RUNNING" || this.phase === "WAVE_TRANSITION" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY";
   }
 
   /**
@@ -636,8 +665,8 @@ export class GameEngine {
    * comment on those fields above).
    */
   private instantiateTowerFromLoadout(entry: TowerLoadoutEntry): TowerInstance {
-    const slot = TOWER_SLOTS.find((s) => s.id === entry.slotId);
-    return createTowerInstance(
+    const slot = getSite(this.layout, entry.slotId);
+    const tower = createTowerInstance(
       entry.slotId,
       entry.type,
       slot ? slot.position : { x: 0, y: 0 },
@@ -650,13 +679,16 @@ export class GameEngine {
       entry.equippedItemInstanceIds,
       this.unlockedItemSlots[entry.type] ? [...this.unlockedItemSlots[entry.type]!] : undefined,
     );
+    tower.siteTrait = slot?.trait ?? "NONE";
+    return tower;
   }
 
   placeTower(slotId: string, type: TowerType): boolean {
     if (!this.canModifyLoadout()) return false;
     if (this.towers.some((t) => t.slotId === slotId)) return false;
+    if (this.towers.length >= MAX_TOWERS_ON_MAP) return false;
 
-    const slot = TOWER_SLOTS.find((s) => s.id === slotId);
+    const slot = getSite(this.layout, slotId);
     if (!slot) return false;
 
     const cost = TOWER_DEFINITIONS[type].buildCost;
@@ -678,6 +710,7 @@ export class GameEngine {
         this.unlockedItemSlots[type] ? [...this.unlockedItemSlots[type]!] : undefined,
       ),
     );
+    this.towers[this.towers.length - 1]!.siteTrait = slot.trait;
     this.persist();
     this.notify();
     return true;
@@ -727,7 +760,7 @@ export class GameEngine {
     if (fromSlotId === toSlotId) return false;
 
     const fromTower = this.towers.find((t) => t.slotId === fromSlotId);
-    const toSlot = TOWER_SLOTS.find((s) => s.id === toSlotId);
+    const toSlot = getSite(this.layout, toSlotId);
     if (!fromTower || !toSlot) return false;
 
     const isFree = this.isFreeRepositionAvailable();
@@ -735,13 +768,15 @@ export class GameEngine {
     if (!isFree && (!currency || !this.canAffordGemsInCurrency(cost, currency))) return false;
 
     const toTower = this.towers.find((t) => t.slotId === toSlotId);
-    const fromSlot = TOWER_SLOTS.find((s) => s.id === fromSlotId)!;
+    const fromSlot = getSite(this.layout, fromSlotId)!;
 
     fromTower.slotId = toSlotId;
     fromTower.position = toSlot.position;
+    fromTower.siteTrait = toSlot.trait;
     if (toTower) {
       toTower.slotId = fromSlotId;
       toTower.position = fromSlot.position;
+      toTower.siteTrait = fromSlot.trait;
     }
 
     if (isFree) {
@@ -753,6 +788,103 @@ export class GameEngine {
     this.persist();
     this.notify();
     return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // MAP LAYOUTS / DEPLOY — every phase has its own map (data/mapLayouts.ts).
+  // When the run moves onto a different map, every tower keeps its level,
+  // Mastery, specialization, skin and items and is placed on the new map's
+  // sites by autoArrange(); on the real game screen the run then pauses in
+  // DEPLOY so the player can rearrange for free before the phase starts.
+  // ---------------------------------------------------------------------
+
+  /** The real game screen opts in to the DEPLOY pause (headless engines auto-arrange and keep going). */
+  enableDeployPause(enabled = true): void {
+    this.deployPauseEnabled = enabled;
+  }
+
+  getMapLayout(): MapLayout {
+    return this.layout;
+  }
+
+  /**
+   * Moves the run onto the current wave's map if it isn't already on it.
+   * Returns true when the map changed.
+   */
+  private syncMapLayout(): boolean {
+    const target = getMapLayout(getPhaseForWave(Math.max(1, this.wave.currentWave)).biomeId);
+    if (target.id === this.layout.id) {
+      setActiveMapLayout(this.layout);
+      return false;
+    }
+    this.layout = target;
+    setActiveMapLayout(target);
+    // Anything still on the old road would be walking the wrong path.
+    this.enemies = [];
+    this.projectiles = [];
+    this.selectedTowerId = null;
+    this.placeTowersOn(autoArrange(this.towers, target));
+    if (this.deployPauseEnabled && this.towers.length > 0 && this.phase !== "PROGRESSION_STOPPED" && this.phase !== "OFFLINE_RETURN") {
+      this.deployResumePhase = this.phase === "DEPLOY" ? this.deployResumePhase : this.phase;
+      this.phase = "DEPLOY";
+    }
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  private placeTowersOn(assignment: ReadonlyMap<string, string>): void {
+    // Any tower that didn't get a site (more towers than sites — can't happen
+    // with MAX_TOWERS_ON_MAP < SITES_PER_MAP, but never lose one) keeps a free one.
+    const used = new Set(assignment.values());
+    const spare = this.layout.sites.filter((s) => !used.has(s.id));
+    for (const tower of this.towers) {
+      const siteId = assignment.get(tower.id) ?? spare.shift()?.id;
+      const site = siteId ? getSite(this.layout, siteId) : undefined;
+      if (!site) continue;
+      tower.slotId = site.id;
+      tower.position = site.position;
+      tower.siteTrait = site.trait;
+    }
+  }
+
+  /** DEPLOY only: moves the tower at `fromSiteId` to `toSiteId` (swapping with any tower already there). Free. */
+  deployMoveTower(fromSiteId: string, toSiteId: string): boolean {
+    if (this.phase !== "DEPLOY" || fromSiteId === toSiteId) return false;
+    const moving = this.towers.find((t) => t.slotId === fromSiteId);
+    const from = getSite(this.layout, fromSiteId);
+    const to = getSite(this.layout, toSiteId);
+    if (!moving || !from || !to) return false;
+    const other = this.towers.find((t) => t.slotId === toSiteId);
+    moving.slotId = to.id;
+    moving.position = to.position;
+    moving.siteTrait = to.trait;
+    if (other) {
+      other.slotId = from.id;
+      other.position = from.position;
+      other.siteTrait = from.trait;
+    }
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** DEPLOY only: reapplies the suggested arrangement. */
+  autoArrangeDeployment(): void {
+    if (this.phase !== "DEPLOY") return;
+    this.placeTowersOn(autoArrange(this.towers, this.layout));
+    this.persist();
+    this.notify();
+  }
+
+  /** Ends DEPLOY and lets the phase begin. */
+  confirmDeployment(): void {
+    if (this.phase !== "DEPLOY") return;
+    this.phase = this.deployResumePhase ?? "RUNNING";
+    this.deployResumePhase = null;
+    this.selectedTowerId = null;
+    this.persist();
+    this.notify();
   }
 
   selectTower(towerId: string | null): void {
@@ -1491,7 +1623,11 @@ export class GameEngine {
   }
 
   update(dtMs: number): void {
-    if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED") return;
+    if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return;
+    if (this.syncMapLayout() && (this.phase as RunPhase) === "DEPLOY") {
+      this.notify();
+      return;
+    }
 
     const scaledDt = dtMs * this.speed;
     // Boss/mini-boss ability cadence (Shield windows, Summon/Disable
@@ -1525,6 +1661,7 @@ export class GameEngine {
         activateNextWave(this.wave);
         this.phase = "RUNNING";
         this.emitAudio({ type: "wave_start" });
+        this.syncMapLayout();
         this.persist();
       }
       this.notify();
@@ -1750,6 +1887,7 @@ export class GameEngine {
         this.advanceBestWave(this.wave.currentWave);
         activateNextWave(this.wave);
         this.phase = "RUNNING";
+        this.syncMapLayout();
         this.persist();
       }
     } else {
@@ -2084,6 +2222,7 @@ export class GameEngine {
         bestWave: this.bestWave,
         gold: this.gold,
         currentWave: this.wave.currentWave,
+        mapLayoutId: this.layout.id,
         towerLoadout: this.towers.map((t) => ({
           slotId: t.slotId,
           type: t.type,
@@ -2160,6 +2299,8 @@ export class GameEngine {
       pendingRouletteResult: this.pendingRouletteResults[0] ?? null,
       pendingRouletteSpinWave: this.pendingRouletteSpinWaves[0] ?? null,
       repositionFreeAvailable: this.isFreeRepositionAvailable(),
+      mapLayoutId: this.layout.id,
+      towerCount: this.towers.length,
     };
 
     const prev = this.cachedHud;
@@ -2177,6 +2318,7 @@ export class GameEngine {
       projectiles: this.projectiles,
       selectedTowerId: this.selectedTowerId,
       biomeId: getPhaseForWave(this.wave.currentWave).biomeId,
+      mapLayoutId: this.layout.id,
     };
   }
 }

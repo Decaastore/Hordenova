@@ -1,6 +1,6 @@
 import { ENEMY_DEFINITIONS, getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
-import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
+import { getActiveMapLayout } from "@/data/mapLayouts";
 import { CC_DR_DECAY_MS, CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "@/config/ccResistance";
 import { getEnragedShieldReduction } from "@/config/enrageShield";
 
@@ -134,7 +134,7 @@ let nextEnemyId = 1;
 export function createEnemyInstance(type: EnemyType, waveNumber: number, difficultyMultiplier = 1): EnemyInstance {
   const stats = getScaledEnemyStats(type, waveNumber);
   const def = ENEMY_DEFINITIONS[type];
-  const start = getPointAtDistance(ENEMY_PATH, 0);
+  const start = getPointAtDistance(getActiveMapLayout().path, 0);
   const hp = Math.max(1, Math.round(stats.hp * difficultyMultiplier));
   return {
     id: `enemy-${nextEnemyId++}`,
@@ -211,10 +211,14 @@ export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult 
     }
   }
 
-  const distanceDelta = getEffectiveSpeed(enemy) * dtSeconds;
+  // Every map is crossed in the same time: speedScale shrinks/stretches the
+  // distance covered per tick to the active road's length (1 on the
+  // original map). See data/mapLayouts.ts.
+  const layout = getActiveMapLayout();
+  const distanceDelta = getEffectiveSpeed(enemy) * dtSeconds * layout.speedScale;
   enemy.distanceTraveled += distanceDelta;
 
-  const sample = getPointAtDistance(ENEMY_PATH, enemy.distanceTraveled);
+  const sample = getPointAtDistance(layout.path, enemy.distanceTraveled);
   enemy.position = sample.position;
   enemy.direction = sample.direction;
 

@@ -82,6 +82,7 @@ export const ptBR: TranslationSchema = {
       BOSS_BATTLE: "BATALHA CONTRA O CHEFE",
       VICTORY: "VITÓRIA",
       PROGRESSION_STOPPED: "PROGRESSÃO INTERROMPIDA",
+      DEPLOY: "PREPARAÇÃO",
     },
   },
   towers: {
@@ -857,6 +858,22 @@ export const ptBR: TranslationSchema = {
     defaultSkin: "Visual padrão",
     equipped: "EQUIPADA",
     updated: "Atualizado em {date}",
+  },
+  deploy: {
+    title: "Prepare sua defesa",
+    kicker: "Mapa novo",
+    body: "Cada fase tem a sua própria estrada. Suas torres mantiveram nível, skin e itens e foram colocadas em lugares sugeridos. Clique numa torre e depois em outro lugar para mover ou trocar, de graça, até começar a fase.",
+    movingHint: "Clique onde esta torre deve ficar: um lugar vazio, ou outra torre para trocar as duas. Clique nela de novo para cancelar.",
+    highGround: "Terreno alto: +{pct}% de alcance",
+    runeAltar: "Altar rúnico: +{pct}% de dano",
+    towerCount: "{count}/{max} torres no mapa",
+    autoArrange: "Organizar automaticamente",
+    start: "Começar fase",
+    previewCoverage: "Cobre {pct}% da estrada",
+    mapFull: "Mapa cheio: {max} torres",
+    movingShort: "Escolha um lugar para esta torre, ou clique nela de novo para cancelar.",
+    hidePanel: "Ver o mapa",
+    showPanel: "Mostrar painel",
   },
   ascension: {
     seasonThemes: {

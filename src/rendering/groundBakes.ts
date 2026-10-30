@@ -2,12 +2,11 @@ import type { BiomeDefinition } from "./biomes";
 import type { DecorationKind } from "./mapDecorations";
 import { getMapDecorations } from "./mapDecorations";
 import type { VisibleBounds } from "./MapRenderer";
-import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { getMapLayout } from "@/data/mapLayouts";
 
 /** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
-const BAKE_VERSION = 5;
+const BAKE_VERSION = 6;
 /** Slot index (index % 6) whose baked platform is the glowing rune altar — see MapRenderer's slot style order. */
-const ALTAR_SLOT_STYLE_INDEX = 4;
 
 /**
  * Pre-rendered ("baked") ground for a biome: the whole terrain — ground
@@ -128,8 +127,9 @@ function glowRegions(biome: BiomeDefinition): { x: number; y: number; r: number;
         r: (d.kind === "WATER" ? 34 * 1.7 : 46 * 0.75) * d.scale,
         phase: i * 1.37 + d.position.x * 0.01,
       }));
-    TOWER_SLOTS.forEach((slot, i) => {
-      if (i % 6 === ALTAR_SLOT_STYLE_INDEX) regions!.push({ x: slot.position.x, y: slot.position.y + 4.5, r: 30, phase: i * 2.1 });
+    // Rune altars glow on their own pulse.
+    getMapLayout(biome.id).sites.forEach((slot, i) => {
+      if (slot.trait === "RUNE_ALTAR") regions!.push({ x: slot.position.x, y: slot.position.y + 4.5, r: 30, phase: i * 2.1 });
     });
     glowRegionCache.set(biome.id, regions);
   }

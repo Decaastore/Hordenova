@@ -38,6 +38,8 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     pendingRouletteResult: null,
     pendingRouletteSpinWave: null,
     repositionFreeAvailable: true,
+    mapLayoutId: "ANCIENT_FOREST",
+    towerCount: 0,
     ...overrides,
   };
 }

@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
-import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import {
   canUpgradeMastery,
@@ -44,13 +43,15 @@ type Action =
  * alongside Tower Level and Specialization Level, exactly like a real
  * Gold-only player now could.
  */
-function cheapestAction(towers: readonly TowerInstance[], occupiedSlotIds: ReadonlySet<string>, typeIndex: number): Action | null {
+function cheapestAction(towers: readonly TowerInstance[], freeSlotIds: readonly string[], typeIndex: number): Action | null {
   const candidates: Action[] = [];
 
-  const freeSlot = TOWER_SLOTS.find((s) => !occupiedSlotIds.has(s.id));
+  // MAP LAYOUTS — build on whatever the engine says is free on the CURRENT
+  // map (each phase has its own sites; nothing is free once 12 towers stand).
+  const freeSlot = freeSlotIds[0];
   if (freeSlot) {
     const type = TOWER_TYPES[typeIndex % TOWER_TYPES.length]!;
-    candidates.push({ kind: "build", cost: TOWER_DEFINITIONS[type].buildCost, slotId: freeSlot.id, type });
+    candidates.push({ kind: "build", cost: TOWER_DEFINITIONS[type].buildCost, slotId: freeSlot, type });
   }
 
   for (const tower of towers) {
@@ -154,8 +155,7 @@ function runGreedyBot(
     for (let guard = 0; guard < 50; guard++) {
       const hud = engine.getHudSnapshot();
       const snapshot = engine.getRenderSnapshot();
-      const occupied = new Set(snapshot.towers.map((t) => t.slotId));
-      const action = cheapestAction(snapshot.towers, occupied, typeIndex);
+      const action = cheapestAction(snapshot.towers, engine.getAvailableSlotIds(), typeIndex);
       if (!action || action.cost > hud.gold) break;
 
       if (action.kind === "build") {

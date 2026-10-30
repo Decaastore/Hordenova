@@ -81,6 +81,7 @@ export const en = {
       BOSS_BATTLE: "BOSS BATTLE",
       VICTORY: "VICTORY",
       PROGRESSION_STOPPED: "PROGRESSION STOPPED",
+      DEPLOY: "PREPARATION",
     },
   },
   towers: {
@@ -856,6 +857,22 @@ export const en = {
     defaultSkin: "Default look",
     equipped: "EQUIPPED",
     updated: "Updated {date}",
+  },
+  deploy: {
+    title: "Prepare your defense",
+    kicker: "New map",
+    body: "Every phase has its own road. Your towers kept their level, skin and items and were placed on suggested spots. Click a tower, then another spot, to move or swap it for free until you start the phase.",
+    movingHint: "Click where this tower should go: an empty spot, or another tower to swap them. Click it again to cancel.",
+    highGround: "High ground: +{pct}% range",
+    runeAltar: "Rune altar: +{pct}% damage",
+    towerCount: "{count}/{max} towers on the map",
+    autoArrange: "Auto-arrange",
+    start: "Start phase",
+    previewCoverage: "Covers {pct}% of the road",
+    mapFull: "Map full: {max} towers",
+    movingShort: "Pick a spot for this tower, or click it again to cancel.",
+    hidePanel: "Show the map",
+    showPanel: "Show panel",
   },
   ascension: {
     seasonThemes: {

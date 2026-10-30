@@ -3,6 +3,7 @@ import { distance, getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { drawRiftPortal, PORTAL_PATH_DISTANCE } from "./riftPortal";
 import { drawEmbers, drawFire, drawSmokeColumn, n01 } from "./fireFx";
 import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
+import { fortressAnchorFor } from "@/data/mapLayouts";
 import { getCastleHpTier } from "@/config/castleConfig";
 import type { CastleSkinDefinition } from "@/config/castleSkins";
 import { PALETTE } from "./theme";
@@ -967,11 +968,10 @@ export function getPortalAnchor(path: readonly Vector2[]): Vector2 {
 }
 
 export function getFortressAnchor(path: readonly Vector2[]): { position: Vector2; facingDir: Vector2 } {
-  const end = path[path.length - 1]!;
-  const prev = path[path.length - 2]!;
-  const endDir = normalize(end.x - prev.x, end.y - prev.y);
-  return { position: { x: end.x - endDir.x * ENDPOINT_INSET, y: end.y - endDir.y * ENDPOINT_INSET }, facingDir: endDir };
+  return fortressAnchorFor(path, ENDPOINT_INSET);
 }
+
+
 
 export function drawPathEndpoints(
   ctx: CanvasRenderingContext2D,
@@ -1711,7 +1711,20 @@ type PlatformStyle = "CLEARING" | "STONE" | "WOOD" | "RUIN" | "ALTAR" | "ELEVATE
 
 const PLATFORM_STYLES: readonly PlatformStyle[] = ["CLEARING", "STONE", "WOOD", "RUIN", "ALTAR", "ELEVATED"];
 
-function styleForSlot(index: number): PlatformStyle {
+/** Plain build sites cycle through these looks; special sites always get their own (see platformStyleFor). */
+const PLAIN_PLATFORM_STYLES: readonly PlatformStyle[] = ["CLEARING", "STONE", "WOOD", "RUIN"];
+
+/**
+ * MAP LAYOUTS — a site's platform look follows what the site does: a rune
+ * altar for RUNE_ALTAR sites, a raised mound for HIGH_GROUND, and one of the
+ * plain looks otherwise, so the strategic spots are recognisable at a
+ * glance. Sites without a trait (older callers) keep the original cycle.
+ * The ground baker uses the same rule.
+ */
+export function platformStyleFor(slot: { trait?: string }, index: number): PlatformStyle {
+  if (slot.trait === "RUNE_ALTAR") return "ALTAR";
+  if (slot.trait === "HIGH_GROUND") return "ELEVATED";
+  if (slot.trait === "NONE") return PLAIN_PLATFORM_STYLES[index % PLAIN_PLATFORM_STYLES.length]!;
   return PLATFORM_STYLES[index % PLATFORM_STYLES.length]!;
 }
 
@@ -1732,7 +1745,7 @@ export function drawSlot(
   /** True when the platform is already painted into the biome's baked ground (only the highlight ring is drawn live). */
   platformBaked = false,
 ): void {
-  const style = styleForSlot(index);
+  const style = platformStyleFor(slot as { trait?: string }, index);
   ctx.save();
   ctx.translate(slot.position.x, slot.position.y);
 

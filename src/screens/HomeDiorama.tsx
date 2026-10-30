@@ -10,7 +10,6 @@ interface HomeDioramaProps {
 
 /** World rectangle the camera frames: the battlefield plus the castle on its right edge. */
 const FOCUS = { x0: 190, y0: 48, x1: 1080, y1: 604 };
-const CASTLE = { x: 930, y: 455 };
 const MAX_DPR = 1.5;
 
 /**
@@ -64,6 +63,7 @@ export function HomeDiorama({ sceneIndex, entering }: HomeDioramaProps) {
       }
 
       scene.update(now, dt);
+      const CASTLE = scene.castlePosition();
 
       // Cover-fit the focus rect, then keep the castle on screen when the
       // viewport is narrower than the battlefield (phones).

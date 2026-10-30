@@ -1,3 +1,4 @@
+import { HIGH_GROUND_RANGE_MULT, RUNE_ALTAR_DAMAGE_MULT, type SiteTrait } from "@/data/mapLayouts";
 import {
   getTowerLevelStats,
   getTowerVisualStage,
@@ -41,6 +42,13 @@ export interface TowerInstance {
    * attack.
    */
   specialCooldownRemainingMs: number;
+  /**
+   * MAP LAYOUTS — the kind of build site the tower currently stands on
+   * (see data/mapLayouts.ts): HIGH_GROUND extends its range, RUNE_ALTAR
+   * raises its damage, for as long as it stays there. Set by GameEngine
+   * whenever the tower is placed or moved; undefined/"NONE" = no bonus.
+   */
+  siteTrait?: SiteTrait;
   /** >0 while jammed by a DISABLER-archetype enemy/mini-boss — see CombatSystem.tickEnemyDisableAbilities. */
   disabledRemainingMs: number;
   /** Progression 2.0 — the player's chosen build-identity path, null until chosen. Permanent once set (see chooseSpecialization). */
@@ -253,6 +261,9 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
     attackSpeed *= bonuses.attackSpeedMultiplier;
     range *= bonuses.rangeMultiplier;
   }
+
+  if (tower.siteTrait === "HIGH_GROUND") range *= HIGH_GROUND_RANGE_MULT;
+  else if (tower.siteTrait === "RUNE_ALTAR") damage *= RUNE_ALTAR_DAMAGE_MULT;
 
   const skinEffect = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;
   if (skinEffect) {

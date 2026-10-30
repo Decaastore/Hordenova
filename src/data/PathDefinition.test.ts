@@ -37,19 +37,20 @@ describe("PathDefinition — single source of truth (spec section 24)", () => {
    * which a purely behavioral test could easily miss if the fork happened
    * to still be numerically close.
    */
-  it("Enemy.ts (movement) and CanvasRenderer.tsx (drawing) both import ENEMY_PATH from this module — no forked copy", () => {
+  it("Enemy.ts (movement) and CanvasRenderer.tsx (drawing) both take the road from data/mapLayouts — no forked copy", () => {
     const here = fileURLToPath(import.meta.url);
     const srcDir = here.slice(0, here.indexOf("/src/") + 5);
 
     const enemySource = readFileSync(`${srcDir}entities/Enemy.ts`, "utf-8");
     const rendererSource = readFileSync(`${srcDir}rendering/CanvasRenderer.tsx`, "utf-8");
 
-    expect(enemySource).toMatch(/import\s*\{[^}]*ENEMY_PATH[^}]*\}\s*from\s*["']@\/data\/mapWhisperingWoods["']/);
-    expect(rendererSource).toMatch(/import\s*\{[^}]*ENEMY_PATH[^}]*\}\s*from\s*["']@\/data\/mapWhisperingWoods["']/);
+    // MAP LAYOUTS — every phase has its own road now; movement walks the
+    // ACTIVE map's path and the renderer draws the snapshot's map's path,
+    // both from the single registry in data/mapLayouts.ts (whose Ancient
+    // Forest entry IS this module's ENEMY_PATH).
+    expect(enemySource).toMatch(/import\s*\{[^}]*getActiveMapLayout[^}]*\}\s*from\s*["']@\/data\/mapLayouts["']/);
+    expect(rendererSource).toMatch(/import\s*\{[^}]*getMapLayout[^}]*\}\s*from\s*["']@\/data\/mapLayouts["']/);
 
-    // Neither file should contain a second, hardcoded coordinate array
-    // (a tell-tale sign of a forked path) — this map's own points are
-    // distinctive enough (e.g. y: 480) that a copy would show up here.
     for (const source of [enemySource, rendererSource]) {
       expect(source).not.toMatch(/\{\s*x:\s*0,\s*y:\s*120\s*\}/);
     }

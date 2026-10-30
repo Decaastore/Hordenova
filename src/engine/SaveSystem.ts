@@ -57,6 +57,8 @@ export interface SaveData {
   /** Persistent resource spent on tower upgrades — survives across attempts, unlike a single "run's" gold in the old model. */
   gold: number;
   towerLoadout: TowerLoadoutEntry[];
+  /** MAP LAYOUTS — which map (data/mapLayouts.ts) `towerLoadout`'s slot ids refer to. null on saves written before per-map layouts existed, which were all on the original Ancient Forest map. */
+  mapLayoutId: string | null;
   /** Every item this save owns — real individually-identified copies, see entities/Item.ts. Item System spec section 8. */
   inventory: ItemInstance[];
   /** Reserved for future skins/attack-effects/death-effects/castle cosmetics — always [] in this phase. */
@@ -274,6 +276,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   currentWave: 0,
   gold: RUN_START.startingGold,
   towerLoadout: [],
+  mapLayoutId: null,
   inventory: [],
   cosmetics: [],
   xp: 0,
@@ -731,6 +734,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       currentWave: typeof parsed.currentWave === "number" ? parsed.currentWave : 0,
       gold: typeof parsed.gold === "number" ? parsed.gold : RUN_START.startingGold,
       towerLoadout: parsedTowerLoadout,
+      mapLayoutId: typeof parsed.mapLayoutId === "string" ? parsed.mapLayoutId : null,
       inventory: parsedInventory,
       cosmetics: Array.isArray(parsed.cosmetics) ? parsed.cosmetics : [],
       xp: typeof parsed.xp === "number" ? parsed.xp : 0,

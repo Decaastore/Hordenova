@@ -20,6 +20,10 @@ import { RoulettePendingPrompt } from "@/ui/RoulettePendingPrompt";
 import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
 import { EndgameWallBanner } from "@/ui/EndgameWallBanner";
 import { RepositioningOverlay } from "@/ui/RepositioningOverlay";
+import { DeployOverlay } from "@/ui/DeployOverlay";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { PHASES } from "@/config/phaseConfig";
+import { HIGH_GROUND_RANGE_MULT, MAX_TOWERS_ON_MAP, RUNE_ALTAR_DAMAGE_MULT } from "@/data/mapLayouts";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import type { DualGemPrice } from "@/config/gemsEconomy";
@@ -98,6 +102,13 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     | { phase: "confirm"; fromSlotId: string; toSlotId: string; price: DualGemPrice }
     | { phase: "blocked"; price: DualGemPrice };
   const [repositionUi, setRepositionUi] = useState<RepositionUiState>({ phase: "idle" });
+  // MAP LAYOUTS / DEPLOY — site of the tower picked up to move (free, DEPLOY only).
+  const [deployPick, setDeployPick] = useState<string | null>(null);
+  const { t } = useLanguage();
+  const deploying = hud.phase === "DEPLOY";
+  useEffect(() => {
+    if (!deploying) setDeployPick(null);
+  }, [deploying]);
 
   useEffect(() => {
     // Master Implementation spec section 9 — every entry point into the
@@ -105,6 +116,8 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     // since it was last opened, before anything Season-related renders.
     // A no-op once already caught up for the current Season.
     syncSeasonIfNeeded();
+    // Moving onto a new map pauses so the player can arrange their towers.
+    engine.enableDeployPause(true);
     engine.startRun();
   }, [engine]);
 
@@ -136,6 +149,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   };
 
   const handleSlotClick = (slotId: string) => {
+    if (deploying && deployPick) {
+      engine.deployMoveTower(deployPick, slotId);
+      setDeployPick(null);
+      return;
+    }
     if (repositionUi.phase === "picking") {
       resolveRepositionDestination(repositionUi.fromSlotId, slotId);
       return;
@@ -147,6 +165,17 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   };
 
   const handleTowerClick = (towerId: string) => {
+    if (deploying) {
+      const tower = engine.getRenderSnapshot().towers.find((t) => t.id === towerId);
+      if (!tower) return;
+      if (!deployPick) setDeployPick(tower.slotId);
+      else if (deployPick === tower.slotId) setDeployPick(null);
+      else {
+        engine.deployMoveTower(deployPick, tower.slotId);
+        setDeployPick(null);
+      }
+      return;
+    }
     if (repositionUi.phase === "picking") {
       const tower = engine.getRenderSnapshot().towers.find((t) => t.id === towerId);
       if (!tower) return;
@@ -162,6 +191,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   };
 
   const handleBackgroundClick = () => {
+    setDeployPick(null);
     engine.selectTower(null);
     setPendingTowerType(null);
     if (repositionUi.phase === "picking") setRepositionUi({ phase: "idle" });
@@ -218,6 +248,12 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           hidden3DEnemyIds={hidden3DEnemyIdsRef}
           hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
+          movingSlotId={deployPick}
+          previewLabels={{
+            coverage: t("deploy.previewCoverage", { pct: "{pct}" }),
+            highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
+            altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
+          }}
         />
         {enable3DEnemies && (
           <Enemy3DErrorBoundary
@@ -256,7 +292,24 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           <RoulettePendingPrompt wave={hud.pendingRouletteSpinWave} onSpin={() => engine.spinPendingRoulette()} />
         )}
 
-        {selectedTower && (
+        {deploying && (
+          <DeployOverlay
+            phaseNumber={Math.max(1, PHASES.findIndex((p) => p.i18nKey === hud.phaseI18nKey) + 1)}
+            phaseI18nKey={hud.phaseI18nKey}
+            towerCount={hud.towerCount}
+            moving={deployPick !== null}
+            onAutoArrange={() => {
+              setDeployPick(null);
+              engine.autoArrangeDeployment();
+            }}
+            onStart={() => {
+              setDeployPick(null);
+              engine.confirmDeployment();
+            }}
+          />
+        )}
+
+        {selectedTower && !deploying && (
           <TowerInfoPanel
             tower={selectedTower}
             gold={hud.gold}
@@ -348,7 +401,13 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         )}
       </div>
 
-      <TowerPalette gold={hud.gold} pendingTowerType={pendingTowerType} onSelect={setPendingTowerType} />
+      <TowerPalette
+        gold={hud.gold}
+        pendingTowerType={pendingTowerType}
+        onSelect={setPendingTowerType}
+        mapFull={hud.towerCount >= MAX_TOWERS_ON_MAP}
+        mapFullLabel={t("deploy.mapFull", { max: MAX_TOWERS_ON_MAP })}
+      />
     </div>
   );
 }

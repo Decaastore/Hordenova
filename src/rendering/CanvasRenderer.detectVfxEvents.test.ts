@@ -6,7 +6,7 @@ import type { RenderSnapshot } from "@/engine/GameEngine";
 import type { RunPhase } from "@/engine/types";
 
 function emptySnapshot(phase: RunPhase = "RUNNING"): RenderSnapshot {
-  return { phase, towers: [], enemies: [], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" };
+  return { phase, towers: [], enemies: [], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" };
 }
 
 describe("CanvasRenderer.detectVfxEvents — camera shake gating (integration)", () => {
@@ -69,7 +69,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
     ]);
 
     detectVfxEvents(
-      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" },
+      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" },
       1,
       "RUNNING",
       "RUNNING",
@@ -95,7 +95,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
     ]);
 
     detectVfxEvents(
-      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" },
+      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" },
       1,
       "RUNNING",
       "RUNNING",
@@ -120,7 +120,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
     ]);
 
     detectVfxEvents(
-      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" },
+      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" },
       1,
       "RUNNING",
       "RUNNING",
@@ -145,7 +145,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
     ]);
 
     detectVfxEvents(
-      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" },
+      { phase: "RUNNING", towers: [], enemies: [enemy], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" },
       1,
       "RUNNING",
       "RUNNING",
@@ -173,7 +173,7 @@ describe("CanvasRenderer.detectVfxEvents — Freeze SHATTER VFX (spec section 11
     // no longer in `snapshot.enemies` at all, so it can't be double-VFX'd
     // by both the shatter branch AND the death-burst branch.
     detectVfxEvents(
-      { phase: "RUNNING", towers: [], enemies: [], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST" },
+      { phase: "RUNNING", towers: [], enemies: [], projectiles: [], selectedTowerId: null, biomeId: "ANCIENT_FOREST", mapLayoutId: "ANCIENT_FOREST" },
       1,
       "RUNNING",
       "RUNNING",

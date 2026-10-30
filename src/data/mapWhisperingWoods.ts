@@ -220,3 +220,6 @@ export const TOWER_SLOTS: readonly TowerSlotDefinition[] = SLOT_SEEDS.map((seed)
 });
 
 export const MAP_WORLD_SIZE = WORLD_SIZE;
+
+/** The original route's sparse control points, for data/mapLayouts.ts (Ancient Forest keeps this exact road). */
+export const PATH_CONTROL_POINTS_FOR_LAYOUTS: readonly Vector2[] = PATH_CONTROL_POINTS;

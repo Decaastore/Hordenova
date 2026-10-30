@@ -7,7 +7,8 @@ import { PHASES, type PhaseDefinition } from "@/config/phaseConfig";
 import { PRESTIGE_TOWER_SKINS, TOWER_SKINS } from "@/config/towerSkins";
 import type { TowerType } from "@/config/towerStats";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
-import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { getMapLayout, setActiveMapLayout, type MapLayout } from "@/data/mapLayouts";
+import { roadCoverage } from "@/engine/MapDeployment";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake } from "./groundBakes";
@@ -47,17 +48,26 @@ const FADE_MS = 650;
 const MAX_ALIVE = 14;
 const SHOWCASE_RANGE = 150;
 
-/** Slot index + tower type + level for the showcase line-up (same for every scene; skins rotate). */
-const LINEUP: readonly { slot: number; type: TowerType; level: number }[] = [
-  { slot: 3, type: "IRONWOOD", level: 60 },
-  { slot: 11, type: "FROSTBORN", level: 60 },
-  { slot: 10, type: "INFERNO", level: 52 },
-  { slot: 9, type: "STORMCALLER", level: 57 },
-  { slot: 4, type: "IRONWOOD", level: 44 },
-  { slot: 2, type: "STORMCALLER", level: 36 },
-  { slot: 5, type: "INFERNO", level: 41 },
-  { slot: 8, type: "FROSTBORN", level: 31 },
+/** Tower type + level for the showcase line-up (placed on each map's best visible sites; skins rotate). */
+const LINEUP: readonly { type: TowerType; level: number }[] = [
+  { type: "IRONWOOD", level: 60 },
+  { type: "FROSTBORN", level: 60 },
+  { type: "INFERNO", level: 52 },
+  { type: "STORMCALLER", level: 57 },
+  { type: "IRONWOOD", level: 44 },
+  { type: "STORMCALLER", level: 36 },
+  { type: "INFERNO", level: 41 },
+  { type: "FROSTBORN", level: 31 },
 ];
+
+/** The sites the showcase towers use on a map: the ones covering the most road, preferring the right side (the left is under the title). */
+function showcaseSites(layout: MapLayout) {
+  return [...layout.sites]
+    .map((site) => ({ site, score: roadCoverage(layout, site.position, 190).fraction * (site.position.x > 330 ? 1.6 : 1) }))
+    .sort((a, b) => b.score - a.score)
+    .slice(0, LINEUP.length)
+    .map((s) => s.site);
+}
 
 /** Readable firing rhythm for the showcase (ms between shots), independent of real attack speed. */
 const FIRE_INTERVAL_MS: Record<TowerType, number> = { IRONWOOD: 820, INFERNO: 1350, FROSTBORN: 1500, STORMCALLER: 1750 };
@@ -116,7 +126,8 @@ export class HomeDiorama {
   /** Scene waiting to be shown once the current one has faded out. */
   private pendingScene: number | null = null;
   private fadeOutStart: number | null = null;
-  private readonly portalAnchor = getPortalAnchor(ENEMY_PATH);
+  private layout: MapLayout = getMapLayout("ANCIENT_FOREST");
+  private portalAnchor = getPortalAnchor(this.layout.path);
 
   constructor(now: number, sceneIndex = 0) {
     this.loadScene(sceneIndex, now);
@@ -139,10 +150,14 @@ export class HomeDiorama {
   private loadScene(sceneIndex: number, now: number): void {
     this.sceneIndex = sceneIndex;
     this.phase = showcasePhase(sceneIndex);
+    this.layout = getMapLayout(this.phase.biomeId);
+    setActiveMapLayout(this.layout);
+    this.portalAnchor = getPortalAnchor(this.layout.path);
+    const sites = showcaseSites(this.layout);
     this.towers = LINEUP.map((entry, i) => {
       const skins = SKINS_BY_TYPE[entry.type];
       const skin = skins[(sceneIndex * 3 + i * 2) % skins.length] ?? null;
-      const slot = TOWER_SLOTS[entry.slot]!;
+      const slot = sites[i % sites.length]!;
       return createTowerInstance(slot.id, entry.type, slot.position, entry.level, null, 0, skin, 0, false);
     });
     pruneTowerAims(new Set(this.towers.map((t) => t.id)));
@@ -184,7 +199,13 @@ export class HomeDiorama {
     this.hitsTotal.delete(enemy.id);
   }
 
+  /** Castle gate position of the map on screen (for camera framing). */
+  castlePosition() {
+    return this.layout.path[this.layout.path.length - 1]!;
+  }
+
   update(now: number, dt: number): void {
+    setActiveMapLayout(this.layout);
     if (this.fadeOutStart !== null && now - this.fadeOutStart >= FADE_MS && this.pendingScene !== null) {
       const next = this.pendingScene;
       this.pendingScene = null;
@@ -282,13 +303,13 @@ export class HomeDiorama {
     } else {
       drawBackground(ctx, biome, bounds);
       drawDecorations(ctx, biome, now);
-      drawPath(ctx, ENEMY_PATH, biome, false);
+      drawPath(ctx, this.layout.path, biome, false);
     }
     const emergingIds = this.enemies.filter((e) => emergenceProgress(e.distanceTraveled) < 1).map((e) => e.id);
-    drawPathEndpoints(ctx, ENEMY_PATH, biome, now, 1, false, { emergingIds, rimBaked: bake !== null });
+    drawPathEndpoints(ctx, this.layout.path, biome, now, 1, false, { emergingIds, rimBaked: bake !== null });
 
     const occupied = new Set(this.towers.map((t) => t.slotId));
-    TOWER_SLOTS.forEach((slot, i) => drawSlot(ctx, slot, i, occupied.has(slot.id), false, biome, now, bake !== null));
+    this.layout.sites.forEach((slot, i) => drawSlot(ctx, slot, i, occupied.has(slot.id), false, biome, now, bake !== null));
 
     // Back-to-front so lower towers overlap the ones behind them.
     for (const tower of [...this.towers].sort((a, b) => a.position.y - b.position.y)) {

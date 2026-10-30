@@ -8,6 +8,9 @@
  * BOSS_INTRO    — brief cinematic pause before a main-boss fight starts.
  * BOSS_BATTLE   — main-boss fight in progress.
  * VICTORY       — main boss just defeated, brief pause before continuing.
+ * DEPLOY        — the run just moved onto a new map (each phase has its
+ *                  own road and build sites); paused while the player
+ *                  arranges their towers on it, for free, before it starts.
  * PROGRESSION_STOPPED — the base fell; the run halts and a diagnostic
  *                  report is shown. This intentionally also covers what the
  *                  spec calls "PLAYER INTERVENTION REQUIRED" — a separate
@@ -26,4 +29,5 @@ export type RunPhase =
   | "BOSS_INTRO"
   | "BOSS_BATTLE"
   | "VICTORY"
-  | "PROGRESSION_STOPPED";
+  | "PROGRESSION_STOPPED"
+  | "DEPLOY";

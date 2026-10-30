@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { getMapDecorations, type Decoration } from "./mapDecorations";
 import { BIOMES } from "./biomes";
-import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { getMapLayout } from "@/data/mapLayouts";
 import { distance, distanceToPolyline } from "@/utils/geometry";
 
 const ALL_BIOMES = Object.values(BIOMES);
@@ -50,17 +50,19 @@ describe("mapDecorations — Floating Islands water duplication/overlap bug fix"
         }
       });
 
+      // MAP LAYOUTS — each biome is checked against its OWN road and build sites.
       it("no decoration's footprint reaches the enemy path", () => {
+        const layout = getMapLayout(biome.id);
         for (const deco of decorations) {
           const footprint = FOOTPRINT[deco.kind] * deco.scale;
-          expect(distanceToPolyline(deco.position, ENEMY_PATH)).toBeGreaterThanOrEqual(50 + footprint - 0.01);
+          expect(distanceToPolyline(deco.position, layout.path)).toBeGreaterThanOrEqual(50 + footprint - 0.01);
         }
       });
 
       it("no decoration's footprint reaches a tower slot", () => {
         for (const deco of decorations) {
           const footprint = FOOTPRINT[deco.kind] * deco.scale;
-          for (const slot of TOWER_SLOTS) {
+          for (const slot of getMapLayout(biome.id).sites) {
             expect(distance(deco.position, slot.position)).toBeGreaterThanOrEqual(40 + footprint - 0.01);
           }
         }

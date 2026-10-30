@@ -3,7 +3,9 @@ import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
 import type { CombatVfxEvent } from "@/engine/CombatVfxEvents";
 import type { TowerType } from "@/config/towerStats";
-import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { getMapLayout, type BuildSite, type MapLayout } from "@/data/mapLayouts";
+import { roadCoverage, roadSamples } from "@/engine/MapDeployment";
+import { createTowerInstance, type TowerInstance } from "@/entities/Tower";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
 import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
@@ -82,6 +84,15 @@ interface CanvasRendererProps {
    * `hidden3DEnemyIds`.
    */
   hidden3DTowerIds?: RefObject<ReadonlySet<string>>;
+  /**
+   * MAP LAYOUTS — site id of the tower the player has picked up to move
+   * (DEPLOY), or null. While placing (a tower type chosen in the palette, or
+   * a tower picked up), hovering a site previews its range, the stretch of
+   * road it would cover and that share as a percentage.
+   */
+  movingSlotId?: string | null;
+  /** Already-translated strings for the placement preview ("{pct}" is replaced). */
+  previewLabels?: { coverage: string; highGround: string; altar: string };
   /**
    * MUNDO 3D — true while the background 3D terrain/atmosphere layer
    * (`src/rendering3d/world/`) is mounted and rendering behind this
@@ -181,12 +192,20 @@ export function CanvasRenderer({
   hidden3DEnemyIds,
   hidden3DTowerIds,
   worldLayerActive = false,
+  movingSlotId = null,
+  previewLabels,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
   const latestSnapshotRef = useRef<RenderSnapshot | null>(null);
   const pendingTowerTypeRef = useRef<TowerType | null>(pendingTowerType);
   pendingTowerTypeRef.current = pendingTowerType;
+  const movingSlotRef = useRef<string | null>(movingSlotId);
+  movingSlotRef.current = movingSlotId;
+  const previewLabelsRef = useRef(previewLabels);
+  previewLabelsRef.current = previewLabels;
+  /** Pointer position in world units (null when the pointer is off the map). */
+  const hoverWorldRef = useRef<Vector2 | null>(null);
   const worldLayerActiveRef = useRef(worldLayerActive);
   worldLayerActiveRef.current = worldLayerActive;
 
@@ -249,8 +268,6 @@ export function CanvasRenderer({
     const resizeObserver = new ResizeObserver(resize);
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
 
-    const gateHomePosition = ENEMY_PATH[ENEMY_PATH.length - 1]!;
-    const portalAnchor = getPortalAnchor(ENEMY_PATH);
 
     const draw = (timestamp: number) => {
       const frameDt = lastFrameTimestamp === null ? 16 : Math.min(timestamp - lastFrameTimestamp, 100);
@@ -258,6 +275,11 @@ export function CanvasRenderer({
 
       const snapshot = engine.getRenderSnapshot();
       const hud = engine.getHudSnapshot();
+      // MAP LAYOUTS — road and build sites come from the map being played.
+      const layout = getMapLayout(snapshot.mapLayoutId);
+      const roadPath = layout.path;
+      const gateHomePosition = roadPath[roadPath.length - 1]!;
+      const portalAnchor = getPortalAnchor(roadPath);
       latestSnapshotRef.current = snapshot;
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
@@ -385,7 +407,7 @@ export function CanvasRenderer({
         const world3dTerrain = worldLayerOn && !hasGroundBake(biome.id);
         if (!world3dTerrain) drawBackground(ctx, biome, visibleBounds);
         drawDecorations(ctx, biome, timestamp, world3dTerrain ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
-        drawPath(ctx, ENEMY_PATH, biome, world3dTerrain);
+        drawPath(ctx, roadPath, biome, world3dTerrain);
       }
       // ROLLBACK NOTE — this used to pass `worldLayerOn` as `skipCastleBody`
       // so the 2D fortress body would hide whenever the 3D world layer's
@@ -395,22 +417,24 @@ export function CanvasRenderer({
       // keeps the parameter at its default (false).
       const emergingIds: string[] = [];
       for (const e of snapshot.enemies) if (emergenceProgress(e.distanceTraveled) < 1) emergingIds.push(e.id);
-      drawPathEndpoints(ctx, ENEMY_PATH, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
+      drawPathEndpoints(ctx, roadPath, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       pruneTowerAims(new Set(snapshot.towers.map((t) => t.id)));
-      TOWER_SLOTS.forEach((slot, index) => {
+      layout.sites.forEach((slot, index) => {
         drawSlot(
           ctx,
           slot,
           index,
           occupiedSlotIds.has(slot.id),
-          pendingTowerTypeRef.current !== null,
+          pendingTowerTypeRef.current !== null || movingSlotRef.current !== null,
           biome,
           timestamp,
           groundBake !== null,
         );
       });
+
+      drawPlacementPreview(ctx, layout, snapshot.towers, snapshot.phase, pendingTowerTypeRef.current, movingSlotRef.current, hoverWorldRef.current, previewLabelsRef.current, timestamp);
 
       // Magic ground layer (rune circles, scorched crater, frozen ground) — under towers and enemies.
       specialVfx.drawGround(ctx, timestamp);
@@ -562,6 +586,15 @@ export function CanvasRenderer({
     };
   }, [engine]);
 
+  const toWorld = (event: React.MouseEvent<HTMLCanvasElement>): Vector2 | null => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const { scale, offsetX, offsetY } = transformRef.current;
+    return { x: ((event.clientX - rect.left) * dpr - offsetX) / scale, y: ((event.clientY - rect.top) * dpr - offsetY) / scale };
+  };
+
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -586,7 +619,7 @@ export function CanvasRenderer({
       }
     }
 
-    for (const slot of TOWER_SLOTS) {
+    for (const slot of getMapLayout(snapshot.mapLayoutId).sites) {
       if (distance(worldPoint, slot.position) <= SLOT_HIT_RADIUS) {
         onSlotClick(slot.id);
         return;
@@ -600,6 +633,8 @@ export function CanvasRenderer({
     <canvas
       ref={canvasRef}
       onClick={handleClick}
+      onMouseMove={(e) => (hoverWorldRef.current = toWorld(e))}
+      onMouseLeave={() => (hoverWorldRef.current = null)}
       style={{
         width: "100%",
         height: "100%",
@@ -756,4 +791,140 @@ export function detectVfxEvents(
       vfx.spawnTowerSiegeImpact(tower.position);
     }
   }
+}
+
+const PREVIEW_HOVER_RADIUS = 26;
+const TRAIT_COLOR = { HIGH_GROUND: "#9fd8ff", RUNE_ALTAR: "#c79bff" } as const;
+
+/**
+ * MAP LAYOUTS — placement guidance, drawn on the ground under the towers.
+ * While placing (palette type chosen, or a tower picked up during DEPLOY):
+ * every special site gets a small marker with its bonus, and the hovered
+ * site (or, for a picked-up tower with nothing hovered, its current site)
+ * shows the tower's range there, the stretch of road it covers, and that
+ * share of the road as a percentage — the information needed to choose a
+ * good spot, computed with the same coverage math the auto-arrangement uses.
+ */
+function drawPlacementPreview(
+  ctx: CanvasRenderingContext2D,
+  layout: MapLayout,
+  towers: readonly TowerInstance[],
+  phase: RunPhase,
+  pendingType: TowerType | null,
+  movingSlotId: string | null,
+  hover: Vector2 | null,
+  labels: { coverage: string; highGround: string; altar: string } | undefined,
+  timeMs: number,
+): void {
+  const moving = movingSlotId ? (towers.find((t) => t.slotId === movingSlotId) ?? null) : null;
+  const placing = pendingType !== null || moving !== null || phase === "DEPLOY";
+  if (!placing) return;
+
+  // Markers on the special sites.
+  for (const site of layout.sites) {
+    if (site.trait === "NONE") continue;
+    const color = TRAIT_COLOR[site.trait];
+    const pulse = 0.65 + 0.35 * Math.sin(timeMs / 420 + site.position.x * 0.05);
+    ctx.save();
+    ctx.translate(site.position.x, site.position.y - 30);
+    ctx.globalAlpha = 0.85 * pulse + 0.15;
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    ctx.beginPath();
+    if (site.trait === "HIGH_GROUND") {
+      ctx.moveTo(0, -5);
+      ctx.lineTo(5, 3);
+      ctx.lineTo(-5, 3);
+    } else {
+      ctx.moveTo(0, -5);
+      ctx.lineTo(4.5, 0);
+      ctx.lineTo(0, 5);
+      ctx.lineTo(-4.5, 0);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  }
+
+  if (moving) {
+    ctx.save();
+    ctx.strokeStyle = "rgba(255,232,170,0.95)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 4]);
+    ctx.lineDashOffset = -timeMs / 60;
+    ctx.beginPath();
+    ctx.ellipse(moving.position.x, moving.position.y + 4.5, 26, 16, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  let target: BuildSite | null = null;
+  if (hover) {
+    let best = PREVIEW_HOVER_RADIUS;
+    for (const site of layout.sites) {
+      const d = distance(hover, site.position);
+      if (d < best) {
+        best = d;
+        target = site;
+      }
+    }
+  }
+  if (!target && moving) target = layout.sites.find((s) => s.id === moving.slotId) ?? null;
+  if (!target) return;
+  const occupant = towers.find((t) => t.slotId === target!.id) ?? null;
+  const subject: TowerInstance | null = moving ?? (pendingType && !occupant ? createTowerInstance("preview", pendingType, target.position, 1) : null);
+  if (!subject) return;
+
+  const range = getTowerStats({ ...subject, siteTrait: target.trait }).range;
+  const coverage = roadCoverage(layout, target.position, range);
+  const samples = roadSamples(layout);
+
+  ctx.save();
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  for (const [from, to] of coverage.runs) {
+    ctx.beginPath();
+    for (let i = from; i <= to; i++) {
+      const p = samples[i]!;
+      if (i === from) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    }
+    ctx.strokeStyle = "rgba(255,214,120,0.28)";
+    ctx.lineWidth = 30;
+    ctx.stroke();
+    ctx.strokeStyle = "rgba(255,236,180,0.75)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+  }
+  ctx.restore();
+  drawRangeCircle(ctx, target.position, range);
+
+  const pct = Math.round(coverage.fraction * 100);
+  const lines = [(labels?.coverage ?? "{pct}%").replace("{pct}", String(pct))];
+  if (target.trait === "HIGH_GROUND" && labels) lines.push(labels.highGround);
+  if (target.trait === "RUNE_ALTAR" && labels) lines.push(labels.altar);
+  ctx.save();
+  ctx.font = "600 11px system-ui, sans-serif";
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
+  const h = 8 + lines.length * 14;
+  // keep the label on the map, and clear of the DEPLOY strip along the top
+  // edge: flip it under the site when there's no room above
+  const x = Math.min(WORLD_SIZE.width - w - 4, Math.max(4, target.position.x - w / 2));
+  const above = target.position.y - 44 - h;
+  const y = above < 46 ? target.position.y + 30 : above;
+  ctx.fillStyle = "rgba(20,14,8,0.88)";
+  ctx.strokeStyle = "rgba(232,176,75,0.6)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, 6);
+  ctx.fill();
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  lines.forEach((line, i) => {
+    ctx.fillStyle = i === 0 ? "#f7dc9c" : target!.trait === "HIGH_GROUND" ? TRAIT_COLOR.HIGH_GROUND : TRAIT_COLOR.RUNE_ALTAR;
+    ctx.fillText(line, x + w / 2, y + 11 + i * 14);
+  });
+  ctx.restore();
 }

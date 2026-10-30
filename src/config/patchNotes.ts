@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v59",
+    dateIso: "2026-10-29",
+    category: "CONTENT",
+    title: {
+      en: "Every Phase Has Its Own Map",
+      ptBR: "Cada Fase Tem o Seu Próprio Mapa",
+    },
+    description: {
+      en: "The sixteen phases no longer share one road. Each has its own battlefield: a caldera you circle into, frozen switchbacks, dune waves, a spiral into the void, mine galleries, a temple that spirals out from its altar and more, each with its own 14 build spots. Up to 12 towers fit on a map, so where you build is a real choice. When a new phase begins the run pauses so you can arrange your towers on the new map for free; they keep their level, Mastery, specialization, skin and items.",
+      ptBR: "As dezesseis fases não dividem mais a mesma estrada. Cada uma tem o seu campo de batalha: uma caldeira que você contorna até o centro, curvas fechadas no gelo, ondas de dunas, uma espiral até o vazio, galerias de mina, um templo que se abre em espiral a partir do altar e muito mais, cada um com 14 lugares para construir. Cabem até 12 torres por mapa, então escolher onde construir faz diferença. Quando uma fase nova começa, a partida pausa para você organizar as torres no mapa novo de graça; elas mantêm nível, Maestria, especialização, skin e itens.",
+    },
+    highlights: [
+      {
+        en: "Special spots: high ground gives +15% range and rune altars give +10% damage to the tower standing on them. Both are marked on the map while you place towers.",
+        ptBR: "Lugares especiais: o terreno alto dá +15% de alcance e o altar rúnico dá +10% de dano à torre que estiver em cima. Os dois aparecem marcados no mapa enquanto você posiciona as torres.",
+      },
+      {
+        en: "Hover a spot while placing or moving a tower to see its range, the stretch of road it would cover and how much of the road that is.",
+        ptBR: "Passe o mouse sobre um lugar enquanto coloca ou move uma torre para ver o alcance dela, o trecho da estrada que ela cobriria e quanto da estrada isso representa.",
+      },
+      {
+        en: "Balanced: enemies take the same time to cross every map, and every map gives the same amount of road to defend as the original one.",
+        ptBR: "Equilibrado: os inimigos levam o mesmo tempo para atravessar qualquer mapa, e todo mapa oferece a mesma quantidade de estrada para defender que o original.",
+      },
+      {
+        en: "Ancient Forest keeps its familiar road and spots, plus two new ones.",
+        ptBR: "A Floresta Antiga mantém a estrada e os lugares de sempre, com dois lugares novos.",
+      },
+      {
+        en: "The rift the enemies come out of now blends into the ground on every map, without the square outline that showed around it.",
+        ptBR: "A fenda de onde saem os inimigos agora se mistura ao chão em todos os mapas, sem o contorno quadrado que aparecia em volta dela.",
+      },
+    ],
+  },
+  {
     id: "v58",
     dateIso: "2026-10-29",
     category: "INTERFACE",

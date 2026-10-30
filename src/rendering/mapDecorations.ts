@@ -1,5 +1,5 @@
 import { WORLD_SIZE } from "@/config/gameBalance";
-import { ENEMY_PATH, TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { fortressAnchorFor, getMapLayout, type MapLayout } from "@/data/mapLayouts";
 import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
 import type { BiomeDefinition } from "./biomes";
 
@@ -95,9 +95,13 @@ const DECORATION_FOOTPRINT_RADIUS: Record<DecorationKind, number> = {
   FISSURE: 24,
 };
 
-function isClearOfPlayArea(point: Vector2, footprint: number): boolean {
-  if (distanceToPolyline(point, ENEMY_PATH) < MIN_DISTANCE_FROM_PATH + footprint) return false;
-  for (const slot of TOWER_SLOTS) {
+function isClearOfPlayArea(point: Vector2, footprint: number, layout: MapLayout): boolean {
+  if (distanceToPolyline(point, layout.path) < MIN_DISTANCE_FROM_PATH + footprint) return false;
+  // The castle grounds and the rift stay clear too (castles can sit anywhere on the new maps).
+  const castle = fortressAnchorFor(layout.path).position;
+  const rift = layout.path[0]!;
+  if (distance(point, castle) < 100 + footprint || distance(point, rift) < 55 + footprint) return false;
+  for (const slot of layout.sites) {
     if (distance(point, slot.position) < MIN_DISTANCE_FROM_SLOT + footprint) return false;
   }
   return true;
@@ -172,6 +176,8 @@ function samplePlacement(kind: DecorationKind, rng: () => number, anchors: reado
 }
 
 function generate(biome: BiomeDefinition): Decoration[] {
+  // Scenery keeps clear of THIS biome's own road and build sites.
+  const layout = getMapLayout(biome.id);
   const rng = mulberry32(20260831 + hashSeed(biome.id));
   const decorations: Decoration[] = [];
 
@@ -196,8 +202,8 @@ function generate(biome: BiomeDefinition): Decoration[] {
       const point = samplePlacement(kind, rng, anchors);
       const scale = 0.7 + rng() * 0.9;
       const footprint = DECORATION_FOOTPRINT_RADIUS[kind] * scale;
-      if (!isClearOfPlayArea(point, footprint)) continue;
-      if (kind === "TORCH" && distanceToPolyline(point, ENEMY_PATH) > MIN_DISTANCE_FROM_PATH + footprint + 34) continue;
+      if (!isClearOfPlayArea(point, footprint, layout)) continue;
+      if (kind === "TORCH" && distanceToPolyline(point, layout.path) > MIN_DISTANCE_FROM_PATH + footprint + 34) continue;
       if (overlapsExistingDecoration(point, footprint, decorations)) continue;
 
       decorations.push({
