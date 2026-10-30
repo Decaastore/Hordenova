@@ -16,6 +16,14 @@ interface DeployOverlayProps {
 
 const pct = (mult: number) => Math.round((mult - 1) * 100);
 
+function isSmallScreen(): boolean {
+  try {
+    return typeof window !== "undefined" && !!window.matchMedia?.("(max-width: 700px), (max-height: 560px)").matches;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * DEPLOY — shown when the run reaches a new map (every phase has its own
  * road and build sites). Towers keep everything (level, Mastery,
@@ -26,7 +34,9 @@ const pct = (mult: number) => Math.round((mult - 1) * 100);
  */
 export function DeployOverlay({ phaseNumber, phaseI18nKey, towerCount, moving, onAutoArrange, onStart }: DeployOverlayProps) {
   const { t } = useLanguage();
-  const [collapsed, setCollapsed] = useState(false);
+  // On a phone the map area is only a few hundred pixels tall: start as the
+  // slim strip there, so "Start phase" is always on screen.
+  const [collapsed, setCollapsed] = useState(isSmallScreen);
   // Build sites can sit anywhere on the map, including under this panel, so
   // it gets out of the way: a slim strip while a tower is being moved, or
   // whenever the player collapses it. The strip itself lets clicks through
@@ -93,6 +103,8 @@ const panelStyle: CSSProperties = {
   boxShadow: "0 12px 32px rgba(0,0,0,0.55)",
   color: PALETTE.uiText,
   zIndex: 7,
+  maxHeight: "calc(100% - 20px)",
+  overflowY: "auto",
 };
 const stripStyle: CSSProperties = {
   position: "absolute",
@@ -113,7 +125,7 @@ const stripStyle: CSSProperties = {
   zIndex: 7,
   pointerEvents: "none",
 };
-const stripTextStyle: CSSProperties = { fontSize: 13, fontWeight: 600, padding: "3px 6px 3px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const stripTextStyle: CSSProperties = { minWidth: 0, flex: "1 1 auto", fontSize: 13, fontWeight: 600, padding: "3px 6px 3px 0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 const smallButton: CSSProperties = { padding: "5px 12px", fontSize: 12.5, pointerEvents: "auto", whiteSpace: "nowrap" };
 const kickerStyle: CSSProperties = { fontSize: 12, color: PALETTE.gold, fontWeight: 700 };
 const titleStyle: CSSProperties = { fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 26, fontWeight: 700, lineHeight: 1.1, color: PALETTE.uiAccentBright };
