@@ -99,6 +99,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
           return (
             <button
               key={speed}
+              data-tutorial={`speed-${speed}`}
               onClick={() => onSetSpeed(speed)}
               style={{
                 ...speedButtonStyle,

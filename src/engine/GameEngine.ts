@@ -298,6 +298,8 @@ export class GameEngine {
   private layout: MapLayout = getMapLayout("ANCIENT_FOREST");
   /** When true (the real game screen), moving onto a new map pauses in DEPLOY so the player can arrange towers; headless engines (tests, sims) just auto-arrange and keep going. */
   private deployPauseEnabled = false;
+  /** First-run tutorial: the run waits while a new player places their first tower. */
+  private tutorialHold = false;
   /** What the run was about to do when DEPLOY interrupted it. */
   private deployResumePhase: RunPhase | null = null;
   private speed: GameSpeed = GAME_SPEEDS[0];
@@ -805,6 +807,11 @@ export class GameEngine {
 
   getMapLayout(): MapLayout {
     return this.layout;
+  }
+
+  /** Holds the run (no enemy moves, nothing spawns) while the first-run tutorial waits on the player. */
+  setTutorialHold(held: boolean): void {
+    this.tutorialHold = held;
   }
 
   /**
@@ -1623,6 +1630,7 @@ export class GameEngine {
   }
 
   update(dtMs: number): void {
+    if (this.tutorialHold) return;
     if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return;
     if (this.syncMapLayout() && (this.phase as RunPhase) === "DEPLOY") {
       this.notify();

@@ -875,6 +875,48 @@ export const ptBR: TranslationSchema = {
     hidePanel: "Ver o mapa",
     showPanel: "Mostrar painel",
   },
+  tutorial: {
+    stepOf: "Passo {n} de {total}",
+    skip: "Pular tutorial",
+    gotIt: "Entendi",
+    intro: {
+      title: "Defenda o castelo",
+      body: "Os inimigos saem da fenda e seguem a estrada até o seu castelo. Cada um que chega lá tira vida do castelo. Torres perto da estrada os impedem.",
+    },
+    pickTower: {
+      title: "Escolha uma torre",
+      body: "Escolha uma torre na barra de baixo. A Ironwood, por {cost} de ouro, é uma ótima primeira torre.",
+    },
+    placeTower: {
+      title: "Construa perto da estrada",
+      body: "Escolha um dos lugares marcados no mapa. O do círculo dourado, bem pertinho da estrada, é um ótimo começo. No computador, passe o mouse sobre um lugar para ver quanto da estrada a torre cobriria.",
+    },
+    gold: {
+      title: "Inimigos derrotados dão ouro",
+      body: "A partida começou. Use o ouro para construir mais torres ou para melhorar as que você já tem.",
+    },
+    selectTower: {
+      title: "Hora de melhorar",
+      body: "Você já tem ouro para melhorar uma torre. Selecione a torre do círculo dourado.",
+    },
+    upgrade: {
+      title: "Melhore a torre",
+      body: "Use o botão Melhorar. Cada nível deixa a torre mais forte.",
+    },
+    speed: {
+      title: "Acelere a partida",
+      body: "Quer que as ondas passem mais rápido? Escolha 2x ou 4x aqui em cima quando quiser.",
+    },
+    finish: {
+      title: "Agora é com você",
+      body: "Cada mapa termina com um chefe, e depois dele começa um mapa novo, com a sua própria estrada. Na Wiki você encontra tudo sobre torres e inimigos.",
+      button: "Bora jogar",
+    },
+    boss: {
+      title: "Um chefe!",
+      body: "Chefes têm muito mais vida que os outros inimigos. A Ironwood é a torre que mais causa dano neles, e fica ainda melhor conforme sobe de nível.",
+    },
+  },
   ascension: {
     seasonThemes: {
       THE_HOLLOW_KING: "O Rei Oco",

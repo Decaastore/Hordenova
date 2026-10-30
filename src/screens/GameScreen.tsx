@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { isWebGLAvailable } from "@/rendering3d/webglSupport";
 import { Enemy3DErrorBoundary } from "@/rendering3d/Enemy3DErrorBoundary";
@@ -21,6 +21,30 @@ import { AscensionHudBadge } from "@/ui/AscensionHudBadge";
 import { EndgameWallBanner } from "@/ui/EndgameWallBanner";
 import { RepositioningOverlay } from "@/ui/RepositioningOverlay";
 import { DeployOverlay } from "@/ui/DeployOverlay";
+import { TutorialOverlay, type TutorialTarget } from "@/ui/TutorialOverlay";
+import {
+  acknowledgeTutorial,
+  advanceTutorial,
+  FINISHED_STATE,
+  hasAcknowledgeButton,
+  isBlockingStep,
+  isNewPlayer,
+  loadTutorialState,
+  NEW_PLAYER_STATE,
+  saveTutorialState,
+  skipTutorial,
+  stepNumber,
+  TUTORIAL_STEP_COUNT,
+  visibleTutorialCard,
+  type TutorialState,
+  type TutorialStep,
+} from "@/tutorial/tutorialFlow";
+import { fortressAnchorFor } from "@/data/mapLayouts";
+import { roadCoverage } from "@/engine/MapDeployment";
+import { PORTAL_PATH_DISTANCE } from "@/rendering/riftPortal";
+import { getTowerUpgradeCost } from "@/entities/Tower";
+import { TOWER_DEFINITIONS } from "@/config/towerStats";
+import type { TranslationKey } from "@/i18n/translate";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { PHASES } from "@/config/phaseConfig";
 import { HIGH_GROUND_RANGE_MULT, MAX_TOWERS_ON_MAP, RUNE_ALTAR_DAMAGE_MULT } from "@/data/mapLayouts";
@@ -106,6 +130,88 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   const [deployPick, setDeployPick] = useState<string | null>(null);
   const { t } = useLanguage();
   const deploying = hud.phase === "DEPLOY";
+
+  // ---- FIRST-RUN TUTORIAL (tutorial/tutorialFlow.ts) ----
+  const [tutorial, setTutorial] = useState<TutorialState>(FINISHED_STATE);
+  const updateTutorial = useCallback((fn: (s: TutorialState) => TutorialState) => {
+    setTutorial((prev) => {
+      const next = fn(prev);
+      if (next !== prev) saveTutorialState(next);
+      return next;
+    });
+  }, []);
+  const towersNow = engine.getRenderSnapshot().towers;
+  const maxTowerLevel = towersNow.reduce((m, tw) => Math.max(m, tw.level), 0);
+  const upgradeableTower = towersNow.find((tw) => {
+    const cost = getTowerUpgradeCost(tw);
+    return cost !== null && cost <= hud.gold;
+  });
+  const canAffordUpgrade = upgradeableTower !== undefined;
+  useEffect(() => {
+    updateTutorial((s) =>
+      advanceTutorial(s, {
+        phase: hud.phase,
+        towerCount: hud.towerCount,
+        pendingTowerType,
+        selectedTowerId: hud.selectedTowerId,
+        maxTowerLevel,
+        canAffordUpgrade,
+        speed: hud.speed,
+      }),
+    );
+  }, [updateTutorial, hud.phase, hud.towerCount, pendingTowerType, hud.selectedTowerId, maxTowerLevel, canAffordUpgrade, hud.speed]);
+  const tutorialBlocking = isBlockingStep(tutorial.step);
+  useEffect(() => {
+    engine.setTutorialHold(tutorialBlocking);
+    return () => engine.setTutorialHold(false);
+  }, [engine, tutorialBlocking]);
+  const tutorialCard = visibleTutorialCard(tutorial, hud.phase);
+  const tutorialStep: TutorialStep | null = tutorialCard?.kind === "step" ? tutorialCard.step : null;
+  // the best free build spot for the tower in hand (or Ironwood), to glow during PLACE_TOWER
+  const suggestedSiteId = useMemo(() => {
+    if (tutorialStep !== "PLACE_TOWER") return null;
+    const layout = engine.getMapLayout();
+    const occupied = new Set(engine.getRenderSnapshot().towers.map((tw) => tw.slotId));
+    const range = TOWER_DEFINITIONS[pendingTowerType ?? "IRONWOOD"].baseRange;
+    let best: { id: string; value: number } | null = null;
+    for (const site of layout.sites) {
+      if (occupied.has(site.id)) continue;
+      const value = roadCoverage(layout, site.position, range * (site.trait === "HIGH_GROUND" ? HIGH_GROUND_RANGE_MULT : 1)).fraction;
+      if (!best || value > best.value) best = { id: site.id, value };
+    }
+    return best?.id ?? null;
+  }, [engine, tutorialStep, pendingTowerType, hud.mapLayoutId]);
+  const upgradeTowerId = upgradeableTower?.id ?? null;
+  const tutorialTargets = useMemo<TutorialTarget[]>(() => {
+    const layout = engine.getMapLayout();
+    switch (tutorialStep) {
+      case "INTRO": {
+        const [a, b] = [layout.path[0]!, layout.path[1]!];
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const castle = fortressAnchorFor(layout.path).position;
+        return [
+          { kind: "world", x: a.x + ((b.x - a.x) / len) * PORTAL_PATH_DISTANCE, y: a.y + ((b.y - a.y) / len) * PORTAL_PATH_DISTANCE, r: 38 },
+          { kind: "world", x: castle.x, y: castle.y - 55, r: 80 },
+        ];
+      }
+      case "PICK_TOWER":
+        return [{ kind: "dom", id: "tower-IRONWOOD" }];
+      case "PLACE_TOWER": {
+        const site = layout.sites.find((s) => s.id === suggestedSiteId);
+        return site ? [{ kind: "world", x: site.position.x, y: site.position.y, r: 28 }] : [];
+      }
+      case "SELECT_TOWER": {
+        const tower = engine.getRenderSnapshot().towers.find((tw) => tw.id === upgradeTowerId);
+        return tower ? [{ kind: "world", x: tower.position.x, y: tower.position.y - 10, r: 34 }] : [];
+      }
+      case "UPGRADE":
+        return [{ kind: "dom", id: "upgrade" }];
+      case "SPEED":
+        return [{ kind: "dom", id: "speed-2" }, { kind: "dom", id: "speed-4" }];
+      default:
+        return [];
+    }
+  }, [engine, tutorialStep, suggestedSiteId, upgradeTowerId, hud.mapLayoutId]);
   useEffect(() => {
     if (!deploying) setDeployPick(null);
   }, [deploying]);
@@ -119,6 +225,15 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     // Moving onto a new map pauses so the player can arrange their towers.
     engine.enableDeployPause(true);
     engine.startRun();
+    // First-run tutorial: only a brand-new save starts it; anyone who
+    // already played is marked done the first time they open this build.
+    const saved = loadTutorialState();
+    const h = engine.getHudSnapshot();
+    const initial = saved ?? (isNewPlayer({ wave: h.wave, bestWave: h.bestWave, towerCount: h.towerCount }) ? NEW_PLAYER_STATE : FINISHED_STATE);
+    if (!saved) saveTutorialState(initial);
+    // hold from the very first frame, not one render later
+    engine.setTutorialHold(isBlockingStep(initial.step));
+    setTutorial(initial);
   }, [engine]);
 
   useEffect(() => {
@@ -274,7 +389,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         {engine.getEndgameWallReport() && (
           <EndgameWallBanner report={engine.getEndgameWallReport()!} onDismiss={acknowledgeEndgameWallReport} />
         )}
-        {hud.pendingDiscoveryType && (
+        {hud.pendingDiscoveryType && !tutorialBlocking && (
           <EnemyDiscoveryBanner enemyType={hud.pendingDiscoveryType} onAcknowledge={acknowledgeDiscovery} />
         )}
         {hud.pendingItemReward && (
@@ -306,6 +421,33 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
               setDeployPick(null);
               engine.confirmDeployment();
             }}
+          />
+        )}
+
+        {tutorialCard && (
+          <TutorialOverlay
+            stepLabel={(() => {
+              const n = tutorialStep ? stepNumber(tutorialStep) : null;
+              return n ? t("tutorial.stepOf", { n, total: TUTORIAL_STEP_COUNT }) : null;
+            })()}
+            title={t(`tutorial.${tutorialCopyKey(tutorialCard.kind === "boss" ? "BOSS" : tutorialCard.step)}.title` as TranslationKey)}
+            body={t(`tutorial.${tutorialCopyKey(tutorialCard.kind === "boss" ? "BOSS" : tutorialCard.step)}.body` as TranslationKey, {
+              cost: TOWER_DEFINITIONS.IRONWOOD.buildCost,
+            })}
+            targets={tutorialCard.kind === "boss" ? NO_TARGETS : tutorialTargets}
+            anchor={tutorialStep && tutorialStep !== "INTRO" && tutorialTargets.length > 0 ? "target" : "map"}
+            ackLabel={
+              tutorialCard.kind === "boss"
+                ? t("tutorial.gotIt")
+                : tutorialStep === "FINISH"
+                  ? t("tutorial.finish.button")
+                  : tutorialStep && hasAcknowledgeButton(tutorialStep)
+                    ? t("tutorial.gotIt")
+                    : null
+            }
+            onAck={() => updateTutorial((s) => (tutorialCard.kind === "boss" ? { ...s, bossTipShown: true } : acknowledgeTutorial(s)))}
+            skipLabel={tutorialCard.kind === "step" && tutorialStep !== "FINISH" ? t("tutorial.skip") : null}
+            onSkip={() => updateTutorial(() => skipTutorial())}
           />
         )}
 
@@ -410,4 +552,30 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
       />
     </div>
   );
+}
+
+const NO_TARGETS: TutorialTarget[] = [];
+
+/** i18n block (tutorial.<key>) for each card. */
+function tutorialCopyKey(step: TutorialStep | "BOSS"): string {
+  switch (step) {
+    case "INTRO":
+      return "intro";
+    case "PICK_TOWER":
+      return "pickTower";
+    case "PLACE_TOWER":
+      return "placeTower";
+    case "GOLD":
+      return "gold";
+    case "SELECT_TOWER":
+      return "selectTower";
+    case "UPGRADE":
+      return "upgrade";
+    case "SPEED":
+      return "speed";
+    case "BOSS":
+      return "boss";
+    default:
+      return "finish";
+  }
 }

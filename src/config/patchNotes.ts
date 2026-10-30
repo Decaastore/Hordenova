@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v60",
+    dateIso: "2026-10-30",
+    category: "INTERFACE",
+    title: {
+      en: "A Tutorial for New Players",
+      ptBR: "Tutorial para Quem Está Começando",
+    },
+    description: {
+      en: "Your first game now teaches you as you play. Short tips point at exactly what to do: where enemies come from, which tower to build, where to put it, how to upgrade it and how to speed the game up. It only appears on a brand-new game and can be skipped at any time.",
+      ptBR: "A primeira partida agora ensina enquanto você joga. Dicas curtas apontam exatamente o que fazer: de onde vêm os inimigos, qual torre construir, onde colocar, como melhorar e como acelerar a partida. Só aparece num jogo novo e pode ser pulado a qualquer momento.",
+    },
+    highlights: [
+      {
+        en: "The first wave waits until you have placed your first tower, so you never lose castle life while learning.",
+        ptBR: "A primeira onda espera você colocar a sua primeira torre, então ninguém perde vida do castelo enquanto aprende.",
+      },
+      {
+        en: "Each tip highlights the button or the spot on the map it talks about, on computers and phones.",
+        ptBR: "Cada dica destaca o botão ou o lugar do mapa de que está falando, no computador e no celular.",
+      },
+      {
+        en: "A short extra tip appears at your first boss.",
+        ptBR: "Uma dica extra aparece no seu primeiro chefe.",
+      },
+      {
+        en: "Players who have already played don't see it.",
+        ptBR: "Quem já jogava não vê o tutorial.",
+      },
+    ],
+  },
+  {
     id: "v59",
     dateIso: "2026-10-29",
     category: "CONTENT",

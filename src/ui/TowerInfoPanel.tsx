@@ -190,6 +190,7 @@ export function TowerInfoPanel({
           )}
 
           <button
+            data-tutorial="upgrade"
             onClick={onUpgrade}
             disabled={!canAfford}
             style={{

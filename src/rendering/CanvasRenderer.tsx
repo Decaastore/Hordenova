@@ -632,6 +632,7 @@ export function CanvasRenderer({
   return (
     <canvas
       ref={canvasRef}
+      data-tutorial="map"
       onClick={handleClick}
       onMouseMove={(e) => (hoverWorldRef.current = toWorld(e))}
       onMouseLeave={() => (hoverWorldRef.current = null)}

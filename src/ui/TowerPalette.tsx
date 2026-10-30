@@ -26,6 +26,7 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
         return (
           <button
             key={type}
+            data-tutorial={`tower-${type}`}
             disabled={!affordable}
             onClick={() => onSelect(active ? null : type)}
             title={t(`towers.${type}.description`)}

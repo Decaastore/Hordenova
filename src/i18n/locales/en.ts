@@ -874,6 +874,48 @@ export const en = {
     hidePanel: "Show the map",
     showPanel: "Show panel",
   },
+  tutorial: {
+    stepOf: "Step {n} of {total}",
+    skip: "Skip tutorial",
+    gotIt: "Got it",
+    intro: {
+      title: "Defend the castle",
+      body: "Enemies come out of the rift and follow the road to your castle. Every one that gets there costs the castle life. Towers next to the road stop them.",
+    },
+    pickTower: {
+      title: "Choose a tower",
+      body: "Pick a tower in the bar at the bottom. Ironwood, for {cost} gold, is a great first tower.",
+    },
+    placeTower: {
+      title: "Build it next to the road",
+      body: "Choose one of the marked spots on the map. The one circled in gold, right by the road, is a great start. On a computer, hover a spot to see how much of the road the tower would cover.",
+    },
+    gold: {
+      title: "Defeated enemies give gold",
+      body: "The game has started. Use your gold to build more towers or to upgrade the ones you already have.",
+    },
+    selectTower: {
+      title: "Time to upgrade",
+      body: "You have enough gold to upgrade a tower. Select the tower circled in gold.",
+    },
+    upgrade: {
+      title: "Upgrade the tower",
+      body: "Use the Upgrade button. Every level makes the tower stronger.",
+    },
+    speed: {
+      title: "Speed it up",
+      body: "Want the waves to go by faster? Choose 2x or 4x up here whenever you like.",
+    },
+    finish: {
+      title: "Now it's up to you",
+      body: "Each map ends with a boss, and after it a new map begins, with a road of its own. The Wiki has everything about towers and enemies.",
+      button: "Let's play",
+    },
+    boss: {
+      title: "A boss!",
+      body: "Bosses have far more life than other enemies. Ironwood is the tower that hits them hardest, and it gets even better as it levels up.",
+    },
+  },
   ascension: {
     seasonThemes: {
       THE_HOLLOW_KING: "The Hollow King",
