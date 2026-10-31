@@ -40,7 +40,6 @@ import {
   type TutorialStep,
 } from "@/tutorial/tutorialFlow";
 import { fortressAnchorFor } from "@/data/mapLayouts";
-import { roadCoverage } from "@/engine/MapDeployment";
 import { PORTAL_PATH_DISTANCE } from "@/rendering/riftPortal";
 import { getTowerUpgradeCost } from "@/entities/Tower";
 import { TOWER_DEFINITIONS } from "@/config/towerStats";
@@ -172,20 +171,6 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   }, [engine, tutorialBlocking]);
   const tutorialCard = visibleTutorialCard(tutorial, hud.phase);
   const tutorialStep: TutorialStep | null = tutorialCard?.kind === "step" ? tutorialCard.step : null;
-  // the best free build spot for the tower in hand (or Ironwood), to glow during PLACE_TOWER
-  const suggestedSiteId = useMemo(() => {
-    if (tutorialStep !== "PLACE_TOWER") return null;
-    const layout = engine.getMapLayout();
-    const occupied = new Set(engine.getRenderSnapshot().towers.map((tw) => tw.slotId));
-    const range = TOWER_DEFINITIONS[pendingTowerType ?? "IRONWOOD"].baseRange;
-    let best: { id: string; value: number } | null = null;
-    for (const site of layout.sites) {
-      if (occupied.has(site.id)) continue;
-      const value = roadCoverage(layout, site.position, range * (site.trait === "HIGH_GROUND" ? HIGH_GROUND_RANGE_MULT : 1)).fraction;
-      if (!best || value > best.value) best = { id: site.id, value };
-    }
-    return best?.id ?? null;
-  }, [engine, tutorialStep, pendingTowerType, hud.mapLayoutId]);
   const upgradeTowerId = upgradeableTower?.id ?? null;
   const tutorialTargets = useMemo<TutorialTarget[]>(() => {
     const layout = engine.getMapLayout();
@@ -201,10 +186,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
       }
       case "PICK_TOWER":
         return [{ kind: "dom", id: "tower-IRONWOOD" }];
-      case "PLACE_TOWER": {
-        const site = layout.sites.find((s) => s.id === suggestedSiteId);
-        return site ? [{ kind: "world", x: site.position.x, y: site.position.y, r: 28 }] : [];
-      }
+      // PLACE_TOWER points at no spot in particular: which spot is good is the player's call
       case "SELECT_TOWER": {
         const tower = engine.getRenderSnapshot().towers.find((tw) => tw.id === upgradeTowerId);
         return tower ? [{ kind: "world", x: tower.position.x, y: tower.position.y - 10, r: 34 }] : [];
@@ -216,7 +198,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
       default:
         return [];
     }
-  }, [engine, tutorialStep, suggestedSiteId, upgradeTowerId, hud.mapLayoutId]);
+  }, [engine, tutorialStep, upgradeTowerId, hud.mapLayoutId]);
   useEffect(() => {
     if (!deploying) setDeployPick(null);
   }, [deploying]);
@@ -360,7 +342,6 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           worldLayerActive={enableWorldLayer}
           placingTower={placingTower}
           previewLabels={{
-            coverage: t("deploy.previewCoverage", { pct: "{pct}" }),
             highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
             altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
           }}

@@ -871,7 +871,6 @@ export const ptBR: TranslationSchema = {
     allPlaced: "Todas as torres estão no mapa",
     placeAllFirst: "Coloque todas as torres para começar",
     start: "Começar fase",
-    previewCoverage: "Cobre {pct}% da estrada",
     mapFull: "Mapa cheio: {max} torres",
     hidePanel: "Ver o mapa",
     showPanel: "Mostrar painel",
@@ -890,7 +889,7 @@ export const ptBR: TranslationSchema = {
     },
     placeTower: {
       title: "Construa perto da estrada",
-      body: "Escolha um dos lugares marcados no mapa. O do círculo dourado, bem pertinho da estrada, é um ótimo começo. No computador, passe o mouse sobre um lugar para ver quanto da estrada a torre cobriria.",
+      body: "Escolha um dos lugares marcados no mapa. As torres só atingem inimigos dentro do alcance, então pense por onde a estrada passa. No computador, passe o mouse sobre um lugar para ver o alcance da torre.",
     },
     gold: {
       title: "Inimigos derrotados dão ouro",

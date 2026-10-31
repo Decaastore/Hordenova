@@ -83,8 +83,12 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
-        en: "The new-map panel lists the towers still waiting, strongest first. Pick one, then click a spot; hovering a spot shows that tower's range and how much of the road it would cover.",
-        ptBR: "O painel do mapa novo mostra as torres que ainda faltam, a mais forte primeiro. Escolha uma e clique num lugar; passar o mouse sobre um lugar mostra o alcance daquela torre e quanto da estrada ela cobriria.",
+        en: "The new-map panel lists the towers still waiting, strongest first. Pick one, then click a spot; hovering a spot shows that tower's range.",
+        ptBR: "O painel do mapa novo mostra as torres que ainda faltam, a mais forte primeiro. Escolha uma e clique num lugar; passar o mouse sobre um lugar mostra o alcance daquela torre.",
+      },
+      {
+        en: "To keep the competition fair, the game no longer shows how much of the road each spot covers, and the tutorial no longer suggests a spot. Choosing where to build is up to you.",
+        ptBR: "Para manter a disputa justa, o jogo não mostra mais quanto da estrada cada lugar cobre, e o tutorial não sugere mais um lugar. Escolher onde construir é com você.",
       },
       {
         en: "The phase starts once every tower is on the map.",

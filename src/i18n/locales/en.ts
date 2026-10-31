@@ -870,7 +870,6 @@ export const en = {
     allPlaced: "Every tower is on the map",
     placeAllFirst: "Place every tower to start",
     start: "Start phase",
-    previewCoverage: "Covers {pct}% of the road",
     mapFull: "Map full: {max} towers",
     hidePanel: "Show the map",
     showPanel: "Show panel",
@@ -889,7 +888,7 @@ export const en = {
     },
     placeTower: {
       title: "Build it next to the road",
-      body: "Choose one of the marked spots on the map. The one circled in gold, right by the road, is a great start. On a computer, hover a spot to see how much of the road the tower would cover.",
+      body: "Choose one of the marked spots on the map. Towers only hit enemies within their range, so think about where the road passes. On a computer, hover a spot to see the tower's range.",
     },
     gold: {
       title: "Defeated enemies give gold",

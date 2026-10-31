@@ -4,7 +4,6 @@ import type { EnemyInstance } from "@/entities/Enemy";
 import type { CombatVfxEvent } from "@/engine/CombatVfxEvents";
 import type { TowerType } from "@/config/towerStats";
 import { getMapLayout, type BuildSite, type MapLayout } from "@/data/mapLayouts";
-import { roadCoverage, roadSamples } from "@/engine/MapDeployment";
 import { createTowerInstance, type TowerInstance } from "@/entities/Tower";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { distance, type Vector2 } from "@/utils/geometry";
@@ -92,7 +91,7 @@ interface CanvasRendererProps {
    */
   placingTower?: TowerInstance | null;
   /** Already-translated strings for the placement preview ("{pct}" is replaced). */
-  previewLabels?: { coverage: string; highGround: string; altar: string };
+  previewLabels?: { highGround: string; altar: string };
   /**
    * MUNDO 3D — true while the background 3D terrain/atmosphere layer
    * (`src/rendering3d/world/`) is mounted and rendering behind this
@@ -798,13 +797,11 @@ const PREVIEW_HOVER_RADIUS = 26;
 const TRAIT_COLOR = { HIGH_GROUND: "#9fd8ff", RUNE_ALTAR: "#c79bff" } as const;
 
 /**
- * MAP LAYOUTS — placement guidance, drawn on the ground under the towers.
- * While placing (palette type chosen, or a tower picked up during DEPLOY):
- * every special site gets a small marker with its bonus, and the hovered
- * site (or, for a picked-up tower with nothing hovered, its current site)
- * shows the tower's range there, the stretch of road it covers, and that
- * share of the road as a percentage — the information needed to choose a
- * good spot, computed with the same coverage math the auto-arrangement uses.
+ * MAP LAYOUTS — placement info, drawn on the ground under the towers.
+ * While placing (palette type chosen, or a benched tower during DEPLOY):
+ * every special site gets a small marker, and the hovered free site shows
+ * the tower's range there plus that site's own bonus, if any. It never
+ * rates spots against each other — choosing well is part of the game.
  */
 function drawPlacementPreview(
   ctx: CanvasRenderingContext2D,
@@ -814,7 +811,7 @@ function drawPlacementPreview(
   pendingType: TowerType | null,
   placingTower: TowerInstance | null,
   hover: Vector2 | null,
-  labels: { coverage: string; highGround: string; altar: string } | undefined,
+  labels: { highGround: string; altar: string } | undefined,
   timeMs: number,
 ): void {
   const placing = pendingType !== null || placingTower !== null || phase === "DEPLOY";
@@ -868,34 +865,16 @@ function drawPlacementPreview(
       : placingTower;
   if (!subject) return;
 
+  // Only the plain facts of this spot: the tower's range circle and the
+  // spot's own bonus. No coverage figure or highlighted road — weighing one
+  // spot against another is the player's call (competitive game).
   const range = getTowerStats({ ...subject, siteTrait: target.trait }).range;
-  const coverage = roadCoverage(layout, target.position, range);
-  const samples = roadSamples(layout);
-
-  ctx.save();
-  ctx.lineCap = "round";
-  ctx.lineJoin = "round";
-  for (const [from, to] of coverage.runs) {
-    ctx.beginPath();
-    for (let i = from; i <= to; i++) {
-      const p = samples[i]!;
-      if (i === from) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    }
-    ctx.strokeStyle = "rgba(255,214,120,0.28)";
-    ctx.lineWidth = 30;
-    ctx.stroke();
-    ctx.strokeStyle = "rgba(255,236,180,0.75)";
-    ctx.lineWidth = 3;
-    ctx.stroke();
-  }
-  ctx.restore();
   drawRangeCircle(ctx, target.position, range);
 
-  const pct = Math.round(coverage.fraction * 100);
-  const lines = [(labels?.coverage ?? "{pct}%").replace("{pct}", String(pct))];
+  const lines: string[] = [];
   if (target.trait === "HIGH_GROUND" && labels) lines.push(labels.highGround);
   if (target.trait === "RUNE_ALTAR" && labels) lines.push(labels.altar);
+  if (lines.length === 0) return;
   ctx.save();
   ctx.font = "600 11px system-ui, sans-serif";
   const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 16;
@@ -915,7 +894,7 @@ function drawPlacementPreview(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   lines.forEach((line, i) => {
-    ctx.fillStyle = i === 0 ? "#f7dc9c" : target!.trait === "HIGH_GROUND" ? TRAIT_COLOR.HIGH_GROUND : TRAIT_COLOR.RUNE_ALTAR;
+    ctx.fillStyle = target!.trait === "HIGH_GROUND" ? TRAIT_COLOR.HIGH_GROUND : TRAIT_COLOR.RUNE_ALTAR;
     ctx.fillText(line, x + w / 2, y + 11 + i * 14);
   });
   ctx.restore();
