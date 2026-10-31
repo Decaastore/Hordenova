@@ -88,50 +88,102 @@ describe("moving onto a new map (real GameEngine)", () => {
     return engine;
   }
 
-  it("on the real game screen the run pauses in DEPLOY, every tower kept (level and all) on the new map's sites", () => {
+  it("on the real game screen the run pauses in DEPLOY with every tower (level and all) off the map, waiting to be placed", () => {
     const engine = engineOnVolcanoWith(6, true);
-    expect(engine.getHudSnapshot().phase).toBe("DEPLOY");
+    const hud = engine.getHudSnapshot();
+    expect(hud.phase).toBe("DEPLOY");
     expect(engine.getMapLayout().id).toBe("VOLCANIC_WASTES");
     expect(getActiveMapLayout().id).toBe("VOLCANIC_WASTES");
-    const towers = engine.getRenderSnapshot().towers;
-    expect(towers.map((t) => t.level).sort((a, b) => a - b)).toEqual([10, 11, 12, 13, 14, 15]);
-    const sites = getMapLayout("VOLCANIC_WASTES").sites;
-    for (const t of towers) {
-      const site = sites.find((s) => s.id === t.slotId)!;
-      expect(t.position).toEqual(site.position);
-      expect(t.siteTrait).toBe(site.trait);
-    }
-    expect(new Set(towers.map((t) => t.slotId)).size).toBe(6);
-    // Paused: time doesn't move while the player arranges.
+    // nothing is placed for the player
+    expect(engine.getRenderSnapshot().towers).toHaveLength(0);
+    expect(hud.towerCount).toBe(0);
+    expect(hud.deployBench.map((t) => t.level).sort((a, b) => a - b)).toEqual([10, 11, 12, 13, 14, 15]);
+    // Paused: time doesn't move while the player places.
     engine.update(5000);
     expect(engine.getRenderSnapshot().enemies).toHaveLength(0);
     expect(loadSave().mapLayoutId).toBe("VOLCANIC_WASTES");
   });
 
-  it("during DEPLOY towers move and swap for free, then the phase starts", () => {
+  it("each tower is placed once, on a free site the player picks; the phase can't start until all are placed", () => {
     const engine = engineOnVolcanoWith(3, true);
-    const [a, b] = engine.getRenderSnapshot().towers;
-    const aSite = a!.slotId;
-    const bSite = b!.slotId;
+    const sites = getMapLayout("VOLCANIC_WASTES").sites;
+    const [first, second, third] = engine.getHudSnapshot().deployBench;
     const gemsBefore = engine.getHudSnapshot().purchasedGems + engine.getHudSnapshot().freeGems;
-    expect(engine.deployMoveTower(aSite, bSite)).toBe(true);
-    expect(a!.slotId).toBe(bSite);
-    expect(b!.slotId).toBe(aSite);
-    const empty = getMapLayout("VOLCANIC_WASTES").sites.find((s) => !engine.getRenderSnapshot().towers.some((t) => t.slotId === s.id))!;
-    expect(engine.deployMoveTower(bSite, empty.id)).toBe(true);
-    expect(a!.slotId).toBe(empty.id);
+
+    expect(engine.deployPlaceTower(first!.id, sites[4]!.id)).toBe(true);
+    const placed = engine.getRenderSnapshot().towers[0]!;
+    expect(placed.slotId).toBe(sites[4]!.id);
+    expect(placed.position).toEqual(sites[4]!.position);
+    expect(placed.siteTrait).toBe(sites[4]!.trait);
+    expect(placed.level).toBe(first!.level);
+    // a site holds one tower; a placed tower is no longer on the bench
+    expect(engine.deployPlaceTower(second!.id, sites[4]!.id)).toBe(false);
+    expect(engine.deployPlaceTower(first!.id, sites[5]!.id)).toBe(false);
+    expect(engine.deployPlaceTower(placed.id, sites[5]!.id)).toBe(false);
+
+    engine.confirmDeployment();
+    expect(engine.getHudSnapshot().phase).toBe("DEPLOY");
+
+    expect(engine.deployPlaceTower(second!.id, sites[0]!.id)).toBe(true);
+    expect(engine.deployPlaceTower(third!.id, sites[9]!.id)).toBe(true);
+    expect(engine.getHudSnapshot().deployBench).toHaveLength(0);
     expect(engine.getHudSnapshot().purchasedGems + engine.getHudSnapshot().freeGems).toBe(gemsBefore);
     engine.confirmDeployment();
     expect(engine.getHudSnapshot().phase).not.toBe("DEPLOY");
-    // free moves are DEPLOY-only
-    expect(engine.deployMoveTower(a!.slotId, aSite)).toBe(false);
+    expect(engine.getRenderSnapshot().towers).toHaveLength(3);
   });
 
-  it("headless engines (tests, simulations) auto-arrange and keep playing", () => {
+  it("after placing, moving a tower is the regular reposition: the day's free move, then it costs Gems", () => {
+    const engine = engineOnVolcanoWith(2, true);
+    const sites = getMapLayout("VOLCANIC_WASTES").sites;
+    const bench = engine.getHudSnapshot().deployBench;
+    engine.deployPlaceTower(bench[0]!.id, sites[1]!.id);
+    engine.deployPlaceTower(bench[1]!.id, sites[3]!.id);
+    expect(engine.getRepositionPrice()).toEqual({ free: 0, purchased: 0 });
+    expect(engine.repositionTower(sites[1]!.id, sites[6]!.id)).toBe(true);
+    // the free move is spent: the next one needs a currency and enough Gems
+    expect(engine.getRepositionPrice().free + engine.getRepositionPrice().purchased).toBeGreaterThan(0);
+    expect(engine.repositionTower(sites[6]!.id, sites[8]!.id)).toBe(false);
+    expect(engine.getRenderSnapshot().towers.find((t) => t.slotId === sites[6]!.id)).toBeDefined();
+  });
+
+  it("a reload in the middle of placing keeps both the placed and the waiting towers", () => {
+    const engine = engineOnVolcanoWith(4, true);
+    const sites = getMapLayout("VOLCANIC_WASTES").sites;
+    const bench = engine.getHudSnapshot().deployBench;
+    engine.deployPlaceTower(bench[0]!.id, sites[2]!.id);
+    engine.deployPlaceTower(bench[1]!.id, sites[7]!.id);
+
+    const saved = loadSave().towerLoadout;
+    expect(saved).toHaveLength(4);
+    expect(saved.filter((e) => e.slotId === "")).toHaveLength(2);
+
+    const reloaded = new GameEngine();
+    reloaded.enableDeployPause(true);
+    reloaded.startRun();
+    expect(reloaded.getHudSnapshot().phase).toBe("DEPLOY");
+    expect(reloaded.getRenderSnapshot().towers.map((t) => t.slotId).sort()).toEqual([sites[2]!.id, sites[7]!.id].sort());
+    expect(reloaded.getHudSnapshot().deployBench).toHaveLength(2);
+  });
+
+  it("the tower cap counts the towers still waiting to be placed", () => {
+    updateSave({ currentWave: VOLCANO_FIRST_WAVE, gold: 1_000_000, towerLoadout: loadout(MAX_TOWERS_ON_MAP), mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.enableDeployPause(true);
+    engine.startRun();
+    expect(engine.getAvailableSlotIds()).toEqual([]);
+    expect(engine.placeTower(getMapLayout("VOLCANIC_WASTES").sites[0]!.id, "IRONWOOD")).toBe(false);
+  });
+
+  it("headless engines (offline progress, simulations — no player to ask) place the towers themselves and keep playing", () => {
     const engine = engineOnVolcanoWith(4, false);
     expect(engine.getHudSnapshot().phase).not.toBe("DEPLOY");
     expect(engine.getMapLayout().id).toBe("VOLCANIC_WASTES");
-    expect(engine.getRenderSnapshot().towers).toHaveLength(4);
+    const towers = engine.getRenderSnapshot().towers;
+    expect(towers).toHaveLength(4);
+    expect(engine.getHudSnapshot().deployBench).toHaveLength(0);
+    const sites = getMapLayout("VOLCANIC_WASTES").sites;
+    for (const t of towers) expect(sites.find((s) => s.id === t.slotId)?.position).toEqual(t.position);
   });
 
   it(`at most ${MAX_TOWERS_ON_MAP} towers can stand on a map — the extra sites are a choice, not more power`, () => {

@@ -184,6 +184,8 @@ export interface HudSnapshot {
   mapLayoutId: string;
   /** Towers currently on the map (at most MAX_TOWERS_ON_MAP). */
   towerCount: number;
+  /** DEPLOY: towers still waiting to be placed on this map. */
+  deployBench: readonly { id: string; type: TowerType; level: number }[];
 }
 
 /**
@@ -266,7 +268,9 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.pendingRouletteSpinWave === b.pendingRouletteSpinWave &&
     a.repositionFreeAvailable === b.repositionFreeAvailable &&
     a.mapLayoutId === b.mapLayoutId &&
-    a.towerCount === b.towerCount
+    a.towerCount === b.towerCount &&
+    a.deployBench.length === b.deployBench.length &&
+    a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
   );
 }
 
@@ -302,6 +306,15 @@ export class GameEngine {
   private tutorialHold = false;
   /** What the run was about to do when DEPLOY interrupted it. */
   private deployResumePhase: RunPhase | null = null;
+  /**
+   * Towers waiting to be placed on the current map (DEPLOY). When the run
+   * reaches a new map every tower comes off the old one and lands here; the
+   * player puts each one on a site ONCE (deployPlaceTower) — after that,
+   * moving it is the regular reposition (one free move a day, then Gems).
+   * Saved in towerLoadout with an empty slotId, so a reload mid-DEPLOY
+   * loses nothing.
+   */
+  private deployBench: TowerInstance[] = [];
   private speed: GameSpeed = GAME_SPEEDS[0];
   private gold = 0;
   private baseHp = RUN_START.baseHp;
@@ -503,7 +516,9 @@ export class GameEngine {
     // moves the run onto the current phase's map if that's a different one.
     this.layout = getMapLayout(save.mapLayoutId ?? "ANCIENT_FOREST");
     setActiveMapLayout(this.layout);
-    this.towers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
+    const loadedTowers = save.towerLoadout.map((entry) => this.instantiateTowerFromLoadout(entry));
+    this.towers = loadedTowers.filter((t) => getSite(this.layout, t.slotId) !== undefined);
+    this.deployBench = loadedTowers.filter((t) => getSite(this.layout, t.slotId) === undefined);
     this.discoveredEnemyTypes = new Set(save.discoveredEnemyTypes);
     this.playerId = save.playerId;
     this.inventory = save.inventory;
@@ -649,7 +664,7 @@ export class GameEngine {
   getAvailableSlotIds(): string[] {
     const occupied = new Set(this.towers.map((t) => t.slotId));
     // Nothing is buildable once the map already holds MAX_TOWERS_ON_MAP towers.
-    if (this.towers.length >= MAX_TOWERS_ON_MAP) return [];
+    if (this.towers.length + this.deployBench.length >= MAX_TOWERS_ON_MAP) return [];
     return this.layout.sites.filter((slot) => !occupied.has(slot.id)).map((slot) => slot.id);
   }
 
@@ -688,7 +703,7 @@ export class GameEngine {
   placeTower(slotId: string, type: TowerType): boolean {
     if (!this.canModifyLoadout()) return false;
     if (this.towers.some((t) => t.slotId === slotId)) return false;
-    if (this.towers.length >= MAX_TOWERS_ON_MAP) return false;
+    if (this.towers.length + this.deployBench.length >= MAX_TOWERS_ON_MAP) return false;
 
     const slot = getSite(this.layout, slotId);
     if (!slot) return false;
@@ -795,9 +810,10 @@ export class GameEngine {
   // ---------------------------------------------------------------------
   // MAP LAYOUTS / DEPLOY — every phase has its own map (data/mapLayouts.ts).
   // When the run moves onto a different map, every tower keeps its level,
-  // Mastery, specialization, skin and items and is placed on the new map's
-  // sites by autoArrange(); on the real game screen the run then pauses in
-  // DEPLOY so the player can rearrange for free before the phase starts.
+  // Mastery, specialization, skin and items and comes off the old map onto
+  // the deploy bench. On the real game screen the run pauses in DEPLOY and
+  // the player places each tower once; headless engines (offline progress,
+  // simulations) place them with autoArrange() and keep going.
   // ---------------------------------------------------------------------
 
   /** The real game screen opts in to the DEPLOY pause (headless engines auto-arrange and keep going). */
@@ -815,78 +831,105 @@ export class GameEngine {
   }
 
   /**
-   * Moves the run onto the current wave's map if it isn't already on it.
-   * Returns true when the map changed.
+   * Moves the run onto the current wave's map if it isn't already on it:
+   * every tower comes off the old map onto the deploy bench, and the real
+   * game screen pauses in DEPLOY until the player has placed them all.
+   * Headless engines (no player to ask) place the bench automatically.
+   * Returns true when the map changed or DEPLOY began.
    */
   private syncMapLayout(): boolean {
     const target = getMapLayout(getPhaseForWave(Math.max(1, this.wave.currentWave)).biomeId);
-    if (target.id === this.layout.id) {
-      setActiveMapLayout(this.layout);
-      return false;
+    let changed = false;
+    if (target.id !== this.layout.id) {
+      this.layout = target;
+      // Anything still on the old road would be walking the wrong path.
+      this.enemies = [];
+      this.projectiles = [];
+      this.selectedTowerId = null;
+      this.deployBench.push(...this.towers);
+      this.towers = [];
+      changed = true;
     }
-    this.layout = target;
-    setActiveMapLayout(target);
-    // Anything still on the old road would be walking the wrong path.
-    this.enemies = [];
-    this.projectiles = [];
-    this.selectedTowerId = null;
-    this.placeTowersOn(autoArrange(this.towers, target));
-    if (this.deployPauseEnabled && this.towers.length > 0 && this.phase !== "PROGRESSION_STOPPED" && this.phase !== "OFFLINE_RETURN") {
-      this.deployResumePhase = this.phase === "DEPLOY" ? this.deployResumePhase : this.phase;
-      this.phase = "DEPLOY";
+    setActiveMapLayout(this.layout);
+    let enteredDeploy = false;
+    if (this.deployBench.length > 0) {
+      const canAskPlayer = this.deployPauseEnabled && this.phase !== "PROGRESSION_STOPPED" && this.phase !== "OFFLINE_RETURN";
+      if (!canAskPlayer) this.autoPlaceBench();
+      else if (this.phase !== "DEPLOY") {
+        this.deployResumePhase = this.phase;
+        this.phase = "DEPLOY";
+        enteredDeploy = true;
+      }
     }
+    if (!changed && !enteredDeploy) return false;
     this.persist();
     this.notify();
     return true;
   }
 
-  private placeTowersOn(assignment: ReadonlyMap<string, string>): void {
-    // Any tower that didn't get a site (more towers than sites — can't happen
-    // with MAX_TOWERS_ON_MAP < SITES_PER_MAP, but never lose one) keeps a free one.
-    const used = new Set(assignment.values());
-    const spare = this.layout.sites.filter((s) => !used.has(s.id));
-    for (const tower of this.towers) {
+  /** Places every benched tower on the free site that suits it best (headless runs only — a player always chooses). */
+  private autoPlaceBench(): void {
+    const used = new Set(this.towers.map((t) => t.slotId));
+    const freeLayout: MapLayout = { ...this.layout, sites: this.layout.sites.filter((s) => !used.has(s.id)) };
+    const assignment = autoArrange(this.deployBench, freeLayout);
+    const spare = freeLayout.sites.filter((s) => ![...assignment.values()].includes(s.id));
+    const stillBenched: TowerInstance[] = [];
+    for (const tower of this.deployBench) {
       const siteId = assignment.get(tower.id) ?? spare.shift()?.id;
       const site = siteId ? getSite(this.layout, siteId) : undefined;
-      if (!site) continue;
-      tower.slotId = site.id;
-      tower.position = site.position;
-      tower.siteTrait = site.trait;
+      if (!site) {
+        stillBenched.push(tower); // never lose a tower, even if the map were somehow full
+        continue;
+      }
+      this.towers.push(this.reinstantiateOnSite(tower, site.id));
     }
+    this.deployBench = stillBenched;
   }
 
-  /** DEPLOY only: moves the tower at `fromSiteId` to `toSiteId` (swapping with any tower already there). Free. */
-  deployMoveTower(fromSiteId: string, toSiteId: string): boolean {
-    if (this.phase !== "DEPLOY" || fromSiteId === toSiteId) return false;
-    const moving = this.towers.find((t) => t.slotId === fromSiteId);
-    const from = getSite(this.layout, fromSiteId);
-    const to = getSite(this.layout, toSiteId);
-    if (!moving || !from || !to) return false;
-    const other = this.towers.find((t) => t.slotId === toSiteId);
-    moving.slotId = to.id;
-    moving.position = to.position;
-    moving.siteTrait = to.trait;
-    if (other) {
-      other.slotId = from.id;
-      other.position = from.position;
-      other.siteTrait = from.trait;
-    }
+  /** Rebuilds a tower on `siteId` from its own progress, picking up any type-wide change (skin, Mastery, item slots) made while it was benched. */
+  private reinstantiateOnSite(tower: TowerInstance, siteId: string): TowerInstance {
+    return this.instantiateTowerFromLoadout({ ...this.loadoutEntryOf(tower), slotId: siteId });
+  }
+
+  private loadoutEntryOf(t: TowerInstance): TowerLoadoutEntry {
+    return {
+      slotId: t.slotId,
+      type: t.type,
+      level: t.level,
+      specializationId: t.specializationId,
+      specializationLevel: t.specializationLevel,
+      equippedSkinId: t.equippedSkinId,
+      masteryLevel: t.masteryLevel,
+      equippedItemInstanceIds: t.equippedItemInstanceIds,
+    };
+  }
+
+  /** Towers still waiting to be placed on this map (DEPLOY). */
+  getDeployBench(): readonly TowerInstance[] {
+    return this.deployBench;
+  }
+
+  /**
+   * DEPLOY only: puts a benched tower on a free site. Once per tower per map
+   * — a placed tower can't be picked up again here; moving it afterwards is
+   * the regular reposition (the daily free move, then Gems).
+   */
+  deployPlaceTower(towerId: string, siteId: string): boolean {
+    if (this.phase !== "DEPLOY") return false;
+    const index = this.deployBench.findIndex((t) => t.id === towerId);
+    const site = getSite(this.layout, siteId);
+    if (index < 0 || !site || this.towers.some((t) => t.slotId === siteId)) return false;
+    const [tower] = this.deployBench.splice(index, 1);
+    this.towers.push(this.reinstantiateOnSite(tower!, site.id));
     this.persist();
     this.notify();
     return true;
-  }
-
-  /** DEPLOY only: reapplies the suggested arrangement. */
-  autoArrangeDeployment(): void {
-    if (this.phase !== "DEPLOY") return;
-    this.placeTowersOn(autoArrange(this.towers, this.layout));
-    this.persist();
-    this.notify();
   }
 
   /** Ends DEPLOY and lets the phase begin. */
   confirmDeployment(): void {
-    if (this.phase !== "DEPLOY") return;
+    // every tower has to be on the map first
+    if (this.phase !== "DEPLOY" || this.deployBench.length > 0) return;
     this.phase = this.deployResumePhase ?? "RUNNING";
     this.deployResumePhase = null;
     this.selectedTowerId = null;
@@ -2231,16 +2274,8 @@ export class GameEngine {
         gold: this.gold,
         currentWave: this.wave.currentWave,
         mapLayoutId: this.layout.id,
-        towerLoadout: this.towers.map((t) => ({
-          slotId: t.slotId,
-          type: t.type,
-          level: t.level,
-          specializationId: t.specializationId,
-          specializationLevel: t.specializationLevel,
-          equippedSkinId: t.equippedSkinId,
-          masteryLevel: t.masteryLevel,
-          equippedItemInstanceIds: t.equippedItemInstanceIds,
-        })),
+        // benched towers (DEPLOY) are saved with no site, so a reload keeps them
+        towerLoadout: [...this.towers.map((t) => this.loadoutEntryOf(t)), ...this.deployBench.map((t) => ({ ...this.loadoutEntryOf(t), slotId: "" }))],
         discoveredEnemyTypes: [...this.discoveredEnemyTypes],
         inventory: this.inventory,
         playerId: this.playerId,
@@ -2309,6 +2344,7 @@ export class GameEngine {
       repositionFreeAvailable: this.isFreeRepositionAvailable(),
       mapLayoutId: this.layout.id,
       towerCount: this.towers.length,
+      deployBench: this.deployBench.map((t) => ({ id: t.id, type: t.type, level: t.level })),
     };
 
     const prev = this.cachedHud;

@@ -85,12 +85,12 @@ interface CanvasRendererProps {
    */
   hidden3DTowerIds?: RefObject<ReadonlySet<string>>;
   /**
-   * MAP LAYOUTS — site id of the tower the player has picked up to move
-   * (DEPLOY), or null. While placing (a tower type chosen in the palette, or
-   * a tower picked up), hovering a site previews its range, the stretch of
-   * road it would cover and that share as a percentage.
+   * MAP LAYOUTS — the benched tower about to be placed (DEPLOY), or null.
+   * While placing (this, or a tower type chosen in the palette), hovering a
+   * site previews the tower's range there, the stretch of road it would
+   * cover and that share as a percentage.
    */
-  movingSlotId?: string | null;
+  placingTower?: TowerInstance | null;
   /** Already-translated strings for the placement preview ("{pct}" is replaced). */
   previewLabels?: { coverage: string; highGround: string; altar: string };
   /**
@@ -192,7 +192,7 @@ export function CanvasRenderer({
   hidden3DEnemyIds,
   hidden3DTowerIds,
   worldLayerActive = false,
-  movingSlotId = null,
+  placingTower = null,
   previewLabels,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -200,8 +200,8 @@ export function CanvasRenderer({
   const latestSnapshotRef = useRef<RenderSnapshot | null>(null);
   const pendingTowerTypeRef = useRef<TowerType | null>(pendingTowerType);
   pendingTowerTypeRef.current = pendingTowerType;
-  const movingSlotRef = useRef<string | null>(movingSlotId);
-  movingSlotRef.current = movingSlotId;
+  const placingTowerRef = useRef<TowerInstance | null>(placingTower);
+  placingTowerRef.current = placingTower;
   const previewLabelsRef = useRef(previewLabels);
   previewLabelsRef.current = previewLabels;
   /** Pointer position in world units (null when the pointer is off the map). */
@@ -427,14 +427,14 @@ export function CanvasRenderer({
           slot,
           index,
           occupiedSlotIds.has(slot.id),
-          pendingTowerTypeRef.current !== null || movingSlotRef.current !== null,
+          pendingTowerTypeRef.current !== null || placingTowerRef.current !== null,
           biome,
           timestamp,
           groundBake !== null,
         );
       });
 
-      drawPlacementPreview(ctx, layout, snapshot.towers, snapshot.phase, pendingTowerTypeRef.current, movingSlotRef.current, hoverWorldRef.current, previewLabelsRef.current, timestamp);
+      drawPlacementPreview(ctx, layout, snapshot.towers, snapshot.phase, pendingTowerTypeRef.current, placingTowerRef.current, hoverWorldRef.current, previewLabelsRef.current, timestamp);
 
       // Magic ground layer (rune circles, scorched crater, frozen ground) — under towers and enemies.
       specialVfx.drawGround(ctx, timestamp);
@@ -812,13 +812,12 @@ function drawPlacementPreview(
   towers: readonly TowerInstance[],
   phase: RunPhase,
   pendingType: TowerType | null,
-  movingSlotId: string | null,
+  placingTower: TowerInstance | null,
   hover: Vector2 | null,
   labels: { coverage: string; highGround: string; altar: string } | undefined,
   timeMs: number,
 ): void {
-  const moving = movingSlotId ? (towers.find((t) => t.slotId === movingSlotId) ?? null) : null;
-  const placing = pendingType !== null || moving !== null || phase === "DEPLOY";
+  const placing = pendingType !== null || placingTower !== null || phase === "DEPLOY";
   if (!placing) return;
 
   // Markers on the special sites.
@@ -848,17 +847,6 @@ function drawPlacementPreview(
     ctx.restore();
   }
 
-  if (moving) {
-    ctx.save();
-    ctx.strokeStyle = "rgba(255,232,170,0.95)";
-    ctx.lineWidth = 2;
-    ctx.setLineDash([5, 4]);
-    ctx.lineDashOffset = -timeMs / 60;
-    ctx.beginPath();
-    ctx.ellipse(moving.position.x, moving.position.y + 4.5, 26, 16, 0, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.restore();
-  }
 
   let target: BuildSite | null = null;
   if (hover) {
@@ -871,10 +859,13 @@ function drawPlacementPreview(
       }
     }
   }
-  if (!target && moving) target = layout.sites.find((s) => s.id === moving.slotId) ?? null;
   if (!target) return;
   const occupant = towers.find((t) => t.slotId === target!.id) ?? null;
-  const subject: TowerInstance | null = moving ?? (pendingType && !occupant ? createTowerInstance("preview", pendingType, target.position, 1) : null);
+  const subject: TowerInstance | null = occupant
+    ? null
+    : pendingType
+      ? createTowerInstance("preview", pendingType, target.position, 1)
+      : placingTower;
   if (!subject) return;
 
   const range = getTowerStats({ ...subject, siteTrait: target.trait }).range;

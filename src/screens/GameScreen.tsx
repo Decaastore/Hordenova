@@ -126,10 +126,15 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     | { phase: "confirm"; fromSlotId: string; toSlotId: string; price: DualGemPrice }
     | { phase: "blocked"; price: DualGemPrice };
   const [repositionUi, setRepositionUi] = useState<RepositionUiState>({ phase: "idle" });
-  // MAP LAYOUTS / DEPLOY — site of the tower picked up to move (free, DEPLOY only).
+  // MAP LAYOUTS / DEPLOY — the benched tower the next click on the map places
+  // (defaults to the strongest one still waiting).
   const [deployPick, setDeployPick] = useState<string | null>(null);
   const { t } = useLanguage();
   const deploying = hud.phase === "DEPLOY";
+  const benchSelectedId = deploying
+    ? (hud.deployBench.find((b) => b.id === deployPick)?.id ?? [...hud.deployBench].sort((a, b) => b.level - a.level)[0]?.id ?? null)
+    : null;
+  const placingTower = benchSelectedId ? (engine.getDeployBench().find((tw) => tw.id === benchSelectedId) ?? null) : null;
 
   // ---- FIRST-RUN TUTORIAL (tutorial/tutorialFlow.ts) ----
   const [tutorial, setTutorial] = useState<TutorialState>(FINISHED_STATE);
@@ -264,11 +269,6 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   };
 
   const handleSlotClick = (slotId: string) => {
-    if (deploying && deployPick) {
-      engine.deployMoveTower(deployPick, slotId);
-      setDeployPick(null);
-      return;
-    }
     if (repositionUi.phase === "picking") {
       resolveRepositionDestination(repositionUi.fromSlotId, slotId);
       return;
@@ -276,21 +276,16 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     if (pendingTowerType) {
       const placed = engine.placeTower(slotId, pendingTowerType);
       if (placed) setPendingTowerType(null);
+      return;
+    }
+    // DEPLOY: put the chosen benched tower here — once; it can't be picked up again for free
+    if (benchSelectedId) {
+      engine.selectTower(null);
+      if (engine.deployPlaceTower(benchSelectedId, slotId)) setDeployPick(null);
     }
   };
 
   const handleTowerClick = (towerId: string) => {
-    if (deploying) {
-      const tower = engine.getRenderSnapshot().towers.find((t) => t.id === towerId);
-      if (!tower) return;
-      if (!deployPick) setDeployPick(tower.slotId);
-      else if (deployPick === tower.slotId) setDeployPick(null);
-      else {
-        engine.deployMoveTower(deployPick, tower.slotId);
-        setDeployPick(null);
-      }
-      return;
-    }
     if (repositionUi.phase === "picking") {
       const tower = engine.getRenderSnapshot().towers.find((t) => t.id === towerId);
       if (!tower) return;
@@ -363,7 +358,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           hidden3DEnemyIds={hidden3DEnemyIdsRef}
           hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
-          movingSlotId={deployPick}
+          placingTower={placingTower}
           previewLabels={{
             coverage: t("deploy.previewCoverage", { pct: "{pct}" }),
             highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
@@ -411,11 +406,11 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           <DeployOverlay
             phaseNumber={Math.max(1, PHASES.findIndex((p) => p.i18nKey === hud.phaseI18nKey) + 1)}
             phaseI18nKey={hud.phaseI18nKey}
-            towerCount={hud.towerCount}
-            moving={deployPick !== null}
-            onAutoArrange={() => {
-              setDeployPick(null);
-              engine.autoArrangeDeployment();
+            bench={hud.deployBench}
+            selectedId={benchSelectedId}
+            onSelect={(id) => {
+              setPendingTowerType(null);
+              setDeployPick(id);
             }}
             onStart={() => {
               setDeployPick(null);
@@ -451,7 +446,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
           />
         )}
 
-        {selectedTower && !deploying && (
+        {selectedTower && (
           <TowerInfoPanel
             tower={selectedTower}
             gold={hud.gold}
@@ -547,7 +542,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
         gold={hud.gold}
         pendingTowerType={pendingTowerType}
         onSelect={setPendingTowerType}
-        mapFull={hud.towerCount >= MAX_TOWERS_ON_MAP}
+        mapFull={hud.towerCount + hud.deployBench.length >= MAX_TOWERS_ON_MAP}
         mapFullLabel={t("deploy.mapFull", { max: MAX_TOWERS_ON_MAP })}
       />
     </div>

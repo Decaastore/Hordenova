@@ -40,6 +40,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     repositionFreeAvailable: true,
     mapLayoutId: "ANCIENT_FOREST",
     towerCount: 0,
+    deployBench: [],
     ...overrides,
   };
 }

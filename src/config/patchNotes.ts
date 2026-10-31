@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v61",
+    dateIso: "2026-10-30",
+    category: "SYSTEMS",
+    title: {
+      en: "You Place Every Tower on Each New Map",
+      ptBR: "Você Posiciona Cada Torre em Cada Mapa Novo",
+    },
+    description: {
+      en: "Towers are no longer arranged automatically when a new map begins. They wait off the map, and you choose the spot for each one. Each tower is placed only once per map, so choose carefully. After that, moving a tower works like it always has: one free move per day, then it costs Gems.",
+      ptBR: "As torres não são mais organizadas automaticamente quando começa um mapa novo. Elas ficam esperando fora do mapa e você escolhe o lugar de cada uma. Cada torre é colocada uma única vez por mapa, então pense bem. Depois disso, mudar uma torre de lugar funciona como sempre: uma mudança grátis por dia, e as outras custam gemas.",
+    },
+    highlights: [
+      {
+        en: "The new-map panel lists the towers still waiting, strongest first. Pick one, then click a spot; hovering a spot shows that tower's range and how much of the road it would cover.",
+        ptBR: "O painel do mapa novo mostra as torres que ainda faltam, a mais forte primeiro. Escolha uma e clique num lugar; passar o mouse sobre um lugar mostra o alcance daquela torre e quanto da estrada ela cobriria.",
+      },
+      {
+        en: "The phase starts once every tower is on the map.",
+        ptBR: "A fase começa depois que todas as torres estão no mapa.",
+      },
+      {
+        en: "Closing the game halfway through keeps the towers you already placed and the ones still waiting.",
+        ptBR: "Se você fechar o jogo no meio, as torres já colocadas e as que faltam continuam como estavam.",
+      },
+    ],
+  },
+  {
     id: "v60",
     dateIso: "2026-10-30",
     category: "INTERFACE",
