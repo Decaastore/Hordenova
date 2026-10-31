@@ -41,23 +41,21 @@ interface MusicGraph {
  * replacement: a real short COMPOSITION (melody, bass, rhythm, harmonic
  * movement, structure, a natural loop point), not a sustained tone bank.
  *
- * HONESTY NOTE: there is no music-generation tool available to this agent,
- * and a filesystem search of this repo turned up zero existing music
- * assets and zero audio libraries (Tone.js, Howler, ...) already
- * installed — see `HOME_THEME_ASSET_URL` below for the real-file path this
- * infrastructure is ready to prefer the moment a licensed track is added;
- * until then, this procedural piece is the best-effort placeholder. It is
- * still synthesized in-code (oscillators + envelopes), NOT a
- * recorded/produced audio file — that distinction is disclosed rather than
- * hidden. What changed from the rejected drone: this has a real, singable
- * melodic phrase, a real bass line following real chord changes, a soft
- * rhythmic pulse, and a ~59s structure (intro -> theme -> development ->
- * return) that loops back to its own starting point instead of holding one
- * unchanging texture indefinitely.
+ * FALLBACK ONLY: the site now plays a recorded orchestral theme (see
+ * HOME_THEME_ASSET_URL). This in-code composition (oscillators + envelopes)
+ * is kept only for when that file can't be fetched or decoded, so the site
+ * is never silent.
  */
 
-/** Where a real, licensed music file would go — dropping a file at this path in `public/` makes `playAmbientMusic()` use it automatically instead of the procedural composition below (see `tryPlayRealTrackFile`). No such file exists in this project today; this constant does not claim otherwise. */
-const HOME_THEME_ASSET_URL = "/audio/music/home-theme.ogg";
+/**
+ * The site's theme: an original orchestral piece (D minor, 88 BPM, 44 bars —
+ * intro, theme, development, climax, transition back to the top), written
+ * as a score and rendered with a sampled orchestra, then mixed and mastered.
+ * The file is one 120 s pass plus its reverb tail — see playLoopingTrackFile.
+ * The procedural composition below only plays if this file can't load.
+ */
+const HOME_THEME_ASSET_URL = "/audio/music/home-theme.mp3";
+const HOME_THEME_LOOP_SECONDS = 120;
 
 /**
  * MÚSICA GLOBAL spec section 24 — "preparar para o futuro": today there is
@@ -73,8 +71,10 @@ const HOME_THEME_ASSET_URL = "/audio/music/home-theme.ogg";
  */
 type AmbientTrackId = "home";
 interface AmbientTrackDefinition {
-  /** Where a real, licensed file for this track would go (see HOME_THEME_ASSET_URL's doc comment — none exist yet for any track). */
+  /** The recorded track (see HOME_THEME_ASSET_URL's doc comment). */
   assetUrl: string;
+  /** Length of one musical pass; the file runs a little longer (its reverb tail). */
+  loopSeconds: number;
   /** Builds this track's procedural fallback graph — same signature buildAdventureThemeGraph already has, so a future track just supplies its own builder function here. */
   buildProceduralGraph: (ctx: AudioContext, destination: AudioNode) => { stop: () => void };
 }
@@ -347,55 +347,86 @@ function buildAdventureThemeGraph(ctx: AudioContext, destination: AudioNode): { 
 const AMBIENT_TRACKS: Record<AmbientTrackId, AmbientTrackDefinition> = {
   home: {
     assetUrl: HOME_THEME_ASSET_URL,
+    loopSeconds: HOME_THEME_LOOP_SECONDS,
     buildProceduralGraph: buildAdventureThemeGraph,
   },
 };
 
 /**
- * Attempts to play a real, licensed music file at `url` through the given
- * master gain (so volume/mute controls apply identically to a real asset
- * or the procedural fallback). Calls `onFailure` — synchronously-ish, via
- * a short grace window — if the file doesn't exist or can't play, so the
- * caller can fall back without ever running two audio sources at once.
- * Never throws.
+ * Plays a recorded track file through `masterGain` as a seamless loop.
+ *
+ * The file holds one pass of the piece (`loopSeconds` long) PLUS its own
+ * reverb tail. Instead of `<audio loop>` (which leaves a gap and cuts the
+ * tail at the seam), the decoded buffer is started again every
+ * `loopSeconds`, so each new pass begins while the previous one is still
+ * ringing out — exactly how a held orchestra would sound. Codec start-up
+ * padding shifts every pass by the same amount, so the seam stays seamless.
+ *
+ * `onFailure` runs if the file can't be fetched or decoded, so the caller
+ * can fall back to the procedural theme; it never runs after a pass has
+ * started. Never throws. Returns a `stop` for teardown.
  */
-function tryPlayRealTrackFile(ctx: AudioContext, url: string, masterGain: GainNode, onFailure: () => void): HTMLAudioElement | null {
+function playLoopingTrackFile(ctx: AudioContext, url: string, loopSeconds: number, masterGain: GainNode, onFailure: () => void): { stop: () => void } {
+  let stopped = false;
   let settled = false;
+  let schedulerInterval: ReturnType<typeof setInterval> | null = null;
+  const sources: AudioBufferSourceNode[] = [];
   const fail = () => {
-    if (settled) return;
+    if (settled || stopped) return;
     settled = true;
     onFailure();
   };
+  const start = (buffer: AudioBuffer) => {
+    if (settled || stopped) return;
+    settled = true;
+    let nextPassAt = ctx.currentTime + 0.1;
+    const schedulePass = () => {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(masterGain);
+      src.start(nextPassAt);
+      sources.push(src);
+      src.onended = () => {
+        const k = sources.indexOf(src);
+        if (k >= 0) sources.splice(k, 1);
+      };
+      nextPassAt += loopSeconds;
+    };
+    schedulePass();
+    // keep the next pass queued well ahead of time; a slow tick can't open a gap
+    schedulerInterval = setInterval(() => {
+      while (!stopped && nextPassAt < ctx.currentTime + 20) schedulePass();
+    }, 5000);
+  };
   try {
-    const audio = new Audio(url);
-    audio.loop = true;
-    audio.addEventListener("error", fail, { once: true });
-    audio.addEventListener(
-      "canplaythrough",
-      () => {
-        if (settled) return;
-        settled = true;
-        try {
-          const source = ctx.createMediaElementSource(audio);
-          source.connect(masterGain);
-          audio.play().catch(fail);
-        } catch {
-          fail();
-        }
-      },
-      { once: true },
-    );
-    // No real asset exists in this project today (see HOME_THEME_ASSET_URL's
-    // doc comment) — this grace window is what lets the procedural
-    // composition take over promptly rather than waiting indefinitely.
-    setTimeout(fail, 800);
-    return audio;
+    if (typeof fetch !== "function") {
+      fail();
+    } else {
+      fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          return r.arrayBuffer();
+        })
+        .then((data) => ctx.decodeAudioData(data))
+        .then(start, fail);
+    }
   } catch {
     fail();
-    return null;
   }
+  return {
+    stop: () => {
+      stopped = true;
+      if (schedulerInterval) clearInterval(schedulerInterval);
+      for (const src of sources.splice(0)) {
+        try {
+          src.stop();
+        } catch {
+          // Already stopped — never throw during teardown.
+        }
+      }
+    },
+  };
 }
-
 
 /** How long stopMusic()'s fade-out takes before the graph is actually torn down — long enough that the gain ramp reaches silence smoothly, short enough that navigating away from Home doesn't leave an audible tail. */
 const MUSIC_STOP_FADE_MS = 350;
@@ -520,16 +551,12 @@ export class AudioManager {
       masterGain.connect(ctx.destination);
 
       let proceduralStop: (() => void) | null = null;
-      let realAudioEl: HTMLAudioElement | null = null;
       let stopped = false;
 
-      // Prefer a real, licensed track the moment one exists at this
-      // track's assetUrl (see HOME_THEME_ASSET_URL's doc comment) — falls
-      // back to the procedural composition the instant that file fails to
-      // load (today, always: no such file exists in this project). Guarded
-      // by `stopped` so a slow/late fallback callback can never start a
-      // graph after stopMusic() has already torn this one down.
-      realAudioEl = tryPlayRealTrackFile(ctx, track.assetUrl, masterGain, () => {
+      // The recorded track; the procedural composition only takes over if
+      // the file can't be fetched/decoded. Guarded by `stopped` so a late
+      // fallback can never start after stopMusic() tore this graph down.
+      const fileTrack = playLoopingTrackFile(ctx, track.assetUrl, track.loopSeconds, masterGain, () => {
         if (stopped || proceduralStop) return;
         proceduralStop = track.buildProceduralGraph(ctx, masterGain).stop;
       });
@@ -540,13 +567,7 @@ export class AudioManager {
         trackId,
         stop: () => {
           stopped = true;
-          if (realAudioEl) {
-            try {
-              realAudioEl.pause();
-            } catch {
-              // Already stopped — never throw during teardown.
-            }
-          }
+          fileTrack.stop();
           if (proceduralStop) proceduralStop();
         },
       };

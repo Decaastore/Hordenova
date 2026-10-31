@@ -327,8 +327,47 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
     expect(manager.isMusicMuted()).toBe(false);
   });
 
-  it("falls back to the procedural adventure theme once the real-track grace window expires, and that theme is a real composition — many distinct pitches scheduled across the pass, not one held drone tone", () => {
+  it("plays the recorded theme when it loads: decoded once, a new pass scheduled every loop length so each pass overlaps the previous one's reverb tail", async () => {
     vi.useFakeTimers();
+    const originalFetch = globalThis.fetch;
+    const started: number[] = [];
+    let oscillatorCount = 0;
+    class FileAudioContext extends FakeAudioContext {
+      decodeAudioData(): Promise<unknown> {
+        return Promise.resolve({ duration: 124 });
+      }
+      createBufferSource(): FakeBufferSourceNode {
+        const src = new FakeBufferSourceNode();
+        src.start = (when?: number) => {
+          started.push(when ?? 0);
+        };
+        return src;
+      }
+      createOscillator(): FakeOscillatorNode {
+        oscillatorCount++;
+        return super.createOscillator();
+      }
+    }
+    (window as unknown as { AudioContext: unknown }).AudioContext = FileAudioContext;
+    globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true, arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)) })) as unknown as typeof fetch;
+    try {
+      const manager = new AudioManager();
+      manager.playAmbientMusic();
+      await vi.advanceTimersByTimeAsync(50);
+      expect(started.length).toBeGreaterThanOrEqual(1);
+      expect(oscillatorCount).toBe(0); // no procedural fallback
+      manager.stopMusic();
+      vi.advanceTimersByTime(1000);
+    } finally {
+      globalThis.fetch = originalFetch;
+      vi.useRealTimers();
+    }
+  });
+
+  it("falls back to the procedural adventure theme when the recorded track can't load, and that theme is a real composition — many distinct pitches scheduled across the pass, not one held drone tone", async () => {
+    vi.useFakeTimers();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(() => Promise.reject(new Error("offline"))) as unknown as typeof fetch;
     try {
       const oscillators: FakeOscillatorNode[] = [];
       class TrackingAudioContext extends FakeAudioContext {
@@ -343,11 +382,10 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
       const manager = new AudioManager();
       manager.playAmbientMusic();
       expect(manager.isMusicPlaying()).toBe(true);
-      expect(oscillators.length).toBe(0); // nothing scheduled yet — still waiting on the real-track attempt
+      expect(oscillators.length).toBe(0); // nothing scheduled yet — still waiting on the recorded track
 
-      // No real asset file exists at HOME_THEME_ASSET_URL, so this grace
-      // window always expires and the procedural composition takes over.
-      vi.advanceTimersByTime(800);
+      // The fetch fails, so the procedural composition takes over.
+      await vi.advanceTimersByTimeAsync(50);
 
       // A drone is 1-4 oscillators holding fixed pitches forever. A real
       // melody+bass+pluck composition schedules dozens of individual notes
@@ -360,6 +398,7 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
       manager.stopMusic();
       vi.advanceTimersByTime(1000);
     } finally {
+      globalThis.fetch = originalFetch;
       vi.useRealTimers();
     }
   });
