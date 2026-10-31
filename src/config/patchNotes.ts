@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v62",
+    dateIso: "2026-10-31",
+    category: "INTERFACE",
+    title: {
+      en: "All-New Sound and Music",
+      ptBR: "Som e Música Totalmente Novos",
+    },
+    description: {
+      en: "Every sound in the game has been replaced, and the site has a new orchestral theme. Towers, enemies, bosses, waves and rewards now have fuller, clearer sounds, balanced so the constant combat sits in the background and the big moments stand out.",
+      ptBR: "Todos os sons do jogo foram trocados, e o site ganhou um tema orquestral novo. Torres, inimigos, chefes, ondas e recompensas agora têm sons mais encorpados e claros, equilibrados para que o combate constante fique em segundo plano e os grandes momentos se destaquem.",
+    },
+    highlights: [
+      {
+        en: "A new two-minute orchestral theme for the site, with strings, horns, choir, harp and drums, that loops without a gap.",
+        ptBR: "Um tema orquestral novo de dois minutos para o site, com cordas, trompas, coral, harpa e tambores, que se repete sem pausa.",
+      },
+      {
+        en: "Each tower has its own shot and impact: Ironwood's bolt, Inferno's fireball, Frostborn's ice and Stormcaller's lightning and chain lightning.",
+        ptBR: "Cada torre tem o seu próprio disparo e impacto: o virote da Ironwood, a bola de fogo da Inferno, o gelo da Frostborn e o raio e o raio em cadeia da Stormcaller.",
+      },
+      {
+        en: "New sounds for boss arrival, boss rage and boss defeat, for the castle being hit, and a war horn when a wave begins.",
+        ptBR: "Sons novos para a chegada, a fúria e a derrota dos chefes, para o castelo sendo atingido e uma trompa de guerra quando a onda começa.",
+      },
+      {
+        en: "Victory, defeat and tower upgrades now have short orchestral fanfares in the same style as the theme.",
+        ptBR: "Vitória, derrota e melhoria de torre agora têm fanfarras orquestrais curtas no mesmo estilo do tema.",
+      },
+      {
+        en: "A boss hitting one of your towers now makes a sound; it used to be silent.",
+        ptBR: "Um chefe atingindo uma das suas torres agora faz som; antes ficava em silêncio.",
+      },
+    ],
+  },
+  {
     id: "v61",
     dateIso: "2026-10-30",
     category: "SYSTEMS",

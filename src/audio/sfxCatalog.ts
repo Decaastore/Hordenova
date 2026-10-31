@@ -1,6 +1,6 @@
 /**
  * Audio spec section 1/14 — the asset registry AudioManager plays from.
- * Nothing outside `src/audio/` references a `.wav` path directly; gameplay
+ * Nothing outside `src/audio/` references a sound file path directly; gameplay
  * code only ever deals in semantic events (see engine/AudioEvents.ts +
  * audio/GameAudioBridge.ts), never file names.
  *
@@ -53,7 +53,7 @@ const asset = (
   file: SfxId,
   overrides: Partial<SfxAssetConfig> & Pick<SfxAssetConfig, "priority">,
 ): SfxAssetConfig => ({
-  url: `/audio/sfx/${file}.wav`,
+  url: `/audio/sfx/${file}.mp3`,
   cooldownMs: 60,
   maxSimultaneous: 4,
   baseVolume: 0.8,
