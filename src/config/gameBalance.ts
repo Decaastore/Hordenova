@@ -15,6 +15,14 @@ export const RUN_START = {
 /** Milliseconds of pause shown between one wave ending and the next starting. */
 export const WAVE_TRANSITION_DURATION_MS = 2500;
 
+/**
+ * How far along the road (world units) the enemies' rift reaches. Over this
+ * first stretch a creature is still climbing out of the portal, and it does
+ * so at its own normal pace: slows and freezes don't hold it inside the
+ * portal (they keep ticking and still apply once it's out).
+ */
+export const PORTAL_EMERGE_DISTANCE = 26;
+
 /** Milliseconds between individual enemy spawns within the same wave. */
 export const ENEMY_SPAWN_INTERVAL_MS = 650;
 

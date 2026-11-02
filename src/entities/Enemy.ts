@@ -1,6 +1,7 @@
 import { ENEMY_DEFINITIONS, getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { getActiveMapLayout } from "@/data/mapLayouts";
+import { PORTAL_EMERGE_DISTANCE } from "@/config/gameBalance";
 import { CC_DR_DECAY_MS, CC_DR_MAX_STACKS, getCcDurationMultiplier, getCcResistanceTier } from "@/config/ccResistance";
 import { getEnragedShieldReduction } from "@/config/enrageShield";
 
@@ -158,7 +159,8 @@ export function createEnemyInstance(type: EnemyType, waveNumber: number, difficu
 }
 
 export function getEffectiveSpeed(enemy: EnemyInstance): number {
-  if (!enemy.slow) return enemy.baseSpeed;
+  // still climbing out of the rift: never held inside it by a slow/freeze
+  if (!enemy.slow || enemy.distanceTraveled < PORTAL_EMERGE_DISTANCE) return enemy.baseSpeed;
   return enemy.baseSpeed * (1 - enemy.slow.percent);
 }
 

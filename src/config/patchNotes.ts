@@ -70,6 +70,25 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v67",
+    dateIso: "2026-11-02",
+    category: "FIXES",
+    title: {
+      en: "Enemies No Longer Get Stuck in the Portal",
+      ptBR: "Inimigos Não Ficam Mais Presos no Portal",
+    },
+    description: {
+      en: "Towers placed next to the portal could slow or freeze creatures while they were still climbing out of it, leaving them stuck half-way out for a few seconds. Now every creature leaves the portal at its normal pace, and the slow or freeze takes hold as soon as it's out.",
+      ptBR: "Torres colocadas perto do portal conseguiam deixar lentas ou congelar as criaturas enquanto elas ainda estavam saindo dele, e elas ficavam presas no meio do caminho por alguns segundos. Agora toda criatura sai do portal no ritmo normal, e a lentidão ou o congelamento pega assim que ela sai.",
+    },
+    highlights: [
+      {
+        en: "Frostborn's slow and freeze aren't wasted: whatever time is left still applies once the creature is out.",
+        ptBR: "A lentidão e o congelamento da Frostborn não se perdem: o tempo que sobrar continua valendo quando a criatura sai.",
+      },
+    ],
+  },
+  {
     id: "v66",
     dateIso: "2026-11-02",
     category: "FIXES",

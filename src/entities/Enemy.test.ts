@@ -3,6 +3,7 @@ import { advanceEnemy, applyDamageToEnemy, applySlow, createEnemyInstance, creat
 import { createBossInstance, tickBossAbilities } from "@/engine/BossManager";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { CC_DR_DECAY_MS } from "@/config/ccResistance";
+import { PORTAL_EMERGE_DISTANCE } from "@/config/gameBalance";
 
 /**
  * Frostborn Freeze bug fix — see entities/Enemy.ts's applySlow doc
@@ -17,8 +18,24 @@ import { CC_DR_DECAY_MS } from "@/config/ccResistance";
  * directly on the entity layer (no rendering/setTimeout involved).
  */
 describe("Freeze / Slow status effect (Frostborn)", () => {
+  it("an enemy still climbing out of the portal leaves it at its normal pace even when frozen; the freeze holds it once it's out", () => {
+    const enemy = createEnemyInstance("CRAWLER", 1);
+    applySlow(enemy, 1, 5000);
+    expect(getEffectiveSpeed(enemy)).toBe(enemy.baseSpeed); // inside the rift: not held there
+    let ticks = 0;
+    while (enemy.distanceTraveled < PORTAL_EMERGE_DISTANCE && ticks < 200) {
+      advanceEnemy(enemy, 50);
+      ticks++;
+    }
+    // out within its normal emergence time (allowing for the map's speed scale)
+    expect(ticks * 50).toBeLessThanOrEqual(Math.ceil((PORTAL_EMERGE_DISTANCE / (enemy.baseSpeed * 0.8)) * 1000) + 50);
+    expect(enemy.slow).not.toBeNull();
+    expect(getEffectiveSpeed(enemy)).toBe(0); // the rest of the freeze applies outside
+  });
+
   it("freezes on application (percent 1 = 0 effective speed) and unfreezes exactly when the duration elapses", () => {
     const enemy = createEnemyInstance("CRAWLER", 1);
+    enemy.distanceTraveled = 100; // out of the portal
     // U2 (v1.0 infinite-progression freeze): a plain enemy now resolves to
     // the ELITE CC-resistance tier, so its first hit (stack 0) is already
     // scaled by ELITE's 0.7 baseline multiplier: 1000 * 0.7 = 700ms.

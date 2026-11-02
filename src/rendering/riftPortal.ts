@@ -1,4 +1,5 @@
 import type { Vector2 } from "@/utils/geometry";
+import { PORTAL_EMERGE_DISTANCE } from "@/config/gameBalance";
 import type { BiomeDefinition } from "./biomes";
 
 /**
@@ -12,7 +13,7 @@ import type { BiomeDefinition } from "./biomes";
  */
 
 /** How far along the road (world units) the rift's centre sits. Enemies covering this first stretch are shown climbing out of it. */
-export const PORTAL_PATH_DISTANCE = 26;
+export const PORTAL_PATH_DISTANCE = PORTAL_EMERGE_DISTANCE;
 const RX = 26;
 const RY = 18;
 
