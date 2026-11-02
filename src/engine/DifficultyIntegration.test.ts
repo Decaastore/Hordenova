@@ -2,20 +2,18 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
-import { DIFFICULTY_MULTIPLIER_MAX, DIFFICULTY_MULTIPLIER_MIN } from "@/config/difficultyScaling";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 
 const TICK_MS = 50;
 
 /**
- * DIFICULDADE INDIVIDUAL POR JOGADOR — end-to-end proof through the REAL
- * GameEngine tick loop: a strong loadout and a weak loadout, on the exact
- * same global wave, spawn enemies at DIFFERENT (but boundedly different) HP
- * — never identical (that would mean no individual adjustment happened),
- * never wildly divergent (that would mean the bound broke), and never equal
- * to the player's own DPS.
+ * SAME WAVES FOR EVERYONE — end-to-end proof through the REAL GameEngine
+ * tick loop: a strong loadout and a weak loadout, on the exact same global
+ * wave, spawn enemies at exactly the same HP (the global curve). The old
+ * per-account HP adjustment (config/difficultyScaling.ts) was removed for
+ * competitive fairness.
  */
-describe("Individual difficulty adjustment — real GameEngine integration", () => {
+describe("Enemy difficulty is the same for every player — real GameEngine integration", () => {
   beforeEach(() => {
     window.localStorage.clear();
   });
@@ -51,10 +49,9 @@ describe("Individual difficulty adjustment — real GameEngine integration", () 
     return null;
   }
 
-  it("a strong, maxed-level loadout spawns tougher normal enemies at the same wave than an empty loadout — but only within the bounded range", () => {
+  it("every player faces the same enemies: a maxed loadout and an empty one see the exact same HP at the same wave", () => {
     // Wave 45 is deliberately NOT a boss milestone (30/50/70/90/110/130...)
-    // so the engine resumes directly into a normal-spawn RUNNING phase,
-    // letting placeTower/upgrade succeed immediately after resume.
+    // so the engine resumes directly into a normal-spawn RUNNING phase.
     const weak = setupAtWave(45, null); // no towers at all placed
     const weakHp = findCrawlerMaxHp(weak);
 
@@ -63,12 +60,9 @@ describe("Individual difficulty adjustment — real GameEngine integration", () 
 
     expect(weakHp).not.toBeNull();
     expect(strongHp).not.toBeNull();
-    expect(strongHp!).toBeGreaterThan(weakHp!);
-
-    // Bound check: neither can stray outside [MIN, MAX] × the frozen global baseline.
     const baselineHp = getScaledEnemyStats("CRAWLER", 45).hp;
-    expect(weakHp!).toBeGreaterThanOrEqual(Math.round(baselineHp * DIFFICULTY_MULTIPLIER_MIN) - 1);
-    expect(strongHp!).toBeLessThanOrEqual(Math.round(baselineHp * DIFFICULTY_MULTIPLIER_MAX) + 1);
+    expect(weakHp).toBe(baselineHp);
+    expect(strongHp).toBe(baselineHp);
   });
 
   it("Boss HP is completely unaffected by the individual difficulty adjustment — Boss/Mini-Boss formulas stay frozen", () => {

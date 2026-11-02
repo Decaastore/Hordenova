@@ -1,4 +1,9 @@
 /**
+ * NO LONGER APPLIED TO SPAWNS: the game now gives every player the same
+ * enemies at the same wave (competitive fairness), so GameEngine doesn't
+ * call getIndividualDifficultyMultiplier any more. The reference curve
+ * below is still used by engine/CombatPower.ts.
+ *
  * DIFICULDADE INDIVIDUAL POR JOGADOR — spec sections 1-2. This is a
  * SECONDARY, BOUNDED adjustment layered on top of the existing GLOBAL
  * wave-difficulty curve (config/enemyStats.ts's hpMultiplierForWaveIndex,

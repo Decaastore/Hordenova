@@ -144,9 +144,8 @@ const LATE_COUNT_CAP = 40;
 const SWARM_COUNT_CAP = 56;
 
 /**
- * Total enemy count for a wave. The same curve for every player — the count
- * never looks at anyone's towers. (Enemy HP has a separate, bounded
- * per-account adjustment: config/difficultyScaling.ts.) Grows quickly in the early game, then keeps
+ * Total enemy count for a wave. The same curve for every player — like enemy
+ * HP, the count never looks at anyone's towers. Grows quickly in the early game, then keeps
  * creeping up slowly instead of flattening out, so long runs keep getting
  * busier. A Swarm wave gets a real numbers spike on top.
  */

@@ -45,8 +45,6 @@ import {
 } from "./ItemFusion";
 import { FUSION_ITEM_COUNT } from "@/config/itemFusion";
 import type { Rarity } from "@/config/rarity";
-import { getAccountCombatPower, getReferenceCombatPowerForWave } from "./CombatPower";
-import { getIndividualDifficultyMultiplier } from "@/config/difficultyScaling";
 import { checkLocalFirst, type LocalFirstDiscoveries } from "./WorldFirst";
 import {
   createTowerInstance,
@@ -1823,7 +1821,7 @@ export class GameEngine {
       const { enemyTypeToSpawn } = tickWaveManager(this.wave, scaledDt, this.enemies.length);
       if (enemyTypeToSpawn) {
         this.enemies.push(
-          createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave, this.computeIndividualDifficultyMultiplier()),
+          createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave),
         );
         this.maybeDiscover(enemyTypeToSpawn);
       }
@@ -2155,20 +2153,9 @@ export class GameEngine {
     this.notify();
   }
 
-  /**
-   * DIFICULDADE INDIVIDUAL POR JOGADOR — the one place this account's real
-   * Combat Power (engine/CombatPower.ts, built from real Level/Mastery/
-   * Specialization) is compared against the real reference curve for the
-   * CURRENT global wave and turned into a bounded HP multiplier (config/
-   * difficultyScaling.ts). Applied ONLY to normal/Elite enemy spawns below
-   * — Boss/Mini-Boss HP (BossManager.ts/createBossInstance) never reads
-   * this, so the frozen Boss HP formula chain is completely untouched.
-   */
-  private computeIndividualDifficultyMultiplier(): number {
-    const accountPower = getAccountCombatPower(this.towers);
-    const referencePower = getReferenceCombatPowerForWave(this.wave.currentWave);
-    return getIndividualDifficultyMultiplier(accountPower, referencePower);
-  }
+  // Enemy HP is the same for every player at the same wave (competitive
+  // fairness): the old per-account Combat Power adjustment
+  // (config/difficultyScaling.ts) is no longer applied to spawns.
 
   private maybeSpawnMiniBoss(nowMs: number): void {
     if (!isMiniBossWave(this.wave.currentWave)) return;
@@ -2186,7 +2173,7 @@ export class GameEngine {
     if (this.wave.phase !== "SPAWNING") return;
     this.eliteSpawnedForWave = this.wave.currentWave;
     this.enemies.push(
-      createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER, this.computeIndividualDifficultyMultiplier()),
+      createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER),
     );
   }
 
