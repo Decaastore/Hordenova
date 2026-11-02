@@ -1,6 +1,6 @@
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GameEngine } from "./GameEngine";
+import { BOSS_FALLS_BEFORE_PHASE_RESTART, GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
@@ -66,13 +66,13 @@ describe("GameEngine — Active Idle progression", () => {
     expect(report!.reasonKeys.length).toBeGreaterThan(0);
   });
 
-  it("records bestWave on PROGRESSION_STOPPED (the wave the castle fell on, not the restart wave)", () => {
+  it("records bestWave on PROGRESSION_STOPPED as the last CLEARED wave (not the one the castle fell on, not the restart wave)", () => {
     const engine = new GameEngine();
     engine.startRun();
     runUntilStopped(engine);
 
     const waveReached = engine.getFailureReport()!.waveReached;
-    expect(engine.getHudSnapshot().bestWave).toBeGreaterThanOrEqual(waveReached);
+    expect(engine.getHudSnapshot().bestWave).toBe(waveReached - 1);
   });
 
   it("retryPhase() plays the failed phase again from its first wave, keeping towers and gold", () => {
@@ -110,6 +110,28 @@ describe("GameEngine — Active Idle progression", () => {
     expect(engine.getHudSnapshot().wave).toBe(30);
   });
 
+  it(`losing to the same boss ${BOSS_FALLS_BEFORE_PHASE_RESTART} times in a row restarts the phase from Wave 1 so the player can earn gold`, () => {
+    updateSave({ currentWave: 30, bestWave: 29, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.startRun();
+    const internals = engine as unknown as { baseHp: number };
+    for (let fall = 1; fall <= BOSS_FALLS_BEFORE_PHASE_RESTART; fall++) {
+      internals.baseHp = 1; // falls to the boss itself
+      runUntilStopped(engine);
+      expect(engine.getFailureReport()!.waveReached).toBe(30);
+      if (fall < BOSS_FALLS_BEFORE_PHASE_RESTART) {
+        expect(engine.getHudSnapshot().wave).toBe(30); // straight back to the boss
+        expect(engine.getHudSnapshot().bossFallStreak).toBe(fall);
+      } else {
+        expect(engine.getHudSnapshot().wave).toBe(21); // phase 3 starts over
+        expect(engine.getHudSnapshot().bossFallStreak).toBe(0);
+      }
+      engine.retryPhase();
+    }
+    expect(engine.getHudSnapshot().phase).toBe("RUNNING");
+    expect(engine.getHudSnapshot().wave).toBe(21);
+  });
+
   it("when the castle falls mid-phase, the run goes back to that phase's Wave 1 — and the save says so, so a reload can't skip it", () => {
     // start in the middle of phase 4 (waves 31-40) with no defence at all
     updateSave({ currentWave: 37, bestWave: 37, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
@@ -122,7 +144,7 @@ describe("GameEngine — Active Idle progression", () => {
     expect(fell).toBeGreaterThanOrEqual(37);
     expect(fell).toBeLessThanOrEqual(40); // still inside phase 4
     expect(engine.getHudSnapshot().wave).toBe(31);
-    expect(engine.getHudSnapshot().bestWave).toBe(fell);
+    expect(engine.getHudSnapshot().bestWave).toBe(Math.max(37, fell - 1));
     expect(loadSave().currentWave).toBe(31);
 
     const reloaded = new GameEngine();
@@ -246,7 +268,7 @@ describe("GameEngine — Active Idle progression", () => {
     expect(loadSave().lastPlayedAt).not.toBeNull();
   });
 
-  it("a main boss that reaches the base without dying does not soft-lock BOSS_BATTLE (regression)", () => {
+  it("a main boss that reaches the base without dying comes back until it is beaten — no soft-lock, no free pass to the next wave", () => {
     // Seed a save exactly at the Wave 30 boss milestone with an empty
     // build, so the boss takes zero damage and is guaranteed to walk to
     // the base and "escape" (removed via the leak path, not isEnemyDead)
@@ -267,12 +289,13 @@ describe("GameEngine — Active Idle progression", () => {
     }
 
     expect(sawBossBattle).toBe(true);
-    // Must have resolved (either fell through to more undefended waves and
-    // stopped, or otherwise moved on) well within the tick budget — never
-    // stuck at wave 30 in BOSS_BATTLE forever.
+    // Resolves well within the tick budget — never stuck in BOSS_BATTLE:
+    // each escape costs castle life until the castle falls to this boss.
     expect(iterations).toBeLessThan(maxIterations);
     expect(engine.getHudSnapshot().phase).toBe("PROGRESSION_STOPPED");
-    expect(engine.getHudSnapshot().wave).toBeGreaterThan(30);
+    expect(engine.getFailureReport()!.waveReached).toBe(30);
+    // never advanced past the boss without beating it, and the retry is the boss again
+    expect(engine.getHudSnapshot().wave).toBe(30);
   });
 
   /**
@@ -314,9 +337,9 @@ describe("GameEngine — Active Idle progression", () => {
       internals.baseHp = internals.maxBaseHp;
       iterations++;
       const phase = engine.getHudSnapshot().phase;
-      // A BOSS_BATTLE -> RUNNING transition with no VICTORY in between (this
-      // empty build never kills anything) is exactly one escape.
-      if (lastPhase === "BOSS_BATTLE" && phase === "RUNNING") escapesSeen++;
+      // A BOSS_BATTLE -> BOSS_INTRO transition (this empty build never kills
+      // anything) is exactly one escape: the boss comes back for another round.
+      if (lastPhase === "BOSS_BATTLE" && phase === "BOSS_INTRO") escapesSeen++;
       lastPhase = phase;
 
       if (escapesSeen === 1 || escapesSeen === 2) {
@@ -332,15 +355,16 @@ describe("GameEngine — Active Idle progression", () => {
     const report = engine.getEndgameWallReport();
     expect(report).not.toBeNull();
     expect(report!.consecutiveEscapes).toBe(3);
-    expect(report!.bestWave).toBeGreaterThanOrEqual(30);
+    // an escaped boss is not a cleared wave: no progress was recorded for it
+    expect(report!.bestWave).toBeLessThan(30);
     expect(report!.bestDamageFraction).toBeGreaterThanOrEqual(0);
     expect(report!.bestDamageFraction).toBeLessThanOrEqual(1);
     expect(report!.diagnosis.reasonKeys.length).toBeGreaterThan(0);
 
-    // Never freezes: the run is still actively progressing (RUNNING or
-    // beyond), not stuck waiting on the report the way PROGRESSION_STOPPED
-    // waits on retryPhase().
+    // Never freezes (not stuck waiting on the report the way
+    // PROGRESSION_STOPPED waits on retryPhase()), and never skips the boss.
     expect(engine.getHudSnapshot().phase).not.toBe("PROGRESSION_STOPPED");
+    expect(engine.getHudSnapshot().wave).toBe(30);
 
     engine.acknowledgeEndgameWallReport();
     expect(engine.getEndgameWallReport()).toBeNull();

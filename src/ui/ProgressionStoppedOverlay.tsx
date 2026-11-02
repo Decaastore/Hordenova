@@ -1,5 +1,6 @@
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { isBossMilestone } from "@/config/waveConfig";
+import { BOSS_FALLS_BEFORE_PHASE_RESTART } from "@/engine/GameEngine";
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import type { FailureReport } from "@/engine/BattleDiagnostics";
@@ -32,9 +33,14 @@ export function ProgressionStoppedOverlay({ hud, report, onDismiss, onRetry, onE
         <SkullIcon size={30} color={PALETTE.danger} style={{ filter: `drop-shadow(0 0 10px ${PALETTE.danger}aa)` }} />
         <h1 style={titleStyle}>{t("progressionStopped.title")}</h1>
         <div style={phaseFailedStyle}>{t("progressionStopped.phaseFailed", { phase: phaseNumberFromWave(report?.waveReached ?? hud.wave) })}</div>
-        <div style={restartNoteStyle}>{isBossMilestone(report?.waveReached ?? hud.wave)
-            ? t("progressionStopped.restartNoteBoss")
-            : t("progressionStopped.restartNote", { onda: waveInPhase(report?.waveReached ?? hud.wave) })}</div>
+        <div style={restartNoteStyle}>{(() => {
+            const fell = report?.waveReached ?? hud.wave;
+            if (!isBossMilestone(fell)) return t("progressionStopped.restartNote", { onda: waveInPhase(fell) });
+            // still on the boss: say how many falls in a row; back at Wave 1: the streak ran out
+            return hud.wave === fell
+              ? t("progressionStopped.restartNoteBoss", { falls: hud.bossFallStreak, max: BOSS_FALLS_BEFORE_PHASE_RESTART })
+              : t("progressionStopped.restartNoteBossPhase", { max: BOSS_FALLS_BEFORE_PHASE_RESTART });
+          })()}</div>
         <div style={dividerStyle} />
 
         {report && (

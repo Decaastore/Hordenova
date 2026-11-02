@@ -132,6 +132,9 @@ const ELITE_MODIFIER: EliteModifier = {
 /** Elites are always built on the Brute silhouette — a consistent "this one's different" read across every phase without needing a bespoke archetype per elite. */
 const ELITE_BASE_TYPE: EnemyType = "BRUTE";
 
+/** Castle falls in a row to the same main boss before the phase restarts from Wave 1 (see bossFallStreak). */
+export const BOSS_FALLS_BEFORE_PHASE_RESTART = 3;
+
 /** CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — this many consecutive boss escapes with zero kills in between is treated as a genuine wall, not bad luck (see EndgameWallReport's own doc comment). */
 const ENDGAME_WALL_ESCAPE_THRESHOLD = 3;
 
@@ -187,6 +190,8 @@ export interface HudSnapshot {
   towerCount: number;
   /** DEPLOY: towers still waiting to be placed on this map. */
   deployBench: readonly { id: string; type: TowerType; level: number }[];
+  /** Castle falls in a row to the current main boss (0 after a kill or a phase restart). */
+  bossFallStreak: number;
 }
 
 /**
@@ -270,6 +275,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.repositionFreeAvailable === b.repositionFreeAvailable &&
     a.mapLayoutId === b.mapLayoutId &&
     a.towerCount === b.towerCount &&
+    a.bossFallStreak === b.bossFallStreak &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
   );
@@ -355,6 +361,15 @@ export class GameEngine {
    * could be "lost" on reload, only a diagnostic banner.
    */
   private consecutiveBossEscapesWithoutKill = 0;
+  /**
+   * Castle falls in a row to the same main boss. The boss is retried
+   * directly, but after BOSS_FALLS_BEFORE_PHASE_RESTART falls the phase
+   * restarts from its first wave instead: replaying only the boss earns
+   * almost no gold, so a build that can't win would otherwise be stuck
+   * forever (measured: a 48h bot froze on the wave-70 boss).
+   */
+  private bossFallStreak = 0;
+  private bossFallStreakWave: number | null = null;
   /** Best fraction of THIS streak's boss HP actually brought down (0..1) — reset alongside the streak counter above. */
   private bestBossDamageFractionInStreak = 0;
   private endgameWallReport: EndgameWallReport | null = null;
@@ -1894,15 +1909,15 @@ export class GameEngine {
         // streak was before it.
         this.consecutiveBossEscapesWithoutKill = 0;
         this.bestBossDamageFractionInStreak = 0;
+        this.bossFallStreak = 0;
+        this.bossFallStreakWave = null;
         this.persist();
       } else if (boss === null) {
         // The boss reached the base and was removed via the normal leak
         // path (reachedBaseIds) instead of dying — it "escaped" rather
-        // than being defeated. Found via balance simulation: without this
-        // branch the engine has no way to leave BOSS_BATTLE once its one
-        // tracked enemy is gone, permanently soft-locking the run. No
-        // reward (it wasn't killed), but Active Idle must never stall —
-        // the base already paid for it in HP, so progression continues.
+        // than being defeated. Without this branch the engine has no way to
+        // leave BOSS_BATTLE once its one tracked enemy is gone. No reward,
+        // and no progress: the boss is fought again (see below).
         // AUDITORIA E CORREÇÃO GERAL spec sections 1, 11 — advanceBestWave
         // MUST be called for the boss wave itself (this.wave.currentWave,
         // BEFORE activateNextWave bumps it) or a milestone landing exactly
@@ -1935,11 +1950,12 @@ export class GameEngine {
           };
         }
 
+        // A boss has to be DEFEATED to move on: one that slips past comes
+        // back for another round. The castle keeps the damage it took, so
+        // the fight always ends — the boss dies, or the castle falls and
+        // stopProgression() keeps the run on this boss for a full-health retry.
         this.activeBossId = null;
-        this.advanceBestWave(this.wave.currentWave);
-        activateNextWave(this.wave);
-        this.phase = "RUNNING";
-        this.syncMapLayout();
+        this.enterBossIntro(this.wave.currentWave);
         this.persist();
       }
     } else {
@@ -2219,12 +2235,24 @@ export class GameEngine {
     const failedWave = this.wave.currentWave;
     const finalized = finalizeBattleStats(this.battleStats, failedWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
-    this.bestWave = recordRunResult(failedWave, this.storageKey).bestWave;
+    // The record counts CLEARED waves: the wave the castle fell on wasn't
+    // cleared. Recording it would also mark its milestone (bonus gold, a
+    // Roulette spin on a boss wave) as already earned, so beating it later
+    // would pay nothing.
+    this.bestWave = recordRunResult(failedWave - 1, this.storageKey).bestWave;
     // The castle fell: the phase starts over from its first wave — except
-    // on a main boss, which is fought again straight away (best wave is kept
-    // as the record either way). Done here, not on retry, and saved right
-    // away so reloading the game can't skip it.
-    this.wave.currentWave = isBossMilestone(failedWave) ? failedWave : phaseStartWave(phaseNumberFromWave(failedWave));
+    // on a main boss, which is fought again straight away, up to
+    // BOSS_FALLS_BEFORE_PHASE_RESTART falls in a row (then the phase
+    // restarts so the player can earn gold). Done here, not on retry, and
+    // saved right away so reloading the game can't skip it.
+    let retryBoss = false;
+    if (isBossMilestone(failedWave)) {
+      this.bossFallStreak = this.bossFallStreakWave === failedWave ? this.bossFallStreak + 1 : 1;
+      this.bossFallStreakWave = failedWave;
+      retryBoss = this.bossFallStreak < BOSS_FALLS_BEFORE_PHASE_RESTART;
+      if (!retryBoss) this.bossFallStreak = 0;
+    }
+    this.wave.currentWave = retryBoss ? failedWave : phaseStartWave(phaseNumberFromWave(failedWave));
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();
@@ -2352,6 +2380,7 @@ export class GameEngine {
       mapLayoutId: this.layout.id,
       towerCount: this.towers.length,
       deployBench: this.deployBench.map((t) => ({ id: t.id, type: t.type, level: t.level })),
+      bossFallStreak: this.bossFallStreak,
     };
 
     const prev = this.cachedHud;

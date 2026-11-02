@@ -74,21 +74,29 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     dateIso: "2026-11-02",
     category: "SYSTEMS",
     title: {
-      en: "A Fallen Castle Restarts the Phase",
-      ptBR: "Castelo Derrubado Recomeça a Fase",
+      en: "Defeat Has Consequences, and Bosses Must Be Beaten",
+      ptBR: "Derrota Tem Consequência, e Chefes Precisam Ser Vencidos",
     },
     description: {
-      en: "When the castle runs out of life, the phase now starts over from Wave 1 instead of retrying only the wave you lost on. Losing to a main boss is the exception: you face the boss again right away. Your towers, gold and best-wave record are kept.",
-      ptBR: "Quando a vida do castelo acaba, a fase agora recomeça da Onda 1, em vez de repetir só a onda em que você perdeu. A exceção é perder para um chefe principal: você enfrenta o chefe de novo na hora. Suas torres, o ouro e o seu recorde de onda continuam.",
+      en: "When the castle runs out of life, the phase now starts over from Wave 1 instead of retrying only the wave you lost on. Main bosses can no longer be skipped: you have to defeat them to move on. Your towers, gold and record are always kept.",
+      ptBR: "Quando a vida do castelo acaba, a fase agora recomeça da Onda 1, em vez de repetir só a onda em que você perdeu. Os chefes principais não podem mais ser pulados: é preciso derrotá-los para avançar. Suas torres, o ouro e o seu recorde continuam sempre.",
     },
     highlights: [
       {
-        en: "The defeat screen shows which phase failed and on which wave the castle fell.",
-        ptBR: "A tela de derrota mostra qual fase falhou e em qual onda o castelo caiu.",
+        en: "A boss that gets past the castle comes back for another round; the castle keeps the damage it took.",
+        ptBR: "Um chefe que passa pelo castelo volta para mais uma rodada; o castelo fica com o dano que levou.",
       },
       {
-        en: "Closing and reopening the game keeps you at the start of the phase.",
-        ptBR: "Fechar e abrir o jogo de novo mantém você no começo da fase.",
+        en: "If the castle falls to a boss, you face the boss again right away. After 3 defeats in a row to the same boss, the phase starts over from Wave 1 so you can earn gold and come back stronger.",
+        ptBR: "Se o castelo cair para um chefe, você enfrenta o chefe de novo na hora. Depois de 3 derrotas seguidas para o mesmo chefe, a fase recomeça da Onda 1 para você juntar ouro e voltar mais forte.",
+      },
+      {
+        en: "Your best-wave record now counts cleared waves. Before, the wave the castle fell on was also counted, which could cost you its milestone reward when you finally beat it.",
+        ptBR: "O seu recorde de onda agora conta as ondas vencidas. Antes, a onda em que o castelo caiu também contava, o que podia tirar a recompensa de marco dela quando você finalmente a vencia.",
+      },
+      {
+        en: "The defeat screen shows which phase failed, where the castle fell and what happens next. Closing and reopening the game doesn't skip it.",
+        ptBR: "A tela de derrota mostra qual fase falhou, onde o castelo caiu e o que acontece agora. Fechar e abrir o jogo não pula isso.",
       },
     ],
   },

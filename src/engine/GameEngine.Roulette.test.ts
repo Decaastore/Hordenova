@@ -162,7 +162,10 @@ describe("GameEngine — Roulette (Master Implementation spec sections 46-48, AU
   });
 
   it("crossing waves 20 and 30 both queue as pending — resolved one at a time, oldest first, never both at once", () => {
-    updateSave({ currentWave: 19, bestWave: 19, gold: 999_999, towerLoadout: STRONG_LOADOUT });
+    // wave 30 is a main boss, which now has to be DEFEATED to count as crossed —
+    // towers strong enough to actually beat it
+    const BOSS_KILLER_LOADOUT = STRONG_LOADOUT.map((t) => ({ ...t, level: 30 }));
+    updateSave({ currentWave: 19, bestWave: 19, gold: 999_999, towerLoadout: BOSS_KILLER_LOADOUT });
     const engine = new GameEngine();
     engine.startRun();
 
