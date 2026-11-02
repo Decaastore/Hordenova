@@ -1,3 +1,4 @@
+import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import {
   BOSS_INTRO_DURATION_MS,
   BOSS_VICTORY_DURATION_MS,
@@ -597,10 +598,10 @@ export class GameEngine {
   }
 
   /**
-   * Player intervention after PROGRESSION_STOPPED: retries the SAME phase
-   * that failed (not a reset to Wave 1) — Active Idle progression only
-   * ever moves forward; a failed attempt is retried after the player
-   * upgrades towers or changes their build, per spec section 1.
+   * Player intervention after PROGRESSION_STOPPED: plays the phase that
+   * failed again from its first wave (stopProgression already moved the
+   * run back there), after the player upgrades towers or changes their
+   * build. Towers, gold and the best-wave record are kept.
    */
   retryPhase(): void {
     if (this.phase !== "PROGRESSION_STOPPED") return;
@@ -2215,9 +2216,14 @@ export class GameEngine {
 
   private stopProgression(): void {
     this.phase = "PROGRESSION_STOPPED";
-    const finalized = finalizeBattleStats(this.battleStats, this.wave.currentWave);
+    const failedWave = this.wave.currentWave;
+    const finalized = finalizeBattleStats(this.battleStats, failedWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
-    this.bestWave = recordRunResult(this.wave.currentWave, this.storageKey).bestWave;
+    this.bestWave = recordRunResult(failedWave, this.storageKey).bestWave;
+    // The castle fell: the phase starts over from its first wave (best wave
+    // is kept as the record). Done here, not on retry, and saved right away
+    // so reloading the game can't skip it.
+    this.wave.currentWave = phaseStartWave(phaseNumberFromWave(failedWave));
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();

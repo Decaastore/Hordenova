@@ -1,3 +1,4 @@
+import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import type { FailureReport } from "@/engine/BattleDiagnostics";
@@ -29,7 +30,8 @@ export function ProgressionStoppedOverlay({ hud, report, onDismiss, onRetry, onE
       <div style={cardStyle}>
         <SkullIcon size={30} color={PALETTE.danger} style={{ filter: `drop-shadow(0 0 10px ${PALETTE.danger}aa)` }} />
         <h1 style={titleStyle}>{t("progressionStopped.title")}</h1>
-        <div style={phaseFailedStyle}>{t("progressionStopped.phaseFailed", { phase: hud.wave })}</div>
+        <div style={phaseFailedStyle}>{t("progressionStopped.phaseFailed", { phase: phaseNumberFromWave(report?.waveReached ?? hud.wave) })}</div>
+        <div style={restartNoteStyle}>{t("progressionStopped.restartNote", { onda: waveInPhase(report?.waveReached ?? hud.wave) })}</div>
         <div style={dividerStyle} />
 
         {report && (
@@ -232,3 +234,5 @@ const boostButtonStyle: CSSProperties = {
   opacity: 0.5,
   cursor: "not-allowed",
 };
+
+const restartNoteStyle: CSSProperties = { marginTop: 6, fontSize: 13, lineHeight: 1.45, color: PALETTE.uiText, textAlign: "center", maxWidth: 420 };

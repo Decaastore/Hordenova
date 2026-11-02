@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v64",
+    dateIso: "2026-11-02",
+    category: "SYSTEMS",
+    title: {
+      en: "A Fallen Castle Restarts the Phase",
+      ptBR: "Castelo Derrubado Recomeça a Fase",
+    },
+    description: {
+      en: "When the castle runs out of life, the phase now starts over from Wave 1 instead of retrying only the wave you lost on. Your towers, gold and best-wave record are kept.",
+      ptBR: "Quando a vida do castelo acaba, a fase agora recomeça da Onda 1, em vez de repetir só a onda em que você perdeu. Suas torres, o ouro e o seu recorde de onda continuam.",
+    },
+    highlights: [
+      {
+        en: "The defeat screen shows which phase failed and on which wave the castle fell.",
+        ptBR: "A tela de derrota mostra qual fase falhou e em qual onda o castelo caiu.",
+      },
+      {
+        en: "Closing and reopening the game keeps you at the start of the phase.",
+        ptBR: "Fechar e abrir o jogo de novo mantém você no começo da fase.",
+      },
+    ],
+  },
+  {
     id: "v63",
     dateIso: "2026-11-02",
     category: "FIXES",

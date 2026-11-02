@@ -421,6 +421,7 @@ export const ptBR: TranslationSchema = {
   progressionStopped: {
     title: "PROGRESSÃO INTERROMPIDA",
     phaseFailed: "FASE {phase} — FALHOU",
+    restartNote: "O castelo caiu na Onda {onda}. A fase recomeça da Onda 1; suas torres, o ouro e o seu recorde continuam.",
     whyDidILose: "POR QUE EU PERDI?",
     howCanIImprove: "COMO POSSO MELHORAR?",
     statDamage: "Dano",

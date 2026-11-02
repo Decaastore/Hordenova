@@ -1,3 +1,4 @@
+import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
@@ -59,34 +60,58 @@ describe("GameEngine — Active Idle progression", () => {
 
     const report = engine.getFailureReport();
     expect(report).not.toBeNull();
-    expect(report!.waveReached).toBe(hud.wave);
+    // the report keeps the wave the castle fell on; the run itself is back at the phase's first wave
+    expect(report!.waveReached).toBeGreaterThanOrEqual(hud.wave);
+    expect(hud.wave).toBe(phaseStartWave(phaseNumberFromWave(report!.waveReached)));
     expect(report!.reasonKeys.length).toBeGreaterThan(0);
   });
 
-  it("records bestWave on PROGRESSION_STOPPED", () => {
+  it("records bestWave on PROGRESSION_STOPPED (the wave the castle fell on, not the restart wave)", () => {
     const engine = new GameEngine();
     engine.startRun();
     runUntilStopped(engine);
 
-    const waveReached = engine.getHudSnapshot().wave;
+    const waveReached = engine.getFailureReport()!.waveReached;
     expect(engine.getHudSnapshot().bestWave).toBeGreaterThanOrEqual(waveReached);
   });
 
-  it("retryPhase() retries the SAME wave (Active Idle never resets progress to Wave 1) and keeps towers/gold", () => {
+  it("retryPhase() plays the failed phase again from its first wave, keeping towers and gold", () => {
     const engine = new GameEngine();
     engine.startRun();
     engine.placeTower(TOWER_SLOTS[0]!.id, "IRONWOOD");
 
     runUntilStopped(engine);
-    const waveThatFailed = engine.getHudSnapshot().wave;
+    const waveThatFailed = engine.getFailureReport()!.waveReached;
     const towersBeforeRetry = engine.getRenderSnapshot().towers.length;
+    const goldBeforeRetry = engine.getHudSnapshot().gold;
 
     engine.retryPhase();
     const hud = engine.getHudSnapshot();
     expect(hud.phase).toBe("RUNNING");
-    expect(hud.wave).toBe(waveThatFailed);
+    expect(hud.wave).toBe(phaseStartWave(phaseNumberFromWave(waveThatFailed)));
     expect(hud.baseHp).toBe(hud.maxBaseHp);
+    expect(hud.gold).toBe(goldBeforeRetry);
     expect(engine.getRenderSnapshot().towers.length).toBe(towersBeforeRetry);
+  });
+
+  it("when the castle falls mid-phase, the run goes back to that phase's Wave 1 — and the save says so, so a reload can't skip it", () => {
+    // start in the middle of phase 4 (waves 31-40) with no defence at all
+    updateSave({ currentWave: 37, bestWave: 37, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getHudSnapshot().wave).toBe(37);
+
+    runUntilStopped(engine);
+    const fell = engine.getFailureReport()!.waveReached;
+    expect(fell).toBeGreaterThanOrEqual(37);
+    expect(fell).toBeLessThanOrEqual(40); // still inside phase 4
+    expect(engine.getHudSnapshot().wave).toBe(31);
+    expect(engine.getHudSnapshot().bestWave).toBe(fell);
+    expect(loadSave().currentWave).toBe(31);
+
+    const reloaded = new GameEngine();
+    reloaded.startRun();
+    expect(reloaded.getHudSnapshot().wave).toBe(31);
   });
 
   it("towers can be upgraded while PROGRESSION_STOPPED — the spec's build-and-strategize loop", () => {
