@@ -228,6 +228,9 @@ export interface SaveData {
    */
   lastFreeRepositionDayIndex: number | null;
 
+  /** STORE — day index (engine/DailyClock.ts) of the last claimed daily Free Gems gift, or null if never claimed. Same day-index comparison as lastFreeRepositionDayIndex. */
+  lastStoreGiftDayIndex: number | null;
+
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
    * seller, PERMANENT and append-only, exactly like ascensionHistory above:
@@ -316,6 +319,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   unlockedSpecializationIds: {},
   unlockedItemSlots: {},
   lastFreeRepositionDayIndex: null,
+  lastStoreGiftDayIndex: null,
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -848,6 +852,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // must be free — never treated as already-spent.
       lastFreeRepositionDayIndex:
         typeof parsed.lastFreeRepositionDayIndex === "number" ? parsed.lastFreeRepositionDayIndex : null,
+      lastStoreGiftDayIndex: typeof parsed.lastStoreGiftDayIndex === "number" ? parsed.lastStoreGiftDayIndex : null,
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has

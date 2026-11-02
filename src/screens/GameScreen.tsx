@@ -319,7 +319,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-

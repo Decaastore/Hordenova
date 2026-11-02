@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v68",
+    dateIso: "2026-11-02",
+    category: "SYSTEMS",
+    title: {
+      en: "The Store Opens",
+      ptBR: "A Loja Abriu",
+    },
+    description: {
+      en: "A new Store page, in the top menu, gathers every tower skin in one place: see each one with its real in-game effects, buy it with Free or Purchased Gems, and equip it right there. There's also a daily gift of Free Gems. Gem packs are already listed with their prices, and buying them with Pix and card is coming soon.",
+      ptBR: "Uma nova página de Loja, no menu de cima, reúne todas as skins de torre num lugar só: veja cada uma com os efeitos reais em jogo, compre com Gemas Grátis ou Compradas e equipe ali mesmo. Também tem um presente diário de Gemas Grátis. Os pacotes de Gemas já aparecem com os preços, e a compra com Pix e cartão chega em breve.",
+    },
+    highlights: [
+      {
+        en: "Daily gift: 5 Free Gems once a day, just for opening the Store.",
+        ptBR: "Presente do dia: 5 Gemas Grátis uma vez por dia, só por abrir a Loja.",
+      },
+      {
+        en: "Skin descriptions no longer say \"purely cosmetic\" on skins that do change stats; the trade-off is always shown.",
+        ptBR: "As descrições das skins não dizem mais \"puramente cosmético\" nas skins que mudam atributos; a troca de atributos sempre aparece.",
+      },
+      {
+        en: "While playing, clicking the HORDENOVA logo at the top left takes you back to the Home page. Your towers and phase are kept; a wave in progress starts over when you return.",
+        ptBR: "Durante a partida, clicar no logo HORDENOVA no canto de cima à esquerda volta para a página inicial. Suas torres e a fase ficam salvas; uma onda em andamento recomeça quando você voltar.",
+      },
+    ],
+  },
+  {
     id: "v67",
     dateIso: "2026-11-02",
     category: "FIXES",

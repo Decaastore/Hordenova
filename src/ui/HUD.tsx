@@ -12,16 +12,24 @@ interface HUDProps {
   hud: HudSnapshot;
   onSetSpeed: (speed: GameSpeed) => void;
   onOpenInventory: () => void;
+  /** The HORDENOVA logo takes the player back to the Home page — same as the defeat screen's Main Menu button (a wave in progress restarts on return). */
+  onExitToHome?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
 
   return (
     <div style={barStyle}>
-      <div style={brandStyle}>HORDENOVA</div>
+      {onExitToHome ? (
+        <button type="button" onClick={onExitToHome} style={brandButtonStyle} title={t("hud.backToHome")} aria-label={t("hud.backToHome")} data-testid="hud-home">
+          HORDENOVA
+        </button>
+      ) : (
+        <div style={brandStyle}>HORDENOVA</div>
+      )}
 
       <div style={groupStyle}>
         <div>
@@ -273,6 +281,14 @@ const brandStyle: CSSProperties = {
   color: PALETTE.uiAccentBright,
   textShadow: `0 0 12px ${PALETTE.uiAccent}88`,
   whiteSpace: "nowrap",
+};
+
+const brandButtonStyle: CSSProperties = {
+  ...brandStyle,
+  background: "none",
+  border: "none",
+  padding: 0,
+  cursor: "pointer",
 };
 
 const groupStyle: CSSProperties = {

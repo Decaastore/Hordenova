@@ -829,7 +829,7 @@ function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstan
 }
 
 /** Formats a SkinGameplayEffect into short, explicit "+X% Stat" / "-X% Stat" lines — never a vague blurb, so the player always knows exactly what they're buying (spec: "nunca esconder o efeito"). Empty array = purely cosmetic (Default, and every PRESTIGE skin). */
-function formatGameplayEffectLines(effect: SkinGameplayEffect, t: Translate): string[] {
+export function formatGameplayEffectLines(effect: SkinGameplayEffect, t: Translate): string[] {
   const lines: string[] = [];
   const pctMult = (mult: number) => `${mult >= 1 ? "+" : ""}${Math.round((mult - 1) * 100)}%`;
   const pctAdd = (add: number) => `${add >= 0 ? "+" : ""}${Math.round(add * 100)}%`;
