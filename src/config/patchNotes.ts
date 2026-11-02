@@ -83,6 +83,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
+        en: "Paid tower skins now also earn more: +5% Gold and Gem Shards for each tower type in play wearing one, up to +20%. Combat strength is unchanged, so the ranking stays fair.",
+        ptBR: "As skins de torre pagas agora também rendem mais: +5% de ouro e de fragmentos de gema para cada tipo de torre em jogo usando uma, até +20%. A força em combate não muda, então o ranking continua justo.",
+      },
+      {
         en: "Daily gift: 1 Free Gem once a day, just for opening the Store.",
         ptBR: "Presente do dia: 1 Gema Grátis uma vez por dia, só por abrir a Loja.",
       },

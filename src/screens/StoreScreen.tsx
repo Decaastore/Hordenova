@@ -5,7 +5,7 @@ import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { loadSave, type SaveData } from "@/engine/SaveSystem";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
-import { getTowerSkinDualPrice, type TowerSkinDefinition } from "@/config/towerSkins";
+import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 import { buyTowerSkin, claimDailyGift, equipTowerSkin, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
@@ -170,6 +170,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                           ))}
                         </ul>
                       )}
+                      <p className="st-reward">{t("store.rewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100) })}</p>
                       <div className="st-actions">
                         {status?.kind === "OWNED" ? (
                           status.equipped ? (
@@ -244,6 +245,7 @@ const STORE_CSS = `
 .st-effects { margin: 8px 0 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 13px; font-weight: 600; }
 .st-effects .is-up { color: var(--ok); }
 .st-effects .is-down { color: var(--danger); }
+.st-reward { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--gold); }
 .st-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; }
 .st-small { padding: 8px 16px; font-size: 13px; }
 .st-pay { display: inline-flex; gap: 6px; align-items: baseline; padding: 8px 12px; border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 800; background: rgba(24,18,12,0.6); border: 1px solid rgba(239,229,210,0.28); font-variant-numeric: tabular-nums; }

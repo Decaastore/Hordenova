@@ -27,7 +27,7 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
+import { getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, isPaidTowerSkin, SKIN_REWARD_BONUS_PER_TYPE, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
@@ -951,6 +951,9 @@ function SkinSection({
               {line}
             </div>
           ))
+        )}
+        {previewSkin && isPaidTowerSkin(previewSkin.id) && (
+          <div style={{ fontSize: 10, color: PALETTE.gold, marginTop: 2 }}>{t("towerInfo.skinRewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100) })}</div>
         )}
       </div>
 

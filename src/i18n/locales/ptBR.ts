@@ -201,6 +201,7 @@ export const ptBR: TranslationSchema = {
     skinEquipAction: "EQUIPAR",
     skinUnequipAction: "DESEQUIPAR",
     skinPreviewLevel: "Prévia no nível",
+    skinRewardBonus: "Bônus de skin paga: +{pct}% de ouro e de fragmentos de gema enquanto equipada",
     skinGameplayEffectsLabel: "EFEITOS DE GAMEPLAY",
     skinGameplayEffectsNone: "Nenhum efeito de gameplay — puramente cosmético.",
     gameplayEffects: {
@@ -773,8 +774,9 @@ export const ptBR: TranslationSchema = {
     buy: "Comprar",
     soon: "Em breve",
     freeGemsHow: "Gemas Grátis também saem jogando: fragmentos de chefes, roleta, prestígio e o presente do dia.",
+    rewardBonus: "+{pct}% de ouro e de fragmentos de gema enquanto equipada",
     skinsTitle: "Skins de torre",
-    skinsSub: "Cada skin muda o visual da torre e traz um pequeno ajuste de estilo, sempre com uma troca: um ponto a mais, outro a menos. Ao equipar, vale para todas as torres daquele tipo.",
+    skinsSub: "Cada skin muda o visual da torre e traz um pequeno ajuste de estilo, sempre com uma troca: um ponto a mais, outro a menos. Além disso, rende +5% de ouro e de fragmentos de gema para cada tipo de torre em jogo com skin equipada (até +20%). Ao equipar, vale para todas as torres daquele tipo.",
     filterAll: "Todas",
     effects: "Efeitos em jogo",
     equip: "Equipar",

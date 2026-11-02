@@ -76,7 +76,7 @@ import {
 } from "@/entities/Tower";
 import { getItemSlotUnlockCost, getItemSlotUnlockPrice, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
-import { getTowerSkinDefinition, getTowerSkinDualPrice, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
+import { getSkinRewardMultiplier, getTowerSkinDefinition, getTowerSkinDualPrice, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
 import {
   SPECIALIZATION_CHANGE_GEM_PRICE,
   SPECIALIZATION_UNLOCK_GEM_PRICE,
@@ -404,6 +404,9 @@ export class GameEngine {
   private freeGems = 0;
   private purchasedGems = 0;
   private gemShards = 0;
+  /** Fractions of Gold / Gem Shards left over by the paid-skin reward bonus, carried to the next grant so small per-kill bonuses aren't rounded away. */
+  private skinGoldCarry = 0;
+  private skinShardCarry = 0;
   /** GEMS ECONOMY v2 — the permanent, one-time Trade Unlock gate (see canUnlockTrade/unlockTrade below). */
   private tradeUnlocked = false;
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
@@ -584,7 +587,7 @@ export class GameEngine {
         // NEVER auto-resolved — exactly like a milestone crossed live.
         const oldBestWave = this.bestWave;
         this.wave.currentWave = result.endingWave;
-        this.gold += result.resourcesEarned;
+        this.gold += this.withSkinGoldBonus(result.resourcesEarned);
         this.bestWave = Math.max(this.bestWave, result.endingWave);
         for (let w = oldBestWave + 1; w <= this.bestWave; w++) {
           if (w % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(w);
@@ -1537,6 +1540,25 @@ export class GameEngine {
     this.notify();
   }
 
+  /** Paid tower skins' reward bonus (config/towerSkins.ts — SKIN_REWARD_BONUS_PER_TYPE): +5% Gold and Gem Shards per tower type in play wearing a paid skin. Never affects combat. */
+  getSkinRewardMultiplier(): number {
+    return getSkinRewardMultiplier(this.equippedTowerSkinByType, this.towers.map((t) => t.type));
+  }
+
+  private withSkinGoldBonus(amount: number): number {
+    const extra = amount * (this.getSkinRewardMultiplier() - 1) + this.skinGoldCarry;
+    const whole = Math.floor(extra);
+    this.skinGoldCarry = extra - whole;
+    return amount + whole;
+  }
+
+  private withSkinShardBonus(amount: number): number {
+    const extra = amount * (this.getSkinRewardMultiplier() - 1) + this.skinShardCarry;
+    const whole = Math.floor(extra);
+    this.skinShardCarry = extra - whole;
+    return amount + whole;
+  }
+
   private addGemShards(amount: number, source: string): void {
     if (amount <= 0) return;
     this.gemShards += amount;
@@ -1920,7 +1942,7 @@ export class GameEngine {
         // applies here, at the one real per-kill Gold grant. Never touches
         // enemy.goldReward itself (the frozen wave-scaling formula), only
         // the amount the player actually receives.
-        this.gold += Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier);
+        this.gold += this.withSkinGoldBonus(Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier));
         this.enemiesDefeated += 1;
         recordKill(this.battleStats, enemy);
         const tier = this.classifyEnemyTier(enemy);
@@ -2063,11 +2085,11 @@ export class GameEngine {
     if (wave <= this.bestWave) return;
     const bonus = getMilestoneBonus(wave);
     if (bonus > 0) {
-      this.gold += bonus;
+      this.gold += this.withSkinGoldBonus(bonus);
       // Gem Shards (spec section 34: "obtidos via... milestones") — a
       // small amount scaled off the SAME milestone bonus gold already
       // computed above, not an invented parallel number.
-      this.addGemShards(Math.max(1, Math.round(bonus / 150)), `milestone_wave_${wave}`);
+      this.addGemShards(this.withSkinShardBonus(Math.max(1, Math.round(bonus / 150))), `milestone_wave_${wave}`);
     }
     this.bestWave = wave;
     if (wave % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(wave);
@@ -2212,7 +2234,7 @@ export class GameEngine {
     // the other (one-time, per-wave-milestone) half of Prestige's income.
     const baseShards = 2;
     const shards = Math.round(baseShards * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
-    this.addGemShards(shards, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
+    this.addGemShards(this.withSkinShardBonus(shards), boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
 
     const def = getBossDefinitionById(boss.bossId);
     if (!def || !def.dropTableId) return;

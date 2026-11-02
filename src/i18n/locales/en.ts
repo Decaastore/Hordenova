@@ -200,6 +200,7 @@ export const en = {
     skinEquipAction: "EQUIP",
     skinUnequipAction: "UNEQUIP",
     skinPreviewLevel: "Preview at level",
+    skinRewardBonus: "Paid skin bonus: +{pct}% Gold and Gem Shards while equipped",
     skinGameplayEffectsLabel: "GAMEPLAY EFFECTS",
     skinGameplayEffectsNone: "No gameplay effect — purely cosmetic.",
     gameplayEffects: {
@@ -772,8 +773,9 @@ export const en = {
     buy: "Buy",
     soon: "Coming soon",
     freeGemsHow: "Free Gems also come from playing: boss shards, the roulette, prestige and the daily gift.",
+    rewardBonus: "+{pct}% Gold and Gem Shards while equipped",
     skinsTitle: "Tower skins",
-    skinsSub: "Each skin changes how the tower looks and brings a small style tweak, always a trade: one stat up, another down. Equipping it applies to every tower of that type.",
+    skinsSub: "Each skin changes how the tower looks and brings a small style tweak, always a trade: one stat up, another down. On top of that, it earns +5% Gold and Gem Shards for each tower type in play wearing a skin (up to +20%). Equipping it applies to every tower of that type.",
     filterAll: "All",
     effects: "In-game effects",
     equip: "Equip",

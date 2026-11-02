@@ -179,6 +179,29 @@ export function getTowerSkinDualPrice(def: Pick<TowerSkinDefinition, "gemCost">)
   return dualGemPrice(def.gemCost);
 }
 
+/**
+ * REWARD BONUS — what a paid skin gives on top of its look and its combat
+ * trade-off: more Gold and more Gem Shards. It never touches combat, so a
+ * tower is exactly as strong in the ranking with or without it; it only
+ * speeds up progression. Counted once per tower TYPE that has a paid
+ * (non-Prestige) skin equipped and at least one tower of that type on the
+ * map — so the most it can reach is 4 types x 5% = +20%.
+ */
+export const SKIN_REWARD_BONUS_PER_TYPE = 0.05;
+
+export function isPaidTowerSkin(skinId: string | null | undefined): boolean {
+  if (!skinId) return false;
+  const def = getTowerSkinDefinition(skinId);
+  return !!def && def.tier !== "PRESTIGE";
+}
+
+/** 1 + 5% for each tower type in play wearing a paid skin. */
+export function getSkinRewardMultiplier(equippedByType: Partial<Record<TowerType, string>>, typesInPlay: Iterable<TowerType>): number {
+  let types = 0;
+  for (const type of new Set(typesInPlay)) if (isPaidTowerSkin(equippedByType[type])) types++;
+  return 1 + types * SKIN_REWARD_BONUS_PER_TYPE;
+}
+
 export interface TowerSkinDefinition {
   id: string;
   towerType: TowerType;
