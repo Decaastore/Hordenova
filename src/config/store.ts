@@ -48,4 +48,4 @@ export function gemPackTotal(pack: GemPack): number {
  * store. Free Gems are the gameplay currency (never Purchased Gems), so this
  * can never be used to buy another player's item on the Marketplace.
  */
-export const DAILY_GIFT_FREE_GEMS = 5;
+export const DAILY_GIFT_FREE_GEMS = 1;

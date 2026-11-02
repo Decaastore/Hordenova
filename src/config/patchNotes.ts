@@ -83,8 +83,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
-        en: "Daily gift: 5 Free Gems once a day, just for opening the Store.",
-        ptBR: "Presente do dia: 5 Gemas Grátis uma vez por dia, só por abrir a Loja.",
+        en: "Daily gift: 1 Free Gem once a day, just for opening the Store.",
+        ptBR: "Presente do dia: 1 Gema Grátis uma vez por dia, só por abrir a Loja.",
       },
       {
         en: "Skin descriptions no longer say \"purely cosmetic\" on skins that do change stats; the trade-off is always shown.",
