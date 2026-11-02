@@ -351,6 +351,10 @@ describe("GameEngine — Active Idle progression", () => {
 
     expect(iterations).toBeLessThan(maxIterations);
     expect(escapesSeen).toBe(3);
+    // the boss fanfare is heard when the boss is announced, not again on
+    // every lap of an escaped boss (it used to replay like a stuck track)
+    const bossIntros = engine.drainAudioEvents().filter((e) => e.type === "boss_intro");
+    expect(bossIntros.length).toBeLessThanOrEqual(1);
 
     const report = engine.getEndgameWallReport();
     expect(report).not.toBeNull();
@@ -660,5 +664,24 @@ describe("GameEngine — audio events (Audio spec section 18)", () => {
     calls = 0;
     for (let i = 0; i < 20; i++) engine.update(50);
     expect(calls).toBe(0); // the old battle is no longer reaching this listener at all
+  });
+});
+
+describe("GameEngine — building during a boss fight", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("towers can be placed and upgraded during the boss intro and the boss battle", () => {
+    updateSave({ currentWave: 30, bestWave: 29, gold: 100_000, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.startRun();
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_INTRO");
+    expect(engine.placeTower(engine.getAvailableSlotIds()[0]!, "IRONWOOD")).toBe(true);
+    const tower = engine.getRenderSnapshot().towers[0]!;
+    engine.selectTower(tower.id);
+    expect(engine.upgradeSelectedTower()).toBe(true);
+    for (let i = 0; i < 100 && engine.getHudSnapshot().phase === "BOSS_INTRO"; i++) engine.update(100);
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_BATTLE");
+    expect(engine.upgradeSelectedTower()).toBe(true);
+    expect(engine.getRenderSnapshot().towers[0]!.level).toBe(3);
   });
 });

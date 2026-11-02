@@ -44,6 +44,7 @@ import { PORTAL_PATH_DISTANCE } from "@/rendering/riftPortal";
 import { getTowerUpgradeCost } from "@/entities/Tower";
 import { TOWER_DEFINITIONS } from "@/config/towerStats";
 import type { TranslationKey } from "@/i18n/translate";
+import { flushBalanceEvents } from "@/telemetry/balanceTelemetry";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { PHASES } from "@/config/phaseConfig";
 import { HIGH_GROUND_RANGE_MULT, MAX_TOWERS_ON_MAP, RUNE_ALTAR_DAMAGE_MULT } from "@/data/mapLayouts";
@@ -211,6 +212,9 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
     syncSeasonIfNeeded();
     // Moving onto a new map pauses so the player can arrange their towers.
     engine.enableDeployPause(true);
+    // anonymous balance data (where castles fall, boss attempts) — local
+    // until a telemetry server is configured; see telemetry/balanceTelemetry.ts
+    engine.enableTelemetry(true);
     engine.startRun();
     // First-run tutorial: only a brand-new save starts it; anyone who
     // already played is marked done the first time they open this build.
@@ -226,6 +230,18 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   useEffect(() => {
     if (hud.phase === "PROGRESSION_STOPPED") setReportDismissed(false);
   }, [hud.phase]);
+
+  // Send queued balance events (no-op unless VITE_TELEMETRY_URL is set).
+  useEffect(() => {
+    const flush = () => void flushBalanceEvents();
+    flush();
+    const id = window.setInterval(flush, 60_000);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, []);
 
   useEffect(() => {
     // Dev-only hook so end-to-end smoke tests can drive/inspect the engine

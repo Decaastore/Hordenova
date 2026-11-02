@@ -91,3 +91,24 @@ describe("waveConfig — 10-biome expansion exclusive pools are actually reachab
     }
   });
 });
+
+describe("enemy count curve — the same for every player", () => {
+  it("grows fast early, keeps growing slowly late (no flat line at 26), and is bounded", async () => {
+    const { enemyCountForWave } = await import("./waveConfig");
+    const { getWaveTag } = await import("./phaseConfig");
+    expect(enemyCountForWave(1)).toBe(6);
+    let last = 0;
+    for (let w = 1; w <= 800; w++) {
+      const n = enemyCountForWave(w);
+      expect(n).toBeLessThanOrEqual(56);
+      if (getWaveTag(w) === "SWARM") continue;
+      expect(n).toBeLessThanOrEqual(40);
+      expect(n).toBeGreaterThanOrEqual(last); // never shrinks between ordinary waves
+      last = n;
+    }
+    const ordinary = (w: number) => (getWaveTag(w) === "SWARM" ? enemyCountForWave(w + 1) : enemyCountForWave(w));
+    expect(ordinary(25)).toBe(26);
+    expect(ordinary(100)).toBeGreaterThan(26);
+    expect(ordinary(300)).toBe(40);
+  });
+});

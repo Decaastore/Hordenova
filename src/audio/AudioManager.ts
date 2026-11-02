@@ -450,6 +450,8 @@ export interface PlayOptions {
 interface VoiceMeta {
   priority: SfxPriority;
   sfxId: SfxId;
+  /** The voice's volume before the master SFX volume, so a volume change can re-apply to it while it plays. */
+  baseVolume: number;
 }
 
 export class AudioManager {
@@ -483,14 +485,46 @@ export class AudioManager {
 
   setVolume(volume: number): void {
     this.volume = Math.max(0, Math.min(1, volume));
+    if (this.volume <= 0) {
+      this.stopAllSfx();
+      return;
+    }
+    // apply to sounds already playing too — a long stinger shouldn't ignore the slider
+    for (const [el, meta] of this.activeVoices) {
+      try {
+        el.volume = Math.max(0, Math.min(1, meta.baseVolume * this.volume));
+      } catch {
+        // never crash over audio
+      }
+    }
   }
 
   getVolume(): number {
     return this.volume;
   }
 
+  /**
+   * Muting silences sound effects NOW, not just future ones: anything still
+   * ringing (a 4 s defeat stinger, a boss intro) is stopped on the spot.
+   */
   setMuted(muted: boolean): void {
     this.muted = muted;
+    if (muted) this.stopAllSfx();
+  }
+
+  /** Stops every sound effect currently playing. */
+  stopAllSfx(): void {
+    for (const pool of this.pools.values()) {
+      for (const el of pool) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {
+          // never crash over audio
+        }
+      }
+    }
+    this.activeVoices.clear();
   }
 
   isMuted(): boolean {
@@ -761,13 +795,14 @@ export class AudioManager {
 
     const pitchVariance = 1 + (Math.random() * 2 - 1) * config.pitchVariance;
     const pitch = pitchVariance * (opts.pitch ?? 1);
-    const vol = Math.max(0, Math.min(1, config.baseVolume * (opts.volume ?? 1) * this.volume));
+    const baseVolume = config.baseVolume * (opts.volume ?? 1);
+    const vol = Math.max(0, Math.min(1, baseVolume * this.volume));
 
     try {
       element.currentTime = 0;
       element.playbackRate = Math.max(0.25, Math.min(4, pitch));
       element.volume = vol;
-      this.activeVoices.set(element, { priority: config.priority, sfxId: id });
+      this.activeVoices.set(element, { priority: config.priority, sfxId: id, baseVolume });
       element.onended = () => this.releaseVoice(element);
       const playResult = element.play();
       if (playResult && typeof playResult.catch === "function") {

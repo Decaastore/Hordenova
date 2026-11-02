@@ -135,11 +135,26 @@ function weightsForWave(waveNumber: number): EnemyWeights {
   return restricted;
 }
 
-/** Total enemy count for a wave — grows steadily, capped for performance. A Swarm wave gets a real numbers spike on top. */
-function enemyCountForWave(waveNumber: number): number {
-  const raw = 6 + Math.floor(waveNumber * 0.8);
-  const base = Math.min(raw, 26);
-  return getWaveTag(waveNumber) === "SWARM" ? Math.round(base * 1.6) : base;
+/** Early game: +0.8 enemies per wave until EARLY_COUNT_CAP (reached at wave 25). */
+const EARLY_COUNT_CAP = 26;
+/** Late game: one more enemy every LATE_COUNT_STEP_WAVES waves, up to LATE_COUNT_CAP (reached at wave 235). */
+const LATE_COUNT_STEP_WAVES = 15;
+const LATE_COUNT_CAP = 40;
+/** A Swarm wave's spike, bounded for phones. */
+const SWARM_COUNT_CAP = 56;
+
+/**
+ * Total enemy count for a wave. The same curve for every player — the count
+ * never looks at anyone's towers. (Enemy HP has a separate, bounded
+ * per-account adjustment: config/difficultyScaling.ts.) Grows quickly in the early game, then keeps
+ * creeping up slowly instead of flattening out, so long runs keep getting
+ * busier. A Swarm wave gets a real numbers spike on top.
+ */
+export function enemyCountForWave(waveNumber: number): number {
+  const early = 6 + Math.floor(waveNumber * 0.8);
+  const base =
+    early <= EARLY_COUNT_CAP ? early : Math.min(LATE_COUNT_CAP, EARLY_COUNT_CAP + Math.floor(Math.max(0, waveNumber - 25) / LATE_COUNT_STEP_WAVES));
+  return getWaveTag(waveNumber) === "SWARM" ? Math.min(SWARM_COUNT_CAP, Math.round(base * 1.6)) : base;
 }
 
 export function isBossMilestone(waveNumber: number): boolean {

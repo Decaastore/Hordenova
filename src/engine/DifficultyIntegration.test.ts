@@ -76,11 +76,9 @@ describe("Individual difficulty adjustment — real GameEngine integration", () 
     const weak = new GameEngine();
     weak.startRun();
 
-    // Build and max the tower BEFORE jumping to the boss wave — wave 30
-    // itself starts the engine directly in BOSS_INTRO (canModifyLoadout()
-    // is false there), so the loadout must be assembled at a normal wave
-    // first, then the save's currentWave is advanced directly and a fresh
-    // engine resumes into the boss fight with that already-built tower.
+    // Build and max the tower at a normal wave first, then advance the
+    // save's currentWave directly so a fresh engine resumes into the boss
+    // fight with that already-built tower.
     updateSave({ gold: 1_000_000, currentWave: 1, towerLoadout: [] });
     const seed = new GameEngine();
     seed.startRun();

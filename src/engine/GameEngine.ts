@@ -1,4 +1,5 @@
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
+import { deviceId, recordBalanceEvent, type DefenceSnapshot } from "@/telemetry/balanceTelemetry";
 import {
   BOSS_INTRO_DURATION_MS,
   BOSS_VICTORY_DURATION_MS,
@@ -370,6 +371,10 @@ export class GameEngine {
    */
   private bossFallStreak = 0;
   private bossFallStreakWave: number | null = null;
+  /** Falls to the current boss since it was last beaten (not reset by a phase restart) — balance telemetry only. */
+  private bossFallsSinceWin = 0;
+  /** Balance telemetry is recorded only by the real game screen (see enableTelemetry), never by tests or simulations. */
+  private telemetryEnabled = false;
   /** Best fraction of THIS streak's boss HP actually brought down (0..1) — reset alongside the streak counter above. */
   private bestBossDamageFractionInStreak = 0;
   private endgameWallReport: EndgameWallReport | null = null;
@@ -662,14 +667,15 @@ export class GameEngine {
     this.emitAudio({ type: "wave_start" });
   }
 
-  private enterBossIntro(waveNumber: number): void {
+  /** `announce: false` skips the intro stinger — used when an escaped boss loops back, so the same fanfare doesn't replay every lap. */
+  private enterBossIntro(waveNumber: number, announce = true): void {
     this.wave.currentWave = waveNumber;
     this.wave.phase = "IDLE";
     this.wave.spawnQueue = [];
     this.phase = "BOSS_INTRO";
     this.bossIntroRemainingMs = BOSS_INTRO_DURATION_MS;
     this.bossIntroNameKey = getMainBossForWave(waveNumber).i18nKey;
-    this.emitAudio({ type: "boss_intro" });
+    if (announce) this.emitAudio({ type: "boss_intro" });
   }
 
   setSpeed(speed: GameSpeed): void {
@@ -684,9 +690,21 @@ export class GameEngine {
     return this.layout.sites.filter((slot) => !occupied.has(slot.id)).map((slot) => slot.id);
   }
 
-  /** Towers as the center of progression (spec section 3): allowed during active combat AND while PROGRESSION_STOPPED, since that's exactly when the player is expected to change their build. */
+  /**
+   * Towers as the center of progression (spec section 3): allowed during
+   * active combat — boss fights included, since a boss now has to be beaten
+   * to move on and upgrading mid-fight is how a player turns it around —
+   * and while PROGRESSION_STOPPED/DEPLOY, when the build is expected to change.
+   */
   private canModifyLoadout(): boolean {
-    return this.phase === "RUNNING" || this.phase === "WAVE_TRANSITION" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY";
+    return (
+      this.phase === "RUNNING" ||
+      this.phase === "WAVE_TRANSITION" ||
+      this.phase === "BOSS_INTRO" ||
+      this.phase === "BOSS_BATTLE" ||
+      this.phase === "PROGRESSION_STOPPED" ||
+      this.phase === "DEPLOY"
+    );
   }
 
   /**
@@ -839,6 +857,35 @@ export class GameEngine {
 
   getMapLayout(): MapLayout {
     return this.layout;
+  }
+
+  /** The real game screen opts in to anonymous balance telemetry (telemetry/balanceTelemetry.ts). */
+  enableTelemetry(enabled = true): void {
+    this.telemetryEnabled = enabled;
+  }
+
+  private defenceSnapshot(): DefenceSnapshot {
+    const byType: DefenceSnapshot["towersByType"] = {};
+    for (const t of [...this.towers, ...this.deployBench]) byType[t.type] = (byType[t.type] ?? 0) + 1;
+    const all = [...this.towers, ...this.deployBench];
+    return {
+      towerCount: all.length,
+      towersByType: byType,
+      avgTowerLevel: all.length ? Math.round((all.reduce((a, t) => a + t.level, 0) / all.length) * 10) / 10 : 0,
+      maxTowerLevel: all.reduce((m, t) => Math.max(m, t.level), 0),
+      castleMaxHp: this.maxBaseHp,
+    };
+  }
+
+  private telemetryBase(wave: number) {
+    return {
+      device: deviceId(),
+      at: Date.now(),
+      mode: this.storageKey === SAVE_STORAGE_KEY ? "main" : "other",
+      wave,
+      phase: phaseNumberFromWave(wave),
+      map: this.layout.id,
+    };
   }
 
   /** Holds the run (no enemy moves, nothing spawns) while the first-run tutorial waits on the player. */
@@ -1909,8 +1956,12 @@ export class GameEngine {
         // streak was before it.
         this.consecutiveBossEscapesWithoutKill = 0;
         this.bestBossDamageFractionInStreak = 0;
+        if (this.telemetryEnabled) {
+          recordBalanceEvent({ ...this.telemetryBase(this.wave.currentWave), type: "boss_defeated", fallsBeforeWin: this.bossFallsSinceWin, defence: this.defenceSnapshot() });
+        }
         this.bossFallStreak = 0;
         this.bossFallStreakWave = null;
+        this.bossFallsSinceWin = 0;
         this.persist();
       } else if (boss === null) {
         // The boss reached the base and was removed via the normal leak
@@ -1955,7 +2006,7 @@ export class GameEngine {
         // the fight always ends — the boss dies, or the castle falls and
         // stopProgression() keeps the run on this boss for a full-health retry.
         this.activeBossId = null;
-        this.enterBossIntro(this.wave.currentWave);
+        this.enterBossIntro(this.wave.currentWave, false);
         this.persist();
       }
     } else {
@@ -2253,6 +2304,17 @@ export class GameEngine {
       if (!retryBoss) this.bossFallStreak = 0;
     }
     this.wave.currentWave = retryBoss ? failedWave : phaseStartWave(phaseNumberFromWave(failedWave));
+    if (isBossMilestone(failedWave)) this.bossFallsSinceWin += 1;
+    if (this.telemetryEnabled) {
+      recordBalanceEvent({
+        ...this.telemetryBase(failedWave),
+        type: "castle_fell",
+        boss: isBossMilestone(failedWave),
+        bossFallStreak: !isBossMilestone(failedWave) ? 0 : retryBoss ? this.bossFallStreak : BOSS_FALLS_BEFORE_PHASE_RESTART,
+        restartedPhase: !retryBoss,
+        defence: this.defenceSnapshot(),
+      });
+    }
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();

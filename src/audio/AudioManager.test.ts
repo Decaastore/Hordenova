@@ -62,6 +62,21 @@ describe("AudioManager", () => {
     expect(playSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("muting stops sounds that are already playing (a long stinger doesn't keep ringing), and the volume slider reaches them too", () => {
+    const manager = unlockedManager();
+    manager.play("defeat");
+    expect(playSpy).toHaveBeenCalledTimes(1);
+    const playing = playSpy.mock.contexts[0] as HTMLAudioElement;
+    manager.setVolume(0.5);
+    const before = playing.volume;
+    manager.setVolume(0.25);
+    expect(playing.volume).toBeCloseTo(before / 2, 5);
+    pauseSpy.mockClear();
+    manager.setMuted(true);
+    expect(pauseSpy).toHaveBeenCalled();
+    expect(pauseSpy.mock.contexts).toContain(playing);
+  });
+
   it("5. cooldown blocks a second play of the SAME id within its window", () => {
     let now = 1000;
     const manager = unlockedManager(() => now);

@@ -70,6 +70,52 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v66",
+    dateIso: "2026-11-02",
+    category: "FIXES",
+    title: {
+      en: "Upgrades During Boss Fights, and Sound That Turns Off",
+      ptBR: "Melhorias Durante o Chefe, e Som que Desliga",
+    },
+    description: {
+      en: "You can now upgrade your towers while a boss is on the map, just like during regular waves. The sound button also works right away now: muting stops what is already playing instead of only future sounds.",
+      ptBR: "Agora dá para melhorar as torres enquanto o chefe está no mapa, igual nas ondas normais. O botão de som também passou a agir na hora: silenciar corta o que já está tocando, e não só os próximos sons.",
+    },
+    highlights: [
+      {
+        en: "Building, upgrading, mastery, specialization and moving towers all work during the boss announcement and the boss fight.",
+        ptBR: "Construir, melhorar, maestria, especialização e mover torres funcionam no anúncio do chefe e durante a luta.",
+      },
+      {
+        en: "When a boss slips past and comes back, its fanfare no longer replays on every lap.",
+        ptBR: "Quando o chefe passa e volta para outra rodada, a fanfarra dele não toca de novo a cada volta.",
+      },
+      {
+        en: "The sound volume button now also changes sounds that are already playing.",
+        ptBR: "O botão de volume dos efeitos agora também ajusta os sons que já estão tocando.",
+      },
+    ],
+  },
+  {
+    id: "v65",
+    dateIso: "2026-11-02",
+    category: "BALANCE",
+    title: {
+      en: "Late Waves Keep Getting Bigger",
+      ptBR: "Ondas Avançadas Continuam Crescendo",
+    },
+    description: {
+      en: "The number of enemies used to stop growing at 26 per wave from wave 25 on. It now keeps rising slowly, one more enemy every 15 waves, up to 40, so long runs stay intense. This count follows the same curve for every player.",
+      ptBR: "A quantidade de inimigos parava de crescer em 26 por onda a partir da onda 25. Agora ela continua subindo devagar, um inimigo a mais a cada 15 ondas, até 40, para as partidas longas continuarem intensas. Essa quantidade segue a mesma curva para todos os jogadores.",
+    },
+    highlights: [
+      {
+        en: "Swarm waves still bring their extra numbers on top, with a ceiling so phones keep running smoothly.",
+        ptBR: "As ondas de enxame continuam trazendo inimigos a mais por cima, com um teto para o celular continuar rodando liso.",
+      },
+    ],
+  },
+  {
     id: "v64",
     dateIso: "2026-11-02",
     category: "SYSTEMS",
