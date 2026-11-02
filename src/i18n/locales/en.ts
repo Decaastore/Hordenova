@@ -15,6 +15,9 @@ export const en = {
     muteSfx: "Mute SFX",
     musicVolume: "Music Volume",
     muteMusic: "Mute Music",
+    pauseMusic: "Pause music",
+    playMusic: "Play music",
+    musicLabel: "Music",
   },
   nav: {
     home: "Home",

@@ -499,21 +499,23 @@ describe("AudioManager — autoplay blocked vs. resumed on first gesture (CORRE�
     expect(manager.isMusicPlaying()).toBe(false); // this fake never actually flips to "running"
   });
 
-  it("mute/unmute and volume stay independent of, and unaffected by, the autoplay-blocked/resumed transition", async () => {
+  it("paused by the player: a gesture or navigation never restarts the music, the volume is kept, and pressing play resumes it", async () => {
     (window as unknown as { AudioContext: unknown }).AudioContext = SuspendedThenResumableAudioContext;
     const manager = new AudioManager();
     manager.setMusicVolume(0.35);
-    manager.setMusicMuted(true);
+    manager.setMusicMuted(true); // the Pause button
 
-    manager.playAmbientMusic(); // blocked
+    manager.playAmbientMusic(); // mount-time attempt
+    manager.playAmbientMusic(); // a later gesture / navigation back to Home
+    await Promise.resolve();
+    expect(manager.isMusicPlaying()).toBe(false); // stays paused
+    expect(manager.isMusicAutoplayBlocked()).toBe(false); // paused on purpose is not "blocked"
     expect(manager.isMusicMuted()).toBe(true);
     expect(manager.getMusicVolume()).toBe(0.35);
 
-    manager.playAmbientMusic(); // first-gesture resume
-    await Promise.resolve(); // let the (asynchronous) resume() settle
-    expect(manager.isMusicPlaying()).toBe(true); // context is running...
-    // ...but the player's own mute choice must still be respected — playing doesn't imply audible.
-    expect(manager.isMusicMuted()).toBe(true);
+    manager.setMusicMuted(false); // the Play button
+    await Promise.resolve();
+    expect(manager.isMusicPlaying()).toBe(true);
     expect(manager.getMusicVolume()).toBe(0.35);
   });
 });

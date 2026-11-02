@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v63",
+    dateIso: "2026-11-02",
+    category: "FIXES",
+    title: {
+      en: "Language and Music Buttons Fixed",
+      ptBR: "Botões de Idioma e Música Corrigidos",
+    },
+    description: {
+      en: "The two controls at the top of the site work properly again.",
+      ptBR: "Os dois controles no topo do site voltaram a funcionar direito.",
+    },
+    highlights: [
+      {
+        en: "The language menu was opening hidden behind the page, so the button seemed to do nothing. It now opens on top and switches between English and Portuguese.",
+        ptBR: "O menu de idioma abria escondido atrás da página, então o botão parecia não fazer nada. Agora ele abre por cima e troca entre português e inglês.",
+      },
+      {
+        en: "The music button is now a clear Pause / Play button. Pausing really stops the music and Play resumes it from the same point; your choice is remembered.",
+        ptBR: "O botão de música agora é um botão claro de Pausar / Tocar. Pausar para a música de verdade e Tocar continua do mesmo ponto; sua escolha fica salva.",
+      },
+    ],
+  },
+  {
     id: "v62",
     dateIso: "2026-10-31",
     category: "INTERFACE",
@@ -87,8 +110,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Um tema orquestral novo de dois minutos para o site, com cordas, trompas, coral, harpa e tambores, que se repete sem pausa.",
       },
       {
-        en: "Each tower has its own shot and impact: Ironwood's bowstring, Inferno's breath of flame, Frostborn's glassy ice and Stormcaller's electric zap. They are short and soft and play less often, so a big fight never turns into noise.",
-        ptBR: "Cada torre tem o seu próprio disparo e impacto: a corda da Ironwood, o sopro de fogo da Inferno, o gelo cristalino da Frostborn e o choque elétrico da Stormcaller. São curtos e suaves e tocam com menos frequência, para que uma batalha grande nunca vire barulho.",
+        en: "Each tower has its own shot and impact: Ironwood's bowstring, Inferno's breath of flame, Frostborn's ice cracking and shattering, and Stormcaller's lightning strike with its crackle and thunder. They are short and play less often, so a big fight never turns into noise.",
+        ptBR: "Cada torre tem o seu próprio disparo e impacto: a corda da Ironwood, o sopro de fogo da Inferno, o gelo rachando e se estilhaçando da Frostborn e o estalo de raio da Stormcaller, com faíscas e trovão. São curtos e tocam com menos frequência, para que uma batalha grande nunca vire barulho.",
       },
       {
         en: "New sounds for boss arrival, boss rage and boss defeat, for the castle being hit, and a war horn when a wave begins.",

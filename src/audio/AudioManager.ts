@@ -428,6 +428,15 @@ function playLoopingTrackFile(ctx: AudioContext, url: string, loopSeconds: numbe
   };
 }
 
+/** Suspends an AudioContext without ever throwing (older/fake contexts may lack suspend()). */
+function suspendQuietly(ctx: AudioContext): void {
+  try {
+    ctx.suspend?.()?.catch?.(() => {});
+  } catch {
+    // never throw over a pause
+  }
+}
+
 /** How long stopMusic()'s fade-out takes before the graph is actually torn down — long enough that the gain ramp reaches silence smoothly, short enough that navigating away from Home doesn't leave an audible tail. */
 const MUSIC_STOP_FADE_MS = 350;
 
@@ -531,7 +540,7 @@ export class AudioManager {
         // gesture yet, or suspended again later (e.g. the tab lost audio
         // focus) — `resume()` is the correct response to both, and is a
         // harmless no-op if it's already running.
-        if (this.musicGraph.ctx.state === "suspended") {
+        if (this.musicGraph.ctx.state === "suspended" && !this.musicMuted) {
           this.musicGraph.ctx.resume().catch(() => {
             // Still blocked — stays silent until the next gesture retries.
           });
@@ -572,10 +581,13 @@ export class AudioManager {
         },
       };
 
-      if (ctx.state === "suspended") {
+      if (ctx.state === "suspended" && !this.musicMuted) {
         ctx.resume().catch(() => {
           // Still blocked — stays silent until the next user gesture calls this again.
         });
+      } else if (this.musicMuted && ctx.state === "running") {
+        // Paused by the player: keep the clock stopped until they press play.
+        suspendQuietly(ctx);
       }
     } catch {
       this.musicGraph = null;
@@ -630,7 +642,8 @@ export class AudioManager {
 
   /** True only while a music graph exists but the browser hasn't yet allowed it to run — i.e. waiting on the first real user gesture. False both before any attempt has been made and once audio is actually flowing; never confused with the independent musicMuted/musicVolume flags. */
   isMusicAutoplayBlocked(): boolean {
-    return this.musicGraph !== null && this.musicGraph.ctx.state !== "running";
+    // a context the player paused on purpose is not "blocked"
+    return this.musicGraph !== null && this.musicGraph.ctx.state !== "running" && !this.musicMuted;
   }
 
   /** Ramps `masterGain` to `target` over a short, click-free transition instead of an instant value jump — the same click/pop risk `stopMusic()`'s doc comment describes applies to any sudden gain change, not just a full stop. */
@@ -652,9 +665,26 @@ export class AudioManager {
     return this.musicVolume;
   }
 
+  /**
+   * Pause/play for the site music (the Home "Pause" button). Pausing fades
+   * out and then suspends the audio clock, so the piece genuinely stops
+   * where it was and resumes from that exact point; playing resumes the
+   * clock and fades back in. The preference persists (musicSettings.ts).
+   */
   setMusicMuted(muted: boolean): void {
     this.musicMuted = muted;
     this.rampMusicGainTo(this.effectiveMusicGain());
+    const graph = this.musicGraph;
+    if (!graph) return;
+    if (muted) {
+      window.setTimeout(() => {
+        if (this.musicGraph === graph && this.musicMuted && graph.ctx.state === "running") suspendQuietly(graph.ctx);
+      }, 160);
+    } else if (graph.ctx.state === "suspended") {
+      graph.ctx.resume().catch(() => {
+        // Still blocked by autoplay — the next gesture resumes it.
+      });
+    }
   }
 
   isMusicMuted(): boolean {

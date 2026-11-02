@@ -16,6 +16,9 @@ export const ptBR: TranslationSchema = {
     muteSfx: "Silenciar Efeitos",
     musicVolume: "Volume da Música",
     muteMusic: "Silenciar Música",
+    pauseMusic: "Pausar música",
+    playMusic: "Tocar música",
+    musicLabel: "Música",
   },
   nav: {
     home: "Início",

@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { LANGUAGE_CODES, LANGUAGE_META, type LanguageCode } from "@/i18n";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { PALETTE } from "@/rendering/theme";
@@ -17,11 +18,33 @@ export function LanguageSelector({ inline = false }: LanguageSelectorProps = {})
   const { language, setLanguage, t } = useLanguage();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  // The menu is drawn in a portal on <body> with fixed positioning, anchored
+  // under the trigger: inside the top bar it was clipped by the bar's
+  // scrolling container and ended up invisible behind the Home scene, so
+  // the button looked like it did nothing.
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const r = rootRef.current?.getBoundingClientRect();
+      if (r) setAnchor({ top: r.bottom + 6, right: Math.max(8, window.innerWidth - r.right) });
+    };
+    place();
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: PointerEvent) => {
-      if (rootRef.current && !rootRef.current.contains(event.target as Node)) setOpen(false);
+      const target = event.target as Node;
+      if (rootRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
     };
     const handleKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") setOpen(false);
@@ -52,8 +75,8 @@ export function LanguageSelector({ inline = false }: LanguageSelectorProps = {})
         </span>
       </button>
 
-      {open && (
-        <ul role="listbox" style={menuStyle}>
+      {open && anchor && createPortal(
+        <ul ref={menuRef} role="listbox" aria-label={t("language.selectorLabel")} style={{ ...menuStyle, top: anchor.top, right: anchor.right }}>
           {LANGUAGE_CODES.map((code) => (
             <LanguageOption
               key={code}
@@ -65,7 +88,8 @@ export function LanguageSelector({ inline = false }: LanguageSelectorProps = {})
               }}
             />
           ))}
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );
@@ -134,10 +158,10 @@ const caretStyle: CSSProperties = {
 
 const menuStyle: CSSProperties = {
   listStyle: "none",
-  margin: "6px 0 0",
+  margin: 0,
   padding: 4,
-  position: "absolute",
-  right: 0,
+  position: "fixed",
+  zIndex: 1000,
   minWidth: 168,
   borderRadius: 8,
   border: `1px solid ${PALETTE.uiPanelBorder}`,

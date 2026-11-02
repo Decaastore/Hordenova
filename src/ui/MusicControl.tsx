@@ -3,7 +3,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { audioManager } from "@/audio/AudioManager";
 import { getMusicVolume, isMusicMuted, MUSIC_VOLUME_STEPS, setMusicVolume, toggleMusicMuted } from "@/audio/musicSettings";
-import { NoteIcon } from "./icons";
+import { PlayPauseIcon } from "./icons";
 
 /**
  * Home screen's ambient-music control: mute toggle + stepped volume +
@@ -43,12 +43,21 @@ export function MusicControl() {
   return (
     <div style={rootStyle}>
       <button
-        onClick={() => setMuted(toggleMusicMuted())}
-        title={t("audio.muteMusic")}
-        style={buttonStyle}
+        onClick={() => {
+          // the click is also the user gesture browsers require before audio may start
+          audioManager.unlock();
+          const nowMuted = toggleMusicMuted();
+          if (!nowMuted) audioManager.playAmbientMusic();
+          setMuted(nowMuted);
+        }}
+        title={muted ? t("audio.playMusic") : t("audio.pauseMusic")}
+        aria-label={muted ? t("audio.playMusic") : t("audio.pauseMusic")}
         aria-pressed={muted}
+        style={{ ...buttonStyle, color: muted ? PALETTE.uiTextDim : PALETTE.uiAccentBright }}
+        data-testid="music-toggle"
       >
-        <NoteIcon size={14} muted={muted} color={PALETTE.uiAccentBright} />
+        <PlayPauseIcon size={11} playing={!muted} color={muted ? PALETTE.uiTextDim : PALETTE.uiAccentBright} />
+        <span>{t("audio.musicLabel")}</span>
         {audible && <span style={indicatorStyle} aria-hidden="true" />}
       </button>
       <button onClick={cycleVolume} title={t("audio.musicVolume")} style={buttonStyle}>

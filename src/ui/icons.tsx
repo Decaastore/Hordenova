@@ -137,6 +137,22 @@ export function NoteIcon({ size = 14, color = "currentColor", style, muted = fal
   );
 }
 
+/** Pause (two bars) / play (triangle) for the site music. */
+export function PlayPauseIcon({ size = 12, color = "currentColor", style, playing }: IconProps & { playing: boolean }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" style={style} aria-hidden="true">
+      {playing ? (
+        <>
+          <rect x="6" y="4" width="4" height="16" rx="1.2" fill={color} />
+          <rect x="14" y="4" width="4" height="16" rx="1.2" fill={color} />
+        </>
+      ) : (
+        <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z" fill={color} />
+      )}
+    </svg>
+  );
+}
+
 export function TrophyIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
