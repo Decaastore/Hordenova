@@ -419,6 +419,8 @@ export const ptBR: TranslationSchema = {
     enrageShield: "ESCUDO -{percent}% DANO",
   },
   progressionStopped: {
+    barText: "O castelo caiu. Melhore as torres e, quando estiver pronto, tente de novo.",
+    showReport: "VER RELATÓRIO",
     title: "PROGRESSÃO INTERROMPIDA",
     phaseFailed: "FASE {phase} — FALHOU",
     restartNote: "O castelo caiu na Onda {onda}. A fase recomeça da Onda 1; suas torres, o ouro e o seu recorde continuam.",

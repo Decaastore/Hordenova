@@ -94,6 +94,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         en: "The sound volume button now also changes sounds that are already playing.",
         ptBR: "O botão de volume dos efeitos agora também ajusta os sons que já estão tocando.",
       },
+      {
+        en: "After choosing to upgrade towers on the defeat screen, a bar stays on the map with Try again and Show report, so you can always go back into the fight.",
+        ptBR: "Depois de escolher melhorar as torres na tela de derrota, uma barra fica no mapa com Tentar novamente e Ver relatório, para você sempre conseguir voltar para a luta.",
+      },
     ],
   },
   {

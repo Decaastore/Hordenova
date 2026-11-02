@@ -103,6 +103,47 @@ export function ProgressionStoppedOverlay({ hud, report, onDismiss, onRetry, onE
   );
 }
 
+/**
+ * Shown while the report is closed (the player chose "upgrade towers"): the
+ * run is still stopped, so the way back into the fight has to stay on screen.
+ */
+export function ProgressionStoppedBar({ onRetry, onShowReport }: { onRetry: () => void; onShowReport: () => void }) {
+  const { t } = useLanguage();
+  return (
+    <div style={stoppedBarStyle} data-testid="stopped-bar">
+      <span style={{ color: PALETTE.uiText, fontSize: 13, lineHeight: 1.35 }}>{t("progressionStopped.barText")}</span>
+      <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+        <button onClick={onShowReport} style={{ ...secondaryButtonStyle, padding: "8px 14px", fontSize: 12 }}>
+          {t("progressionStopped.showReport")}
+        </button>
+        <button onClick={onRetry} style={{ ...primaryButtonStyle, padding: "8px 16px", fontSize: 12 }}>
+          {t("progressionStopped.retry")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const stoppedBarStyle: CSSProperties = {
+  position: "absolute",
+  top: 12,
+  left: "50%",
+  transform: "translateX(-50%)",
+  width: "max-content",
+  maxWidth: "calc(100% - 24px)",
+  display: "flex",
+  alignItems: "center",
+  flexWrap: "wrap",
+  justifyContent: "center",
+  gap: 12,
+  padding: "10px 14px",
+  borderRadius: 10,
+  border: `1px solid ${PALETTE.danger}88`,
+  background: "rgba(28,18,10,0.94)",
+  boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+  zIndex: 6,
+};
+
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div style={{ textAlign: "center" }}>

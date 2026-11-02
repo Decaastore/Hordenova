@@ -8,7 +8,7 @@ import { CanvasRenderer } from "@/rendering/CanvasRenderer";
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
-import { ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
+import { ProgressionStoppedBar, ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
 import { BossBanner } from "@/ui/BossBanner";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
 import { PhaseBanner } from "@/ui/PhaseBanner";
@@ -508,6 +508,10 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
             onRetry={() => engine.retryPhase()}
             onExitToMenu={onExitToMenu}
           />
+        )}
+
+        {hud.phase === "PROGRESSION_STOPPED" && reportDismissed && (
+          <ProgressionStoppedBar onRetry={() => engine.retryPhase()} onShowReport={() => setReportDismissed(false)} />
         )}
 
         {offlineSummary && (

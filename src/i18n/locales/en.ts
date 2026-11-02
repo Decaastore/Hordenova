@@ -418,6 +418,8 @@ export const en = {
     enrageShield: "SHIELDED -{percent}% DMG",
   },
   progressionStopped: {
+    barText: "The castle fell. Upgrade your towers and try again when you are ready.",
+    showReport: "SHOW REPORT",
     title: "PROGRESSION STOPPED",
     phaseFailed: "PHASE {phase} — FAILED",
     restartNote: "The castle fell on Wave {onda}. The phase starts over from Wave 1; your towers, gold and record stay.",
