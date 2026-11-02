@@ -87,8 +87,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Um tema orquestral novo de dois minutos para o site, com cordas, trompas, coral, harpa e tambores, que se repete sem pausa.",
       },
       {
-        en: "Each tower has its own shot and impact: Ironwood's bolt, Inferno's fireball, Frostborn's ice and Stormcaller's lightning and chain lightning.",
-        ptBR: "Cada torre tem o seu próprio disparo e impacto: o virote da Ironwood, a bola de fogo da Inferno, o gelo da Frostborn e o raio e o raio em cadeia da Stormcaller.",
+        en: "Each tower has its own shot and impact: Ironwood's bowstring, Inferno's breath of flame, Frostborn's glassy ice and Stormcaller's electric zap. They are short and soft and play less often, so a big fight never turns into noise.",
+        ptBR: "Cada torre tem o seu próprio disparo e impacto: a corda da Ironwood, o sopro de fogo da Inferno, o gelo cristalino da Frostborn e o choque elétrico da Stormcaller. São curtos e suaves e tocam com menos frequência, para que uma batalha grande nunca vire barulho.",
       },
       {
         en: "New sounds for boss arrival, boss rage and boss defeat, for the castle being hit, and a war horn when a wave begins.",

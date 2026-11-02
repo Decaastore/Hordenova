@@ -62,22 +62,25 @@ const asset = (
 });
 
 export const SFX_ASSETS: Record<SfxId, SfxAssetConfig> = {
-  // Tower identities — spec section 3/4.
-  ironwood_attack: asset("ironwood_attack", { priority: "LOW", cooldownMs: 80 }),
-  ironwood_impact: asset("ironwood_impact", { priority: "LOW", cooldownMs: 80 }),
-  inferno_attack: asset("inferno_attack", { priority: "LOW", cooldownMs: 90 }),
+  // Tower identities — spec section 3/4. These play hundreds of times a
+  // minute, so they are short, soft designed sounds (no noise beds), spaced
+  // out per id and capped at two overlapping copies; a little more pitch
+  // variance keeps the stream from sounding mechanical.
+  ironwood_attack: asset("ironwood_attack", { priority: "LOW", cooldownMs: 200, maxSimultaneous: 2, baseVolume: 0.7, pitchVariance: 0.08 }),
+  ironwood_impact: asset("ironwood_impact", { priority: "LOW", cooldownMs: 240, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.1 }),
+  inferno_attack: asset("inferno_attack", { priority: "LOW", cooldownMs: 220, maxSimultaneous: 2, baseVolume: 0.7, pitchVariance: 0.08 }),
   // Doubles as the "burn ignition" cue (spec: don't play a full sound per
   // burn tick) — a much longer cooldown than the other impacts, since burn
   // re-applies on every Inferno volley but should read as one ongoing fire
   // effect, not a repeated ping.
-  inferno_impact: asset("inferno_impact", { priority: "LOW", cooldownMs: 350, maxSimultaneous: 2 }),
-  frostborn_attack: asset("frostborn_attack", { priority: "LOW", cooldownMs: 80 }),
-  frostborn_impact: asset("frostborn_impact", { priority: "LOW", cooldownMs: 80 }),
-  frostborn_freeze: asset("frostborn_freeze", { priority: "MEDIUM", cooldownMs: 250, maxSimultaneous: 2, baseVolume: 0.9 }),
-  stormcaller_attack: asset("stormcaller_attack", { priority: "LOW", cooldownMs: 80 }),
-  stormcaller_impact: asset("stormcaller_impact", { priority: "LOW", cooldownMs: 80 }),
+  inferno_impact: asset("inferno_impact", { priority: "LOW", cooldownMs: 400, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.1 }),
+  frostborn_attack: asset("frostborn_attack", { priority: "LOW", cooldownMs: 200, maxSimultaneous: 2, baseVolume: 0.7, pitchVariance: 0.06 }),
+  frostborn_impact: asset("frostborn_impact", { priority: "LOW", cooldownMs: 240, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  frostborn_freeze: asset("frostborn_freeze", { priority: "MEDIUM", cooldownMs: 350, maxSimultaneous: 2, baseVolume: 0.8 }),
+  stormcaller_attack: asset("stormcaller_attack", { priority: "LOW", cooldownMs: 200, maxSimultaneous: 2, baseVolume: 0.7, pitchVariance: 0.08 }),
+  stormcaller_impact: asset("stormcaller_impact", { priority: "LOW", cooldownMs: 240, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.1 }),
   // Chain lightning explicitly must not turn into a wall of noise.
-  stormcaller_chain: asset("stormcaller_chain", { priority: "MEDIUM", cooldownMs: 300, maxSimultaneous: 1, baseVolume: 0.85 }),
+  stormcaller_chain: asset("stormcaller_chain", { priority: "MEDIUM", cooldownMs: 400, maxSimultaneous: 1, baseVolume: 0.8 }),
 
   // Generic enemy feedback, reused (with pitch/volume params supplied by
   // the caller — see GameAudioBridge) for elite/mini-boss variants instead
