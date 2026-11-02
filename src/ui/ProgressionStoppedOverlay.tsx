@@ -1,4 +1,5 @@
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
+import { isBossMilestone } from "@/config/waveConfig";
 import type { CSSProperties } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import type { FailureReport } from "@/engine/BattleDiagnostics";
@@ -31,7 +32,9 @@ export function ProgressionStoppedOverlay({ hud, report, onDismiss, onRetry, onE
         <SkullIcon size={30} color={PALETTE.danger} style={{ filter: `drop-shadow(0 0 10px ${PALETTE.danger}aa)` }} />
         <h1 style={titleStyle}>{t("progressionStopped.title")}</h1>
         <div style={phaseFailedStyle}>{t("progressionStopped.phaseFailed", { phase: phaseNumberFromWave(report?.waveReached ?? hud.wave) })}</div>
-        <div style={restartNoteStyle}>{t("progressionStopped.restartNote", { onda: waveInPhase(report?.waveReached ?? hud.wave) })}</div>
+        <div style={restartNoteStyle}>{isBossMilestone(report?.waveReached ?? hud.wave)
+            ? t("progressionStopped.restartNoteBoss")
+            : t("progressionStopped.restartNote", { onda: waveInPhase(report?.waveReached ?? hud.wave) })}</div>
         <div style={dividerStyle} />
 
         {report && (

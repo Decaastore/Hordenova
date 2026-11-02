@@ -78,8 +78,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
       ptBR: "Castelo Derrubado Recomeça a Fase",
     },
     description: {
-      en: "When the castle runs out of life, the phase now starts over from Wave 1 instead of retrying only the wave you lost on. Your towers, gold and best-wave record are kept.",
-      ptBR: "Quando a vida do castelo acaba, a fase agora recomeça da Onda 1, em vez de repetir só a onda em que você perdeu. Suas torres, o ouro e o seu recorde de onda continuam.",
+      en: "When the castle runs out of life, the phase now starts over from Wave 1 instead of retrying only the wave you lost on. Losing to a main boss is the exception: you face the boss again right away. Your towers, gold and best-wave record are kept.",
+      ptBR: "Quando a vida do castelo acaba, a fase agora recomeça da Onda 1, em vez de repetir só a onda em que você perdeu. A exceção é perder para um chefe principal: você enfrenta o chefe de novo na hora. Suas torres, o ouro e o seu recorde de onda continuam.",
     },
     highlights: [
       {

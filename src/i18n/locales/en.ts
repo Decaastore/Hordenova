@@ -421,6 +421,7 @@ export const en = {
     title: "PROGRESSION STOPPED",
     phaseFailed: "PHASE {phase} — FAILED",
     restartNote: "The castle fell on Wave {onda}. The phase starts over from Wave 1; your towers, gold and record stay.",
+    restartNoteBoss: "The castle fell to the boss. You face the boss again; your towers, gold and record stay.",
     whyDidILose: "WHY DID I LOSE?",
     howCanIImprove: "HOW CAN I IMPROVE?",
     statDamage: "Damage",

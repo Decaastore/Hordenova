@@ -2220,10 +2220,11 @@ export class GameEngine {
     const finalized = finalizeBattleStats(this.battleStats, failedWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
     this.bestWave = recordRunResult(failedWave, this.storageKey).bestWave;
-    // The castle fell: the phase starts over from its first wave (best wave
-    // is kept as the record). Done here, not on retry, and saved right away
-    // so reloading the game can't skip it.
-    this.wave.currentWave = phaseStartWave(phaseNumberFromWave(failedWave));
+    // The castle fell: the phase starts over from its first wave — except
+    // on a main boss, which is fought again straight away (best wave is kept
+    // as the record either way). Done here, not on retry, and saved right
+    // away so reloading the game can't skip it.
+    this.wave.currentWave = isBossMilestone(failedWave) ? failedWave : phaseStartWave(phaseNumberFromWave(failedWave));
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();

@@ -94,6 +94,22 @@ describe("GameEngine — Active Idle progression", () => {
     expect(engine.getRenderSnapshot().towers.length).toBe(towersBeforeRetry);
   });
 
+  it("when the castle falls to a main boss, the run stays on the boss — it is fought again, not the whole phase", () => {
+    // wave 30 closes Ancient Forest with its main boss
+    updateSave({ currentWave: 30, bestWave: 30, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.startRun();
+    // a castle on its last point of life, so it falls to the boss itself
+    (engine as unknown as { baseHp: number }).baseHp = 1;
+    runUntilStopped(engine);
+    expect(engine.getFailureReport()!.waveReached).toBe(30);
+    expect(engine.getHudSnapshot().wave).toBe(30);
+    expect(loadSave().currentWave).toBe(30);
+    engine.retryPhase();
+    expect(engine.getHudSnapshot().phase).toBe("BOSS_INTRO");
+    expect(engine.getHudSnapshot().wave).toBe(30);
+  });
+
   it("when the castle falls mid-phase, the run goes back to that phase's Wave 1 — and the save says so, so a reload can't skip it", () => {
     // start in the middle of phase 4 (waves 31-40) with no defence at all
     updateSave({ currentWave: 37, bestWave: 37, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
