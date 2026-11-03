@@ -12,6 +12,7 @@ import { buyTowerSkin, claimDailyGift, equipTowerSkin, getSkinStatus, getStoreTo
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { GemIcon } from "@/ui/icons";
+import { RewardPartsLabel, REWARD_CSS } from "@/ui/RewardPartsLabel";
 
 interface StoreScreenProps {
   onNavigate: (view: NavView) => void;
@@ -68,7 +69,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 
   return (
     <div className="pg-root">
-      <style>{PAGE_CSS + STORE_CSS}</style>
+      <style>{PAGE_CSS + STORE_CSS + REWARD_CSS}</style>
       <TopNav active="STORE" onNavigate={onNavigate} onPlay={onPlay} />
       <div className="pg-scroll">
         <header className="pg-hero">
@@ -118,7 +119,10 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
             <article className="st-starter" data-testid="starter-pack">
               <div>
                 <h3>{t("store.starterTitle")}</h3>
-                <p>{t("store.starterBody", { gems: num.format(STARTER_PACK.gems), shards: STARTER_PACK.gemShards, price: brl.format(STARTER_PACK.priceBrl) })}</p>
+                <p>{t("store.starterBody")}</p>
+                <div className="st-starter-list">
+                  <RewardPartsLabel parts={STARTER_PACK.contents} currentWave={save.currentWave} />
+                </div>
               </div>
               <div className="st-starter-buy">
                 <span className="st-price">{brl.format(STARTER_PACK.priceBrl)}</span>
@@ -242,6 +246,7 @@ const STORE_CSS = `
 .st-starter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-bottom: 18px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(232,176,75,0.55); background: linear-gradient(100deg, rgba(232,176,75,0.14), rgba(24,18,12,0.6) 60%); }
 .st-starter h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--gold-hi); }
 .st-starter p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 56ch; }
+.st-starter-list { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 14px; }
 .st-starter-buy { display: grid; justify-items: center; gap: 6px; min-width: 170px; }
 .st-starter-buy .st-price { margin: 0; }
 .st-starter-buy small { font-size: 12px; color: var(--ash); }

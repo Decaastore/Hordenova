@@ -751,7 +751,18 @@ export const en = {
   worldFirst: {
     badge: "FIRST TIME YOU FOUND THIS",
   },
+  reward: {
+    purchasedGems: "{n} Purchased Gems",
+    shards: "{n} shards",
+    gem: "{n} Gem",
+    gems: "{n} Gems",
+    gold: "{n} Gold",
+    slots: "+{n} inventory slots",
+    item: "{rarity} item",
+    skin: "Skin: {name}",
+  },
   pass: {
+    boundNote: "Items from the Pass and the Store stay on your account: you can equip and fuse them, but not sell them on the Marketplace.",
     title: "Season Pass",
     sub: "Earn XP by playing: {wave} per wave cleared, {mini} per mini-boss, {boss} per boss and {mission} per daily mission claimed. The Pass starts over every Season.",
     level: "Level {level} of {max}",
@@ -759,9 +770,6 @@ export const en = {
     complete: "Pass complete",
     freeTrack: "Free",
     premiumTrack: "Premium",
-    shards: "{n} shards",
-    gem: "{n} Gem",
-    gems: "{n} Gems",
     claim: "Claim",
     claimed: "Claimed",
     claimAll: "Claim all ({n})",
@@ -786,7 +794,7 @@ export const en = {
   },
   store: {
     starterTitle: "Starter pack",
-    starterBody: "Once per account: {gems} Gems and {shards} shards for {price}. More than three times the same-price pack.",
+    starterBody: "Once per account, to start with an edge. This pack's skin never shows up in the Season Pass.",
     starterSoon: "Arrives with Pix and card payments.",
     pageTitle: "Store",
     lead: "Gems, tower skins and a gift every day. Skins you buy are yours for good, across every Season.",

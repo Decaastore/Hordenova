@@ -752,7 +752,18 @@ export const ptBR: TranslationSchema = {
   worldFirst: {
     badge: "PRIMEIRA VEZ QUE VOCÊ ENCONTROU ISSO",
   },
+  reward: {
+    purchasedGems: "{n} Gemas Compradas",
+    shards: "{n} fragmentos",
+    gem: "{n} Gema",
+    gems: "{n} Gemas",
+    gold: "{n} de ouro",
+    slots: "+{n} espaços no inventário",
+    item: "Item {rarity}",
+    skin: "Skin: {name}",
+  },
   pass: {
+    boundNote: "Os itens do Passe e da Loja ficam na sua conta: dá para equipar e fundir, mas não para vender no Mercado.",
     title: "Passe da Season",
     sub: "Ganhe XP jogando: {wave} por onda vencida, {mini} por mini-chefe, {boss} por chefe e {mission} por missão do dia resgatada. O Passe recomeça a cada Season.",
     level: "Nível {level} de {max}",
@@ -760,9 +771,6 @@ export const ptBR: TranslationSchema = {
     complete: "Passe completo",
     freeTrack: "Grátis",
     premiumTrack: "Premium",
-    shards: "{n} fragmentos",
-    gem: "{n} Gema",
-    gems: "{n} Gemas",
     claim: "Resgatar",
     claimed: "Resgatado",
     claimAll: "Resgatar tudo ({n})",
@@ -787,7 +795,7 @@ export const ptBR: TranslationSchema = {
   },
   store: {
     starterTitle: "Pacote inicial",
-    starterBody: "Uma vez por conta: {gems} Gemas e {shards} fragmentos por {price}. Mais que o triplo do pacote de mesmo preço.",
+    starterBody: "Uma vez por conta, para começar com vantagem. A skin deste pacote não aparece no Passe da Season.",
     starterSoon: "Chega com a compra por Pix e cartão.",
     pageTitle: "Loja",
     lead: "Gemas, skins de torre e um presente todo dia. As skins compradas ficam com você para sempre, em todas as Seasons.",

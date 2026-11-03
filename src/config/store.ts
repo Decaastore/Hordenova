@@ -1,3 +1,4 @@
+import { STARTER_PACK_SKIN_ID, type RewardPart } from "./seasonPass";
 /**
  * STORE — what the Loja page sells.
  *
@@ -41,10 +42,21 @@ export const GEM_PACKS: readonly GemPack[] = [
 
 /**
  * One-time starter offer (once per account), unlocked with real payments
- * like the packs above. 600 Gems + 50 Gem Shards for the price of the
- * 220-Gem pack: the first purchase is the hardest one to earn.
+ * like the packs above. Deliberately different from the gem packs and from
+ * the Season Pass: Gems, a Premium tower skin, a Rare item and extra
+ * inventory space, for the price of the 220-Gem pack — the first purchase
+ * is the hardest one to earn.
  */
-export const STARTER_PACK = { id: "STARTER", gems: 600, gemShards: 50, priceBrl: 9.9 } as const;
+export const STARTER_PACK: { id: string; priceBrl: number; contents: readonly RewardPart[] } = {
+  id: "STARTER",
+  priceBrl: 9.9,
+  contents: [
+    { kind: "PURCHASED_GEMS", amount: 500 },
+    { kind: "SKIN", skinId: STARTER_PACK_SKIN_ID },
+    { kind: "ITEM", rarity: "RARE" },
+    { kind: "INVENTORY_SLOTS", amount: 10 },
+  ],
+};
 
 export function gemPackTotal(pack: GemPack): number {
   return pack.gems + pack.bonusGems;

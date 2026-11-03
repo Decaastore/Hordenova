@@ -1,5 +1,5 @@
 import { loadSave, updateSave, type SaveData } from "./SaveSystem";
-import { appendLedgerEvent } from "./EconomyLedger";
+import { applyRewardParts } from "./RewardGrant";
 import { seasonClock } from "./SeasonClock";
 import { freeRewardForLevel, freshPassState, PASS_LEVELS, PASS_XP_PER_LEVEL, passLevelFromXp, type SeasonPassState } from "@/config/seasonPass";
 
@@ -46,14 +46,8 @@ export function claimFreePassLevel(level: number): SaveData | null {
   const save = loadSave();
   const state = currentPassState(save);
   if (level < 1 || level > passLevelFromXp(state.xp) || state.claimedFree.includes(level)) return null;
-  const reward = freeRewardForLevel(level);
-  if (reward.gemShards > 0) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: save.playerId, source: `season_pass:${level}`, amount: reward.gemShards });
-  if (reward.freeGems > 0) appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: save.playerId, source: `season_pass:${level}`, amount: reward.freeGems, currency: "FREE" });
-  return updateSave({
-    gemShards: save.gemShards + reward.gemShards,
-    freeGems: save.freeGems + reward.freeGems,
-    seasonPass: { ...state, claimedFree: [...state.claimedFree, level] },
-  });
+  const changes = applyRewardParts(save, freeRewardForLevel(level), { type: "SEASON_PASS", refId: `free:${level}` });
+  return updateSave({ ...changes, seasonPass: { ...state, claimedFree: [...state.claimedFree, level] } });
 }
 
 /** Claims every reached free level at once. */

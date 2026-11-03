@@ -91,8 +91,12 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "XP do Passe: 1 por onda vencida, 3 por mini-chefe, 20 por chefe e 10 por missão resgatada.",
       },
       {
-        en: "The free track pays Gem Shards on every level and a Free Gem every 10 levels. The Premium track and the one-time Starter pack in the Store are listed and arrive with Pix and card payments.",
-        ptBR: "A trilha Grátis paga fragmentos em todo nível e uma Gema Grátis a cada 10 níveis. A trilha Premium e o Pacote inicial da Loja, uma vez por conta, já aparecem e chegam junto com a compra por Pix e cartão.",
+        en: "The free track mixes Gem Shards, Gold, equipment items (up to Epic at level 30) and Free Gems. The Premium track offers different rewards on every level, including two tower skins that change each Season, and the one-time Starter pack in the Store brings Gems, its own skin, a Rare item and inventory space. Both arrive with Pix and card payments.",
+        ptBR: "A trilha Grátis mistura fragmentos, ouro, itens de equipamento (até Épico no nível 30) e Gemas Grátis. A trilha Premium tem recompensas diferentes em todo nível, incluindo duas skins de torre que mudam a cada Season, e o Pacote inicial da Loja, uma vez por conta, traz Gemas, uma skin própria, um item Raro e espaço no inventário. Os dois chegam junto com a compra por Pix e cartão.",
+      },
+      {
+        en: "Items from the Pass and the Store stay on your account: they can be equipped and fused, but not sold on the Marketplace.",
+        ptBR: "Os itens do Passe e da Loja ficam na sua conta: dá para equipar e fundir, mas não para vender no Mercado.",
       },
     ],
   },

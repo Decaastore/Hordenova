@@ -1390,6 +1390,8 @@ export class GameEngine {
         }
       }
     }
+    // account-bound inputs (Season Pass / Store rewards) make an account-bound result
+    const allInputsTradable = this.inventory.filter((item) => consumedIds.has(item.instanceId)).every((item) => item.tradable);
     this.inventory = this.inventory.filter((item) => !consumedIds.has(item.instanceId));
 
     for (const instanceId of selectedInstanceIds) {
@@ -1430,6 +1432,7 @@ export class GameEngine {
     }
 
     const resultItem = createItemInstance(resultDefinitionId, this.playerId, { type: "FUSION", refId: "fusion" });
+    if (!allInputsTradable) resultItem.tradable = false;
     const addResult = addItemWithCapacity(this.inventory, this.overflowInventory, resultItem, this.inventoryCapacity);
     this.inventory = addResult.inventory;
     this.overflowInventory = addResult.overflow;

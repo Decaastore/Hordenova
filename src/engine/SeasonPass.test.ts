@@ -3,9 +3,12 @@ import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
 import { claimAllFreePassLevels, claimFreePassLevel, getPassView } from "./SeasonPassService";
 import { seasonClock } from "./SeasonClock";
-import { freeRewardForLevel, PASS_LEVELS, PASS_XP, PASS_XP_PER_LEVEL } from "@/config/seasonPass";
+import { freeRewardForLevel, PASS_LEVELS, PASS_XP, PASS_XP_PER_LEVEL, premiumRewardForLevel, premiumSkinsForSeason } from "@/config/seasonPass";
+import { STARTER_PACK } from "@/config/store";
+import { getItemDefinition } from "@/config/itemDefinitions";
 
 const season = () => seasonClock.getCurrentSeasonWindow().seasonNumber;
+const kinds = (parts: readonly { kind: string }[]) => parts.map((p) => p.kind).join("+");
 
 describe("Season Pass", () => {
   beforeEach(() => window.localStorage.clear());
@@ -20,27 +23,44 @@ describe("Season Pass", () => {
     expect(loadSave().seasonPass!.seasonNumber).toBe(season());
   });
 
-  it("free levels are claimable once reached, pay their reward once, and claim-all takes every reached level", () => {
-    updateSave({ seasonPass: { seasonNumber: season(), xp: PASS_XP_PER_LEVEL * 10 + 5, claimedFree: [] }, gemShards: 0, freeGems: 0 });
+  it("the free track, the premium track and the starter pack each offer different things", () => {
+    const free = new Set<string>();
+    const premium = new Set<string>();
+    for (let l = 1; l <= PASS_LEVELS; l++) {
+      for (const p of freeRewardForLevel(l)) free.add(p.kind);
+      for (const p of premiumRewardForLevel(l, season())) premium.add(p.kind);
+      expect(kinds(premiumRewardForLevel(l, season()))).not.toBe(kinds(freeRewardForLevel(l)));
+    }
+    expect([...free].sort()).toEqual(["GEMS", "GOLD", "ITEM", "SHARDS"]);
+    expect(premium.has("SKIN") && premium.has("INVENTORY_SLOTS")).toBe(true);
+    expect(free.has("SKIN")).toBe(false);
+    // the starter pack's skin isn't one of this season's pass skins, and it carries Purchased Gems the pass never gives
+    const starterSkin = (STARTER_PACK.contents.find((p) => p.kind === "SKIN") as { skinId: string }).skinId;
+    for (let n = 1; n <= 40; n++) expect(premiumSkinsForSeason(n)).not.toContain(starterSkin);
+    expect(STARTER_PACK.contents.some((p) => p.kind === "PURCHASED_GEMS")).toBe(true);
+    // premium skins change from one Season to the next
+    expect(premiumSkinsForSeason(season())).not.toEqual(premiumSkinsForSeason(season() + 1));
+  });
+
+  it("claiming pays the level's real reward once: Shards, Gold, account-bound items, Gems", () => {
+    updateSave({ seasonPass: { seasonNumber: season(), xp: PASS_XP_PER_LEVEL * 10 + 5, claimedFree: [] }, gemShards: 0, freeGems: 0, gold: 0, currentWave: 20, inventory: [] });
     const view = getPassView();
     expect(view.level).toBe(10);
     expect(view.xpIntoLevel).toBe(5);
     expect(view.claimable).toHaveLength(10);
 
     expect(claimFreePassLevel(11)).toBeNull(); // not reached
-    const after = claimFreePassLevel(5)!;
-    expect(after.gemShards).toBe(freeRewardForLevel(5).gemShards);
+    expect(claimFreePassLevel(2)!.gold).toBeGreaterThan(0); // a Gold level
+    const withItem = claimFreePassLevel(5)!; // an item level
+    expect(withItem.inventory).toHaveLength(1);
+    const item = withItem.inventory[0]!;
+    expect(getItemDefinition(item.itemDefinitionId)!.rarity).toBe("UNCOMMON");
+    expect(item.tradable).toBe(false); // can't be sold on the Marketplace
     expect(claimFreePassLevel(5)).toBeNull(); // only once
 
     const all = claimAllFreePassLevels();
-    let shards = 0;
-    let gems = 0;
-    for (let l = 1; l <= 10; l++) {
-      shards += freeRewardForLevel(l).gemShards;
-      gems += freeRewardForLevel(l).freeGems;
-    }
-    expect(all.gemShards).toBe(shards);
-    expect(all.freeGems).toBe(gems);
+    expect(all.freeGems).toBe(1); // level 10
+    expect(all.gemShards).toBeGreaterThan(0);
     expect(getPassView().claimable).toHaveLength(0);
   });
 
