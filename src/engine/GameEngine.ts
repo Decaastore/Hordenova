@@ -32,7 +32,7 @@ import {
   PRESTIGE_MILESTONE_REWARDS,
   type PrestigeBonuses,
 } from "@/config/prestige";
-import type { EnemyType } from "@/config/enemyStats";
+import { getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
 import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY, findItem } from "./InventoryManager";
@@ -83,6 +83,7 @@ import {
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { gemPriceForCurrency, TRADE_UNLOCK_PRICE, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
 import { getCurrentDayIndex } from "./DailyClock";
+import { freshMissionsState, MISSION_REWARD_KILLS_WORTH_OF_GOLD, MISSION_REWARD_SHARDS, missionsForDay, type DailyMissionsState, type MissionKind } from "@/config/dailyMissions";
 import {
   advanceEnemy,
   createEliteEnemyInstance,
@@ -191,6 +192,18 @@ export interface HudSnapshot {
   deployBench: readonly { id: string; type: TowerType; level: number }[];
   /** Castle falls in a row to the current main boss (0 after a kill or a phase restart). */
   bossFallStreak: number;
+  /** Daily missions: changes whenever any progress/claim changes (for re-rendering), and how many are done but not yet claimed. */
+  missionsKey: string;
+  missionsClaimable: number;
+}
+
+export interface DailyMissionView {
+  kind: MissionKind;
+  target: number;
+  progress: number;
+  claimed: boolean;
+  rewardShards: number;
+  rewardGold: number;
 }
 
 /**
@@ -275,6 +288,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.mapLayoutId === b.mapLayoutId &&
     a.towerCount === b.towerCount &&
     a.bossFallStreak === b.bossFallStreak &&
+    a.missionsKey === b.missionsKey &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
   );
@@ -404,6 +418,7 @@ export class GameEngine {
   private gemShards = 0;
   /** Fractions of Gold / Gem Shards left over by the paid-skin reward bonus, carried to the next grant so small per-kill bonuses aren't rounded away. */
   private skinGoldCarry = 0;
+  private dailyMissions: DailyMissionsState = freshMissionsState(getCurrentDayIndex());
   private skinShardCarry = 0;
   /** GEMS ECONOMY v2 — the permanent, one-time Trade Unlock gate (see canUnlockTrade/unlockTrade below). */
   private tradeUnlocked = false;
@@ -563,6 +578,7 @@ export class GameEngine {
     this.grantEarnedPrestigeMilestoneRewards();
     this.pendingRouletteSpinWaves = [...save.pendingRouletteSpinWaves];
     this.lastFreeRepositionDayIndex = save.lastFreeRepositionDayIndex;
+    this.dailyMissions = save.dailyMissions ?? freshMissionsState(getCurrentDayIndex());
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -1016,6 +1032,7 @@ export class GameEngine {
 
     this.gold -= cost;
     upgradeTowerEntity(tower);
+    this.trackMission("UPGRADE_TOWERS");
     const unlock = getMilestoneUnlockForLevel(tower.type, tower.level);
     this.emitAudio(unlock ? { type: "level_unlock" } : { type: "tower_upgrade" });
     this.persist();
@@ -1538,6 +1555,61 @@ export class GameEngine {
     this.notify();
   }
 
+  // -------------------------------------------------------------------
+  // DAILY MISSIONS (config/dailyMissions.ts)
+  // -------------------------------------------------------------------
+
+  /** Rolls the state over to a fresh set when the day changed. */
+  private currentMissions(): DailyMissionsState {
+    const today = getCurrentDayIndex();
+    if (this.dailyMissions.dayIndex !== today) this.dailyMissions = freshMissionsState(today);
+    return this.dailyMissions;
+  }
+
+  private missionRewardGold(): number {
+    return getScaledEnemyStats("CRAWLER", Math.max(1, this.wave.currentWave)).goldReward * MISSION_REWARD_KILLS_WORTH_OF_GOLD;
+  }
+
+  getDailyMissions(): DailyMissionView[] {
+    const state = this.currentMissions();
+    const gold = this.missionRewardGold();
+    return missionsForDay(state.dayIndex).map((def, i) => ({
+      kind: def.kind,
+      target: def.target,
+      progress: Math.min(def.target, state.progress[i] ?? 0),
+      claimed: state.claimed[i] === true,
+      rewardShards: MISSION_REWARD_SHARDS,
+      rewardGold: gold,
+    }));
+  }
+
+  private missionsKey(): string {
+    const state = this.currentMissions();
+    return `${state.dayIndex}:${state.progress.join(",")}:${state.claimed.map((c) => (c ? 1 : 0)).join("")}`;
+  }
+
+  /** Counts a real gameplay event toward today's missions of that kind. */
+  private trackMission(kind: MissionKind, amount = 1): void {
+    const state = this.currentMissions();
+    missionsForDay(state.dayIndex).forEach((def, i) => {
+      if (def.kind === kind && !state.claimed[i]) state.progress[i] = Math.min(def.target, (state.progress[i] ?? 0) + amount);
+    });
+  }
+
+  /** Grants a finished mission's reward (Gem Shards + Gold) once. */
+  claimDailyMission(index: number): boolean {
+    const state = this.currentMissions();
+    const def = missionsForDay(state.dayIndex)[index];
+    if (!def || state.claimed[index] || (state.progress[index] ?? 0) < def.target) return false;
+    state.claimed[index] = true;
+    this.gold += this.missionRewardGold();
+    this.addGemShards(MISSION_REWARD_SHARDS, `daily_mission:${def.kind}`);
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
   /** Paid tower skins' reward bonus (config/towerSkins.ts — SKIN_REWARD_BONUS_PER_TYPE): +5% Gold and Gem Shards per tower type in play wearing a paid skin. Never affects combat. */
   getSkinRewardMultiplier(): number {
     return getSkinRewardMultiplier(this.equippedTowerSkinByType, this.towers.map((t) => t.type));
@@ -1913,7 +1985,10 @@ export class GameEngine {
           isCrit: damageEvent.isCrit === true,
         });
       }
-      if (damageEvent.isFreeze) this.emitAudio({ type: "frostborn_freeze" });
+      if (damageEvent.isFreeze) {
+        this.emitAudio({ type: "frostborn_freeze" });
+        this.trackMission("FREEZE_ENEMIES");
+      }
     }
 
     for (const projectile of this.projectiles) tickProjectile(projectile, scaledDt);
@@ -1942,6 +2017,8 @@ export class GameEngine {
         // the amount the player actually receives.
         this.gold += this.withSkinGoldBonus(Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier));
         this.enemiesDefeated += 1;
+        this.trackMission("KILL_ENEMIES");
+        if (enemy.boss && !enemy.boss.isMainBoss) this.trackMission("DEFEAT_MINI_BOSSES");
         recordKill(this.battleStats, enemy);
         const tier = this.classifyEnemyTier(enemy);
         const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
@@ -2036,6 +2113,7 @@ export class GameEngine {
         if (this.waveCompleteAudioFiredForWave !== this.wave.currentWave) {
           this.waveCompleteAudioFiredForWave = this.wave.currentWave;
           this.emitAudio({ type: "wave_complete" });
+          this.trackMission("CLEAR_WAVES");
         }
         // AUDITORIA E CORREÇÃO GERAL spec section 10/13 — advanceBestWave
         // can now enqueue a pending Roulette spin (pendingRouletteSpinWaves)
@@ -2406,6 +2484,7 @@ export class GameEngine {
         equippedTowerSkinByType: this.equippedTowerSkinByType,
         unlockedSpecializationIds: this.unlockedSpecializationIds,
         lastFreeRepositionDayIndex: this.lastFreeRepositionDayIndex,
+        dailyMissions: this.dailyMissions,
       },
       this.storageKey,
     );
@@ -2452,6 +2531,8 @@ export class GameEngine {
       towerCount: this.towers.length,
       deployBench: this.deployBench.map((t) => ({ id: t.id, type: t.type, level: t.level })),
       bossFallStreak: this.bossFallStreak,
+      missionsKey: this.missionsKey(),
+      missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
     };
 
     const prev = this.cachedHud;

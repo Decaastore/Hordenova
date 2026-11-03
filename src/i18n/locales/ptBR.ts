@@ -65,6 +65,7 @@ export const ptBR: TranslationSchema = {
     footerRights: "© {year} HORDENOVA. Todos os direitos reservados.",
   },
   hud: {
+    openStore: "Abrir a Loja",
     backToHome: "Voltar para o início",
     wave: "FASE",
     phaseWaveValue: "FASE {phase} — ONDA {onda}",
@@ -750,6 +751,22 @@ export const ptBR: TranslationSchema = {
   },
   worldFirst: {
     badge: "PRIMEIRA VEZ QUE VOCÊ ENCONTROU ISSO",
+  },
+  missions: {
+    button: "Missões",
+    title: "Missões do dia",
+    resets: "Três desafios novos todo dia, iguais para todos os jogadores.",
+    claim: "Resgatar",
+    claimed: "Resgatada",
+    inProgress: "Em andamento",
+    close: "Fechar",
+    kinds: {
+      KILL_ENEMIES: "Derrote {n} inimigos",
+      CLEAR_WAVES: "Vença {n} ondas",
+      DEFEAT_MINI_BOSSES: "Derrote {n} mini-chefes",
+      UPGRADE_TOWERS: "Melhore torres {n} vezes",
+      FREEZE_ENEMIES: "Congele {n} inimigos com a Frostborn",
+    },
   },
   store: {
     pageTitle: "Loja",

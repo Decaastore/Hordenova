@@ -64,6 +64,7 @@ export const en = {
     footerRights: "© {year} HORDENOVA. All rights reserved.",
   },
   hud: {
+    openStore: "Open the Store",
     backToHome: "Back to Home",
     wave: "PHASE",
     phaseWaveValue: "PHASE {phase} — WAVE {onda}",
@@ -749,6 +750,22 @@ export const en = {
   },
   worldFirst: {
     badge: "FIRST TIME YOU FOUND THIS",
+  },
+  missions: {
+    button: "Missions",
+    title: "Daily missions",
+    resets: "Three new challenges every day, the same for every player.",
+    claim: "Claim",
+    claimed: "Claimed",
+    inProgress: "In progress",
+    close: "Close",
+    kinds: {
+      KILL_ENEMIES: "Defeat {n} enemies",
+      CLEAR_WAVES: "Clear {n} waves",
+      DEFEAT_MINI_BOSSES: "Defeat {n} mini-bosses",
+      UPGRADE_TOWERS: "Upgrade towers {n} times",
+      FREEZE_ENEMIES: "Freeze {n} enemies with Frostborn",
+    },
   },
   store: {
     pageTitle: "Store",

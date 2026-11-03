@@ -65,7 +65,7 @@ export default function App() {
   return (
     <LanguageProvider>
       {view === "GAME" ? (
-        <GameScreen onExitToMenu={() => setView("HOME")} />
+        <GameScreen onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
       ) : view === "SEASON" ? (
         // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the ONLY "JOGAR"
         // that goes straight into gameplay: the player is already looking

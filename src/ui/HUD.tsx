@@ -6,7 +6,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
-import { BagIcon, BoltIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -14,9 +14,13 @@ interface HUDProps {
   onOpenInventory: () => void;
   /** The HORDENOVA logo takes the player back to the Home page — same as the defeat screen's Main Menu button (a wave in progress restarts on return). */
   onExitToHome?: () => void;
+  /** Clicking either Gem balance opens the Store. */
+  onOpenStore?: () => void;
+  /** Opens/closes the daily missions panel. */
+  onToggleMissions?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -71,20 +75,22 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome }: HUDProps
          * icons/labels, and a tooltip stating the real conversion rate make
          * the two currencies impossible to conflate at a glance.
          */}
-        <Stat
-          icon={<GemIcon color={PALETTE.gem} />}
-          label={t("hud.freeGems")}
-          value={String(hud.freeGems)}
-          valueColor={PALETTE.gem}
-          title={t("gems.freeExplainer")}
-        />
-        <Stat
-          icon={<GemIcon color={PALETTE.gem} />}
-          label={t("hud.purchasedGems")}
-          value={String(hud.purchasedGems)}
-          valueColor={PALETTE.gem}
-          title={t("gems.purchasedExplainer")}
-        />
+        <GemsLink onOpenStore={onOpenStore} title={t("hud.openStore")}>
+          <Stat
+            icon={<GemIcon color={PALETTE.gem} />}
+            label={t("hud.freeGems")}
+            value={String(hud.freeGems)}
+            valueColor={PALETTE.gem}
+            title={onOpenStore ? undefined : t("gems.freeExplainer")}
+          />
+          <Stat
+            icon={<GemIcon color={PALETTE.gem} />}
+            label={t("hud.purchasedGems")}
+            value={String(hud.purchasedGems)}
+            valueColor={PALETTE.gem}
+            title={onOpenStore ? undefined : t("gems.purchasedExplainer")}
+          />
+        </GemsLink>
         {hud.gemShards > 0 && (
           <Stat
             icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
@@ -121,6 +127,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome }: HUDProps
             </button>
           );
         })}
+        {onToggleMissions && (
+          <button onClick={onToggleMissions} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="missions-button">
+            <ScrollIcon size={13} />
+            {t("missions.button")}
+            {hud.missionsClaimable > 0 && <span style={badgeStyle}>{hud.missionsClaimable}</span>}
+          </button>
+        )}
         <button onClick={onOpenInventory} style={inventoryButtonStyle}>
           <BagIcon size={13} />
           {t("inventory.button")}
@@ -227,6 +240,16 @@ function PhaseWaveProgress({ onda }: { onda: number }) {
         );
       })}
     </div>
+  );
+}
+
+/** Wraps the two Gem balances in one button to the Store (or renders them plainly when there's no Store link). */
+function GemsLink({ onOpenStore, title, children }: { onOpenStore?: () => void; title: string; children: ReactNode }) {
+  if (!onOpenStore) return <>{children}</>;
+  return (
+    <button type="button" onClick={onOpenStore} title={title} aria-label={title} style={gemsLinkStyle} data-testid="hud-gems">
+      {children}
+    </button>
   );
 }
 
@@ -347,6 +370,37 @@ const goldGainStyle: CSSProperties = {
   fontWeight: 700,
   whiteSpace: "nowrap",
   pointerEvents: "none",
+};
+
+const gemsLinkStyle: CSSProperties = {
+  display: "flex",
+  gap: 20,
+  alignItems: "center",
+  padding: "2px 6px",
+  margin: "-2px -6px",
+  borderRadius: 8,
+  border: "1px solid transparent",
+  background: "none",
+  color: "inherit",
+  font: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
+const badgeStyle: CSSProperties = {
+  position: "absolute",
+  top: -7,
+  right: -7,
+  minWidth: 16,
+  height: 16,
+  padding: "0 4px",
+  borderRadius: 8,
+  background: PALETTE.gold,
+  color: "#2b1906",
+  fontSize: 10,
+  fontWeight: 800,
+  lineHeight: "16px",
+  textAlign: "center",
 };
 
 const inventoryButtonStyle: CSSProperties = {

@@ -8,6 +8,7 @@ import { CanvasRenderer } from "@/rendering/CanvasRenderer";
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
+import { DailyMissionsPanel } from "@/ui/DailyMissionsPanel";
 import { ProgressionStoppedBar, ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
 import { BossBanner } from "@/ui/BossBanner";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
@@ -66,9 +67,11 @@ const WorldSceneOverlay = lazy(() =>
 
 interface GameScreenProps {
   onExitToMenu: () => void;
+  /** Leaves the game for the Store page (the HUD's Gem balances). */
+  onOpenStore?: () => void;
 }
 
-export function GameScreen({ onExitToMenu }: GameScreenProps) {
+export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const { engine, hud } = useGameEngine();
   useGameAudio(engine);
   // Stable callback identities for the dismissible banners below: `engine`
@@ -89,6 +92,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
   // re-armed whenever a fresh PROGRESSION_STOPPED report comes in.
   const [reportDismissed, setReportDismissed] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [missionsOpen, setMissionsOpen] = useState(false);
 
   // INIMIGOS 3D — pilot scope: only BRUTE gets a 3D model (see
   // rendering3d/BruteEnemyLayer.tsx). `enable3DEnemies` starts as the
@@ -319,7 +323,7 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -516,6 +520,10 @@ export function GameScreen({ onExitToMenu }: GameScreenProps) {
 
         {offlineSummary && (
           <WelcomeBackOverlay summary={offlineSummary} onContinue={() => engine.dismissOfflineSummary()} />
+        )}
+
+        {missionsOpen && (
+          <DailyMissionsPanel missions={engine.getDailyMissions()} onClaim={(i) => engine.claimDailyMission(i)} onClose={() => setMissionsOpen(false)} />
         )}
 
         {inventoryOpen && (

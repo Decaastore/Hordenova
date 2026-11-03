@@ -42,6 +42,8 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     towerCount: 0,
     deployBench: [],
     bossFallStreak: 0,
+    missionsKey: "",
+    missionsClaimable: 0,
     ...overrides,
   };
 }

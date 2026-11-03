@@ -42,11 +42,15 @@ export function EnemyDiscoveryBanner({ enemyType, onAcknowledge }: EnemyDiscover
   );
 }
 
+// Bottom-centre, not top-left: almost every map's portal sits on the left
+// edge, and the card used to hide the creatures coming out of it.
 const containerStyle: CSSProperties = {
   position: "absolute",
-  top: 16,
-  left: 16,
+  bottom: 16,
+  left: "50%",
+  transform: "translateX(-50%)",
   width: 230,
+  maxWidth: "calc(100% - 24px)",
   padding: "12px 14px",
   borderRadius: 10,
   border: `1px solid ${PALETTE.uiPanelBorder}`,
