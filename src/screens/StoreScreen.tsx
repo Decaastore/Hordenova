@@ -4,7 +4,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { loadSave, type SaveData } from "@/engine/SaveSystem";
-import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
+import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
@@ -115,6 +115,19 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
               <h2 className="pg-h2">{t("store.gemsTitle")}</h2>
             </div>
             <p className="pg-sub">{REAL_MONEY_PAYMENTS_ENABLED ? t("store.gemsSub") : t("store.gemsSubSoon")}</p>
+            <article className="st-starter" data-testid="starter-pack">
+              <div>
+                <h3>{t("store.starterTitle")}</h3>
+                <p>{t("store.starterBody", { gems: num.format(STARTER_PACK.gems), shards: STARTER_PACK.gemShards, price: brl.format(STARTER_PACK.priceBrl) })}</p>
+              </div>
+              <div className="st-starter-buy">
+                <span className="st-price">{brl.format(STARTER_PACK.priceBrl)}</span>
+                <button className="st-buy" disabled={!REAL_MONEY_PAYMENTS_ENABLED} onClick={() => onBuyPack(STARTER_PACK.id)}>
+                  {REAL_MONEY_PAYMENTS_ENABLED ? t("store.buy") : t("store.soon")}
+                </button>
+                {!REAL_MONEY_PAYMENTS_ENABLED && <small>{t("store.starterSoon")}</small>}
+              </div>
+            </article>
             <div className="st-packs">
               {GEM_PACKS.map((pack) => (
                 <article key={pack.id} className={`st-pack${pack.tag ? " is-tagged" : ""}`}>
@@ -226,6 +239,12 @@ const STORE_CSS = `
 .st-section { padding: 40px 0 8px; }
 .st-section:last-child { padding-bottom: 96px; }
 
+.st-starter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-bottom: 18px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(232,176,75,0.55); background: linear-gradient(100deg, rgba(232,176,75,0.14), rgba(24,18,12,0.6) 60%); }
+.st-starter h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--gold-hi); }
+.st-starter p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 56ch; }
+.st-starter-buy { display: grid; justify-items: center; gap: 6px; min-width: 170px; }
+.st-starter-buy .st-price { margin: 0; }
+.st-starter-buy small { font-size: 12px; color: var(--ash); }
 .st-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
 .st-pack { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 16px 18px; border-radius: 12px; background: linear-gradient(180deg, rgba(60,90,120,0.16), rgba(24,18,12,0.6)); border: 1px solid rgba(159,211,255,0.18); }
 .st-pack.is-tagged { border-color: rgba(232,176,75,0.55); }

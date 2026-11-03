@@ -12,6 +12,7 @@ import { formatDurationShort } from "@/utils/formatDuration";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { AscensionPanel } from "@/ui/AscensionPanel";
 import { PAGE_CSS } from "@/ui/pageChrome";
+import { SeasonPassSection } from "@/ui/SeasonPassSection";
 
 interface SeasonScreenProps {
   onNavigate: (view: NavView) => void;
@@ -128,6 +129,8 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
               <dd>{save.ascensionTop5}</dd>
             </div>
           </dl>
+
+          <SeasonPassSection />
 
           <div className="pg-cols">
             <section>

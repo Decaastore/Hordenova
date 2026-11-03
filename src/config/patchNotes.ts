@@ -70,6 +70,66 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v71",
+    dateIso: "2026-11-02",
+    category: "SYSTEMS",
+    title: {
+      en: "Daily Missions and the Season Pass",
+      ptBR: "Missões do Dia e Passe da Season",
+    },
+    description: {
+      en: "Every day brings three new missions, the same for every player, such as defeating 300 enemies or clearing 15 waves. Each one pays Gem Shards and Gold. Playing also fills the new Season Pass on the Season page: 30 levels with a reward on each, starting over every Season.",
+      ptBR: "Todo dia chegam três missões novas, iguais para todos os jogadores, como derrotar 300 inimigos ou vencer 15 ondas. Cada uma paga fragmentos de gema e ouro. Jogar também enche o novo Passe da Season, na página Season: 30 níveis com uma recompensa em cada, recomeçando a cada Season.",
+    },
+    highlights: [
+      {
+        en: "Open the missions with the MISSIONS button during a run; a badge shows how many are ready to claim.",
+        ptBR: "Abra as missões pelo botão MISSÕES durante a partida; um selo mostra quantas estão prontas para resgatar.",
+      },
+      {
+        en: "Pass XP: 1 per wave cleared, 3 per mini-boss, 20 per boss and 10 per mission claimed.",
+        ptBR: "XP do Passe: 1 por onda vencida, 3 por mini-chefe, 20 por chefe e 10 por missão resgatada.",
+      },
+      {
+        en: "The free track pays Gem Shards on every level and a Free Gem every 10 levels. The Premium track and the one-time Starter pack in the Store are listed and arrive with Pix and card payments.",
+        ptBR: "A trilha Grátis paga fragmentos em todo nível e uma Gema Grátis a cada 10 níveis. A trilha Premium e o Pacote inicial da Loja, uma vez por conta, já aparecem e chegam junto com a compra por Pix e cartão.",
+      },
+    ],
+  },
+  {
+    id: "v70",
+    dateIso: "2026-11-02",
+    category: "BALANCE",
+    title: {
+      en: "The Same Waves for Everyone",
+      ptBR: "As Mesmas Ondas para Todos",
+    },
+    description: {
+      en: "Enemy life used to be nudged per player, from 18% lower to 22% higher depending on how strong your defense was. That's gone: at the same wave, every player now faces exactly the same enemies, so the ranking compares like with like.",
+      ptBR: "A vida dos inimigos era ajustada por jogador, de 18% menor a 22% maior conforme a força da sua defesa. Isso acabou: na mesma onda, todo jogador agora enfrenta exatamente os mesmos inimigos, então o ranking compara todos nas mesmas condições.",
+    },
+    highlights: [
+      {
+        en: "Strong defenses no longer face tougher enemies, and new players no longer get easier ones.",
+        ptBR: "Defesas fortes não enfrentam mais inimigos mais resistentes, e jogadores novos não recebem mais inimigos mais fracos.",
+      },
+    ],
+  },
+  {
+    id: "v69",
+    dateIso: "2026-11-02",
+    category: "INTERFACE",
+    title: {
+      en: "Quicker Store Access, Clearer Portal",
+      ptBR: "Loja Mais à Mão, Portal Mais Visível",
+    },
+    description: {
+      en: "During a run, clicking your Gem balances at the top opens the Store. The New Enemy card moved to the bottom of the map, so it no longer hides the creatures coming out of the portal.",
+      ptBR: "Durante a partida, clicar nos seus saldos de Gemas no topo abre a Loja. O aviso de Novo Inimigo foi para a parte de baixo do mapa, para não esconder mais as criaturas saindo do portal.",
+    },
+    highlights: [],
+  },
+  {
     id: "v68",
     dateIso: "2026-11-02",
     category: "SYSTEMS",

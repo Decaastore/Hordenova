@@ -1,5 +1,6 @@
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { parseDailyMissionsState, type DailyMissionsState } from "@/config/dailyMissions";
+import { parseSeasonPassState, type SeasonPassState } from "@/config/seasonPass";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
 import { SPECIALIZATIONS_BY_TOWER, type SpecializationId } from "@/config/specializations";
@@ -235,6 +236,9 @@ export interface SaveData {
   /** DAILY MISSIONS (config/dailyMissions.ts) — today's progress and claims, or null before the first mission event. Reset when the day index changes. */
   dailyMissions: DailyMissionsState | null;
 
+  /** SEASON PASS (config/seasonPass.ts) — this Season's pass XP and claimed free levels, or null before any XP. */
+  seasonPass: SeasonPassState | null;
+
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
    * seller, PERMANENT and append-only, exactly like ascensionHistory above:
@@ -325,6 +329,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   lastFreeRepositionDayIndex: null,
   lastStoreGiftDayIndex: null,
   dailyMissions: null,
+  seasonPass: null,
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -859,6 +864,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
         typeof parsed.lastFreeRepositionDayIndex === "number" ? parsed.lastFreeRepositionDayIndex : null,
       lastStoreGiftDayIndex: typeof parsed.lastStoreGiftDayIndex === "number" ? parsed.lastStoreGiftDayIndex : null,
       dailyMissions: parseDailyMissionsState(parsed.dailyMissions),
+      seasonPass: parseSeasonPassState(parsed.seasonPass),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has

@@ -3,7 +3,7 @@ import { appendLedgerEvent } from "./EconomyLedger";
 import { getCurrentDayIndex } from "./DailyClock";
 import { getTowerSkinDefinition, getTowerSkinDualPrice, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
-import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
+import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
 import type { TowerType } from "@/config/towerStats";
 
 /**
@@ -93,7 +93,7 @@ export function claimDailyGift(nowMs: number = Date.now()): SaveData | null {
  * connected. Until then it refuses — it never grants Gems on its own.
  */
 export function requestGemPackPurchase(packId: string): { ok: false; reason: "PAYMENTS_NOT_ENABLED" | "UNKNOWN_PACK" } {
-  if (!GEM_PACKS.some((p) => p.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
+  if (packId !== STARTER_PACK.id && !GEM_PACKS.some((p) => p.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
   if (!REAL_MONEY_PAYMENTS_ENABLED) return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
   // The checkout integration goes here (see config/store.ts's header).
   return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };

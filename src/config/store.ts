@@ -39,6 +39,13 @@ export const GEM_PACKS: readonly GemPack[] = [
   { id: "GEMS_7500", gems: 5000, bonusGems: 2500, priceBrl: 249.9, tag: "BEST_VALUE" },
 ];
 
+/**
+ * One-time starter offer (once per account), unlocked with real payments
+ * like the packs above. 600 Gems + 50 Gem Shards for the price of the
+ * 220-Gem pack: the first purchase is the hardest one to earn.
+ */
+export const STARTER_PACK = { id: "STARTER", gems: 600, gemShards: 50, priceBrl: 9.9 } as const;
+
 export function gemPackTotal(pack: GemPack): number {
   return pack.gems + pack.bonusGems;
 }

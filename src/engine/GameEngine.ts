@@ -83,6 +83,8 @@ import {
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { gemPriceForCurrency, TRADE_UNLOCK_PRICE, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
 import { getCurrentDayIndex } from "./DailyClock";
+import { freshPassState, PASS_XP, type PassXpSource, type SeasonPassState } from "@/config/seasonPass";
+import { seasonClock } from "./SeasonClock";
 import { freshMissionsState, MISSION_REWARD_KILLS_WORTH_OF_GOLD, MISSION_REWARD_SHARDS, missionsForDay, type DailyMissionsState, type MissionKind } from "@/config/dailyMissions";
 import {
   advanceEnemy,
@@ -419,6 +421,7 @@ export class GameEngine {
   /** Fractions of Gold / Gem Shards left over by the paid-skin reward bonus, carried to the next grant so small per-kill bonuses aren't rounded away. */
   private skinGoldCarry = 0;
   private dailyMissions: DailyMissionsState = freshMissionsState(getCurrentDayIndex());
+  private seasonPass: SeasonPassState = freshPassState(seasonClock.getCurrentSeasonWindow().seasonNumber);
   private skinShardCarry = 0;
   /** GEMS ECONOMY v2 — the permanent, one-time Trade Unlock gate (see canUnlockTrade/unlockTrade below). */
   private tradeUnlocked = false;
@@ -579,6 +582,7 @@ export class GameEngine {
     this.pendingRouletteSpinWaves = [...save.pendingRouletteSpinWaves];
     this.lastFreeRepositionDayIndex = save.lastFreeRepositionDayIndex;
     this.dailyMissions = save.dailyMissions ?? freshMissionsState(getCurrentDayIndex());
+    this.seasonPass = save.seasonPass ?? freshPassState(seasonClock.getCurrentSeasonWindow().seasonNumber);
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -1588,6 +1592,13 @@ export class GameEngine {
     return `${state.dayIndex}:${state.progress.join(",")}:${state.claimed.map((c) => (c ? 1 : 0)).join("")}`;
   }
 
+  /** Season Pass XP (config/seasonPass.ts) — a new Season starts the pass over. */
+  private addPassXp(source: PassXpSource): void {
+    const season = seasonClock.getCurrentSeasonWindow().seasonNumber;
+    if (this.seasonPass.seasonNumber !== season) this.seasonPass = freshPassState(season);
+    this.seasonPass.xp += PASS_XP[source];
+  }
+
   /** Counts a real gameplay event toward today's missions of that kind. */
   private trackMission(kind: MissionKind, amount = 1): void {
     const state = this.currentMissions();
@@ -1604,6 +1615,7 @@ export class GameEngine {
     state.claimed[index] = true;
     this.gold += this.missionRewardGold();
     this.addGemShards(MISSION_REWARD_SHARDS, `daily_mission:${def.kind}`);
+    this.addPassXp("MISSION_CLAIMED");
     this.emitAudio({ type: "level_unlock" });
     this.persist();
     this.notify();
@@ -2018,7 +2030,11 @@ export class GameEngine {
         this.gold += this.withSkinGoldBonus(Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier));
         this.enemiesDefeated += 1;
         this.trackMission("KILL_ENEMIES");
-        if (enemy.boss && !enemy.boss.isMainBoss) this.trackMission("DEFEAT_MINI_BOSSES");
+        if (enemy.boss && !enemy.boss.isMainBoss) {
+          this.trackMission("DEFEAT_MINI_BOSSES");
+          this.addPassXp("MINI_BOSS");
+        }
+        if (enemy.boss?.isMainBoss) this.addPassXp("MAIN_BOSS");
         recordKill(this.battleStats, enemy);
         const tier = this.classifyEnemyTier(enemy);
         const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
@@ -2114,6 +2130,7 @@ export class GameEngine {
           this.waveCompleteAudioFiredForWave = this.wave.currentWave;
           this.emitAudio({ type: "wave_complete" });
           this.trackMission("CLEAR_WAVES");
+          this.addPassXp("WAVE_CLEARED");
         }
         // AUDITORIA E CORREÇÃO GERAL spec section 10/13 — advanceBestWave
         // can now enqueue a pending Roulette spin (pendingRouletteSpinWaves)
@@ -2485,6 +2502,7 @@ export class GameEngine {
         unlockedSpecializationIds: this.unlockedSpecializationIds,
         lastFreeRepositionDayIndex: this.lastFreeRepositionDayIndex,
         dailyMissions: this.dailyMissions,
+        seasonPass: this.seasonPass,
       },
       this.storageKey,
     );
