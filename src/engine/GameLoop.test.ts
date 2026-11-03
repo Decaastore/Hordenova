@@ -271,6 +271,32 @@ describe("GameLoop — visibility transitions (no lost or duplicated time)", () 
     expect(ticks.reduce((a, b) => a + b, 0)).toBe(backgroundTotal + 16);
   });
 
+  it("a tab whose timers the browser froze replays the frozen time when it becomes visible again", () => {
+    const fake = createFakeEnv();
+    fake.setHidden(true);
+    const ticks: number[] = [];
+    const loop = new GameLoop((dt) => ticks.push(dt), fake.env);
+    loop.start();
+    fake.fireInterval(); // baseline
+    fake.advanceClock(4 * 60 * 1000); // 4 minutes with no interval firing at all
+    fake.setHidden(false);
+    expect(ticks.reduce((a, b) => a + b, 0)).toBe(4 * 60 * 1000);
+  });
+
+  it("time past the per-firing replay cap is handed over instead of silently dropped", () => {
+    const fake = createFakeEnv();
+    fake.setHidden(true);
+    const ticks: number[] = [];
+    const handed: number[] = [];
+    const loop = new GameLoop((dt) => ticks.push(dt), fake.env, (ms) => handed.push(ms));
+    loop.start();
+    fake.fireInterval(); // baseline
+    fake.advanceClock(70 * 60 * 1000); // frozen for 70 minutes
+    fake.setHidden(false);
+    expect(ticks.reduce((a, b) => a + b, 0)).toBe(10 * 60 * 1000); // replayed tick by tick
+    expect(handed).toEqual([60 * 60 * 1000]); // the rest, for the offline simulation
+  });
+
   it("rapid visibility flapping never loses or duplicates elapsed real time beyond what was actually simulated", () => {
     const fake = createFakeEnv();
     const ticks: number[] = [];

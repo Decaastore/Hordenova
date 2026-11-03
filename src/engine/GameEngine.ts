@@ -12,7 +12,7 @@ import {
 import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
 import { getMapLayout, getSite, MAX_TOWERS_ON_MAP, setActiveMapLayout, type MapLayout } from "@/data/mapLayouts";
 import { autoArrange } from "./MapDeployment";
-import { isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
+import { enemyCountForWave, isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
 import { getMilestoneBonus, getPhaseForWave, getWaveTag } from "@/config/phaseConfig";
 import { computeCastleDamage, type CastleDamageCategory } from "@/config/castleDamage";
@@ -117,7 +117,7 @@ import {
   type BattleStats,
   type FailureReport,
 } from "./BattleDiagnostics";
-import { computeOfflineCapacityMs, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
+import { computeOfflineCapacityMs, MAX_OFFLINE_CAPACITY_MS, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
 import type { CombatVfxEvent } from "./CombatVfxEvents";
@@ -197,6 +197,20 @@ export interface HudSnapshot {
   /** Daily missions: changes whenever any progress/claim changes (for re-rendering), and how many are done but not yet claimed. */
   missionsKey: string;
   missionsClaimable: number;
+}
+
+/** The Welcome Back summary: the offline simulation plus everything it was turned into. */
+export interface OfflineReturnSummary extends OfflineSimulationResult {
+  /** Real time away that was simulated (capped by MAX_OFFLINE_CAPACITY_MS). */
+  awayMs: number;
+  /** "CLOSED": the game was closed and reopened. "HIDDEN_TAB": the tab stayed open but the browser stopped running it. */
+  source: "CLOSED" | "HIDDEN_TAB";
+  /** Gold actually received (with the paid-skin bonus). */
+  goldEarned: number;
+  gemShardsEarned: number;
+  passXpEarned: number;
+  /** Today's missions that moved forward while away. */
+  missions: { kind: MissionKind; progress: number; target: number }[];
 }
 
 export interface DailyMissionView {
@@ -482,7 +496,7 @@ export class GameEngine {
 
   private battleStats: BattleStats = createBattleStats();
   private lastFailureReport: FailureReport | null = null;
-  private offlineSummary: OfflineSimulationResult | null = null;
+  private offlineSummary: OfflineReturnSummary | null = null;
 
   private readonly listeners = new Set<() => void>();
 
@@ -597,23 +611,7 @@ export class GameEngine {
         capacityMs,
       });
       if (result.phasesCleared > 0) {
-        // AUDITORIA E CORREÇÃO GERAL spec section 12 — Offline Defense can
-        // jump `currentWave`/`bestWave` across several ROULETTE_MILESTONE_
-        // INTERVAL boundaries in one shot (this never happens in live play,
-        // where advanceBestWave is called once per single wave crossed).
-        // Every milestone crossed while offline is queued as pending here —
-        // NEVER auto-resolved — exactly like a milestone crossed live.
-        const oldBestWave = this.bestWave;
-        this.wave.currentWave = result.endingWave;
-        this.gold += this.withSkinGoldBonus(result.resourcesEarned);
-        this.bestWave = Math.max(this.bestWave, result.endingWave);
-        for (let w = oldBestWave + 1; w <= this.bestWave; w++) {
-          if (w % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(w);
-        }
-        this.offlineSummary = result;
-        this.phase = "OFFLINE_RETURN";
-        this.persist();
-        this.notify();
+        this.applyOfflineResult(result, capacityMs, "CLOSED");
         return;
       }
     }
@@ -622,6 +620,82 @@ export class GameEngine {
     this.syncMapLayout();
     this.persist();
     this.notify();
+  }
+
+  /**
+   * Turns an offline simulation into real progress and shows the Welcome
+   * Back summary. Shared by reopening the game and by a tab the browser
+   * stopped running for a long time (catchUpHiddenTime).
+   */
+  private applyOfflineResult(result: OfflineSimulationResult, awayMs: number, source: OfflineReturnSummary["source"]): void {
+    // AUDITORIA E CORREÇÃO GERAL spec section 12 — Offline Defense can
+    // jump `currentWave`/`bestWave` across several ROULETTE_MILESTONE_
+    // INTERVAL boundaries in one shot (this never happens in live play,
+    // where advanceBestWave is called once per single wave crossed).
+    // Every milestone crossed while offline is queued as pending here —
+    // NEVER auto-resolved — exactly like a milestone crossed live.
+    const oldBestWave = this.bestWave;
+    const goldEarned = this.withSkinGoldBonus(result.resourcesEarned);
+    this.gold += goldEarned;
+    this.wave.currentWave = result.endingWave;
+    this.bestWave = Math.max(this.bestWave, result.endingWave);
+    if (result.endingWave > this.seasonBestWave) this.seasonBestWave = result.endingWave;
+    for (let w = oldBestWave + 1; w <= this.bestWave; w++) {
+      if (w % ROULETTE_MILESTONE_INTERVAL === 0) this.pendingRouletteSpinWaves.push(w);
+    }
+
+    // The same rewards live play gives for what was cleared: boss/mini-boss
+    // Gem Shards, Season Pass XP, and today's missions.
+    const bossKills = result.bossesCleared + result.miniBossesCleared;
+    const shardsBefore = this.gemShards;
+    if (bossKills > 0) {
+      const perKill = Math.round(2 * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
+      this.addGemShards(this.withSkinShardBonus(perKill * bossKills), "offline_boss_kills");
+    }
+    const passXpBefore = this.seasonPass.xp;
+    const missionsBefore = this.getDailyMissions().map((m) => m.progress);
+    let kills = 0;
+    for (let w = result.startingWave + 1; w <= result.endingWave; w++) kills += enemyCountForWave(w);
+    const waves = result.endingWave - result.startingWave;
+    for (let i = 0; i < waves; i++) this.addPassXp("WAVE_CLEARED");
+    for (let i = 0; i < result.miniBossesCleared; i++) this.addPassXp("MINI_BOSS");
+    for (let i = 0; i < result.bossesCleared; i++) this.addPassXp("MAIN_BOSS");
+    this.trackMission("CLEAR_WAVES", waves);
+    this.trackMission("KILL_ENEMIES", kills);
+    if (result.miniBossesCleared > 0) this.trackMission("DEFEAT_MINI_BOSSES", result.miniBossesCleared);
+    const missionsAfter = this.getDailyMissions();
+
+    this.offlineSummary = {
+      ...result,
+      awayMs,
+      source,
+      goldEarned,
+      gemShardsEarned: this.gemShards - shardsBefore,
+      passXpEarned: this.seasonPass.xp - passXpBefore,
+      missions: missionsAfter.filter((m, i) => m.progress > (missionsBefore[i] ?? 0)).map((m) => ({ kind: m.kind, progress: m.progress, target: m.target })),
+    };
+    this.phase = "OFFLINE_RETURN";
+    this.persist();
+    this.notify();
+  }
+
+  /**
+   * A tab left open in the background normally keeps playing (see
+   * GameLoop's hidden-tab driver). But browsers can freeze a background tab
+   * entirely; when it wakes up, the time it couldn't replay arrives here
+   * and is covered the same way as closing and reopening the game: the
+   * Offline Defense simulation and a Welcome Back summary. Short gaps are
+   * ignored, like the offline return's own minimum.
+   */
+  catchUpHiddenTime(ms: number): boolean {
+    if (ms < OFFLINE_RETURN_MIN_ELAPSED_MS || this.towers.length === 0) return false;
+    if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return false;
+    const capacityMs = Math.min(ms, MAX_OFFLINE_CAPACITY_MS);
+    const result = simulateOfflineDefense({ startingWave: this.wave.currentWave, towerLoadout: this.towers.map((t) => this.loadoutEntryOf(t)), capacityMs });
+    if (result.phasesCleared === 0) return false;
+    this.resetAttemptState();
+    this.applyOfflineResult(result, capacityMs, "HIDDEN_TAB");
+    return true;
   }
 
   /** Dismisses the Welcome Back summary and resumes automatic combat. */
@@ -634,7 +708,7 @@ export class GameEngine {
     this.notify();
   }
 
-  getOfflineSummary(): OfflineSimulationResult | null {
+  getOfflineSummary(): OfflineReturnSummary | null {
     return this.offlineSummary;
   }
 
@@ -724,7 +798,9 @@ export class GameEngine {
       this.phase === "BOSS_INTRO" ||
       this.phase === "BOSS_BATTLE" ||
       this.phase === "PROGRESSION_STOPPED" ||
-      this.phase === "DEPLOY"
+      this.phase === "DEPLOY" ||
+      // the Welcome Back screen offers spending the gold right away
+      this.phase === "OFFLINE_RETURN"
     );
   }
 

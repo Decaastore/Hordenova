@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v73",
+    dateIso: "2026-11-03",
+    category: "SYSTEMS",
+    title: {
+      en: "A Better Welcome Back, and the Tab Keeps You Posted",
+      ptBR: "Volta Melhor ao Jogo, e a Aba Te Avisa",
+    },
+    description: {
+      en: "Coming back after time away now shows exactly what happened: where you left and where you are now, waves cleared, Gold, bosses, Gem Shards and Season Pass XP earned, and which daily missions moved. You can spend the Gold on upgrades right there before the fight resumes.",
+      ptBR: "Voltar depois de um tempo fora agora mostra exatamente o que aconteceu: onde você parou e onde está agora, ondas vencidas, ouro, chefes, fragmentos e XP do Passe ganhos, e quais missões do dia andaram. Dá para gastar o ouro em melhorias ali mesmo, antes da luta continuar.",
+    },
+    highlights: [
+      {
+        en: "Progress while away now also counts for the Season Pass, daily missions and boss Gem Shards, like live play does.",
+        ptBR: "O progresso fora do jogo agora também conta para o Passe da Season, as missões do dia e os fragmentos de chefe, como na partida normal.",
+      },
+      {
+        en: "With the game in a background tab, the tab title shows what's going on: the current wave, a boss arriving, a mission ready, a new map waiting for your towers, or the castle falling.",
+        ptBR: "Com o jogo numa aba em segundo plano, o título da aba mostra o que está acontecendo: a onda atual, um chefe chegando, uma missão pronta, um mapa novo esperando suas torres ou o castelo caindo.",
+      },
+      {
+        en: "Back to the tab after a while, a short note sums up the waves and Gold gained meanwhile. If the browser had paused the tab completely, that time is no longer lost: it counts like time away.",
+        ptBR: "Ao voltar para a aba depois de um tempo, um aviso resume as ondas e o ouro ganhos nesse meio-tempo. Se o navegador tinha pausado a aba por completo, esse tempo não se perde mais: conta como tempo fora do jogo.",
+      },
+    ],
+  },
+  {
     id: "v72",
     dateIso: "2026-11-03",
     category: "INTERFACE",

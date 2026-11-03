@@ -31,12 +31,10 @@
  *
  * A single firing's catch-up is bounded by BACKGROUND_CATCHUP_CAP_MS so a
  * truly extreme gap (the OS suspending the whole process, e.g. laptop
- * sleep with the tab still open) can't block the main thread replaying a
- * huge number of ticks synchronously; time beyond that cap in one firing
- * is simply not replayed, the same conservative fallback the old flat
- * 100ms clamp already used for any large gap — just far more generous,
- * and only reachable in that rare case rather than on every ordinary
- * minimize.
+ * sleep with the tab still open, or the browser freezing the tab) can't
+ * block the main thread replaying a huge number of ticks synchronously.
+ * Time beyond that cap isn't replayed tick by tick; it's handed to
+ * `onUnreplayedTime`, which covers it with the Offline Defense simulation.
  *
  * Switching between the two drivers (on every visibilitychange) never
  * calls onTick with a stale or double-counted delta: whichever driver
@@ -88,7 +86,16 @@ export class GameLoop {
   private unsubscribeVisibility: (() => void) | null = null;
   private running = false;
 
-  constructor(private readonly onTick: (dtMs: number) => void, env?: Partial<GameLoopEnv>) {
+  /**
+   * @param onUnreplayedTime Real time a background firing couldn't replay
+   * (past BACKGROUND_CATCHUP_CAP_MS — e.g. the browser froze the tab for an
+   * hour). The caller covers it another way (GameEngine.catchUpHiddenTime).
+   */
+  constructor(
+    private readonly onTick: (dtMs: number) => void,
+    env?: Partial<GameLoopEnv>,
+    private readonly onUnreplayedTime?: (ms: number) => void,
+  ) {
     this.env = { ...defaultEnv(), ...env };
   }
 
@@ -127,6 +134,10 @@ export class GameLoop {
       this.stopRaf();
       this.startInterval();
     } else {
+      // Browsers can throttle or freeze a background tab's timers, so the
+      // last interval firing may be long ago: replay up to now before
+      // handing back to requestAnimationFrame, or that time would be lost.
+      if (this.intervalId !== null) this.intervalStep();
       this.stopInterval();
       this.startRaf();
     }
@@ -169,7 +180,8 @@ export class GameLoop {
       this.lastTickAtMs = now;
       return;
     }
-    let remaining = Math.min(now - this.lastTickAtMs, BACKGROUND_CATCHUP_CAP_MS);
+    const gap = now - this.lastTickAtMs;
+    let remaining = Math.min(gap, BACKGROUND_CATCHUP_CAP_MS);
     this.lastTickAtMs = now;
 
     while (remaining > 0) {
@@ -177,5 +189,6 @@ export class GameLoop {
       this.onTick(step);
       remaining -= step;
     }
+    if (gap > BACKGROUND_CATCHUP_CAP_MS) this.onUnreplayedTime?.(gap - BACKGROUND_CATCHUP_CAP_MS);
   };
 }

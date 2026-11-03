@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import { PALETTE } from "@/rendering/theme";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGameEngine } from "@/hooks/useGameEngine";
 import { isWebGLAvailable } from "@/rendering3d/webglSupport";
@@ -9,6 +11,8 @@ import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
 import { DailyMissionsPanel } from "@/ui/DailyMissionsPanel";
+import { useTabPresence } from "@/hooks/useTabPresence";
+import { formatDurationShort } from "@/utils/formatDuration";
 import { ProgressionStoppedBar, ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
 import { BossBanner } from "@/ui/BossBanner";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
@@ -73,6 +77,7 @@ interface GameScreenProps {
 
 export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const { engine, hud } = useGameEngine();
+  const tabPresence = useTabPresence(hud);
   useGameAudio(engine);
   // Stable callback identities for the dismissible banners below: `engine`
   // itself never changes across renders (see useGameEngine), but passing a
@@ -133,7 +138,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   // MAP LAYOUTS / DEPLOY — the benched tower the next click on the map places
   // (defaults to the strongest one still waiting).
   const [deployPick, setDeployPick] = useState<string | null>(null);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const deploying = hud.phase === "DEPLOY";
   const benchSelectedId = deploying
     ? (hud.deployBench.find((b) => b.id === deployPick)?.id ?? [...hud.deployBench].sort((a, b) => b.level - a.level)[0]?.id ?? null)
@@ -399,7 +404,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           <RouletteBanner result={hud.pendingRouletteResult} onAcknowledge={acknowledgeRouletteResult} />
         )}
         {/* AUDITORIA E CORREÇÃO GERAL spec sections 2-3, 11 — shown whenever a milestone is unlocked but not yet spun (persists across F5). Hidden while a just-resolved result is still being revealed, so the two never overlap in the same bottom-center slot; a second pending wave (e.g. Offline Defense crossing both 20 and 30) shows here again the instant the current reveal is acknowledged. */}
-        {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && (
+        {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && hud.phase !== "OFFLINE_RETURN" && (
           <RoulettePendingPrompt wave={hud.pendingRouletteSpinWave} onSpin={() => engine.spinPendingRoulette()} />
         )}
 
@@ -518,8 +523,32 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           <ProgressionStoppedBar onRetry={() => engine.retryPhase()} onShowReport={() => setReportDismissed(false)} />
         )}
 
+        {tabPresence.summary && (
+          <div style={tabSummaryStyle} role="status" data-testid="tab-summary">
+            <span>
+              {t("tab.summary", { time: formatDurationShort(tabPresence.summary.hiddenMs) })}{" "}
+              <strong style={{ color: PALETTE.uiAccentBright }}>{t("tab.summaryWaves", { n: tabPresence.summary.waves })}</strong>
+              {" · "}
+              <strong style={{ color: PALETTE.gold }}>{t("tab.summaryGold", { n: tabPresence.summary.gold.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US") })}</strong>
+            </span>
+            <button onClick={tabPresence.dismiss} style={tabSummaryCloseStyle} aria-label={t("missions.close")}>
+              ×
+            </button>
+          </div>
+        )}
+
         {offlineSummary && (
-          <WelcomeBackOverlay summary={offlineSummary} onContinue={() => engine.dismissOfflineSummary()} />
+          <WelcomeBackOverlay
+            summary={offlineSummary}
+            gold={hud.gold}
+            towers={engine.getRenderSnapshot().towers}
+            onUpgrade={(towerId) => {
+              engine.selectTower(towerId);
+              engine.upgradeSelectedTower();
+              engine.selectTower(null);
+            }}
+            onContinue={() => engine.dismissOfflineSummary()}
+          />
         )}
 
         {missionsOpen && (
@@ -583,3 +612,24 @@ function tutorialCopyKey(step: TutorialStep | "BOSS"): string {
       return "finish";
   }
 }
+
+const tabSummaryStyle: CSSProperties = {
+  position: "absolute",
+  top: 12,
+  left: "50%",
+  transform: "translateX(-50%)",
+  maxWidth: "calc(100% - 24px)",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "9px 12px 9px 16px",
+  borderRadius: 10,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(28,18,10,0.94)",
+  boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+  color: PALETTE.uiText,
+  fontSize: 13,
+  zIndex: 6,
+};
+
+const tabSummaryCloseStyle: CSSProperties = { background: "none", border: "none", color: PALETTE.uiTextDim, fontSize: 18, cursor: "pointer", lineHeight: 1 };

@@ -31,7 +31,11 @@ export function useGameEngine(storageKey?: string) {
   const hud = useSyncExternalStore(subscribe, getSnapshot);
 
   useEffect(() => {
-    const loop = new GameLoop((dtMs) => engine.update(dtMs));
+    const loop = new GameLoop(
+      (dtMs) => engine.update(dtMs),
+      undefined,
+      (ms) => engine.catchUpHiddenTime(ms),
+    );
     loop.start();
     return () => loop.stop();
   }, [engine]);
