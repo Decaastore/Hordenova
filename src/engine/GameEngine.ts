@@ -117,7 +117,7 @@ import {
   type BattleStats,
   type FailureReport,
 } from "./BattleDiagnostics";
-import { computeOfflineCapacityMs, FROZEN_TAB_INEFFICIENCY_MULTIPLIER, MAX_OFFLINE_CAPACITY_MS, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
+import { computeOfflineCapacityMs, FROZEN_TAB_INEFFICIENCY_MULTIPLIER, OFFLINE_GOLD_SHARE, MAX_OFFLINE_CAPACITY_MS, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
 import type { CombatVfxEvent } from "./CombatVfxEvents";
@@ -645,7 +645,8 @@ export class GameEngine {
         milestoneShards += Math.max(1, Math.round(bonus / 150));
       }
     }
-    const goldEarned = this.withSkinGoldBonus(result.resourcesEarned + milestoneGold);
+    const goldShare = source === "CLOSED" ? OFFLINE_GOLD_SHARE : 1;
+    const goldEarned = this.withSkinGoldBonus(Math.round((result.resourcesEarned + milestoneGold) * goldShare));
     this.gold += goldEarned;
     this.wave.currentWave = result.endingWave;
     this.bestWave = Math.max(this.bestWave, result.endingWave);

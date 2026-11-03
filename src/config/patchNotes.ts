@@ -83,8 +83,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
-        en: "With the game closed, the defense now advances at 40% of the normal pace (it used to be faster), so playing with the browser open is clearly worth more. A background tab still counts at 100%.",
-        ptBR: "Com o jogo fechado, a defesa agora avança a 40% do ritmo normal (antes era mais rápido), então jogar com o navegador aberto vale bem mais. Uma aba em segundo plano continua valendo 100%.",
+        en: "With the game closed, the defense now advances at 40% of the normal pace (it used to be faster) and each wave pays half its Gold, so playing with the browser open is clearly worth more. A background tab still counts at 100%.",
+        ptBR: "Com o jogo fechado, a defesa agora avança a 40% do ritmo normal (antes era mais rápido) e cada onda paga metade do ouro, então jogar com o navegador aberto vale bem mais. Uma aba em segundo plano continua valendo 100%.",
       },
       {
         en: "Progress while away now also counts for the Season Pass, daily missions, milestone bonuses and boss Gem Shards, like live play does.",

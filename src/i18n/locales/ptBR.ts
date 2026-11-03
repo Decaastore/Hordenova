@@ -461,7 +461,7 @@ export const ptBR: TranslationSchema = {
     dismiss: "Dispensar",
   },
   offlineReturn: {
-    paceNote: "Com o jogo fechado, a defesa avança a {pct}% do ritmo normal. Com o navegador aberto, mesmo numa aba em segundo plano, ela rende 100%.",
+    paceNote: "Com o jogo fechado, a defesa avança a {pct}% do ritmo normal e cada onda paga {gold}% do ouro. Com o navegador aberto, mesmo numa aba em segundo plano, tudo rende 100%.",
     title: "BEM-VINDO DE VOLTA",
     awayClosed: "Você ficou fora por {time}, e a defesa continuou lutando.",
     awayTab: "A aba ficou parada por {time}, e a defesa continuou lutando.",

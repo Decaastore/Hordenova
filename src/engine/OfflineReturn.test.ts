@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
+import { OFFLINE_GOLD_SHARE } from "./OfflineDefense";
 
 const strong = (slotId: string) => ({ slotId, type: "IRONWOOD" as const, level: 60, specializationId: null, specializationLevel: 0, equippedSkinId: null, masteryLevel: 0, equippedItemInstanceIds: [null, null, null] });
 const HOUR = 60 * 60 * 1000;
@@ -25,7 +26,9 @@ describe("Welcome Back — offline progress", () => {
     expect(s.source).toBe("CLOSED");
     expect(s.awayMs).toBeGreaterThan(1.9 * HOUR);
     expect(s.endingWave).toBeGreaterThan(s.startingWave);
-    expect(s.goldEarned).toBeGreaterThanOrEqual(s.resourcesEarned);
+    // with the game closed each wave pays half its gold
+    expect(s.goldEarned).toBeLessThan(s.resourcesEarned);
+    expect(s.goldEarned).toBeGreaterThan(0);
     expect(engine.getHudSnapshot().gold).toBe(s.goldEarned);
     // pass XP and today's wave mission moved with the waves cleared
     expect(s.passXpEarned).toBeGreaterThanOrEqual(s.endingWave - s.startingWave);
@@ -47,6 +50,18 @@ describe("Welcome Back — offline progress", () => {
     internals.towers[0]!.level = 30;
     engine.selectTower(tower.id);
     expect(engine.upgradeSelectedTower()).toBe(true);
+  });
+
+  it("closed-game gold is cut; a frozen open tab keeps full gold per wave", () => {
+    expect(OFFLINE_GOLD_SHARE).toBeLessThan(1);
+    seed(null);
+    const engine = new GameEngine();
+    engine.startRun();
+    const gold0 = engine.getHudSnapshot().gold;
+    engine.catchUpHiddenTime(HOUR);
+    const s = engine.getOfflineSummary()!;
+    expect(s.goldEarned).toBeGreaterThanOrEqual(s.resourcesEarned);
+    expect(engine.getHudSnapshot().gold).toBe(gold0 + s.goldEarned);
   });
 
   it("a tab the browser froze for a long time gets the same Welcome Back on waking up; short gaps don't", () => {

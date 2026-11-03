@@ -2,7 +2,7 @@ import type { CSSProperties } from "react";
 import type { OfflineReturnSummary } from "@/engine/GameEngine";
 import type { TowerInstance } from "@/entities/Tower";
 import { getTowerUpgradeCost } from "@/entities/Tower";
-import { MAX_OFFLINE_CAPACITY_MS, OFFLINE_PACE } from "@/engine/OfflineDefense";
+import { MAX_OFFLINE_CAPACITY_MS, OFFLINE_GOLD_SHARE, OFFLINE_PACE } from "@/engine/OfflineDefense";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { PALETTE } from "@/rendering/theme";
@@ -92,7 +92,7 @@ export function WelcomeBackOverlay({ summary, gold, towers, onUpgrade, onContinu
         )}
 
         {stopNote && <p style={noteStyle}>{stopNote}</p>}
-        {summary.source === "CLOSED" && <p style={noteStyle}>{t("offlineReturn.paceNote", { pct: Math.round(OFFLINE_PACE * 100) })}</p>}
+        {summary.source === "CLOSED" && <p style={noteStyle}>{t("offlineReturn.paceNote", { pct: Math.round(OFFLINE_PACE * 100), gold: Math.round(OFFLINE_GOLD_SHARE * 100) })}</p>}
 
         {upgrades.length > 0 && (
           <div style={upgradesStyle}>

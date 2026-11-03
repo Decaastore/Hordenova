@@ -50,6 +50,13 @@ export const OFFLINE_PACE = 0.4;
  */
 const LIVE_WAVE_TIME_OVER_BUDGET = 1.43;
 const OFFLINE_INEFFICIENCY_MULTIPLIER = LIVE_WAVE_TIME_OVER_BUDGET / OFFLINE_PACE;
+/**
+ * With the game closed, each wave also pays only this share of its normal
+ * Gold (kills and milestone bonuses). Together with OFFLINE_PACE that puts
+ * closed-game Gold at roughly a tenth of what the same time with the
+ * browser open earns. Gem Shards, Pass XP and missions are not reduced.
+ */
+export const OFFLINE_GOLD_SHARE = 0.5;
 /** A tab that stayed open but that the browser froze: the player did keep the game open, so this is kinder than closing it. */
 export const FROZEN_TAB_INEFFICIENCY_MULTIPLIER = LIVE_WAVE_TIME_OVER_BUDGET / 0.7;
 const OFFLINE_SAFETY_MARGIN = 1.5;
