@@ -460,6 +460,7 @@ export const en = {
     dismiss: "Dismiss",
   },
   offlineReturn: {
+    paceNote: "With the game closed, the defense advances at {pct}% of the normal pace. With the browser open, even in a background tab, it gets 100%.",
     title: "WELCOME BACK",
     awayClosed: "You were away for {time}, and the defense kept fighting.",
     awayTab: "The tab sat idle for {time}, and the defense kept fighting.",

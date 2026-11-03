@@ -36,7 +36,22 @@ const ELITE_WAVE_HP_MULTIPLIER = 1.4;
 
 export const MAX_OFFLINE_CAPACITY_MS = 8 * 60 * 60 * 1000;
 
-const OFFLINE_INEFFICIENCY_MULTIPLIER = 1.6;
+/**
+ * Offline (game closed) advances at this fraction of the live pace: the
+ * game is meant to be played with the browser open, so being away pays,
+ * but clearly less. Live play — including a background tab — is 100%.
+ */
+export const OFFLINE_PACE = 0.4;
+/**
+ * A real wave takes about this many times its spawn budget (enemies still
+ * have to walk the road): measured on the live engine, 4 towers at level
+ * 30, ~23 s per wave vs a ~16 s budget. Dividing it by the pace keeps
+ * "40%" true against actual play, not against the estimate.
+ */
+const LIVE_WAVE_TIME_OVER_BUDGET = 1.43;
+const OFFLINE_INEFFICIENCY_MULTIPLIER = LIVE_WAVE_TIME_OVER_BUDGET / OFFLINE_PACE;
+/** A tab that stayed open but that the browser froze: the player did keep the game open, so this is kinder than closing it. */
+export const FROZEN_TAB_INEFFICIENCY_MULTIPLIER = LIVE_WAVE_TIME_OVER_BUDGET / 0.7;
 const OFFLINE_SAFETY_MARGIN = 1.5;
 const BOSS_FIGHT_BUDGET_MS = 20_000;
 
@@ -125,7 +140,10 @@ export function simulateOfflineDefense(input: {
   startingWave: number;
   towerLoadout: readonly TowerLoadoutEntry[];
   capacityMs: number;
+  /** Virtual-time cost per simulated wave relative to its live duration (defaults to the closed-game pace, 1 / OFFLINE_PACE). */
+  inefficiency?: number;
 }): OfflineSimulationResult {
+  const inefficiency = input.inefficiency ?? OFFLINE_INEFFICIENCY_MULTIPLIER;
   const buildDps = estimateBuildDps(input.towerLoadout);
 
   let currentWave = input.startingWave;
@@ -143,7 +161,7 @@ export function simulateOfflineDefense(input: {
     const nextWave = currentWave + 1;
     const threat = estimateWaveThreat(nextWave);
     const requiredDps = threat.totalHp / (threat.durationBudgetMs / 1000);
-    const costMs = threat.durationBudgetMs * OFFLINE_INEFFICIENCY_MULTIPLIER;
+    const costMs = threat.durationBudgetMs * inefficiency;
 
     if (costMs > capacityRemainingMs) {
       stoppedReason = "RAN_OUT_OF_CAPACITY";

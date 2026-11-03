@@ -83,8 +83,12 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     },
     highlights: [
       {
-        en: "Progress while away now also counts for the Season Pass, daily missions and boss Gem Shards, like live play does.",
-        ptBR: "O progresso fora do jogo agora também conta para o Passe da Season, as missões do dia e os fragmentos de chefe, como na partida normal.",
+        en: "With the game closed, the defense now advances at 40% of the normal pace (it used to be faster), so playing with the browser open is clearly worth more. A background tab still counts at 100%.",
+        ptBR: "Com o jogo fechado, a defesa agora avança a 40% do ritmo normal (antes era mais rápido), então jogar com o navegador aberto vale bem mais. Uma aba em segundo plano continua valendo 100%.",
+      },
+      {
+        en: "Progress while away now also counts for the Season Pass, daily missions, milestone bonuses and boss Gem Shards, like live play does.",
+        ptBR: "O progresso fora do jogo agora também conta para o Passe da Season, as missões do dia, os bônus de marco e os fragmentos de chefe, como na partida normal.",
       },
       {
         en: "With the game in a background tab, the tab title shows what's going on: the current wave, a boss arriving, a mission ready, a new map waiting for your towers, or the castle falling.",

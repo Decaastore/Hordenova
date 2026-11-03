@@ -117,7 +117,7 @@ import {
   type BattleStats,
   type FailureReport,
 } from "./BattleDiagnostics";
-import { computeOfflineCapacityMs, MAX_OFFLINE_CAPACITY_MS, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
+import { computeOfflineCapacityMs, FROZEN_TAB_INEFFICIENCY_MULTIPLIER, MAX_OFFLINE_CAPACITY_MS, simulateOfflineDefense, type OfflineSimulationResult } from "./OfflineDefense";
 import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
 import type { CombatVfxEvent } from "./CombatVfxEvents";
@@ -635,7 +635,17 @@ export class GameEngine {
     // Every milestone crossed while offline is queued as pending here —
     // NEVER auto-resolved — exactly like a milestone crossed live.
     const oldBestWave = this.bestWave;
-    const goldEarned = this.withSkinGoldBonus(result.resourcesEarned);
+    // Same milestone bonuses live play pays for reaching a new best wave.
+    let milestoneGold = 0;
+    let milestoneShards = 0;
+    for (let w = oldBestWave + 1; w <= result.endingWave; w++) {
+      const bonus = getMilestoneBonus(w);
+      if (bonus > 0) {
+        milestoneGold += bonus;
+        milestoneShards += Math.max(1, Math.round(bonus / 150));
+      }
+    }
+    const goldEarned = this.withSkinGoldBonus(result.resourcesEarned + milestoneGold);
     this.gold += goldEarned;
     this.wave.currentWave = result.endingWave;
     this.bestWave = Math.max(this.bestWave, result.endingWave);
@@ -648,6 +658,7 @@ export class GameEngine {
     // Gem Shards, Season Pass XP, and today's missions.
     const bossKills = result.bossesCleared + result.miniBossesCleared;
     const shardsBefore = this.gemShards;
+    if (milestoneShards > 0) this.addGemShards(this.withSkinShardBonus(milestoneShards), "offline_milestones");
     if (bossKills > 0) {
       const perKill = Math.round(2 * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
       this.addGemShards(this.withSkinShardBonus(perKill * bossKills), "offline_boss_kills");
@@ -691,7 +702,12 @@ export class GameEngine {
     if (ms < OFFLINE_RETURN_MIN_ELAPSED_MS || this.towers.length === 0) return false;
     if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return false;
     const capacityMs = Math.min(ms, MAX_OFFLINE_CAPACITY_MS);
-    const result = simulateOfflineDefense({ startingWave: this.wave.currentWave, towerLoadout: this.towers.map((t) => this.loadoutEntryOf(t)), capacityMs });
+    const result = simulateOfflineDefense({
+      startingWave: this.wave.currentWave,
+      towerLoadout: this.towers.map((t) => this.loadoutEntryOf(t)),
+      capacityMs,
+      inefficiency: FROZEN_TAB_INEFFICIENCY_MULTIPLIER,
+    });
     if (result.phasesCleared === 0) return false;
     this.resetAttemptState();
     this.applyOfflineResult(result, capacityMs, "HIDDEN_TAB");
