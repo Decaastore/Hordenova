@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { BOSS_RETREAT_RECOVERY, mainBossHpFactor } from "@/config/bossAssault";
 import { getScaledEnemyStats, ENEMY_TYPES } from "@/config/enemyStats";
 import { getEndgameBossHpMultiplierBonus, getEndgameCycleLapCount } from "@/config/phaseConfig";
 import { specializationEffectScale, SPECIALIZATION_EFFECT_EXPONENT, getSpecializationUpgradeCost, getSpecializationsForTower } from "@/config/specializations";
@@ -294,13 +295,22 @@ describe("R4 — Boss Kill Margin contract (U1/U3, real GameEngine)", () => {
   const CHECKPOINTS = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800];
   const def = MAIN_BOSSES["hollow-warden"]!;
 
-  it("every wave 300-800 checkpoint reaches a Boss Kill Margin of at least 1.5x for a realistic F2P-paced round-robin build", () => {
+  /**
+   * BOSS SIEGE (config/bossAssault.ts) replaced the one-pass kill: a boss
+   * keeps its wounds between assaults (recovering BOSS_RETREAT_RECOVERY),
+   * so the contract is now "falls within a few assaults", not "dies in one
+   * pass with 1.5x to spare". A one-pass damage share of at least 30% means
+   * at most 1 + ceil(0.7 / (0.3 - recovery)) = 5 assaults.
+   */
+  it("every wave 300-800 checkpoint: a realistic F2P-paced build brings the boss down within a few assaults (one pass deals at least 30% of its HP)", () => {
     for (const wave of CHECKPOINTS) {
       const build = f2pBuildForWave(wave);
       const budget = measureDamageBudget(build, def, wave);
-      const bossHp = realBossHp(def, wave);
-      const margin = budget / bossHp;
-      expect(margin, `wave ${wave}`).toBeGreaterThanOrEqual(1.5);
+      const bossHp = realBossHp(def, wave) * mainBossHpFactor(def.id, wave);
+      const share = budget / bossHp;
+      expect(share, `wave ${wave}`).toBeGreaterThanOrEqual(0.3);
+      const assaults = share >= 1 ? 1 : 1 + Math.ceil((1 - share) / (share - BOSS_RETREAT_RECOVERY));
+      expect(assaults, `wave ${wave}`).toBeLessThanOrEqual(5);
     }
   }, 120_000);
 

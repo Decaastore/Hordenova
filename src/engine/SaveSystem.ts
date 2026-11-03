@@ -1,6 +1,7 @@
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { parseDailyMissionsState, type DailyMissionsState } from "@/config/dailyMissions";
 import { parseSeasonPassState, type SeasonPassState } from "@/config/seasonPass";
+import { parseBossRecords, parseBossSiegeState, type BossRecords, type BossSiegeState } from "@/config/bossAssault";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
 import { SPECIALIZATIONS_BY_TOWER, type SpecializationId } from "@/config/specializations";
@@ -239,6 +240,11 @@ export interface SaveData {
   /** SEASON PASS (config/seasonPass.ts) — this Season's pass XP and claimed free levels, or null before any XP. */
   seasonPass: SeasonPassState | null;
 
+  /** BOSS SIEGE (config/bossAssault.ts) — the main boss currently besieging the map, with the wounds it carries; null when none. */
+  bossSiege: BossSiegeState | null;
+  /** BOSS SIEGE — assaults each main boss took to fall this Season. */
+  bossRecords: BossRecords | null;
+
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
    * seller, PERMANENT and append-only, exactly like ascensionHistory above:
@@ -330,6 +336,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   lastStoreGiftDayIndex: null,
   dailyMissions: null,
   seasonPass: null,
+  bossSiege: null,
+  bossRecords: null,
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -865,6 +873,8 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       lastStoreGiftDayIndex: typeof parsed.lastStoreGiftDayIndex === "number" ? parsed.lastStoreGiftDayIndex : null,
       dailyMissions: parseDailyMissionsState(parsed.dailyMissions),
       seasonPass: parseSeasonPassState(parsed.seasonPass),
+      bossSiege: parseBossSiegeState(parsed.bossSiege),
+      bossRecords: parseBossRecords(parsed.bossRecords),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has

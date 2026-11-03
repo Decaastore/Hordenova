@@ -5,6 +5,7 @@ import { loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
+import { getMainBossForWave } from "@/config/bossConfig";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { canUnlockPrestige, getPrestigeBonuses, getPrestigeTier, getPrestigeUpgradeDualPrice, PRESTIGE_MIN_BEST_WAVE } from "@/config/prestige";
 import { getSeasonRewardBundle, type AscensionRank } from "@/config/ascension";
@@ -68,6 +69,7 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
   const score = t("hud.phaseWaveValue", { phase: phaseNumberFromWave(Math.max(1, status.seasonBestWave)), onda: waveInPhase(Math.max(1, status.seasonBestWave)) });
   const art = THEME_ART[status.themeNameKey] ?? "ancient_forest";
   const inRun = save.currentWave > 0 && save.towerLoadout.length > 0;
+  const bossRecords = save.bossRecords && save.bossRecords.seasonNumber === status.seasonNumber ? Object.entries(save.bossRecords.assaultsByWave).sort((a, b) => Number(a[0]) - Number(b[0])) : [];
 
   return (
     <div className="pg-root">
@@ -167,6 +169,22 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
             </section>
 
             <aside className="pg-aside">
+              <div className="pg-block">
+                <h3>{t("season.bossesTitle")}</h3>
+                {bossRecords.length === 0 ? (
+                  <p>{t("season.bossesEmpty")}</p>
+                ) : (
+                  <ul style={{ margin: "10px 0 0", padding: 0, listStyle: "none", display: "grid", gap: 6, fontSize: 14 }}>
+                    {bossRecords.map(([wave, assaults]) => (
+                      <li key={wave} style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                        <span>{t(`bosses.${getMainBossForWave(Number(wave)).i18nKey}.name` as TranslationKey)} <span className="pg-muted">· {t("season.bossWave", { wave })}</span></span>
+                        <strong style={{ color: assaults === 1 ? "var(--gold-hi)" : "var(--bone)", whiteSpace: "nowrap" }}>{assaults === 1 ? t("season.bossFirst") : t("season.bossAssaults", { n: assaults })}</strong>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p>{t("season.bossesBody")}</p>
+              </div>
               <div className="pg-block">
                 <h3>{t("season.standingTitle")}</h3>
                 <p>{t("season.standingBody")}</p>

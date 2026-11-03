@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { FIRST_ASSAULT_BONUS_SHARDS } from "@/config/bossAssault";
 import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
@@ -459,7 +460,8 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
     const shardsBeforeKill = engine.getGemShardBalance();
     mainBoss!.hp = 0;
     engine.update(50);
-    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2);
+    // 2 for the kill + the BOSS SIEGE first-assault bonus
+    expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2 + FIRST_ASSAULT_BONUS_SHARDS);
 
     updateSave({ currentWave: 21, bestWave: 999, gold: 999_999, towerLoadout: [] }); // a mini-boss wave, no main boss
     const engine2 = new GameEngine();
@@ -627,7 +629,7 @@ describe("GameEngine — Progression 2.0: Specialization, Skins, Gems, Inventory
       const shardsBeforeKill = engine.getGemShardBalance();
       mainBoss!.hp = 0;
       engine.update(50);
-      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2);
+      expect(engine.getGemShardBalance() - shardsBeforeKill).toBe(2 + FIRST_ASSAULT_BONUS_SHARDS);
     });
   });
 });

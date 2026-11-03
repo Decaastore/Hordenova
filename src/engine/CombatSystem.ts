@@ -11,6 +11,7 @@ import {
   tickTowerSurvivalRegen,
   type TowerInstance,
 } from "@/entities/Tower";
+import { bossWeakness, WEAKNESS_DAMAGE_MULTIPLIER } from "@/config/bossAssault";
 import {
   applyBurn,
   applyDamageToEnemy,
@@ -23,7 +24,6 @@ import { getTowerSpecialAtLevel, type TowerSpecial, type TowerType } from "@/con
 import { applySpecializationToSpecial } from "@/config/specializations";
 import { applyMasteryToSpecial } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
-import { windowedBossDamageBump } from "@/config/bossPowerBudget";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
 import { distance, type Vector2 } from "@/utils/geometry";
 
@@ -153,7 +153,18 @@ export function tickCombat(
     // U1: a direct multiplier on the player's effective damage against the
     // Main Boss only — never applied to Boss HP, never to a mini-boss or
     // any normal enemy. See config/bossPowerBudget.ts.
-    const effectiveDamage = enemy.boss?.isMainBoss === true ? rawDamage * windowedBossDamageBump(waveNumber) : rawDamage;
+    // (the old windowed main-boss damage bump is no longer applied: under the
+    // BOSS SIEGE rules a boss's wounds stay, see config/bossAssault.ts)
+    void waveNumber;
+    let effectiveDamage = rawDamage;
+    // BOSS SIEGE — the boss's weakness tower hits harder and goes through
+    // its ability shield (config/bossAssault.ts).
+    if (enemy.boss?.isMainBoss && bossWeakness(enemy.boss.bossId) === tower.type) {
+      effectiveDamage *= WEAKNESS_DAMAGE_MULTIPLIER;
+      if (enemy.boss.shieldUntilMs !== null && enemy.damageReduction > enemy.boss.baseDamageReduction) {
+        armorPenetration = Math.max(armorPenetration, 1 - enemy.boss.baseDamageReduction / enemy.damageReduction);
+      }
+    }
     const actual = applyDamageToEnemy(enemy, effectiveDamage, armorPenetration);
     const event: DamageEvent = {
       towerId: tower.id,

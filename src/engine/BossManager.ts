@@ -1,4 +1,5 @@
 import type { BossDefinition } from "@/config/bossConfig";
+import { mainBossHpFactor } from "@/config/bossAssault";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 import { getEndgameBossHpMultiplierBonus } from "@/config/phaseConfig";
 import { getPointAtDistance, distance } from "@/utils/geometry";
@@ -16,7 +17,7 @@ import {
 let nextBossInstanceId = 1;
 
 /** Below this HP fraction, a boss enrages once — see tickBossAbilities. */
-const ENRAGE_HP_THRESHOLD = 0.3;
+export const ENRAGE_HP_THRESHOLD = 0.3;
 const ENRAGE_SPEED_MULTIPLIER = 1.4;
 const ENRAGE_ABILITY_INTERVAL_MULTIPLIER = 0.5;
 const DISABLE_RADIUS = 300;
@@ -36,7 +37,8 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
   // slowly-growing multiplier on top of the boss's normal HP baseline once
   // the post-130 endgame rotation is underway (1 = no change everywhere
   // else) — see phaseConfig.ts's own doc comment for the full rationale.
-  const hp = Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber));
+  const siegeFactor = def.isMainBoss ? mainBossHpFactor(def.id, waveNumber) : 1;
+  const hp = Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber) * siegeFactor);
 
   return {
     id: `boss-${nextBossInstanceId++}`,
@@ -157,7 +159,7 @@ export function tickBossAbilities(
     state.shieldUntilMs = null;
   }
 
-  if (!state.enraged && boss.maxHp > 0 && boss.hp / boss.maxHp <= ENRAGE_HP_THRESHOLD) {
+  if (!state.enraged && !state.exhausted && boss.maxHp > 0 && boss.hp / boss.maxHp <= ENRAGE_HP_THRESHOLD) {
     state.enraged = true;
     boss.baseSpeed *= ENRAGE_SPEED_MULTIPLIER;
     state.abilityIntervalMs = Math.round(state.abilityIntervalMs * ENRAGE_ABILITY_INTERVAL_MULTIPLIER);

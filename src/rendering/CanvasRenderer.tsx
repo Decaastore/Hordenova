@@ -14,6 +14,8 @@ import { getBiome } from "./biomes";
 import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
+import { drawBossRune } from "./bossRune";
+import { RUNE_HIT_RADIUS } from "@/config/bossAssault";
 import { pruneTowerAims, steerTowerAim } from "./towerSprites";
 import { findPrimaryTarget } from "@/engine/CombatSystem";
 import {
@@ -533,6 +535,7 @@ export function CanvasRenderer({
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
       // Magic air layer (piercing lance, firestorm, frost nova, sky strikes) — over units, under damage numbers.
       specialVfx.drawAir(ctx, timestamp);
+      for (const rune of engine.getBossRunes()) drawBossRune(ctx, rune.x, rune.y, rune.lifeLeft, timestamp);
 
       // FASE 3 — death-collapse animations (spec section 11): drawn after
       // live enemies/projectiles so a fresh corpse never sits underneath
@@ -610,6 +613,14 @@ export function CanvasRenderer({
 
     const snapshot = latestSnapshotRef.current;
     if (!snapshot) return;
+
+    // BOSS SIEGE — a lit rune beside the road takes the click first
+    for (const rune of engine.getBossRunes()) {
+      if (Math.hypot(worldPoint.x - rune.x, worldPoint.y - rune.y) <= RUNE_HIT_RADIUS) {
+        engine.strikeBossRune(rune.id);
+        return;
+      }
+    }
 
     for (const tower of snapshot.towers) {
       if (distance(worldPoint, tower.position) <= TOWER_HIT_RADIUS) {

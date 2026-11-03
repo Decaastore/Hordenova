@@ -1,6 +1,7 @@
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { BOSS_FALLS_BEFORE_PHASE_RESTART, GameEngine } from "./GameEngine";
+import { GameEngine } from "./GameEngine";
+import { BOSS_RETREAT_RECOVERY, SIEGE_WAVES } from "@/config/bossAssault";
 import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
@@ -94,42 +95,58 @@ describe("GameEngine — Active Idle progression", () => {
     expect(engine.getRenderSnapshot().towers.length).toBe(towersBeforeRetry);
   });
 
-  it("when the castle falls to a main boss, the run stays on the boss — it is fought again, not the whole phase", () => {
+  it("BOSS SIEGE: when the castle falls to a main boss, the boss retreats with its wounds and the map goes under siege — no defeat screen", () => {
     // wave 30 closes Ancient Forest with its main boss
-    updateSave({ currentWave: 30, bestWave: 30, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
-    const engine = new GameEngine();
-    engine.startRun();
-    // a castle on its last point of life, so it falls to the boss itself
-    (engine as unknown as { baseHp: number }).baseHp = 1;
-    runUntilStopped(engine);
-    expect(engine.getFailureReport()!.waveReached).toBe(30);
-    expect(engine.getHudSnapshot().wave).toBe(30);
-    expect(loadSave().currentWave).toBe(30);
-    engine.retryPhase();
-    expect(engine.getHudSnapshot().phase).toBe("BOSS_INTRO");
-    expect(engine.getHudSnapshot().wave).toBe(30);
-  });
-
-  it(`losing to the same boss ${BOSS_FALLS_BEFORE_PHASE_RESTART} times in a row restarts the phase from Wave 1 so the player can earn gold`, () => {
     updateSave({ currentWave: 30, bestWave: 29, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
     const engine = new GameEngine();
     engine.startRun();
-    const internals = engine as unknown as { baseHp: number };
-    for (let fall = 1; fall <= BOSS_FALLS_BEFORE_PHASE_RESTART; fall++) {
-      internals.baseHp = 1; // falls to the boss itself
-      runUntilStopped(engine);
-      expect(engine.getFailureReport()!.waveReached).toBe(30);
-      if (fall < BOSS_FALLS_BEFORE_PHASE_RESTART) {
-        expect(engine.getHudSnapshot().wave).toBe(30); // straight back to the boss
-        expect(engine.getHudSnapshot().bossFallStreak).toBe(fall);
-      } else {
-        expect(engine.getHudSnapshot().wave).toBe(21); // phase 3 starts over
-        expect(engine.getHudSnapshot().bossFallStreak).toBe(0);
-      }
-      engine.retryPhase();
-    }
-    expect(engine.getHudSnapshot().phase).toBe("RUNNING");
-    expect(engine.getHudSnapshot().wave).toBe(21);
+    const internals = engine as unknown as { baseHp: number; enemies: { boss?: unknown; hp: number; maxHp: number }[] };
+    // into the fight, wound the boss to 40%, then the castle falls
+    for (let i = 0; i < 400 && engine.getHudSnapshot().phase !== "BOSS_BATTLE"; i++) engine.update(100);
+    const boss = internals.enemies.find((e) => e.boss)!;
+    boss.hp = boss.maxHp * 0.4;
+    engine.update(100);
+    internals.baseHp = 0;
+    engine.update(100);
+    const hud = engine.getHudSnapshot();
+    expect(hud.phase).not.toBe("PROGRESSION_STOPPED");
+    expect(hud.wave).toBe(30 - SIEGE_WAVES); // replaying the last waves before the boss
+    expect(hud.baseHp).toBe(hud.maxBaseHp);
+    expect(hud.bossSiege!.wave).toBe(30);
+    expect(hud.bossSiege!.assaults).toBe(1);
+    expect(hud.bossSiege!.hpFraction).toBeCloseTo(0.4 + BOSS_RETREAT_RECOVERY, 1);
+    expect(loadSave().bossSiege!.wave).toBe(30); // survives a reload
+  });
+
+  it("BOSS SIEGE: the next assault starts with the wounds; killing the boss ends the siege and records the assaults", () => {
+    updateSave({ currentWave: 30, bestWave: 29, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null, bossSiege: { wave: 30, hpFraction: 0.3, assaults: 2 } });
+    const engine = new GameEngine();
+    engine.startRun();
+    const internals = engine as unknown as { enemies: { boss?: unknown; hp: number; maxHp: number }[] };
+    for (let i = 0; i < 400 && engine.getHudSnapshot().phase !== "BOSS_BATTLE"; i++) engine.update(100);
+    const boss = internals.enemies.find((e) => e.boss)!;
+    expect(boss.hp / boss.maxHp).toBeCloseTo(0.3, 2);
+    boss.hp = 0;
+    for (let i = 0; i < 5; i++) engine.update(100);
+    expect(engine.getHudSnapshot().bossSiege).toBeNull();
+    expect(engine.getLastBossAssaults()).toBe(3);
+    expect(engine.getBossRecords()!.assaultsByWave["30"]).toBe(3);
+    expect(loadSave().bossSiege).toBeNull();
+  });
+
+  it("BOSS SIEGE: a lit rune strikes the boss when clicked", () => {
+    updateSave({ currentWave: 30, bestWave: 29, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
+    const engine = new GameEngine();
+    engine.startRun();
+    for (let i = 0; i < 400 && engine.getHudSnapshot().phase !== "BOSS_BATTLE"; i++) engine.update(100);
+    for (let i = 0; i < 200 && engine.getBossRunes().length === 0; i++) engine.update(100);
+    const rune = engine.getBossRunes()[0]!;
+    expect(rune).toBeDefined();
+    const before = engine.getHudSnapshot().bossHp!;
+    expect(engine.strikeBossRune(rune.id)).toBe(true);
+    expect(engine.strikeBossRune(rune.id)).toBe(false); // used up
+    engine.update(16);
+    expect(engine.getHudSnapshot().bossHp!).toBeLessThan(before);
   });
 
   it("when the castle falls mid-phase, the run goes back to that phase's Wave 1 — and the save says so, so a reload can't skip it", () => {
@@ -281,21 +298,25 @@ describe("GameEngine — Active Idle progression", () => {
 
     let sawBossBattle = false;
     let iterations = 0;
-    const maxIterations = 20_000; // 2000s simulated — the boss crossing the path takes well under 200s
-    while (engine.getHudSnapshot().phase !== "PROGRESSION_STOPPED" && iterations < maxIterations) {
+    const maxIterations = 20_000;
+    let maxWave = 0;
+    while (!engine.getHudSnapshot().bossSiege && iterations < maxIterations) {
       if (engine.getHudSnapshot().phase === "BOSS_BATTLE") sawBossBattle = true;
       engine.update(100);
+      maxWave = Math.max(maxWave, engine.getHudSnapshot().wave);
       iterations++;
     }
 
     expect(sawBossBattle).toBe(true);
-    // Resolves well within the tick budget — never stuck in BOSS_BATTLE:
-    // each escape costs castle life until the castle falls to this boss.
+    // never stuck in BOSS_BATTLE: the escaped boss retreats and the map goes under siege
     expect(iterations).toBeLessThan(maxIterations);
-    expect(engine.getHudSnapshot().phase).toBe("PROGRESSION_STOPPED");
-    expect(engine.getFailureReport()!.waveReached).toBe(30);
-    // never advanced past the boss without beating it, and the retry is the boss again
-    expect(engine.getHudSnapshot().wave).toBe(30);
+    expect(engine.getHudSnapshot().bossSiege!.wave).toBe(30);
+    // never advanced past the boss without beating it
+    for (let i = 0; i < 3000; i++) {
+      engine.update(100);
+      maxWave = Math.max(maxWave, engine.getHudSnapshot().wave);
+    }
+    expect(maxWave).toBe(30);
   });
 
   /**
@@ -317,18 +338,17 @@ describe("GameEngine — Active Idle progression", () => {
    * expressed in a way that doesn't fight the real (and intentionally
    * unbounded) damage formula.
    */
-  it("3 consecutive boss escapes with zero kills surface an explicit EndgameWallReport — a single escape does not, and the run never freezes", () => {
+  it("8 assaults in a row with zero kills surface an explicit EndgameWallReport — fewer do not, and the run never freezes", () => {
     updateSave({ currentWave: 30, gold: 0, towerLoadout: [] });
     const engine = new GameEngine();
     engine.startRun();
     engine.setSpeed(4);
 
     let escapesSeen = 0;
-    let lastPhase = engine.getHudSnapshot().phase;
     let iterations = 0;
     const maxIterations = 400_000;
 
-    while (escapesSeen < 3 && iterations < maxIterations) {
+    while (escapesSeen < 8 && iterations < maxIterations) {
       engine.update(500);
       // Refill the castle to full after every tick — see the doc comment
       // above for why this test decouples itself from the real (now
@@ -336,13 +356,11 @@ describe("GameEngine — Active Idle progression", () => {
       const internals = engine as unknown as { baseHp: number; maxBaseHp: number };
       internals.baseHp = internals.maxBaseHp;
       iterations++;
-      const phase = engine.getHudSnapshot().phase;
-      // A BOSS_BATTLE -> BOSS_INTRO transition (this empty build never kills
-      // anything) is exactly one escape: the boss comes back for another round.
-      if (lastPhase === "BOSS_BATTLE" && phase === "BOSS_INTRO") escapesSeen++;
-      lastPhase = phase;
+      // each finished assault (this empty build never kills anything) is
+      // one escape: the boss retreats, the siege waves play, it comes back.
+      escapesSeen = engine.getHudSnapshot().bossSiege?.assaults ?? escapesSeen;
 
-      if (escapesSeen === 1 || escapesSeen === 2) {
+      if (escapesSeen >= 1 && escapesSeen < 8) {
         // Below the threshold — must stay null, and the run must keep
         // ticking (phase is never some frozen/blocking value).
         expect(engine.getEndgameWallReport()).toBeNull();
@@ -350,15 +368,14 @@ describe("GameEngine — Active Idle progression", () => {
     }
 
     expect(iterations).toBeLessThan(maxIterations);
-    expect(escapesSeen).toBe(3);
-    // the boss fanfare is heard when the boss is announced, not again on
-    // every lap of an escaped boss (it used to replay like a stuck track)
+    expect(escapesSeen).toBe(8);
+    // the boss fanfare is heard once per assault, never on a loop
     const bossIntros = engine.drainAudioEvents().filter((e) => e.type === "boss_intro");
-    expect(bossIntros.length).toBeLessThanOrEqual(1);
+    expect(bossIntros.length).toBeLessThanOrEqual(escapesSeen + 1);
 
     const report = engine.getEndgameWallReport();
     expect(report).not.toBeNull();
-    expect(report!.consecutiveEscapes).toBe(3);
+    expect(report!.consecutiveEscapes).toBe(8);
     // an escaped boss is not a cleared wave: no progress was recorded for it
     expect(report!.bestWave).toBeLessThan(30);
     expect(report!.bestDamageFraction).toBeGreaterThanOrEqual(0);
@@ -368,7 +385,8 @@ describe("GameEngine — Active Idle progression", () => {
     // Never freezes (not stuck waiting on the report the way
     // PROGRESSION_STOPPED waits on retryPhase()), and never skips the boss.
     expect(engine.getHudSnapshot().phase).not.toBe("PROGRESSION_STOPPED");
-    expect(engine.getHudSnapshot().wave).toBe(30);
+    expect(engine.getHudSnapshot().wave).toBeLessThanOrEqual(30); // under siege: the waves before the boss
+    expect(engine.getHudSnapshot().bossSiege!.wave).toBe(30);
 
     engine.acknowledgeEndgameWallReport();
     expect(engine.getEndgameWallReport()).toBeNull();

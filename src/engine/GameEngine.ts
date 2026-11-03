@@ -104,7 +104,20 @@ import {
   tickWaveManager,
   type WaveManagerState,
 } from "./WaveManager";
-import { createBossInstance, tickBossAbilities, tickBossSiege } from "./BossManager";
+import { createBossInstance, ENRAGE_HP_THRESHOLD, tickBossAbilities, tickBossSiege } from "./BossManager";
+import {
+  BOSS_RETREAT_RECOVERY,
+  bossWeakness,
+  FIRST_ASSAULT_BONUS_SHARDS,
+  FIRST_ASSAULT_GOLD_MULTIPLIER,
+  RUNE_INTERVAL_MS,
+  RUNE_LIFETIME_MS,
+  RUNE_STRIKE_FRACTION,
+  SIEGE_WAVES,
+  type BossRecords,
+  type BossSiegeState,
+} from "@/config/bossAssault";
+import { getPointAtDistance } from "@/utils/geometry";
 import { SIEGE_DISABLE_ON_DEPLETION_MS } from "@/config/bossSiege";
 import {
   createBattleStats,
@@ -134,11 +147,12 @@ const ELITE_MODIFIER: EliteModifier = {
 /** Elites are always built on the Brute silhouette — a consistent "this one's different" read across every phase without needing a bespoke archetype per elite. */
 const ELITE_BASE_TYPE: EnemyType = "BRUTE";
 
-/** Castle falls in a row to the same main boss before the phase restarts from Wave 1 (see bossFallStreak). */
-export const BOSS_FALLS_BEFORE_PHASE_RESTART = 3;
 
 /** CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — this many consecutive boss escapes with zero kills in between is treated as a genuine wall, not bad luck (see EndgameWallReport's own doc comment). */
-const ENDGAME_WALL_ESCAPE_THRESHOLD = 3;
+const ENDGAME_WALL_ESCAPE_THRESHOLD = 8;
+
+/** Audio/VFX event queues are drained every frame by the game screen; when nothing drains them they stay this short. */
+const MAX_QUEUED_EVENTS = 2000;
 
 export interface HudSnapshot {
   phase: RunPhase;
@@ -192,8 +206,12 @@ export interface HudSnapshot {
   towerCount: number;
   /** DEPLOY: towers still waiting to be placed on this map. */
   deployBench: readonly { id: string; type: TowerType; level: number }[];
-  /** Castle falls in a row to the current main boss (0 after a kill or a phase restart). */
-  bossFallStreak: number;
+  /** BOSS SIEGE: the main boss besieging this map (HP left as a fraction, assaults so far, waves until it attacks again), or null. */
+  bossSiege: { wave: number; hpFraction: number; assaults: number; wavesUntilBoss: number } | null;
+  /** BOSS SIEGE: about the main boss being announced/fought now — its weakness, which assault this is, and its state. Null outside a boss fight. */
+  bossFight: { weakness: TowerType | null; assault: number; enraged: boolean; exhausted: boolean } | null;
+  /** Set during VICTORY: how many assaults the boss took (1 = first-assault kill, which pays a bonus). */
+  bossVictoryAssaults: number | null;
   /** Daily missions: changes whenever any progress/claim changes (for re-rendering), and how many are done but not yet claimed. */
   missionsKey: string;
   missionsClaimable: number;
@@ -303,7 +321,15 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.repositionFreeAvailable === b.repositionFreeAvailable &&
     a.mapLayoutId === b.mapLayoutId &&
     a.towerCount === b.towerCount &&
-    a.bossFallStreak === b.bossFallStreak &&
+    a.bossSiege?.wave === b.bossSiege?.wave &&
+    a.bossSiege?.hpFraction === b.bossSiege?.hpFraction &&
+    a.bossSiege?.assaults === b.bossSiege?.assaults &&
+    a.bossSiege?.wavesUntilBoss === b.bossSiege?.wavesUntilBoss &&
+    a.bossFight?.assault === b.bossFight?.assault &&
+    a.bossFight?.enraged === b.bossFight?.enraged &&
+    a.bossFight?.exhausted === b.bossFight?.exhausted &&
+    a.bossFight?.weakness === b.bossFight?.weakness &&
+    a.bossVictoryAssaults === b.bossVictoryAssaults &&
     a.missionsKey === b.missionsKey &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
@@ -390,17 +416,15 @@ export class GameEngine {
    * could be "lost" on reload, only a diagnostic banner.
    */
   private consecutiveBossEscapesWithoutKill = 0;
-  /**
-   * Castle falls in a row to the same main boss. The boss is retried
-   * directly, but after BOSS_FALLS_BEFORE_PHASE_RESTART falls the phase
-   * restarts from its first wave instead: replaying only the boss earns
-   * almost no gold, so a build that can't win would otherwise be stuck
-   * forever (measured: a 48h bot froze on the wave-70 boss).
-   */
-  private bossFallStreak = 0;
-  private bossFallStreakWave: number | null = null;
-  /** Falls to the current boss since it was last beaten (not reset by a phase restart) — balance telemetry only. */
-  private bossFallsSinceWin = 0;
+  /** BOSS SIEGE (config/bossAssault.ts): the main boss besieging the map and the wounds it carries; persisted. */
+  private bossSiege: BossSiegeState | null = null;
+  private bossRecords: BossRecords | null = null;
+  /** Runes lit beside the road during a boss assault (click to strike). In-memory: an assault never survives a reload. */
+  private bossRunes: { id: string; x: number; y: number; expiresAtMs: number }[] = [];
+  private nextRuneAtMs = 0;
+  private runeSeq = 0;
+  private lastBossHpFraction = 1;
+  private lastBossAssaults: number | null = null;
   /** Balance telemetry is recorded only by the real game screen (see enableTelemetry), never by tests or simulations. */
   private telemetryEnabled = false;
   /** Best fraction of THIS streak's boss HP actually brought down (0..1) — reset alongside the streak counter above. */
@@ -597,6 +621,8 @@ export class GameEngine {
     this.lastFreeRepositionDayIndex = save.lastFreeRepositionDayIndex;
     this.dailyMissions = save.dailyMissions ?? freshMissionsState(getCurrentDayIndex());
     this.seasonPass = save.seasonPass ?? freshPassState(seasonClock.getCurrentSeasonWindow().seasonNumber);
+    this.bossSiege = save.bossSiege;
+    this.bossRecords = save.bossRecords;
     this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
     this.wave = createWaveManagerState();
     this.resetAttemptState();
@@ -645,6 +671,8 @@ export class GameEngine {
         milestoneShards += Math.max(1, Math.round(bonus / 150));
       }
     }
+    // a besieging boss that the simulation got past is beaten
+    if (this.bossSiege && result.endingWave > this.bossSiege.wave) this.bossSiege = null;
     const goldShare = source === "CLOSED" ? OFFLINE_GOLD_SHARE : 1;
     const goldEarned = this.withSkinGoldBonus(Math.round((result.resourcesEarned + milestoneGold) * goldShare));
     this.gold += goldEarned;
@@ -1960,8 +1988,16 @@ export class GameEngine {
       this.bossIntroRemainingMs -= scaledDt;
       if (this.bossIntroRemainingMs <= 0) {
         const boss = createBossInstance(getMainBossForWave(this.wave.currentWave), this.wave.currentWave, nowMs);
+        // the wounds of earlier assaults stay
+        if (this.bossSiege && this.bossSiege.wave === this.wave.currentWave) {
+          boss.hp = Math.max(1, Math.round(boss.maxHp * this.bossSiege.hpFraction));
+          // back already below its enrage threshold: it's exhausted, not enraged
+          if (boss.boss && this.bossSiege.hpFraction <= ENRAGE_HP_THRESHOLD) boss.boss.exhausted = true;
+        }
         this.activeBossId = boss.id;
         this.enemies.push(boss);
+        this.bossRunes = [];
+        this.nextRuneAtMs = nowMs + RUNE_INTERVAL_MS / 2;
         this.phase = "BOSS_BATTLE";
       }
       this.notify();
@@ -2155,6 +2191,10 @@ export class GameEngine {
     if (this.phase === "BOSS_BATTLE") {
       const boss = this.enemies.find((e) => e.id === this.activeBossId) ?? null;
       recordBossSnapshot(this.battleStats, boss);
+      if (boss) {
+        this.lastBossHpFraction = Math.max(0, boss.hp / boss.maxHp);
+        this.tickBossRunes(boss, nowMs);
+      }
       if (bossDefeatedThisTick) {
         this.phase = "VICTORY";
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
@@ -2165,12 +2205,7 @@ export class GameEngine {
         // streak was before it.
         this.consecutiveBossEscapesWithoutKill = 0;
         this.bestBossDamageFractionInStreak = 0;
-        if (this.telemetryEnabled) {
-          recordBalanceEvent({ ...this.telemetryBase(this.wave.currentWave), type: "boss_defeated", fallsBeforeWin: this.bossFallsSinceWin, defence: this.defenceSnapshot() });
-        }
-        this.bossFallStreak = 0;
-        this.bossFallStreakWave = null;
-        this.bossFallsSinceWin = 0;
+        this.onBossKilled(this.wave.currentWave);
         this.persist();
       } else if (boss === null) {
         // The boss reached the base and was removed via the normal leak
@@ -2210,13 +2245,9 @@ export class GameEngine {
           };
         }
 
-        // A boss has to be DEFEATED to move on: one that slips past comes
-        // back for another round. The castle keeps the damage it took, so
-        // the fight always ends — the boss dies, or the castle falls and
-        // stopProgression() keeps the run on this boss for a full-health retry.
-        this.activeBossId = null;
-        this.enterBossIntro(this.wave.currentWave, false);
-        this.persist();
+        // A boss has to be DEFEATED to move on — but it keeps its wounds and
+        // the map goes under siege (config/bossAssault.ts).
+        this.bossRetreat();
       }
     } else {
       this.phase = this.wave.phase === "TRANSITIONING" ? "WAVE_TRANSITION" : "RUNNING";
@@ -2482,6 +2513,12 @@ export class GameEngine {
   }
 
   private stopProgression(): void {
+    // The castle fell during a boss assault: the boss retreats with its
+    // wounds and the siege goes on — no defeat screen, nothing lost.
+    if (this.phase === "BOSS_BATTLE" && isBossMilestone(this.wave.currentWave)) {
+      this.bossRetreat();
+      return;
+    }
     this.phase = "PROGRESSION_STOPPED";
     const failedWave = this.wave.currentWave;
     const finalized = finalizeBattleStats(this.battleStats, failedWave);
@@ -2491,33 +2528,127 @@ export class GameEngine {
     // Roulette spin on a boss wave) as already earned, so beating it later
     // would pay nothing.
     this.bestWave = recordRunResult(failedWave - 1, this.storageKey).bestWave;
-    // The castle fell: the phase starts over from its first wave — except
-    // on a main boss, which is fought again straight away, up to
-    // BOSS_FALLS_BEFORE_PHASE_RESTART falls in a row (then the phase
-    // restarts so the player can earn gold). Done here, not on retry, and
-    // saved right away so reloading the game can't skip it.
-    let retryBoss = false;
-    if (isBossMilestone(failedWave)) {
-      this.bossFallStreak = this.bossFallStreakWave === failedWave ? this.bossFallStreak + 1 : 1;
-      this.bossFallStreakWave = failedWave;
-      retryBoss = this.bossFallStreak < BOSS_FALLS_BEFORE_PHASE_RESTART;
-      if (!retryBoss) this.bossFallStreak = 0;
-    }
-    this.wave.currentWave = retryBoss ? failedWave : phaseStartWave(phaseNumberFromWave(failedWave));
-    if (isBossMilestone(failedWave)) this.bossFallsSinceWin += 1;
+    // The castle fell: the phase starts over from its first wave. Done here,
+    // not on retry, and saved right away so reloading can't skip it.
+    this.wave.currentWave = phaseStartWave(phaseNumberFromWave(failedWave));
     if (this.telemetryEnabled) {
       recordBalanceEvent({
         ...this.telemetryBase(failedWave),
         type: "castle_fell",
-        boss: isBossMilestone(failedWave),
-        bossFallStreak: !isBossMilestone(failedWave) ? 0 : retryBoss ? this.bossFallStreak : BOSS_FALLS_BEFORE_PHASE_RESTART,
-        restartedPhase: !retryBoss,
+        boss: false,
+        bossFallStreak: 0,
+        restartedPhase: true,
         defence: this.defenceSnapshot(),
       });
     }
     this.emitAudio({ type: "defeat" });
     this.persist();
     this.notify();
+  }
+
+  // -------------------------------------------------------------------
+  // BOSS SIEGE (config/bossAssault.ts)
+  // -------------------------------------------------------------------
+
+  /** The boss survived the assault: it keeps its wounds (recovering a little) and the map goes under siege. */
+  private bossRetreat(): void {
+    const wave = this.wave.currentWave;
+    const left = Math.min(1, this.lastBossHpFraction + BOSS_RETREAT_RECOVERY);
+    const assaults = (this.bossSiege?.wave === wave ? this.bossSiege.assaults : 0) + 1;
+    this.bossSiege = { wave, hpFraction: left, assaults };
+    this.emitAudio({ type: "boss_enrage" });
+    this.resetAttemptState();
+    this.bossRunes = [];
+    this.lastBossHpFraction = 1;
+    // replay the last few regular waves before the boss, then it attacks again
+    this.wave.currentWave = Math.max(1, wave - SIEGE_WAVES);
+    this.beginCurrentOrNextWave();
+    this.persist();
+    this.notify();
+  }
+
+  private onBossKilled(wave: number): void {
+    const assaults = (this.bossSiege?.wave === wave ? this.bossSiege.assaults : 0) + 1;
+    if (assaults === 1) {
+      // first-assault kill: a bonus on top of the boss's normal reward
+      const boss = getMainBossForWave(wave);
+      this.gold += this.withSkinGoldBonus(Math.round(boss.goldReward * (FIRST_ASSAULT_GOLD_MULTIPLIER - 1)));
+      this.addGemShards(FIRST_ASSAULT_BONUS_SHARDS, "boss_first_assault");
+    }
+    const season = seasonClock.getCurrentSeasonWindow().seasonNumber;
+    if (!this.bossRecords || this.bossRecords.seasonNumber !== season) this.bossRecords = { seasonNumber: season, assaultsByWave: {} };
+    const key = String(wave);
+    const prev = this.bossRecords.assaultsByWave[key];
+    this.bossRecords.assaultsByWave[key] = prev === undefined ? assaults : Math.min(prev, assaults);
+    this.lastBossAssaults = assaults;
+    if (this.telemetryEnabled) {
+      recordBalanceEvent({ ...this.telemetryBase(wave), type: "boss_defeated", fallsBeforeWin: assaults - 1, defence: this.defenceSnapshot() });
+    }
+    this.bossSiege = null;
+    this.bossRunes = [];
+  }
+
+  private tickBossRunes(boss: EnemyInstance, nowMs: number): void {
+    this.bossRunes = this.bossRunes.filter((r) => r.expiresAtMs > nowMs);
+    if (nowMs < this.nextRuneAtMs || this.bossRunes.length > 0) return;
+    this.nextRuneAtMs = nowMs + RUNE_INTERVAL_MS;
+    const path = this.layout.path;
+    const ahead = boss.distanceTraveled + 70 + Math.random() * 90;
+    const at = getPointAtDistance(path, ahead);
+    if (at.finished) return;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const nx = -at.direction.y;
+    const ny = at.direction.x;
+    this.bossRunes.push({ id: `rune-${++this.runeSeq}`, x: at.position.x + nx * 40 * side, y: at.position.y + ny * 40 * side, expiresAtMs: nowMs + RUNE_LIFETIME_MS });
+    this.notify();
+  }
+
+  /** Clicking a lit rune strikes the boss for a share of its max HP. */
+  strikeBossRune(runeId: string): boolean {
+    if (this.phase !== "BOSS_BATTLE") return false;
+    const index = this.bossRunes.findIndex((r) => r.id === runeId);
+    const boss = this.enemies.find((e) => e.id === this.activeBossId);
+    if (index < 0 || !boss || isEnemyDead(boss)) return false;
+    this.bossRunes.splice(index, 1);
+    const amount = Math.min(boss.hp, Math.round(boss.maxHp * RUNE_STRIKE_FRACTION));
+    boss.hp -= amount;
+    boss.msSinceLastDamage = 0;
+    this.emitCombatVfx({ kind: "HIT", enemyId: boss.id, position: boss.position, amount, isCrit: true });
+    this.emitAudio({ type: "stormcaller_chain" });
+    this.notify();
+    return true;
+  }
+
+  private bossFightInfo(): HudSnapshot["bossFight"] {
+    if (this.phase !== "BOSS_INTRO" && this.phase !== "BOSS_BATTLE") return null;
+    const wave = this.wave.currentWave;
+    const boss = this.enemies.find((e) => e.id === this.activeBossId);
+    return {
+      weakness: bossWeakness(getMainBossForWave(wave).id),
+      assault: (this.bossSiege?.wave === wave ? this.bossSiege.assaults : 0) + 1,
+      enraged: boss?.boss?.enraged === true,
+      exhausted: boss?.boss?.exhausted === true,
+    };
+  }
+
+  /** Runes lit right now, with how much of their life is left (1 = just appeared). */
+  getBossRunes(): { id: string; x: number; y: number; lifeLeft: number }[] {
+    if (this.phase !== "BOSS_BATTLE") return [];
+    return this.bossRunes.map((r) => ({ id: r.id, x: r.x, y: r.y, lifeLeft: Math.max(0, Math.min(1, (r.expiresAtMs - this.simClockMs) / RUNE_LIFETIME_MS)) }));
+  }
+
+  /** Assaults the last main boss took to fall (for the victory banner), or null. */
+  getLastBossAssaults(): number | null {
+    return this.lastBossAssaults;
+  }
+
+  getBossRecords(): BossRecords | null {
+    return this.bossRecords;
+  }
+
+  getBossWeakness(): TowerType | null {
+    if (!isBossMilestone(this.wave.currentWave) && !this.bossSiege) return null;
+    return bossWeakness(getMainBossForWave(this.bossSiege?.wave ?? this.wave.currentWave).id);
   }
 
   private classifyEnemyTier(enemy: EnemyInstance): EnemyAudioTier {
@@ -2529,6 +2660,8 @@ export class GameEngine {
 
   private emitAudio(event: GameAudioEvent): void {
     this.audioEvents.push(event);
+    // nobody draining (simulations, a long background catch-up): keep it bounded
+    if (this.audioEvents.length > MAX_QUEUED_EVENTS) this.audioEvents.splice(0, this.audioEvents.length - MAX_QUEUED_EVENTS);
   }
 
   /** Audio spec section 16 — the ONLY way anything outside this class observes what happened audio-wise. Called once per real tick by audio/GameAudioBridge.ts, never from inside a render loop. */
@@ -2540,6 +2673,7 @@ export class GameEngine {
 
   private emitCombatVfx(event: CombatVfxEvent): void {
     this.combatVfxEvents.push(event);
+    if (this.combatVfxEvents.length > MAX_QUEUED_EVENTS) this.combatVfxEvents.splice(0, this.combatVfxEvents.length - MAX_QUEUED_EVENTS);
   }
 
   /** Floating Damage Numbers rewrite — the ONLY way the rendering layer observes real damage application. Safe to drain every render frame (unlike audio, which is tick-cadenced): an empty array is the overwhelmingly common case, and nothing is lost between drains since this is a plain queue like drainAudioEvents above. */
@@ -2599,6 +2733,8 @@ export class GameEngine {
         lastFreeRepositionDayIndex: this.lastFreeRepositionDayIndex,
         dailyMissions: this.dailyMissions,
         seasonPass: this.seasonPass,
+        bossSiege: this.bossSiege,
+        bossRecords: this.bossRecords,
       },
       this.storageKey,
     );
@@ -2644,7 +2780,11 @@ export class GameEngine {
       mapLayoutId: this.layout.id,
       towerCount: this.towers.length,
       deployBench: this.deployBench.map((t) => ({ id: t.id, type: t.type, level: t.level })),
-      bossFallStreak: this.bossFallStreak,
+      bossFight: this.bossFightInfo(),
+      bossVictoryAssaults: this.phase === "VICTORY" ? this.lastBossAssaults : null,
+      bossSiege: this.bossSiege
+        ? { wave: this.bossSiege.wave, hpFraction: this.bossSiege.hpFraction, assaults: this.bossSiege.assaults, wavesUntilBoss: Math.max(0, this.bossSiege.wave - this.wave.currentWave) }
+        : null,
       missionsKey: this.missionsKey(),
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
     };

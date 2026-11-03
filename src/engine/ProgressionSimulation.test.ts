@@ -233,20 +233,16 @@ describe("Progression 2.0 balance simulation (spec section 3/4)", () => {
     expect(result.avgTowerLevel).toBeLessThan(25);
   }, 30_000);
 
-  it("NO PERMANENT BOSS WALL: main bosses must be beaten to move on, yet a greedy bot never stalls — over 48h it keeps getting stronger and keeps beating bosses", () => {
-    // Bosses can no longer be skipped (an escaped boss comes back; a castle
-    // that falls to it retries the boss). Replaying only the boss earns
-    // almost no gold, so before the BOSS_FALLS_BEFORE_PHASE_RESTART rule
-    // this same bot froze for good on the wave-70 boss (towers stuck at
-    // ~11.9, gold flat for 20 simulated hours). This guards against that.
+  it("NO PERMANENT BOSS WALL: main bosses must be beaten to move on, yet a greedy bot keeps beating them — the siege rules (wounds stay) never let a boss stall the run", () => {
+    // Before BOSS SIEGE (config/bossAssault.ts) this same bot needed 10h for
+    // the wave-30 boss and never got past the wave-70 one in 48h. With
+    // wounds that stay and the siege waves paying gold, it now brings each
+    // boss down in a few assaults.
     const H = 60 * 60 * 1000;
-    const at24 = runGreedyBot(24 * H);
-    const at48 = runGreedyBot(48 * H);
-
-    expect(at48.avgTowerLevel).toBeGreaterThan(at24.avgTowerLevel + 1); // still growing in the second day
-    expect(at48.bossesDefeatedTotal).toBeGreaterThanOrEqual(2);
-    expect(at48.waveReached).toBeGreaterThanOrEqual(50);
-    expect(Number.isFinite(at48.gold)).toBe(true);
+    const result = runGreedyBot(6 * H);
+    expect(result.bossesDefeatedTotal).toBeGreaterThanOrEqual(4);
+    expect(result.waveReached).toBeGreaterThanOrEqual(110);
+    expect(Number.isFinite(result.gold)).toBe(true);
   }, 300_000);
 
   /**

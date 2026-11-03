@@ -57,6 +57,8 @@ export interface BossState {
   nextAbilityAtMs: number;
   /** Set once the boss crosses its enrage HP threshold — see BossManager.tickBossAbilities. */
   enraged: boolean;
+  /** BOSS SIEGE — a boss that comes back already badly wounded is exhausted: it no longer enrages. */
+  exhausted?: boolean;
 
   // -------------------------------------------------------------------
   // Master Implementation Pass spec section 13 — Boss Siege Attack. A

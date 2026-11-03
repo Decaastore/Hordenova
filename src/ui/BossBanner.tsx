@@ -27,7 +27,9 @@ export function BossBanner({ hud }: BossBannerProps) {
 
   const bossName = t(`bosses.${hud.bossNameKey}.name` as TranslationKey);
   const hpRatio = hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1;
-  const isEnraged = hud.phase === "BOSS_BATTLE" && hpRatio <= ENRAGE_HP_RATIO;
+  const isEnraged = hud.phase === "BOSS_BATTLE" && (hud.bossFight ? hud.bossFight.enraged : hpRatio <= ENRAGE_HP_RATIO);
+  const fight = hud.bossFight;
+  const weaknessLine = fight?.weakness ? t("boss.weakness", { tower: t(`towers.${fight.weakness}.name` as TranslationKey) }) : null;
   // SHIELD DURANTE O MODO ENFURECIDO — reuses the same real reduction
   // function entities/Enemy.ts's applyDamageToEnemy calls (isMainBoss=true
   // here since this banner only ever shows the main boss), so the
@@ -39,6 +41,11 @@ export function BossBanner({ hud }: BossBannerProps) {
       <div style={containerStyle}>
         <div style={nameStyle}>{t("boss.defeatedLine", { name: bossName })}</div>
         <div style={{ ...subtitleStyle, color: PALETTE.gold }}>{t("boss.rewardLine", { amount: victoryReward })}</div>
+        {hud.bossVictoryAssaults !== null && (
+          <div style={{ ...hintStyle, color: hud.bossVictoryAssaults === 1 ? PALETTE.gold : PALETTE.uiTextDim, fontWeight: 700 }}>
+            {hud.bossVictoryAssaults === 1 ? t("boss.firstAssault") : t("boss.fellOnAssault", { n: hud.bossVictoryAssaults })}
+          </div>
+        )}
       </div>
     );
   }
@@ -48,6 +55,12 @@ export function BossBanner({ hud }: BossBannerProps) {
       <div style={nameStyle}>{t("boss.introLine", { name: bossName })}</div>
       {hud.phase === "BOSS_BATTLE" ? (
         <>
+          {(fight?.assault ?? 1) > 1 || fight?.exhausted ? (
+            <div style={tagRowStyle}>
+              {(fight?.assault ?? 1) > 1 && <div style={assaultTagStyle}>{t("boss.assault", { n: fight!.assault })}</div>}
+              {fight?.exhausted && <div style={assaultTagStyle}>{t("boss.exhausted")}</div>}
+            </div>
+          ) : null}
           {isEnraged && (
             <div style={tagRowStyle}>
               <div style={enragedTagStyle}>{t("boss.enraged")}</div>
@@ -63,16 +76,29 @@ export function BossBanner({ hud }: BossBannerProps) {
           <div style={hpTextStyle}>
             {Math.max(0, Math.ceil(hud.bossHp ?? 0)).toLocaleString()} / {Math.round(hud.bossMaxHp ?? 0).toLocaleString()}
           </div>
+          {weaknessLine && <div style={hintStyle}>{weaknessLine}</div>}
         </>
       ) : (
         <>
-          <div style={subtitleStyle}>{t("boss.getReady")}</div>
-          <div style={hintStyle}>{t("boss.compositionHint")}</div>
+          <div style={subtitleStyle}>{(fight?.assault ?? 1) > 1 ? t("boss.returns", { n: fight!.assault, pct: Math.round((hud.bossSiege?.hpFraction ?? 1) * 100) }) : t("boss.getReady")}</div>
+          <div style={hintStyle}>{weaknessLine ?? t("boss.compositionHint")}</div>
+          <div style={hintStyle}>{t("boss.runeHint")}</div>
         </>
       )}
     </div>
   );
 }
+
+const assaultTagStyle: CSSProperties = {
+  padding: "2px 8px",
+  borderRadius: 999,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
+  background: "rgba(0,0,0,0.35)",
+  color: PALETTE.uiAccentBright,
+  fontSize: 10,
+  fontWeight: 700,
+  letterSpacing: 0.5,
+};
 
 const containerStyle: CSSProperties = {
   position: "absolute",

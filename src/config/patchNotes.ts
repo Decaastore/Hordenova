@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v74",
+    dateIso: "2026-11-03",
+    category: "BOSSES",
+    title: {
+      en: "Boss Siege: No More Endless Boss Walls",
+      ptBR: "Cerco do Chefe: Fim das Paredes de Chefe",
+    },
+    description: {
+      en: "Main bosses still have to be beaten to leave their map, but the damage you deal now stays. If a boss survives, it retreats wounded, the last waves before it are played again (paying Gold, missions and Pass XP as usual) and it comes back to finish the job. No more defeat screens or going back to Wave 1 because of a boss.",
+      ptBR: "Os chefes principais continuam precisando ser vencidos para sair do mapa, mas o dano que você causa agora fica. Se o chefe aguentar, ele recua ferido, as últimas ondas antes dele são jogadas de novo (pagando ouro, missões e XP do Passe normalmente) e ele volta para terminar a luta. Acabaram a tela de derrota e a volta para a Onda 1 por causa de chefe.",
+    },
+    highlights: [
+      {
+        en: "A retreating boss recovers only 10% of its life. One that comes back already below 30% is exhausted and no longer enrages.",
+        ptBR: "O chefe que recua recupera só 10% da vida. Se ele voltar já abaixo de 30%, está exausto e não se enfurece mais.",
+      },
+      {
+        en: "Every boss has a weakness shown when it arrives: that tower hits it 30% harder and goes through its shield.",
+        ptBR: "Todo chefe tem uma fraqueza, mostrada quando ele chega: essa torre causa 30% a mais de dano nele e atravessa o escudo dele.",
+      },
+      {
+        en: "During the fight, runes light up beside the road: click them to strike the boss. Playing with the game open brings bosses down about twice as fast.",
+        ptBR: "Durante a luta, runas acendem perto da estrada: clique nelas para golpear o chefe. Jogando com o jogo aberto, os chefes caem cerca de duas vezes mais rápido.",
+      },
+      {
+        en: "Boss life rebalanced so a player keeping pace brings each one down in about 3 assaults. Killing it on the first assault pays bonus Gold and Gem Shards, and the Season page shows how many assaults each boss took you.",
+        ptBR: "A vida dos chefes foi rebalanceada para quem acompanha o ritmo derrubar cada um em cerca de 3 ataques. Derrubar no primeiro ataque paga ouro e fragmentos de bônus, e a página Season mostra quantos ataques cada chefe levou.",
+      },
+    ],
+  },
+  {
     id: "v73",
     dateIso: "2026-11-03",
     category: "SYSTEMS",

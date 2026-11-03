@@ -11,6 +11,7 @@ import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
 import { DailyMissionsPanel } from "@/ui/DailyMissionsPanel";
+import { getMainBossForWave } from "@/config/bossConfig";
 import { useTabPresence } from "@/hooks/useTabPresence";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { ProgressionStoppedBar, ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
@@ -523,6 +524,19 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           <ProgressionStoppedBar onRetry={() => engine.retryPhase()} onShowReport={() => setReportDismissed(false)} />
         )}
 
+        {hud.bossSiege && (hud.phase === "RUNNING" || hud.phase === "WAVE_TRANSITION") && (
+          <div style={siegePillStyle} role="status" data-testid="siege-pill">
+            <span style={{ ...siegeBarTrackStyle }}>
+              <span style={{ ...siegeBarFillStyle, width: `${Math.round(hud.bossSiege.hpFraction * 100)}%` }} />
+            </span>
+            {t(hud.bossSiege.wavesUntilBoss > 0 ? "boss.siege" : "boss.siegeNow", {
+              name: t(`bosses.${getMainBossForWave(hud.bossSiege.wave).i18nKey}.name` as TranslationKey),
+              n: hud.bossSiege.wavesUntilBoss,
+              pct: Math.round(hud.bossSiege.hpFraction * 100),
+            })}
+          </div>
+        )}
+
         {tabPresence.summary && (
           <div style={tabSummaryStyle} role="status" data-testid="tab-summary">
             <span>
@@ -613,9 +627,31 @@ function tutorialCopyKey(step: TutorialStep | "BOSS"): string {
   }
 }
 
-const tabSummaryStyle: CSSProperties = {
+const siegePillStyle: CSSProperties = {
   position: "absolute",
   top: 12,
+  left: "50%",
+  transform: "translateX(-50%)",
+  maxWidth: "calc(100% - 24px)",
+  display: "flex",
+  alignItems: "center",
+  gap: 10,
+  padding: "7px 14px",
+  borderRadius: 999,
+  border: `1px solid ${PALETTE.danger}88`,
+  background: "rgba(28,18,10,0.9)",
+  color: PALETTE.uiText,
+  fontSize: 12.5,
+  fontWeight: 600,
+  zIndex: 4,
+  pointerEvents: "none",
+};
+const siegeBarTrackStyle: CSSProperties = { display: "inline-block", width: 70, height: 6, borderRadius: 3, background: "rgba(255,255,255,0.1)", overflow: "hidden", flexShrink: 0 };
+const siegeBarFillStyle: CSSProperties = { display: "block", height: "100%", background: PALETTE.danger };
+
+const tabSummaryStyle: CSSProperties = {
+  position: "absolute",
+  top: 56,
   left: "50%",
   transform: "translateX(-50%)",
   maxWidth: "calc(100% - 24px)",
