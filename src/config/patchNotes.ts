@@ -70,6 +70,25 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v72",
+    dateIso: "2026-11-03",
+    category: "INTERFACE",
+    title: {
+      en: "A New Logo: Horde Nova",
+      ptBR: "Logo Novo: Horde Nova",
+    },
+    description: {
+      en: "The game has its own logo. HORDE NOVA is written in gold, and the O of NOVA became the game's emblem: the violet rift the horde pours out of, inside a gold rune ring, with a nova bursting from it. It's on the Home page, the top menu and inside the game.",
+      ptBR: "O jogo ganhou um logo próprio. HORDE NOVA aparece em dourado, e o O de NOVA virou o emblema do jogo: a fenda violeta de onde a horda sai, dentro de um anel dourado de runas, com uma nova explodindo dela. Ele aparece na página inicial, no menu de cima e dentro da partida.",
+    },
+    highlights: [
+      {
+        en: "The emblem is also the new site icon in the browser tab and when saving the game to a phone's home screen.",
+        ptBR: "O emblema também é o novo ícone do site, na aba do navegador e ao salvar o jogo na tela inicial do celular.",
+      },
+    ],
+  },
+  {
     id: "v71",
     dateIso: "2026-11-02",
     category: "SYSTEMS",

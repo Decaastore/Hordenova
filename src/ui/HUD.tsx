@@ -6,6 +6,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
+import { BrandLogo } from "./BrandLogo";
 import { BagIcon, BoltIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
@@ -29,10 +30,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
     <div style={barStyle}>
       {onExitToHome ? (
         <button type="button" onClick={onExitToHome} style={brandButtonStyle} title={t("hud.backToHome")} aria-label={t("hud.backToHome")} data-testid="hud-home">
-          HORDENOVA
+          <BrandLogo height={20} decorative />
         </button>
       ) : (
-        <div style={brandStyle}>HORDENOVA</div>
+        <div style={brandStyle}>
+          <BrandLogo height={20} />
+        </div>
       )}
 
       <div style={groupStyle}>

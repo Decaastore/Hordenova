@@ -61,7 +61,7 @@ export const en = {
     rankingCardCta: "View the ranking",
     wikiCardCta: "Open the wiki",
     footerTagline: "A tower defense about holding the line, one wave at a time.",
-    footerRights: "© {year} HORDENOVA. All rights reserved.",
+    footerRights: "© {year} Horde Nova. All rights reserved.",
   },
   hud: {
     openStore: "Open the Store",
@@ -728,7 +728,7 @@ export const en = {
       buying: "Buying other players' items",
     },
     unavailableTitle: "No live trade partner yet",
-    unavailableBody: "HORDENOVA's trade system is fully built and tested, but there is no live multiplayer backend yet to trade with another real player. Once matchmaking exists, this exact screen connects to it — nothing here is a placeholder or a fake partner.",
+    unavailableBody: "Horde Nova's trade system is fully built and tested, but there is no live multiplayer backend yet to trade with another real player. Once matchmaking exists, this exact screen connects to it — nothing here is a placeholder or a fake partner.",
     yourOffer: "YOUR OFFER",
     theirOffer: "THEIR OFFER",
     addItem: "+ Add an Item",
@@ -873,7 +873,7 @@ export const en = {
     gemsCol: "Gems",
     rewardsCol: "Cosmetics",
     standingTitle: "Your standing",
-    standingBody: "Your season score is saved on this device. Your place among other players will show here once HORDENOVA goes online.",
+    standingBody: "Your season score is saved on this device. Your place among other players will show here once Horde Nova goes online.",
     rankingCta: "Open the ranking",
     prestigeBonus: "Current bonus: +{gold}% Gold and +{shards}% Gem Shards.",
     prestigeNone: "No bonus yet. Each level adds a little Gold and Gem Shard income.",
@@ -891,12 +891,12 @@ export const en = {
   },
   ranking: {
     title: "RANKING",
-    subtitle: "Every number here is your own real progress — HORDENOVA has no live leaderboard server yet, so nothing here is ever a fabricated opponent.",
+    subtitle: "Every number here is your own real progress — Horde Nova has no live leaderboard server yet, so nothing here is ever a fabricated opponent.",
     yourSeasonScore: "Your season score",
     scoreBasis: "Your furthest wave this season",
     yourPosition: "Your position",
     noBackendYet: "Not available without a server",
-    honestNote: "A real Top 50 ranking (with other players' positions, distance to the next rank, and live movement) requires a backend HORDENOVA doesn't have yet. This screen will show it the moment one exists — never a fabricated one before then.",
+    honestNote: "A real Top 50 ranking (with other players' positions, distance to the next rank, and live movement) requires a backend Horde Nova doesn't have yet. This screen will show it the moment one exists — never a fabricated one before then.",
     prestigeHint: "Next Prestige level costs 🔒 {free} Free Gems or 💎 {purchased} Purchased Gems — purely cosmetic status, never combat power.",
     tiersTitle: "Ranking Tiers (reserved for real data)",
     tiersNote: "These are the tier bands the ranking will use once a real leaderboard exists.",
@@ -907,7 +907,7 @@ export const en = {
     prestigeCol: "Prestige",
     bestCol: "Best this season",
     you: "You",
-    positionOffline: "Not available yet. Positions need the online ranking, which arrives when HORDENOVA goes live; until then the table only lists you.",
+    positionOffline: "Not available yet. Positions need the online ranking, which arrives when Horde Nova goes live; until then the table only lists you.",
     positionOnline: "Your row is highlighted in the table.",
     rewardsTitle: "What each place earns",
     gemsValue: "{gems} Gems",
@@ -917,7 +917,7 @@ export const en = {
   profile: {
     viewMine: "VIEW MY PROFILE",
     leaderboardTitle: "Season leaderboard",
-    leaderboardOfflineNote: "Only your own profile is listed until HORDENOVA goes online. Once the server is live, every player in the ranking appears here and you can open any of them.",
+    leaderboardOfflineNote: "Only your own profile is listed until Horde Nova goes online. Once the server is live, every player in the ranking appears here and you can open any of them.",
     leaderboardLoading: "Loading ranking…",
     leaderboardError: "Couldn't load the ranking right now.",
     you: "YOU",
@@ -1023,7 +1023,7 @@ export const en = {
     },
     topFive: {
       title: "TOP 5",
-      honestNote: "HORDENOVA has no live server yet, so there is no real opponent pool to rank you against. Once a backend exists, this becomes a real Top 5 leaderboard — nothing here is a fabricated rival. Your own season result is still recorded honestly below.",
+      honestNote: "Horde Nova has no live server yet, so there is no real opponent pool to rank you against. Once a backend exists, this becomes a real Top 5 leaderboard — nothing here is a fabricated rival. Your own season result is still recorded honestly below.",
     },
     collection: {
       title: "COLLECTION",
@@ -1164,7 +1164,7 @@ export const en = {
   },
   wiki: {
     title: "WIKI",
-    subtitle: "Everything below is pulled directly from HORDENOVA's own game data — nothing here is invented.",
+    subtitle: "Everything below is pulled directly from Horde Nova's own game data — nothing here is invented.",
     categories: {
       TOWERS: "Towers",
       BESTIARY: "Bestiary",
@@ -1318,10 +1318,10 @@ export const en = {
   },
   novidades: {
     title: "NOVIDADES",
-    subtitle: "A real, honest log of what changed in HORDENOVA — nothing here is invented history.",
+    subtitle: "A real, honest log of what changed in Horde Nova — nothing here is invented history.",
     latest: "Latest",
     pageTitle: "News",
-    lead: "Everything that changed in HORDENOVA, newest first. Every entry is a change that actually shipped.",
+    lead: "Everything that changed in Horde Nova, newest first. Every entry is a change that actually shipped.",
     countLabel: "Updates so far",
     lastUpdate: "Last update on {date}",
     filterLabel: "Filter by category",
@@ -1391,7 +1391,7 @@ export const en = {
       badge: "demo",
       leaderLabel: "Local Demonstration",
       bidExplainer:
-        "HORDENOVA has no live multiplayer server yet. This bid is registered under a clearly labeled local demonstration identity so you can exercise the full bid/outbid/anti-snipe flow — no real Gems change hands, and no other real player is being simulated.",
+        "Horde Nova has no live multiplayer server yet. This bid is registered under a clearly labeled local demonstration identity so you can exercise the full bid/outbid/anti-snipe flow — no real Gems change hands, and no other real player is being simulated.",
     },
     detail: {
       origin: "Dropped by {boss}",

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { BrandLogo } from "@/ui/BrandLogo";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
 import { loadSave } from "@/engine/SaveSystem";
@@ -92,7 +93,9 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
             <span className="hn-season-meta">{t("menu.seasonEnds", { theme: themeName, time: formatDurationShort(status.timeRemainingMs) })}</span>
           </button>
 
-          <h1 className="hn-wordmark">HORDENOVA</h1>
+          <h1 className="hn-wordmark">
+            <BrandLogo height="100%" />
+          </h1>
           <p className="hn-tagline">{t("menu.subtitle")}</p>
           <p className="hn-pitch">{t("menu.description")}</p>
 
@@ -235,10 +238,12 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
 
       <footer className="hn-footer">
         <div>
-          <div className="hn-footer-mark">HORDENOVA</div>
+          <div className="hn-footer-mark">
+            <BrandLogo height={26} />
+          </div>
           <p>{t("menu.footerTagline")}</p>
         </div>
-        <nav aria-label="HORDENOVA">
+        <nav aria-label="HORDE NOVA">
           {(["SEASON", "RANKING", "MARKETPLACE", "WIKI", "NOVIDADES"] as const).map((view) => (
             <button key={view} onClick={() => onNavigate(view)}>
               {t(`nav.${view === "NOVIDADES" ? "novidades" : view.toLowerCase()}` as TranslationKey)}
@@ -362,12 +367,10 @@ const HOME_CSS = `
 .hn-season-meta { color: var(--ash); }
 
 .hn-wordmark {
-  margin: 0; font-family: var(--display); font-weight: 700;
-  font-size: clamp(50px, 7.2vw, 112px); line-height: 0.9; letter-spacing: 0.035em;
-  background: linear-gradient(180deg, #fff4d6 0%, var(--gold-hi) 38%, var(--gold) 70%, #a8711f 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-  filter: drop-shadow(0 2px 0 rgba(60,34,8,0.9)) drop-shadow(0 12px 28px rgba(0,0,0,0.55));
+  margin: 0; height: clamp(54px, 7.6vw, 118px); max-width: 100%;
+  filter: drop-shadow(0 12px 28px rgba(0,0,0,0.55));
 }
+.hn-wordmark img { max-width: 100%; object-fit: contain; object-position: left center; }
 .hn-tagline {
   margin: 14px 0 0; font-family: var(--display); font-weight: 600; font-style: italic;
   font-size: clamp(20px, 2.2vw, 28px); color: var(--gold-hi); letter-spacing: 0.01em;
@@ -479,7 +482,7 @@ const HOME_CSS = `
   border-top: 1px solid var(--line);
   display: grid; grid-template-columns: 1fr auto; gap: 18px 32px; align-items: start;
 }
-.hn-footer-mark { font-family: var(--display); font-weight: 700; font-size: 22px; letter-spacing: 0.06em; color: var(--gold-hi); }
+.hn-footer-mark { display: flex; }
 .hn-footer p { margin: 6px 0 0; font-size: 13px; color: var(--ash); }
 .hn-footer nav { display: flex; flex-wrap: wrap; gap: 6px 22px; }
 .hn-footer nav button { padding: 4px 0; background: none; border: none; cursor: pointer; font-size: 14px; color: #d9cdb6; }

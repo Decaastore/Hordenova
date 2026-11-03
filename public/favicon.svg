@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-108 -108 216 216">
+<defs><linearGradient id="hnegold" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#fff4d6"/><stop offset="0.36" stop-color="#f7dc9c"/><stop offset="0.7" stop-color="#e8b04b"/><stop offset="1" stop-color="#a8711f"/></linearGradient>
+<radialGradient id="hnerift" cx="0.5" cy="0.5" r="0.5">
+  <stop offset="0" stop-color="#f6ecff"/><stop offset="0.16" stop-color="#c9a8ff"/><stop offset="0.5" stop-color="#6a2bd0"/><stop offset="1" stop-color="#160826"/></radialGradient>
+<linearGradient id="hnestar" x1="0" y1="0" x2="0" y2="1">
+  <stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#fff1c8"/><stop offset="1" stop-color="#f2c873"/></linearGradient></defs>
+<circle r="97.0" fill="#1f1208"/>
+<circle r="80.0" fill="url(#hnerift)"/>
+<circle r="87.5" fill="none" stroke="url(#hnegold)" stroke-width="20.0"/>
+<path d="M0.0,-108.0 L21.2,-21.2 L90.0,-0.0 L21.2,21.2 L0.0,108.0 L-21.2,21.2 L-90.0,0.0 L-21.2,-21.2Z" fill="url(#hnestar)" stroke="#6b4210" stroke-width="3.5" stroke-linejoin="round"/>
+<circle r="10.0" fill="#ffffff"/>
+</svg>

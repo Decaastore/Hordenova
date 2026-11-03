@@ -62,7 +62,7 @@ export const ptBR: TranslationSchema = {
     rankingCardCta: "Ver o ranking",
     wikiCardCta: "Abrir a wiki",
     footerTagline: "Um tower defense sobre segurar a linha, uma onda de cada vez.",
-    footerRights: "© {year} HORDENOVA. Todos os direitos reservados.",
+    footerRights: "© {year} Horde Nova. Todos os direitos reservados.",
   },
   hud: {
     openStore: "Abrir a Loja",
@@ -729,7 +729,7 @@ export const ptBR: TranslationSchema = {
       buying: "Comprar itens de outros jogadores",
     },
     unavailableTitle: "Ainda não há um parceiro de troca disponível",
-    unavailableBody: "O sistema de troca do HORDENOVA está totalmente implementado e testado, mas ainda não existe um backend multiplayer ativo para negociar com outro jogador real. Quando o matchmaking existir, esta mesma tela se conectará a ele — nada aqui é um placeholder ou um parceiro falso.",
+    unavailableBody: "O sistema de troca do Horde Nova está totalmente implementado e testado, mas ainda não existe um backend multiplayer ativo para negociar com outro jogador real. Quando o matchmaking existir, esta mesma tela se conectará a ele — nada aqui é um placeholder ou um parceiro falso.",
     yourOffer: "SUA OFERTA",
     theirOffer: "OFERTA DELE(A)",
     addItem: "+ Adicionar Item",
@@ -874,7 +874,7 @@ export const ptBR: TranslationSchema = {
     gemsCol: "Gemas",
     rewardsCol: "Cosméticos",
     standingTitle: "Sua colocação",
-    standingBody: "Sua pontuação da season fica salva neste aparelho. A sua posição entre os outros jogadores vai aparecer aqui quando o HORDENOVA estiver online.",
+    standingBody: "Sua pontuação da season fica salva neste aparelho. A sua posição entre os outros jogadores vai aparecer aqui quando o Horde Nova estiver online.",
     rankingCta: "Abrir o ranking",
     prestigeBonus: "Bônus atual: +{gold}% de Ouro e +{shards}% de Fragmentos de Gema.",
     prestigeNone: "Ainda sem bônus. Cada nível aumenta um pouco o Ouro e os Fragmentos de Gema que você ganha.",
@@ -892,12 +892,12 @@ export const ptBR: TranslationSchema = {
   },
   ranking: {
     title: "RANKING",
-    subtitle: "Todo número aqui é seu progresso real — HORDENOVA ainda não tem um servidor de ranking ao vivo, então nada aqui é um oponente fabricado.",
+    subtitle: "Todo número aqui é seu progresso real — Horde Nova ainda não tem um servidor de ranking ao vivo, então nada aqui é um oponente fabricado.",
     yourSeasonScore: "Sua pontuação na season",
     scoreBasis: "Sua onda mais distante nesta season",
     yourPosition: "Sua posição",
     noBackendYet: "Indisponível sem um servidor",
-    honestNote: "Um ranking Top 50 real (com a posição de outros jogadores, distância para o próximo posto e movimento ao vivo) exige um backend que o HORDENOVA ainda não tem. Esta tela vai mostrar isso no momento em que existir — nunca um ranking fabricado antes disso.",
+    honestNote: "Um ranking Top 50 real (com a posição de outros jogadores, distância para o próximo posto e movimento ao vivo) exige um backend que o Horde Nova ainda não tem. Esta tela vai mostrar isso no momento em que existir — nunca um ranking fabricado antes disso.",
     prestigeHint: "O próximo nível de Prestígio custa 🔒 {free} Gemas Grátis ou 💎 {purchased} Gemas Compradas — status puramente cosmético, nunca poder de combate.",
     tiersTitle: "Tiers de Ranking (reservados para dados reais)",
     tiersNote: "Estas são as faixas de tier que o ranking usará quando um leaderboard real existir.",
@@ -908,7 +908,7 @@ export const ptBR: TranslationSchema = {
     prestigeCol: "Prestígio",
     bestCol: "Melhor da season",
     you: "Você",
-    positionOffline: "Ainda não disponível. As posições dependem do ranking online, que chega quando o HORDENOVA for ao ar; até lá a tabela mostra só você.",
+    positionOffline: "Ainda não disponível. As posições dependem do ranking online, que chega quando o Horde Nova for ao ar; até lá a tabela mostra só você.",
     positionOnline: "A sua linha está destacada na tabela.",
     rewardsTitle: "O que cada posição ganha",
     gemsValue: "{gems} Gemas",
@@ -918,7 +918,7 @@ export const ptBR: TranslationSchema = {
   profile: {
     viewMine: "VER MEU PERFIL",
     leaderboardTitle: "Ranking da Season",
-    leaderboardOfflineNote: "Por enquanto só o seu perfil aparece aqui, porque o HORDENOVA ainda não está online. Quando o servidor estiver no ar, todos os jogadores do ranking vão aparecer nesta lista e você vai poder abrir o perfil de qualquer um.",
+    leaderboardOfflineNote: "Por enquanto só o seu perfil aparece aqui, porque o Horde Nova ainda não está online. Quando o servidor estiver no ar, todos os jogadores do ranking vão aparecer nesta lista e você vai poder abrir o perfil de qualquer um.",
     leaderboardLoading: "Carregando o ranking…",
     leaderboardError: "Não foi possível carregar o ranking agora.",
     you: "VOCÊ",
@@ -1024,7 +1024,7 @@ export const ptBR: TranslationSchema = {
     },
     topFive: {
       title: "TOP 5",
-      honestNote: "HORDENOVA ainda não tem um servidor ativo, então não existe um grupo real de adversários para te ranquear. Quando houver um backend, isto se tornará um Top 5 real — nada aqui é um rival inventado. Seu próprio resultado da temporada continua sendo registrado com honestidade abaixo.",
+      honestNote: "Horde Nova ainda não tem um servidor ativo, então não existe um grupo real de adversários para te ranquear. Quando houver um backend, isto se tornará um Top 5 real — nada aqui é um rival inventado. Seu próprio resultado da temporada continua sendo registrado com honestidade abaixo.",
     },
     collection: {
       title: "COLEÇÃO",
@@ -1165,7 +1165,7 @@ export const ptBR: TranslationSchema = {
   },
   wiki: {
     title: "WIKI",
-    subtitle: "Tudo abaixo vem diretamente dos dados reais do jogo HORDENOVA — nada aqui foi inventado.",
+    subtitle: "Tudo abaixo vem diretamente dos dados reais do jogo Horde Nova — nada aqui foi inventado.",
     categories: {
       TOWERS: "Torres",
       BESTIARY: "Bestiário",
@@ -1319,10 +1319,10 @@ export const ptBR: TranslationSchema = {
   },
   novidades: {
     title: "NOVIDADES",
-    subtitle: "Um registro real e honesto do que mudou em HORDENOVA — nada aqui é histórico inventado.",
+    subtitle: "Um registro real e honesto do que mudou em Horde Nova — nada aqui é histórico inventado.",
     latest: "Mais recente",
     pageTitle: "Novidades",
-    lead: "Tudo o que mudou no HORDENOVA, do mais novo para o mais antigo. Cada entrada é uma mudança que realmente entrou no jogo.",
+    lead: "Tudo o que mudou no Horde Nova, do mais novo para o mais antigo. Cada entrada é uma mudança que realmente entrou no jogo.",
     countLabel: "Atualizações até agora",
     lastUpdate: "Última atualização em {date}",
     filterLabel: "Filtrar por categoria",
@@ -1392,7 +1392,7 @@ export const ptBR: TranslationSchema = {
       badge: "demo",
       leaderLabel: "Demonstração Local",
       bidExplainer:
-        "HORDENOVA ainda não tem um servidor multiplayer real. Este lance é registrado sob uma identidade de demonstração local claramente rotulada, para você exercitar o fluxo completo de lance/superação/anti-sniping — nenhuma Gema real muda de mãos, e nenhum outro jogador real está sendo simulado.",
+        "Horde Nova ainda não tem um servidor multiplayer real. Este lance é registrado sob uma identidade de demonstração local claramente rotulada, para você exercitar o fluxo completo de lance/superação/anti-sniping — nenhuma Gema real muda de mãos, e nenhum outro jogador real está sendo simulado.",
     },
     detail: {
       origin: "Dropado por {boss}",

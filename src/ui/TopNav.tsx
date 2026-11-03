@@ -3,6 +3,7 @@ import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { MusicControl } from "./MusicControl";
+import { BrandLogo } from "./BrandLogo";
 
 export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE";
 
@@ -35,7 +36,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   return (
     <nav style={navStyle}>
       <button style={brandStyle} onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
-        HORDENOVA
+        <BrandLogo height={24} decorative />
       </button>
       <div style={linksStyle}>
         <button style={playLinkStyle} onClick={onPlay}>
