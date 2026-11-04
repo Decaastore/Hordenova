@@ -26,14 +26,14 @@ describe("towerMastery (Master Implementation Pass spec sections 3-6, FASE 6 —
 
   it("FASE 6 currency division: the one-time unlock is GOLD, never Gems — anchored to each tower type's own upgradeCostBase, not an arbitrary flat number", () => {
     for (const type of TOWER_TYPES) {
-      expect(getMasteryUnlockGoldCost(type)).toBe(TOWER_DEFINITIONS[type].upgradeCostBase * 300);
+      expect(getMasteryUnlockGoldCost(type)).toBe(TOWER_DEFINITIONS[type].upgradeCostBase * 80);
     }
   });
 
-  it("the one-time Gold unlock cost is a considerable but real amount — same order of magnitude as leveling a tower to 10 (Specialization's own unlock milestone), never a trivial tax nor an impossible wall", () => {
+  it("the one-time Gold unlock cost is a considerable but real amount — reachable around the second map (measured with the pacing bot), never a trivial tax nor an impossible wall", () => {
     for (const type of TOWER_TYPES) {
       const cost = getMasteryUnlockGoldCost(type);
-      expect(cost).toBeGreaterThan(5000);
+      expect(cost).toBeGreaterThan(1000);
       expect(cost).toBeLessThan(25000);
     }
   });

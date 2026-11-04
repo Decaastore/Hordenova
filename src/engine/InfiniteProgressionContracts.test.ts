@@ -98,12 +98,13 @@ describe("R2 — every frozen asymptotic exponent stays locked within tolerance"
   const LATE_1 = 1e8;
   const LATE_2 = 1e9;
 
-  it("Enemy HP late exponent stays at 0.72 ± 0.01 (measured via log-log slope between wave 1e8 and 1e9)", () => {
+  // Late power-law term (1.15) + mid-game pace (0.25) + long-haul pace (1.15) — the endless pace measured with the greedy-bot simulation.
+  it("Enemy HP late exponent stays at 2.55 ± 0.01 (measured via log-log slope between wave 1e8 and 1e9)", () => {
     const hp1 = getScaledEnemyStats("BRUTE", LATE_1).hp;
     const hp2 = getScaledEnemyStats("BRUTE", LATE_2).hp;
     const slope = logLogSlope(LATE_1, hp1, LATE_2, hp2);
-    expect(slope).toBeGreaterThan(0.72 - 0.01);
-    expect(slope).toBeLessThan(0.72 + 0.01);
+    expect(slope).toBeGreaterThan(2.55 - 0.01);
+    expect(slope).toBeLessThan(2.55 + 0.01);
   });
 
   it("Specialization effect exponent stays at 0.50 ± 0.005 (measured via log-log slope between level 1e8 and 1e9)", () => {

@@ -42,7 +42,7 @@ export const RUNE_HIT_RADIUS = 26;
  * on the curve, never walls above it. BOSS_HP_TWEAK corrects bosses whose
  * ability measured clearly tougher than the rest.
  */
-export const MAIN_BOSS_HP_VS_PREVIOUS_WAVE = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.BOSS_R ?? 1.15);
+export const MAIN_BOSS_HP_VS_PREVIOUS_WAVE = 0.85;
 export const BOSS_HP_TWEAK: Record<string, number> = {
   "abyssal-maw": 0.7,
   "iron-burrower-sovereign": 0.75,

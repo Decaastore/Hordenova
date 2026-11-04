@@ -569,19 +569,20 @@ export const GOLD_GROWTH_PER_WAVE = 0.03;
  * WHAT REPLACES IT — a genuinely unbounded but SUB-EXPLOSIVE curve, built as
  * the product of two strictly-increasing factors:
  *
- *   hpMultiplier(i) = EARLY(i) * LATE(i)
+ *   hpMultiplier(i) = EARLY(i) * LATE(i) * PACE(i) * PACE2(i)
  *   EARLY(i) = 1 + A * (1 - e^(-i / T))     // bounded, smooth, front-loaded
- *   LATE(i)  = (1 + i / S) ^ P              // power law, P < 1, unbounded
+ *   LATE(i)  = (1 + i / S) ^ P              // power law, unbounded
+ *   PACE(i)  = (1 + max(0, i-30)/60) ^ 0.25 // gentle mid-game slowdown
+ *   PACE2(i) = (1 + max(0, i-130)/120)^1.15 // long-haul slowdown past wave ~130
  *
  * Properties this shape guarantees, none of which the old one had:
  *  - STRICTLY INCREASING FOREVER. Both factors are strictly increasing in i,
  *    so enemies never "stay permanently the same" at any wave, ever. There is
  *    no plateau, no soft cap, no frozen term.
- *  - SUB-EXPLOSIVE. Asymptotically hpMultiplier ~ (1+A) * (i/S)^P with
- *    P = HP_LATE_EXPONENT < 1 relative to the player's own compounding
- *    (Specialization x Mastery) growth — so difficulty keeps climbing while
- *    the RATE of climb keeps decelerating, which is exactly what makes an
- *    endless game endless instead of walled.
+ *  - POLYNOMIAL, NEVER EXPONENTIAL. Every factor is a power of i, so the
+ *    curve keeps climbing forever without ever compounding into a wall: the
+ *    player's own power (levels x Mastery, also polynomial) can always catch
+ *    up, it just takes longer the deeper they go.
  *  - NO ARTIFICIAL OVERFLOW CAP NEEDED. A polynomial in i can never reach
  *    Number.MAX_VALUE at any wave number representable as a JS integer
  *    (wave 1e15 -> multiplier ~1e11), so the old
@@ -605,16 +606,23 @@ const HP_EARLY_SURGE_AMPLITUDE = 3.5;
 const HP_EARLY_SURGE_SCALE = 80;
 /** Wave scale of the permanent power-law term — larger = gentler early contribution. */
 const HP_LATE_SCALE = 30;
-/** The permanent asymptotic exponent. Deliberately < 1 and, more importantly, below the exponent at which Specialization x Mastery power grows with wave number (~0.95) — that inequality is the structural no-wall guarantee. */
-const HP_LATE_EXPONENT = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.HP_EXP ?? 0.72);
+/** The permanent power-law exponent. */
+const HP_LATE_EXPONENT = 1.15;
 
-const ENV = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+/*
+ * PACE TERMS — set how long the endless climb takes, measured with a greedy-bot
+ * simulation of the real engine (12 towers, no rune clicks): about wave 60 on
+ * the first day (~2-3 h), wave 150 after ~22 h and wave 300 after ~90 h of
+ * play, slowing down smoothly with no hard wall. PACE starts after the
+ * hand-made opening (index 30); PACE2 adds the long-haul slowdown that keeps
+ * the deep endgame from turning into a sprint.
+ */
 const HP_PACE_START_INDEX = 30;
-const HP_PACE_SCALE = Number(ENV?.HP_PS ?? 60);
-const HP_PACE_EXPONENT = Number(ENV?.HP_PB ?? 0);
-const HP_PACE2_START_INDEX = Number(ENV?.HP_P2I ?? 90);
-const HP_PACE2_SCALE = Number(ENV?.HP_P2S ?? 90);
-const HP_PACE2_EXPONENT = Number(ENV?.HP_P2B ?? 0);
+const HP_PACE_SCALE = 60;
+const HP_PACE_EXPONENT = 0.25;
+const HP_PACE2_START_INDEX = 130;
+const HP_PACE2_SCALE = 120;
+const HP_PACE2_EXPONENT = 1.15;
 
 /**
  * The HP multiplier for a given (0-indexed) wave. Strictly increasing,

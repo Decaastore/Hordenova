@@ -60,7 +60,7 @@ import { TOWER_DEFINITIONS, type TowerSpecial, type TowerType } from "./towerSta
  * like every other Gold cost in this codebase, so the four tower types stay
  * proportionally consistent with each other.
  */
-const MASTERY_UNLOCK_GOLD_MULTIPLIER = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.M_UNLOCK ?? 300);
+const MASTERY_UNLOCK_GOLD_MULTIPLIER = 80;
 
 export function getMasteryUnlockGoldCost(type: TowerType): number {
   return TOWER_DEFINITIONS[type].upgradeCostBase * MASTERY_UNLOCK_GOLD_MULTIPLIER;
@@ -178,7 +178,7 @@ const MASTERY_DAMAGE_PER_POINT = 0.0015;
 const MASTERY_ATTACK_SPEED_PER_POINT = 0.0045;
 const MASTERY_RANGE_PER_POINT = 0.006;
 const MASTERY_GOLD_DISCOUNT_PER_POINT = 0.005;
-const MASTERY_GOLD_DISCOUNT_MAX = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.M_DISC ?? 0.5);
+const MASTERY_GOLD_DISCOUNT_MAX = 0.5;
 const MASTERY_SIEGE_RESISTANCE_PER_POINT = 0.005;
 const MASTERY_SIEGE_RESISTANCE_MAX = 0.8;
 
