@@ -68,7 +68,7 @@ export function measuredWaveCorrection(wave: number): number {
   if (wave < CORRECTION_FIRST_WAVE) return 1;
   const lastMeasured = CORRECTION_FIRST_WAVE + MEASURED_BLOCK_CORRECTION.length * CORRECTION_BLOCK_WAVES - 1;
   const w = wave > lastMeasured ? ROTATION_START_WAVE + ((wave - ROTATION_START_WAVE) % ROTATION_LENGTH_WAVES) : wave;
-  return MEASURED_BLOCK_CORRECTION[Math.floor((w - CORRECTION_FIRST_WAVE) / CORRECTION_BLOCK_WAVES)] ?? 1;
+  return Math.pow(MEASURED_BLOCK_CORRECTION[Math.floor((w - CORRECTION_FIRST_WAVE) / CORRECTION_BLOCK_WAVES)] ?? 1, Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CORR_POW ?? 1));
 }
 
 function earlyBlend(wave: number, factor: number): number {
