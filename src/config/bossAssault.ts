@@ -43,6 +43,12 @@ export const RUNE_HIT_RADIUS = 26;
  * ability measured clearly tougher than the rest.
  */
 export const MAIN_BOSS_HP_VS_PREVIOUS_WAVE = 0.85;
+/**
+ * Mini-bosses keep their Brute-based HP formula, scaled by this so they stay
+ * easier than the main bosses around them (Normal < Mini-Boss < Main Boss)
+ * now that main-boss HP follows the wave before it.
+ */
+export const MINI_BOSS_HP_SCALE = 0.8;
 export const BOSS_HP_TWEAK: Record<string, number> = {
   "abyssal-maw": 0.7,
   "iron-burrower-sovereign": 0.75,

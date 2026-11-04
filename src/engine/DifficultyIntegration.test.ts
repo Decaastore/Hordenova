@@ -1,3 +1,4 @@
+import { waveHpFactor } from "@/config/waveBudget";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
@@ -60,7 +61,8 @@ describe("Enemy difficulty is the same for every player — real GameEngine inte
 
     expect(weakHp).not.toBeNull();
     expect(strongHp).not.toBeNull();
-    const baselineHp = getScaledEnemyStats("CRAWLER", 45).hp;
+    // The same per-wave budget factor for everyone (config/waveBudget.ts) — never a per-player adjustment.
+    const baselineHp = Math.max(1, Math.round(getScaledEnemyStats("CRAWLER", 45).hp * waveHpFactor(45)));
     expect(weakHp).toBe(baselineHp);
     expect(strongHp).toBe(baselineHp);
   });

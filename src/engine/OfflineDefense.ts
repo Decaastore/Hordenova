@@ -1,6 +1,6 @@
 import type { TowerLoadoutEntry } from "@/entities/Tower";
 import { waveGoldFactor, waveHpFactor } from "@/config/waveBudget";
-import { mainBossHp } from "@/config/bossAssault";
+import { MINI_BOSS_HP_SCALE, mainBossHp } from "@/config/bossAssault";
 import { previousWaveTotalHp } from "./BossManager";
 import { getTowerLevelStats } from "@/config/towerStats";
 import { getScaledEnemyStats } from "@/config/enemyStats";
@@ -116,7 +116,7 @@ function estimateWaveThreat(waveNumber: number): WaveThreat {
   if (miniBoss) {
     const bruteHp = getScaledEnemyStats("BRUTE", waveNumber).hp;
     const miniBossDef = getMiniBossForWave(waveNumber);
-    totalHp += bruteHp * miniBossDef.hpMultiplierVsBrute;
+    totalHp += bruteHp * miniBossDef.hpMultiplierVsBrute * MINI_BOSS_HP_SCALE;
     goldReward += miniBossDef.goldReward;
   }
 

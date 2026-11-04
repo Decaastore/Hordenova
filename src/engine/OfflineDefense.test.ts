@@ -68,8 +68,9 @@ describe("OfflineDefense", () => {
   });
   it("with the game closed progress is clearly slower than with the browser open (a frozen open tab is kinder)", () => {
     const loadout = ["slot-1", "slot-2", "slot-3", "slot-4"].map((slotId, i) => ({ slotId, type: (["IRONWOOD", "INFERNO", "FROSTBORN", "STORMCALLER"] as const)[i]!, level: 60, specializationId: null, specializationLevel: 0, equippedSkinId: null, masteryLevel: 0, equippedItemInstanceIds: [null, null, null] }));
-    const closed = simulateOfflineDefense({ startingWave: 0, towerLoadout: loadout as never, capacityMs: 60 * 60 * 1000 });
-    const frozenTab = simulateOfflineDefense({ startingWave: 0, towerLoadout: loadout as never, capacityMs: 60 * 60 * 1000, inefficiency: FROZEN_TAB_INEFFICIENCY_MULTIPLIER });
+    // 15 minutes: short enough that time, not tower power, is what limits both runs.
+    const closed = simulateOfflineDefense({ startingWave: 0, towerLoadout: loadout as never, capacityMs: 15 * 60 * 1000 });
+    const frozenTab = simulateOfflineDefense({ startingWave: 0, towerLoadout: loadout as never, capacityMs: 15 * 60 * 1000, inefficiency: FROZEN_TAB_INEFFICIENCY_MULTIPLIER });
     expect(closed.phasesCleared).toBeGreaterThan(0);
     expect(closed.phasesCleared).toBeLessThan(frozenTab.phasesCleared * 0.7);
   });

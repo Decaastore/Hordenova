@@ -95,8 +95,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Inimigos rápidos, armadura e regeneração agora contam na dificuldade da onda, então ondas cheias de inimigos rápidos ou que se regeneram não ficam mais muito mais duras que as outras.",
       },
       {
-        en: "Main boss life now follows the wave right before it, so a player keeping pace still brings each boss down in about 3-5 assaults at any depth.",
-        ptBR: "A vida do chefe principal agora acompanha a onda logo antes dele, então quem acompanha o ritmo continua derrubando cada chefe em cerca de 3 a 5 ataques, em qualquer profundidade.",
+        en: "Main boss life now follows the wave right before it, so a player keeping pace still brings each boss down in about 3-5 assaults at any depth. Mini-bosses have 20% less life so they stay easier than the main bosses.",
+        ptBR: "A vida do chefe principal agora acompanha a onda logo antes dele, então quem acompanha o ritmo continua derrubando cada chefe em cerca de 3 a 5 ataques, em qualquer profundidade. Os mini-chefes têm 20% menos vida, para continuarem mais fáceis que os chefes principais.",
       },
       {
         en: "Unlocking a tower's Mastery is cheaper (about a quarter of the old Gold cost), so it joins the climb much earlier.",

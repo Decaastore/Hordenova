@@ -1,5 +1,5 @@
 import type { BossDefinition } from "@/config/bossConfig";
-import { mainBossHp } from "@/config/bossAssault";
+import { MINI_BOSS_HP_SCALE, mainBossHp } from "@/config/bossAssault";
 import { generateWaveSpawns } from "@/config/waveConfig";
 import { waveHpFactor } from "@/config/waveBudget";
 import { getScaledEnemyStats } from "@/config/enemyStats";
@@ -48,7 +48,7 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
   // Main bosses follow the regular waves (config/bossAssault.ts); mini-bosses keep the Brute-based formula.
   const hp = def.isMainBoss
     ? mainBossHp(def.id, previousWaveTotalHp(waveNumber))
-    : Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber));
+    : Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber) * MINI_BOSS_HP_SCALE);
 
   return {
     id: `boss-${nextBossInstanceId++}`,

@@ -1,3 +1,5 @@
+import { MINI_BOSS_HP_SCALE, mainBossHp } from "@/config/bossAssault";
+import { previousWaveTotalHp } from "./BossManager";
 import { describe, expect, it } from "vitest";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { createTowerInstance, applySiegeDamage, type TowerInstance } from "@/entities/Tower";
@@ -138,24 +140,33 @@ function measureDamageBudget(towers: readonly TowerInstance[], def: BossDefiniti
   }
 }
 
+/** The HP the real game gives this boss (BossManager): a main boss follows the wave right before it, a mini-boss the Brute baseline. */
 function realBossHp(def: BossDefinition, wave: number): number {
+  if (def.id in MAIN_BOSSES) return mainBossHp(def.id, previousWaveTotalHp(wave));
   const bruteHp = getScaledEnemyStats("BRUTE", wave).hp;
-  return Math.round(bruteHp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(wave));
+  return Math.round(bruteHp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(wave) * MINI_BOSS_HP_SCALE);
 }
 
 describe("Boss killability across the full wave range (real GameEngine, coverage-adjusted DPS)", () => {
-  it("a build that keeps reinvesting (Specialization/Mastery scale with wave) can ALWAYS out-damage the main boss's HP budget — the ratio must never collapse toward 1, at any wave from 30 to 10,000", () => {
+  /**
+   * The endless pace (config/enemyStats.ts) makes enemy HP grow polynomially
+   * (about wave^2.55 deep in the game): progress slows down forever, on
+   * purpose, but never hits a wall. A player whose Mastery/Specialization
+   * keep growing polynomially with the wave (here ~wave^1.8, levels 60)
+   * always out-damages the main boss — there is no depth where no amount of
+   * investment is enough.
+   */
+  it("a build that keeps reinvesting (Mastery/Specialization growing polynomially with wave) can ALWAYS out-damage the main boss's HP budget, at any wave from 30 to 10,000", () => {
     const waves = [30, 100, 300, 800, 2000, 5000, 10_000];
     const def = MAIN_BOSSES["hollow-warden"]!;
     for (const wave of waves) {
-      const build = makeBuild(growingBuild(wave));
+      const points = Math.max(1, Math.round(0.05 * Math.pow(wave, 1.8)));
+      const build = makeBuild(roundRobinBuild(60, points, points));
       const budget = measureDamageBudget(build, def, wave);
       const bossHp = realBossHp(def, wave);
       const ratio = budget / bossHp;
-      // A healthy margin, not just "barely above 1" — real data at these
-      // waves comfortably clears 30x; guard well below that so the test
-      // only fails on an actual regression, not routine tuning noise.
-      expect(ratio).toBeGreaterThan(5);
+      // Measured 27x-155x across this range; guard well below that.
+      expect(ratio, `wave ${wave}`).toBeGreaterThan(5);
     }
   }, 60_000);
 
