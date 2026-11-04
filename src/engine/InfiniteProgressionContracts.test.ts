@@ -172,15 +172,15 @@ describe("R3 — economy fixed point: Gold income and Gold cost-per-level both c
 // GameEngine economic trace (see the frozen spec's U1 calibration).
 // ---------------------------------------------------------------------------
 
-/** [wave, specLevel, masteryLevel, towerLevel] — real ticks of a greedy always-cheapest-Gold-action F2P bot. */
+/** [wave, specLevel, masteryLevel, towerLevel] — real milestones of the greedy pacing bot (12 towers, no rune clicks) on the endless pace curve. */
 const F2P_TRACE: readonly [number, number, number, number][] = [
-  [29, 0, 0, 3.6],
-  [58, 0, 0, 6.4],
-  [303, 0, 14.3, 16.7],
-  [842, 0, 54.3, 30],
-  [2140, 84.6, 70.0, 30],
-  [3510, 183.3, 82.5, 30],
-  [4825, 245.7, 99.8, 30],
+  [30, 0, 0, 3.7],
+  [60, 0, 0, 5.9],
+  [100, 0, 3, 9.8],
+  [150, 0, 16.8, 14.9],
+  [200, 0, 23.3, 19.2],
+  [250, 0, 32.8, 26.5],
+  [300, 0, 39.3, 33.6],
 ];
 
 function interpolateTrace(wave: number): { specLevel: number; masteryLevel: number; towerLevel: number } {
@@ -202,13 +202,13 @@ function interpolateTrace(wave: number): { specLevel: number; masteryLevel: numb
   return {
     specLevel: Math.max(0, sLast + rate * (sLast - sPrev)),
     masteryLevel: Math.max(0, mLast + rate * (mLast - mPrev)),
-    towerLevel: Math.min(30, Math.max(1, tLast + rate * (tLast - tPrev))),
+    towerLevel: Math.min(60, Math.max(1, tLast + rate * (tLast - tPrev))),
   };
 }
 
 function f2pBuildForWave(wave: number): TowerInstance[] {
   const { specLevel, masteryLevel, towerLevel } = interpolateTrace(wave);
-  const level = Math.round(Math.min(30, Math.max(1, towerLevel)));
+  const level = Math.round(Math.min(60, Math.max(1, towerLevel)));
   return TOWER_SLOTS.map((slot, i) => {
     const type = TOWER_TYPES[i % TOWER_TYPES.length]!;
     return createTowerInstance(
@@ -289,7 +289,7 @@ function measureDamageBudget(towers: readonly TowerInstance[], def: BossDefiniti
 }
 
 describe("R4 — Boss Kill Margin contract (U1/U3, real GameEngine)", () => {
-  const CHECKPOINTS = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800];
+  const CHECKPOINTS = [110, 150, 190, 230, 270, 310];
   const def = MAIN_BOSSES["hollow-warden"]!;
 
   /**
@@ -299,7 +299,7 @@ describe("R4 — Boss Kill Margin contract (U1/U3, real GameEngine)", () => {
    * pass with 1.5x to spare". A one-pass damage share of at least 30% means
    * at most 1 + ceil(0.7 / (0.3 - recovery)) = 5 assaults.
    */
-  it("every wave 300-800 checkpoint: a realistic F2P-paced build brings the boss down within a few assaults (one pass deals at least 30% of its HP)", () => {
+  it("every boss checkpoint from wave 110 to 310: a bot-paced build brings the boss down within a few assaults (one pass deals at least 30% of its HP)", () => {
     for (const wave of CHECKPOINTS) {
       const build = f2pBuildForWave(wave);
       const budget = measureDamageBudget(build, def, wave);

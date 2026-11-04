@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v75",
+    dateIso: "2026-11-04",
+    category: "BALANCE",
+    title: {
+      en: "A Slower, Endless Climb",
+      ptBR: "Uma Subida Mais Lenta e Sem Fim",
+    },
+    description: {
+      en: "The whole difficulty curve after the first map was rebuilt so the climb is long, steady and never ends. Every wave is now measured against the same threat and Gold budget for its number, so no map is suddenly much harder or much richer than the ones around it, and the deeper you go the more each wave asks of your towers.",
+      ptBR: "Toda a curva de dificuldade depois do primeiro mapa foi refeita para a subida ser longa, constante e sem fim. Cada onda agora segue o mesmo orçamento de ameaça e de ouro para o seu número, então nenhum mapa fica de repente muito mais difícil ou muito mais rico que os vizinhos, e quanto mais fundo você vai, mais cada onda exige das suas torres.",
+    },
+    highlights: [
+      {
+        en: "Measured with a simulated player that never clicks runes: about wave 60 on the first day, wave 150 after about 22 hours of play and wave 300 after about 85 hours, slowing down gradually with no hard wall.",
+        ptBR: "Medido com um jogador simulado que nunca clica nas runas: cerca da onda 60 no primeiro dia, onda 150 depois de umas 22 horas de jogo e onda 300 depois de umas 85 horas, desacelerando aos poucos, sem parede.",
+      },
+      {
+        en: "The first map (waves 1-30) plays exactly as before.",
+        ptBR: "O primeiro mapa (ondas 1-30) continua exatamente igual.",
+      },
+      {
+        en: "Fast enemies, armour and regeneration now count toward a wave's difficulty, so waves full of fast or regenerating enemies no longer come out much tougher than the rest.",
+        ptBR: "Inimigos rápidos, armadura e regeneração agora contam na dificuldade da onda, então ondas cheias de inimigos rápidos ou que se regeneram não ficam mais muito mais duras que as outras.",
+      },
+      {
+        en: "Main boss life now follows the wave right before it, so a player keeping pace still brings each boss down in about 3-5 assaults at any depth.",
+        ptBR: "A vida do chefe principal agora acompanha a onda logo antes dele, então quem acompanha o ritmo continua derrubando cada chefe em cerca de 3 a 5 ataques, em qualquer profundidade.",
+      },
+      {
+        en: "Unlocking a tower's Mastery is cheaper (about a quarter of the old Gold cost), so it joins the climb much earlier.",
+        ptBR: "Desbloquear a Maestria de uma torre ficou mais barato (cerca de um quarto do ouro de antes), então ela entra na subida bem mais cedo.",
+      },
+    ],
+  },
+  {
     id: "v74",
     dateIso: "2026-11-03",
     category: "BOSSES",
