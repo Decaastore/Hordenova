@@ -608,6 +608,11 @@ const HP_LATE_SCALE = 30;
 /** The permanent asymptotic exponent. Deliberately < 1 and, more importantly, below the exponent at which Specialization x Mastery power grows with wave number (~0.95) — that inequality is the structural no-wall guarantee. */
 const HP_LATE_EXPONENT = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.HP_EXP ?? 0.72);
 
+const ENV = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env;
+const HP_PACE_START_INDEX = 30;
+const HP_PACE_SCALE = Number(ENV?.HP_PS ?? 60);
+const HP_PACE_EXPONENT = Number(ENV?.HP_PB ?? 0);
+
 /**
  * The HP multiplier for a given (0-indexed) wave. Strictly increasing,
  * finite, and positive for every finite waveIndex >= 0 — see this section's
@@ -617,7 +622,8 @@ export function hpMultiplierForWaveIndex(waveIndex: number): number {
   const i = Math.max(0, waveIndex);
   const early = 1 + HP_EARLY_SURGE_AMPLITUDE * (1 - Math.exp(-i / HP_EARLY_SURGE_SCALE));
   const late = Math.pow(1 + i / HP_LATE_SCALE, HP_LATE_EXPONENT);
-  return early * late;
+  const pace = Math.pow(1 + Math.max(0, i - HP_PACE_START_INDEX) / HP_PACE_SCALE, HP_PACE_EXPONENT);
+  return early * late * pace;
 }
 
 /**
