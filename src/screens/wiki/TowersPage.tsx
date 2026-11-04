@@ -1,3 +1,4 @@
+import { SPECIAL_ATTACK_COOLDOWN_MS } from "@/config/towerSpecials";
 import { useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -157,6 +158,24 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="wk-block">
+        <h3 className="wk-h3">{t("wiki.specialTitle")}</h3>
+        <div className="wk-specs">
+          <div className="wk-spec">
+            <h4>{t(`wiki.specialName.${tower}` as TranslationKey)}</h4>
+            <p>{t(`wiki.specialEffect.${tower}` as TranslationKey)}</p>
+          </div>
+          <div className="wk-spec">
+            <h4>{t("wiki.manaTitle")}</h4>
+            <p>{t("wiki.manaBody", { seconds: Math.round(SPECIAL_ATTACK_COOLDOWN_MS[tower] / 1000) })}</p>
+          </div>
+          <div className="wk-spec">
+            <h4>{t("wiki.holdTitle")}</h4>
+            <p>{t("wiki.holdBody")}</p>
+          </div>
+        </div>
       </section>
 
       <section className="wk-block">
