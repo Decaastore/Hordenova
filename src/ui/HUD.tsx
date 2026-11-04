@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
@@ -22,7 +22,8 @@ interface HUDProps {
 }
 
 export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions }: HUDProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const stateWidth = useMemo(() => widestStateLabel(STATE_PHASES.map((p) => t(`hud.phase.${p}`))), [language, t]);
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
 
@@ -61,7 +62,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           value={`${Math.ceil(hud.baseHp)} / ${hud.maxBaseHp}`}
           valueColor={hpColor}
         />
-        <div style={{ position: "relative", minWidth: 92 }}>
+        <div style={{ position: "relative" }}>
           <Stat
             icon={<CoinIcon color={PALETTE.gold} />}
             label={t("hud.gold")}
@@ -94,26 +95,23 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             title={onOpenStore ? undefined : t("gems.purchasedExplainer")}
           />
         </GemsLink>
-        {/* Always takes its space (empty at 0) so the bar never reflows when the first shard arrives. */}
-        <div style={{ minWidth: 96 }}>
-          {hud.gemShards > 0 && (
-            <Stat
-              icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
-              label={t("hud.gemShards")}
-              value={`+${hud.gemShards}`}
-              valueColor={PALETTE.uiTextDim}
-              title={t("hud.gemShardsTooltip")}
-            />
-          )}
-        </div>
-        {/* Fixed width so a longer state ("BOSS APPROACHING") never pushes the bar onto another line and resizes the map. */}
-        <div style={{ textAlign: "center", width: 200, flexShrink: 0 }}>
+        {hud.gemShards > 0 && (
+          <Stat
+            icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
+            label={t("hud.gemShards")}
+            value={`+${hud.gemShards}`}
+            valueColor={PALETTE.uiTextDim}
+            title={t("hud.gemShardsTooltip")}
+          />
+        )}
+        {/* As wide as the longest state label, so a state change (every wave) never reflows the bar and resizes the map. */}
+        <div style={{ textAlign: "center", minWidth: Math.max(100, stateWidth), whiteSpace: "nowrap" }}>
           <div style={labelStyle}>{t("hud.state")}</div>
-          <div style={{ ...valueStyle, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(`hud.phase.${hud.phase}`)}</div>
+          <div style={{ ...valueStyle, fontSize: 13 }}>{t(`hud.phase.${hud.phase}`)}</div>
         </div>
       </div>
 
-      <div style={{ ...groupStyle, flexBasis: "100%" }}>
+      <div style={groupStyle}>
         <BoltIcon color={PALETTE.uiTextDim} size={13} />
         {GAME_SPEEDS.map((speed) => {
           const active = hud.speed === speed;
@@ -149,6 +147,21 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
       </div>
     </div>
   );
+}
+
+const STATE_PHASES = ["PRE_RUN", "OFFLINE_RETURN", "RUNNING", "WAVE_TRANSITION", "BOSS_INTRO", "BOSS_BATTLE", "VICTORY", "PROGRESSION_STOPPED", "DEPLOY"] as const satisfies readonly HudSnapshot["phase"][];
+
+/** Width in px of the widest state label at the state value's font (13px bold), measured once per language. */
+function widestStateLabel(labels: readonly string[]): number {
+  try {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) return 0;
+    const family = getComputedStyle(document.body).fontFamily || "sans-serif";
+    ctx.font = `700 13px ${family}`;
+    return Math.ceil(Math.max(...labels.map((l) => ctx.measureText(l).width)) + 4);
+  } catch {
+    return 0;
+  }
 }
 
 /** Audio spec section 13 — SFX Volume (0/25/50/75/100%) + a separate Mute toggle, persisted via audio/audioSettings.ts. No music control — none exists yet. */
