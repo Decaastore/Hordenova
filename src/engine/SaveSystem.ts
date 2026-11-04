@@ -188,6 +188,8 @@ export interface SaveData {
   // -----------------------------------------------------------------------
   /** SEASON-scoped per-tower-TYPE Mastery level — resets to {} at every Season boundary. Applied to a freshly-placed tower of that type via GameEngine.instantiateTowerFromLoadout/placeTower. */
   towerMasteryLevels: Partial<Record<TowerType, number>>;
+  /** TOWER MANA — SEASON-scoped per-tower-TYPE Gold mana upgrade level (config/towerMana.ts); resets to {} at every Season boundary, like towerMasteryLevels. Optional on old saves (self-heals to {}). */
+  towerManaLevels: Partial<Record<TowerType, number>>;
   /** PERMANENT per-tower-TYPE Mastery ownership (the one-time Gold ever-purchase, FASE 6 — see config/towerMastery.ts's getMasteryUnlockGoldCost) — never reset by a Season boundary, never charged again once true for a given type. */
   masteryUnlocked: Partial<Record<TowerType, boolean>>;
   /** Permanent record of every Tower Skin id this account has ever unlocked (by reaching its unlockLevel on some tower, in any Season) — mirrors unlockedCastleSkinIds. Never removed once granted, regardless of the tower's current (seasonal) level. */
@@ -327,6 +329,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   pendingRouletteSpinWaves: [],
   seasonBestWave: 0,
   towerMasteryLevels: {},
+  towerManaLevels: {},
   masteryUnlocked: {},
   ownedTowerSkinIds: [],
   equippedTowerSkinByType: {},
@@ -842,6 +845,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // in towerLoadout). A pre-existing save never tracked these
       // separately, so empty is the only correct default.
       towerMasteryLevels: parsedTowerMasteryLevels,
+      towerManaLevels: parseTowerMasteryLevels(parsed.towerManaLevels),
       ownedTowerSkinIds: parseOwnedTowerSkinIds(parsed.ownedTowerSkinIds),
       equippedTowerSkinByType: parseEquippedTowerSkinByType(parsed.equippedTowerSkinByType),
       // HORDENOVA Season/Progression v1.0 (save v15 -> v16) — Mastery/

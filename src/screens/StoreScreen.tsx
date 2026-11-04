@@ -1,3 +1,4 @@
+import { SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -187,7 +188,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                           ))}
                         </ul>
                       )}
-                      <p className="st-reward">{t("store.rewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100) })}</p>
+                      <p className="st-reward">{t("store.rewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100), mana: Math.round(SKIN_MANA_GAIN_BONUS * 100) })}</p>
                       <div className="st-actions">
                         {status?.kind === "OWNED" ? (
                           status.equipped ? (

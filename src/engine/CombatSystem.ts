@@ -4,9 +4,10 @@ import {
   getTowerMuzzleOffset,
   getTowerStats,
   isTowerReadyForSpecial,
+  gainTowerMana,
   isTowerReadyToAttack,
   resetTowerCooldown,
-  resetTowerSpecialCooldown,
+  spendTowerMana,
   tickTowerCooldown,
   tickTowerSurvivalRegen,
   type TowerInstance,
@@ -25,6 +26,7 @@ import { applySpecializationToSpecial } from "@/config/specializations";
 import { applyMasteryToSpecial } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
+import { MANA_PER_KILL, manaPerAttack } from "@/config/towerMana";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -138,6 +140,8 @@ export function tickCombat(
   // outside the [300,800] window so every existing/omitted call site keeps
   // its exact prior behavior (bump === 1, unconditionally).
   waveNumber = 0,
+  /** TOWER MANA — while true no special fires and mana keeps charging past full (config/towerMana.ts). */
+  specialsHeld = false,
 ): CombatTickResult {
   const projectiles: ProjectileInstance[] = [];
   const damageEvents: DamageEvent[] = [];
@@ -165,7 +169,10 @@ export function tickCombat(
         armorPenetration = Math.max(armorPenetration, 1 - enemy.boss.baseDamageReduction / enemy.damageReduction);
       }
     }
+    const wasAlive = !isEnemyDead(enemy);
     const actual = applyDamageToEnemy(enemy, effectiveDamage, armorPenetration);
+    // TOWER MANA — a kill feeds the tower that landed it.
+    if (wasAlive && isEnemyDead(enemy)) gainTowerMana(tower, MANA_PER_KILL, specialsHeld);
     const event: DamageEvent = {
       towerId: tower.id,
       towerType: tower.type,
@@ -188,10 +195,13 @@ export function tickCombat(
     // 26-28) and must still get its own chance to fire on the same tick
     // even when the normal attack isn't ready or has nothing to hit.
     if (isTowerReadyToAttack(tower)) {
-      resolveNormalAttack(tower, enemies, dealDamage, projectiles);
+      // TOWER MANA — every normal attack that finds a target charges the special.
+      if (resolveNormalAttack(tower, enemies, dealDamage, projectiles)) {
+        gainTowerMana(tower, manaPerAttack(tower.type, getTowerStats(tower).attackSpeed), specialsHeld);
+      }
     }
 
-    if (isTowerReadyForSpecial(tower)) {
+    if (isTowerReadyForSpecial(tower, specialsHeld)) {
       resolveSpecialAttack(tower, enemies, dealDamage, projectiles);
     }
   }
@@ -204,10 +214,10 @@ function resolveNormalAttack(
   enemies: readonly EnemyInstance[],
   dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number, isCrit?: boolean) => DamageEvent,
   projectiles: ProjectileInstance[],
-): void {
+): boolean {
   const stats = getTowerStats(tower);
   const target = findPrimaryTarget(tower.position, stats.range, enemies);
-  if (!target) return;
+  if (!target) return false;
 
   // TOWER PRESENTATION PASS — see getTowerMuzzleOffset's own doc comment.
   // Purely cosmetic (the ProjectileInstance `from` point): every distance/
@@ -299,6 +309,7 @@ function resolveNormalAttack(
       );
     }
   }
+  return true;
 }
 
 /**
@@ -327,11 +338,13 @@ function resolveSpecialAttack(
   // TOWER PRESENTATION PASS — see getTowerMuzzleOffset's own doc comment.
   const muzzle = getTowerMuzzleOffset(tower);
 
-  resetTowerSpecialCooldown(tower);
+  // TOWER MANA — the whole bar is spent; a held (overcharged) bar hits harder.
+  const overcharge = spendTowerMana(tower);
   const ultimate = tower.type;
+  const damage = stats.damage * overcharge;
 
   if (ultimate === "IRONWOOD") {
-    dealDamage(tower, target, stats.damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
+    dealDamage(tower, target, damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
     projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
   } else if (ultimate === "INFERNO") {
     const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level, getEquippedSkinGameplayEffect(tower)) as Extract<
@@ -342,7 +355,7 @@ function resolveSpecialAttack(
     for (const enemy of enemies) {
       if (isEnemyDead(enemy)) continue;
       if (distance(target.position, enemy.position) > radius) continue;
-      dealDamage(tower, enemy, stats.damage * INFERNO_SPECIAL.damageMultiplier);
+      dealDamage(tower, enemy, damage * INFERNO_SPECIAL.damageMultiplier);
       applyBurn(enemy, infernoSpecial.burnDamagePerSecond, infernoSpecial.burnDurationMs, infernoSpecial.burnMaxStacks);
     }
     projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
@@ -353,7 +366,7 @@ function resolveSpecialAttack(
     for (const enemy of enemies) {
       if (isEnemyDead(enemy)) continue;
       if (distance(tower.position, enemy.position) > stats.range) continue;
-      dealDamage(tower, enemy, stats.damage * FROSTBORN_SPECIAL.damageMultiplier);
+      dealDamage(tower, enemy, damage * FROSTBORN_SPECIAL.damageMultiplier);
       applySlow(enemy, 1, FROSTBORN_SPECIAL.freezeDurationMs);
     }
     projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
@@ -363,7 +376,7 @@ function resolveSpecialAttack(
       tower.level,
       getEquippedSkinGameplayEffect(tower),
     ) as Extract<TowerSpecial, { type: "STORMCALLER" }>;
-    let chainDamage = stats.damage * STORMCALLER_SPECIAL.damageMultiplier;
+    let chainDamage = damage * STORMCALLER_SPECIAL.damageMultiplier;
     dealDamage(tower, target, chainDamage, stormSpecial.armorPenetration);
 
     const chainImpactPoints: Vector2[] = [];

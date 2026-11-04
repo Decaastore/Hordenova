@@ -45,6 +45,8 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     bossFight: null,
     bossVictoryAssaults: null,
     missionsKey: "",
+    specialsHeld: false,
+    specialsReady: 0,
     missionsClaimable: 0,
     ...overrides,
   };

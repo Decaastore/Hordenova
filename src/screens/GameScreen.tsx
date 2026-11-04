@@ -329,7 +329,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleSpecials={() => engine.setSpecialsHeld(!engine.isSpecialsHeld())} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -468,6 +468,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
             isSkinOwned={(skinId) => engine.isTowerSkinOwned(skinId)}
             onUnlockMastery={() => engine.unlockSelectedTowerMastery()}
             onUpgradeMastery={() => engine.upgradeSelectedTowerMastery()}
+            onUpgradeMana={() => engine.upgradeSelectedTowerMana()}
             unlockedSpecializationIdsForType={engine.getUnlockedSpecializationIdsForType(selectedTower.type)}
             onSwitchSpecialization={(id, currency) => engine.switchTowerSpecialization(id, currency)}
             repositionFreeAvailable={hud.repositionFreeAvailable}

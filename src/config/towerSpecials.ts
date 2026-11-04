@@ -1,12 +1,13 @@
 import type { TowerType } from "./towerStats";
 
 /**
- * Master Implementation spec section 26-28 — Special Attack. A second,
- * completely independent attack cadence per tower: while the normal attack
- * keeps firing on its attack-speed-driven cooldown (unchanged), each tower
- * also fires a fixed-interval "ultimate" with its own identity — never just
- * `damage * 3` on the same attack, a mechanically and visually distinct hit
- * (see entities/Tower.ts's `specialCooldownRemainingMs`,
+ * Master Implementation spec section 26-28 — Special Attack. A second
+ * attack per tower: while the normal attack keeps firing on its
+ * attack-speed-driven cooldown (unchanged), each tower also fires an
+ * "ultimate" with its own identity — never just `damage * 3` on the same
+ * attack, a mechanically and visually distinct hit. It is charged by TOWER
+ * MANA (config/towerMana.ts): a tower that keeps attacking fills its bar in
+ * the interval below (see entities/Tower.ts's `mana`,
  * engine/CombatSystem.ts's special-attack block, and
  * rendering/EntityRenderer.ts's per-type special VFX).
  *

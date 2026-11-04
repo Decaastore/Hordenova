@@ -19,9 +19,11 @@ interface HUDProps {
   onOpenStore?: () => void;
   /** Opens/closes the daily missions panel. */
   onToggleMissions?: () => void;
+  /** TOWER MANA — holds every special, or lets them all go at once (config/towerMana.ts). */
+  onToggleSpecials?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleSpecials }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -130,6 +132,9 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             </button>
           );
         })}
+        {onToggleSpecials && (
+          <SpecialsButton hud={hud} onToggle={onToggleSpecials} />
+        )}
         {onToggleMissions && (
           <button onClick={onToggleMissions} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="missions-button">
             <ScrollIcon size={13} />
@@ -144,6 +149,41 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
         <SfxControl />
       </div>
     </div>
+  );
+}
+
+/**
+ * TOWER MANA — "Segurar especiais" / "Soltar tudo". Holding stops every
+ * special and lets the towers overcharge (up to +50% damage); releasing
+ * fires them all together. Only usable while a wave or boss fight is on, and
+ * it glows during a boss fight, where a timed volley matters most.
+ */
+function SpecialsButton({ hud, onToggle }: { hud: HudSnapshot; onToggle: () => void }) {
+  const { t } = useLanguage();
+  const fighting = hud.phase === "RUNNING" || hud.phase === "BOSS_INTRO" || hud.phase === "BOSS_BATTLE";
+  const boss = hud.phase === "BOSS_INTRO" || hud.phase === "BOSS_BATTLE";
+  const held = hud.specialsHeld;
+  return (
+    <button
+      onClick={onToggle}
+      disabled={!fighting && !held}
+      title={t(held ? "hud.releaseSpecialsHint" : "hud.holdSpecialsHint")}
+      data-testid="specials-button"
+      aria-pressed={held}
+      style={{
+        ...inventoryButtonStyle,
+        position: "relative",
+        opacity: fighting || held ? 1 : 0.45,
+        color: held ? "#2b1906" : boss ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
+        background: held ? "linear-gradient(180deg,#ffe27a,#e0a92e)" : "#3a2a18",
+        borderColor: held ? "#ffe9a8" : boss ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
+        boxShadow: held ? "0 0 14px rgba(255,210,87,0.65)" : boss ? `0 0 10px ${PALETTE.uiAccent}55` : "none",
+      }}
+    >
+      <BoltIcon size={13} color={held ? "#2b1906" : undefined} />
+      {held ? t("hud.releaseSpecials") : t("hud.holdSpecials")}
+      {hud.specialsReady > 0 && <span style={badgeStyle}>{hud.specialsReady}</span>}
+    </button>
   );
 }
 

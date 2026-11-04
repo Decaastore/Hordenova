@@ -75,6 +75,7 @@ import {
 } from "@/entities/Tower";
 import { getItemSlotUnlockCost, getItemSlotUnlockPrice, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getMasteryUnlockGoldCost } from "@/config/towerMastery";
+import { getManaUpgradeCost, MANA_MAX } from "@/config/towerMana";
 import { getSkinRewardMultiplier, getTowerSkinDefinition, getTowerSkinDualPrice, PRESTIGE_TOWER_SKINS } from "@/config/towerSkins";
 import {
   SPECIALIZATION_CHANGE_GEM_PRICE,
@@ -209,6 +210,10 @@ export interface HudSnapshot {
   deployBench: readonly { id: string; type: TowerType; level: number }[];
   /** BOSS SIEGE: the main boss besieging this map (HP left as a fraction, assaults so far, waves until it attacks again), or null. */
   bossSiege: { wave: number; hpFraction: number; assaults: number; wavesUntilBoss: number } | null;
+  /** TOWER MANA — true while the player holds every special (config/towerMana.ts). */
+  specialsHeld: boolean;
+  /** Towers whose mana bar is full (their special is ready or held). */
+  specialsReady: number;
   /** BOSS SIEGE: about the main boss being announced/fought now — its weakness, which assault this is, and its state. Null outside a boss fight. */
   bossFight: { weakness: TowerType | null; assault: number; enraged: boolean; exhausted: boolean } | null;
   /** Set during VICTORY: how many assaults the boss took (1 = first-assault kill, which pays a bonus). */
@@ -331,6 +336,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bossFight?.exhausted === b.bossFight?.exhausted &&
     a.bossFight?.weakness === b.bossFight?.weakness &&
     a.bossVictoryAssaults === b.bossVictoryAssaults &&
+    a.specialsHeld === b.specialsHeld &&
+    a.specialsReady === b.specialsReady &&
     a.missionsKey === b.missionsKey &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
@@ -475,6 +482,11 @@ export class GameEngine {
   // placed tower of a type shares its type's Mastery level/ownership and
   // equipped skin). See SaveData's doc comment for the full split.
   private towerMasteryLevels: Partial<Record<TowerType, number>> = {};
+  /** TOWER MANA — SEASON-scoped per-TYPE Gold mana upgrade level (config/towerMana.ts), exactly like towerMasteryLevels. */
+  private towerManaLevels: Partial<Record<TowerType, number>> = {};
+  /** TOWER MANA — the player is holding every special; cleared when the wave it started in ends. */
+  private specialsHeld = false;
+  private specialsHeldWave = 0;
   /** Permanent per-TYPE Mastery ownership (the one-time Gold purchase, FASE 6) — never reset by a Season boundary. */
   private masteryUnlocked: Partial<Record<TowerType, boolean>> = {};
   /** SISTEMA DE SLOTS DE EQUIPAMENTO — permanent per-TYPE slot ownership (mirrors masteryUnlocked exactly, but an array per type instead of a single boolean). A one-time, per-slot Gems purchase — never reset by a Season boundary, never re-locked by removing/swapping an equipped item. */
@@ -573,6 +585,7 @@ export class GameEngine {
     // reads these maps to give each tower its permanent-by-type Mastery
     // level and equipped skin.
     this.towerMasteryLevels = { ...save.towerMasteryLevels };
+    this.towerManaLevels = { ...save.towerManaLevels };
     this.masteryUnlocked = { ...save.masteryUnlocked };
     // Deep-copy each per-type array for the same reason as
     // unlockedSpecializationIds below — a shallow spread would leave every
@@ -775,6 +788,7 @@ export class GameEngine {
   private resetAttemptState(): void {
     this.enemies = [];
     this.projectiles = [];
+    this.specialsHeld = false;
     this.baseHp = this.maxBaseHp;
     this.enemiesDefeated = 0;
     this.selectedTowerId = null;
@@ -872,6 +886,7 @@ export class GameEngine {
       this.masteryUnlocked[entry.type] === true,
       entry.equippedItemInstanceIds,
       this.unlockedItemSlots[entry.type] ? [...this.unlockedItemSlots[entry.type]!] : undefined,
+      this.towerManaLevels[entry.type] ?? 0,
     );
     tower.siteTrait = slot?.trait ?? "NONE";
     return tower;
@@ -902,6 +917,7 @@ export class GameEngine {
         this.masteryUnlocked[type] === true,
         undefined,
         this.unlockedItemSlots[type] ? [...this.unlockedItemSlots[type]!] : undefined,
+        this.towerManaLevels[type] ?? 0,
       ),
     );
     this.towers[this.towers.length - 1]!.siteTrait = slot.trait;
@@ -1227,6 +1243,48 @@ export class GameEngine {
     for (const other of this.towers) {
       if (other.type === tower.type && other.id !== tower.id) other.masteryLevel = tower.masteryLevel;
     }
+    this.emitAudio({ type: "tower_upgrade" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  // -------------------------------------------------------------------
+  // TOWER MANA (config/towerMana.ts) — hold/release the specials and the
+  // per-type Gold mana upgrade (Season-scoped, like Mastery).
+  // -------------------------------------------------------------------
+
+  /** Holds every special (towers keep charging past full, for a stronger hit) or lets them go. Only while a wave or boss fight is on. */
+  setSpecialsHeld(held: boolean): boolean {
+    if (held && this.phase !== "RUNNING" && this.phase !== "BOSS_INTRO" && this.phase !== "BOSS_BATTLE") return false;
+    this.specialsHeld = held;
+    this.specialsHeldWave = this.wave.currentWave;
+    this.notify();
+    return true;
+  }
+
+  isSpecialsHeld(): boolean {
+    return this.specialsHeld;
+  }
+
+  /** Gold for the selected tower TYPE's next mana level, or null when there's no selection or it's at the top. */
+  getSelectedTowerManaUpgradeCost(): number | null {
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    return tower ? getManaUpgradeCost(tower.type, tower.manaLevel) : null;
+  }
+
+  upgradeSelectedTowerMana(): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const tower = this.towers.find((t) => t.id === this.selectedTowerId);
+    if (!tower) return false;
+    const cost = getManaUpgradeCost(tower.type, tower.manaLevel);
+    if (cost === null || this.gold < cost) return false;
+
+    this.gold -= cost;
+    const level = tower.manaLevel + 1;
+    this.towerManaLevels[tower.type] = level;
+    for (const other of this.towers) if (other.type === tower.type) other.manaLevel = level;
+    for (const other of this.deployBench) if (other.type === tower.type) other.manaLevel = level;
     this.emitAudio({ type: "tower_upgrade" });
     this.persist();
     this.notify();
@@ -2098,7 +2156,11 @@ export class GameEngine {
       }
     }
 
-    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave);
+    // TOWER MANA — a hold only lasts for the wave or boss fight it started in.
+    if (this.specialsHeld && (this.wave.currentWave !== this.specialsHeldWave || this.phase === "WAVE_TRANSITION")) {
+      this.specialsHeld = false;
+    }
+    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave, this.specialsHeld);
     this.projectiles.push(...newProjectiles);
     recordDamageEvents(this.battleStats, damageEvents);
 
@@ -2726,6 +2788,7 @@ export class GameEngine {
         pendingRouletteSpinWaves: this.pendingRouletteSpinWaves,
         seasonBestWave: this.seasonBestWave,
         towerMasteryLevels: this.towerMasteryLevels,
+        towerManaLevels: this.towerManaLevels,
         masteryUnlocked: this.masteryUnlocked,
         unlockedItemSlots: this.unlockedItemSlots,
         ownedTowerSkinIds: [...this.ownedTowerSkinIds],
@@ -2786,6 +2849,8 @@ export class GameEngine {
       bossSiege: this.bossSiege
         ? { wave: this.bossSiege.wave, hpFraction: this.bossSiege.hpFraction, assaults: this.bossSiege.assaults, wavesUntilBoss: Math.max(0, this.bossSiege.wave - this.wave.currentWave) }
         : null,
+      specialsHeld: this.specialsHeld,
+      specialsReady: this.towers.filter((t) => t.mana >= MANA_MAX).length,
       missionsKey: this.missionsKey(),
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
     };

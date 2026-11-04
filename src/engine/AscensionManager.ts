@@ -265,6 +265,7 @@ export function syncSeasonIfNeeded(): void {
     // (when Mastery ownership and level were still the same conflated
     // number) and no longer does.
     towerMasteryLevels: {},
+    towerManaLevels: {},
   });
 }
 
@@ -338,5 +339,6 @@ export function resetSeasonProgressionForTesting(): void {
     currentWave: 0,
     gold: RUN_START.startingGold,
     towerMasteryLevels: {},
+    towerManaLevels: {},
   });
 }

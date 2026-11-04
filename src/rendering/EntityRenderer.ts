@@ -1,3 +1,4 @@
+import { MANA_MAX, MANA_OVERCHARGE_MAX } from "@/config/towerMana";
 import type { TowerInstance } from "@/entities/Tower";
 import type { EnemyInstance } from "@/entities/Enemy";
 import { getEffectiveSpeed } from "@/entities/Enemy";
@@ -372,6 +373,40 @@ export function drawTower(
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   ctx.fillText(String(stats.level), 0, 0.5);
+  ctx.restore();
+
+  drawTowerManaBar(ctx, tower, visualScale, timeMs, selected);
+}
+
+/**
+ * TOWER MANA (config/towerMana.ts) — a slim bar under the tower: violet
+ * while charging, glowing when the special is ready, with a gold segment
+ * for the overcharge built up while specials are held.
+ */
+function drawTowerManaBar(ctx: CanvasRenderingContext2D, tower: TowerInstance, visualScale: number, timeMs: number, selected: boolean): void {
+  if (tower.mana <= 0) return;
+  const w = 24 * visualScale;
+  const h = selected ? 3.4 : 2.6;
+  const x = tower.position.x - w / 2;
+  const y = tower.position.y + 25 * visualScale;
+  const fill = Math.min(1, tower.mana / MANA_MAX);
+  const over = Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX)));
+  const full = fill >= 1;
+  ctx.save();
+  ctx.globalAlpha = selected || full ? 1 : 0.8;
+  ctx.fillStyle = "rgba(10,8,20,0.7)";
+  ctx.fillRect(x - 0.8, y - 0.8, w + 1.6, h + 1.6);
+  if (full) {
+    const pulse = 0.5 + 0.5 * Math.sin(timeMs / 180);
+    ctx.shadowColor = over > 0 ? "rgba(255,214,90,0.95)" : "rgba(150,130,255,0.95)";
+    ctx.shadowBlur = 4 + 4 * pulse;
+  }
+  ctx.fillStyle = full ? "#b9a6ff" : "#6f7dff";
+  ctx.fillRect(x, y, w * fill, h);
+  if (over > 0) {
+    ctx.fillStyle = "#ffd75e";
+    ctx.fillRect(x, y, w * over, h);
+  }
   ctx.restore();
 }
 

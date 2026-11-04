@@ -181,9 +181,9 @@ export function getTowerSkinDualPrice(def: Pick<TowerSkinDefinition, "gemCost">)
 
 /**
  * REWARD BONUS — what a paid skin gives on top of its look and its combat
- * trade-off: more Gold and more Gem Shards. It never touches combat, so a
- * tower is exactly as strong in the ranking with or without it; it only
- * speeds up progression. Counted once per tower TYPE that has a paid
+ * trade-off: more Gold and more Gem Shards, which only speed up
+ * progression. (A paid skin also charges its tower's mana a little faster —
+ * SKIN_MANA_GAIN_BONUS in config/towerMana.ts.) Counted once per tower TYPE that has a paid
  * (non-Prestige) skin equipped and at least one tower of that type on the
  * map — so the most it can reach is 4 types x 5% = +20%.
  */

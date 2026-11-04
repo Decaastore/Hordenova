@@ -1,3 +1,4 @@
+import { getManaUpgradeCost, MANA_MAX, MANA_OVERCHARGE_MAX, MANA_UPGRADE_GAIN_PER_LEVEL, MANA_UPGRADE_MAX_LEVEL, manaGainMultiplier, SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
 import { drawTower } from "@/rendering/EntityRenderer";
@@ -59,6 +60,8 @@ interface TowerInfoPanelProps {
   onUnlockMastery: () => void;
   /** Gold-funded, uncapped upgrade (0 -> 1 -> 2 -> ... forever, resetting to 0 every Season), mirroring onUpgradeSpecialization. */
   onUpgradeMastery: () => void;
+  /** TOWER MANA — Gold upgrade of the selected tower TYPE's mana gain (config/towerMana.ts). Optional so older test fixtures still render. */
+  onUpgradeMana?: () => void;
   /** Every SpecializationId this account has ever purchased for the selected tower's TYPE — permanent, never reset. A path in this list is free to (re-)choose or switch to. */
   unlockedSpecializationIdsForType: readonly SpecializationId[];
   /** "Trocar Especialização" — dual-priced, switches to a DIFFERENT path already in `unlockedSpecializationIdsForType`. */
@@ -107,6 +110,7 @@ export function TowerInfoPanel({
   isSkinOwned,
   onUnlockMastery,
   onUpgradeMastery,
+  onUpgradeMana,
   unlockedSpecializationIdsForType,
   onSwitchSpecialization,
   repositionFreeAvailable,
@@ -220,6 +224,8 @@ export function TowerInfoPanel({
         onUnlock={onUnlockMastery}
         onUpgrade={onUpgradeMastery}
       />
+
+      {onUpgradeMana && <ManaSection tower={tower} gold={gold} theme={theme} t={t} onUpgrade={onUpgradeMana} />}
 
       <SpecializationSection
         key={`specialization-${tower.id}`}
@@ -591,6 +597,60 @@ function MasterySection({
 }
 
 /**
+ * TOWER MANA (config/towerMana.ts) — the tower's live mana bar and the
+ * per-type Gold upgrade that makes it fill faster.
+ */
+function ManaSection({
+  tower,
+  gold,
+  theme,
+  t,
+  onUpgrade,
+}: {
+  tower: TowerInstance;
+  gold: number;
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  onUpgrade: () => void;
+}) {
+  const cost = getManaUpgradeCost(tower.type, tower.manaLevel);
+  const affordable = cost !== null && gold >= cost;
+  const fill = Math.min(1, tower.mana / MANA_MAX);
+  const over = Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX)));
+  const bonusPct = Math.round((manaGainMultiplier(tower.manaLevel, tower.equippedSkinId) - 1) * 100);
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.manaSection")}</div>
+      <div style={{ position: "relative", height: 6, borderRadius: 3, background: "rgba(0,0,0,0.45)", overflow: "hidden", marginTop: 2 }} data-testid="tower-mana-bar">
+        <div style={{ position: "absolute", inset: 0, width: `${fill * 100}%`, background: "linear-gradient(90deg,#4f7dff,#9d7bff)" }} />
+        {over > 0 && <div style={{ position: "absolute", top: 0, bottom: 0, left: 0, width: `${over * 100}%`, background: "linear-gradient(90deg,#ffd257,#fff1b8)" }} />}
+      </div>
+      <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 3, lineHeight: 1.35 }}>{t("towerInfo.manaHint")}</div>
+      <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 2 }}>
+        {t("towerInfo.manaLevel", { level: tower.manaLevel, max: MANA_UPGRADE_MAX_LEVEL, pct: bonusPct })}
+      </div>
+      {isPaidTowerSkin(tower.equippedSkinId) && (
+        <div style={{ fontSize: 9.5, color: PALETTE.gold, marginTop: 1 }}>{t("towerInfo.manaSkinBonus", { pct: Math.round(SKIN_MANA_GAIN_BONUS * 100) })}</div>
+      )}
+      {cost !== null ? (
+        <button onClick={onUpgrade} disabled={!affordable} style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }} data-testid="mana-upgrade">
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+            {t("towerInfo.manaUpgrade", { pct: Math.round(MANA_UPGRADE_GAIN_PER_LEVEL * 100) })}
+            <span style={{ opacity: 0.6 }}>·</span>
+            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
+          </span>
+        </button>
+      ) : (
+        <button disabled style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: 0.5 }}>
+          {t("towerInfo.manaMax")}
+        </button>
+      )}
+    </>
+  );
+}
+
+/**
  * HORDENOVA Season/Progression v1.0 — the CHOICE of a path (this section's
  * top half) is free the moment this account already OWNS that path
  * (`unlockedSpecializationIdsForType`, permanent — most commonly true at
@@ -953,7 +1013,7 @@ function SkinSection({
           ))
         )}
         {previewSkin && isPaidTowerSkin(previewSkin.id) && (
-          <div style={{ fontSize: 10, color: PALETTE.gold, marginTop: 2 }}>{t("towerInfo.skinRewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100) })}</div>
+          <div style={{ fontSize: 10, color: PALETTE.gold, marginTop: 2 }}>{t("towerInfo.skinRewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100), mana: Math.round(SKIN_MANA_GAIN_BONUS * 100) })}</div>
         )}
       </div>
 

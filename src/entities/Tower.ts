@@ -15,7 +15,7 @@ import {
   type SpecializationId,
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
-import { getTowerSpecialCooldownMs } from "@/config/towerSpecials";
+import { MANA_MAX, MANA_OVERCHARGE_MAX, manaGainMultiplier, overchargeMultiplier } from "@/config/towerMana";
 import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import { DEFAULT_UNLOCKED_ITEM_SLOTS, getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
@@ -31,17 +31,15 @@ export interface TowerInstance {
   position: Vector2;
   cooldownRemainingMs: number;
   /**
-   * Master Implementation spec section 26-28 — Special Attack: a SECOND,
-   * fully independent cooldown timer from `cooldownRemainingMs`. The normal
-   * attack keeps firing at its attack-speed-driven cadence exactly as
-   * before; this one ticks down on a fixed per-tower-type interval (see
-   * config/towerSpecials.ts) and fires a distinct, more impactful attack
-   * when it reaches 0, without ever touching or resetting the normal
-   * cooldown. Deliberately NOT derived from attackSpeed — it's a rhythm of
-   * its own, the way a real "ultimate" reads differently from a basic
-   * attack.
+   * TOWER MANA (config/towerMana.ts) — charges the Special Attack. Filled by
+   * the tower's own normal attacks and kills; the special fires when it
+   * reaches MANA_MAX (or, while specials are held, keeps charging up to
+   * MANA_OVERCHARGE_MAX for a stronger hit). Transient battle state: a
+   * freshly built or rebuilt tower starts empty.
    */
-  specialCooldownRemainingMs: number;
+  mana: number;
+  /** Season-scoped, per-TYPE Gold mana upgrade level (0..MANA_UPGRADE_MAX_LEVEL), denormalized like `masteryLevel`. */
+  manaLevel: number;
   /**
    * MAP LAYOUTS — the kind of build site the tower currently stands on
    * (see data/mapLayouts.ts): HIGH_GROUND extends its range, RUNE_ALTAR
@@ -131,6 +129,7 @@ export function createTowerInstance(
   masteryUnlocked = false,
   equippedItemInstanceIds: (string | null)[] = Array(TOWER_ITEM_SLOT_COUNT).fill(null),
   unlockedItemSlots: boolean[] = [...DEFAULT_UNLOCKED_ITEM_SLOTS],
+  manaLevel = 0,
 ): TowerInstance {
   return {
     id: `tower-${nextTowerId++}`,
@@ -139,13 +138,9 @@ export function createTowerInstance(
     level: Math.min(Math.max(initialLevel, 1), MAX_TOWER_LEVEL),
     position,
     cooldownRemainingMs: 0,
-    // A freshly-built tower must charge up before its first Special Attack
-    // — the ultimate meter starts empty, not full — both thematically (an
-    // "ultimate" firing before a single normal shot feels wrong) and
-    // mechanically (keeps the special's much bigger cooldown from ever
-    // colliding with the normal attack's own instant-ready-at-0 on the
-    // very same first tick).
-    specialCooldownRemainingMs: getTowerSpecialCooldownMs(type),
+    // A freshly-built tower must charge up before its first Special Attack.
+    mana: 0,
+    manaLevel,
     disabledRemainingMs: 0,
     specializationId,
     specializationLevel,
@@ -421,10 +416,9 @@ export function upgradeTower(tower: TowerInstance): void {
   if (canUpgradeTower(tower)) tower.level += 1;
 }
 
-/** Mutates `tower` in place, ticking its attack cooldown, special cooldown, and any active jam down. */
+/** Mutates `tower` in place, ticking its attack cooldown and any active jam down. */
 export function tickTowerCooldown(tower: TowerInstance, dtMs: number): void {
   tower.cooldownRemainingMs = Math.max(0, tower.cooldownRemainingMs - dtMs);
-  tower.specialCooldownRemainingMs = Math.max(0, tower.specialCooldownRemainingMs - dtMs);
   tower.disabledRemainingMs = Math.max(0, tower.disabledRemainingMs - dtMs);
 }
 
@@ -432,9 +426,16 @@ export function isTowerReadyToAttack(tower: TowerInstance): boolean {
   return tower.cooldownRemainingMs <= 0 && tower.disabledRemainingMs <= 0;
 }
 
-/** Special Attack readiness — completely independent of the normal-attack cooldown above; only shares the disable-jam gate (a disabled tower can't fire either attack). */
-export function isTowerReadyForSpecial(tower: TowerInstance): boolean {
-  return tower.specialCooldownRemainingMs <= 0 && tower.disabledRemainingMs <= 0;
+/** Special Attack readiness — a full mana bar (config/towerMana.ts), never while specials are held; shares the disable-jam gate (a disabled tower can't fire either attack). */
+export function isTowerReadyForSpecial(tower: TowerInstance, specialsHeld = false): boolean {
+  return !specialsHeld && tower.mana >= MANA_MAX && tower.disabledRemainingMs <= 0;
+}
+
+/** Adds mana from the tower's own hit or kill, capped at full (or at the overcharge cap while specials are held). A bar already above the cap is never drained. */
+export function gainTowerMana(tower: TowerInstance, amount: number, specialsHeld = false): void {
+  const cap = specialsHeld ? MANA_OVERCHARGE_MAX : MANA_MAX;
+  if (tower.mana >= cap) return;
+  tower.mana = Math.min(cap, tower.mana + amount * manaGainMultiplier(tower.manaLevel, tower.equippedSkinId));
 }
 
 /** Jams the tower for `durationMs` (a DISABLER-archetype hit) — refreshes rather than stacks. */
@@ -448,9 +449,11 @@ export function resetTowerCooldown(tower: TowerInstance): void {
   tower.cooldownRemainingMs = 1000 / stats.attackSpeed;
 }
 
-/** Resets the Special Attack cooldown to its fixed per-tower-type interval (config/towerSpecials.ts) — never derived from attackSpeed/level. */
-export function resetTowerSpecialCooldown(tower: TowerInstance): void {
-  tower.specialCooldownRemainingMs = getTowerSpecialCooldownMs(tower.type);
+/** Spends the whole mana bar on a special and returns its damage multiplier (overcharge, config/towerMana.ts). */
+export function spendTowerMana(tower: TowerInstance): number {
+  const mult = overchargeMultiplier(tower.mana);
+  tower.mana = 0;
+  return mult;
 }
 
 // ---------------------------------------------------------------------------
