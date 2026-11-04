@@ -70,6 +70,45 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v76",
+    dateIso: "2026-11-04",
+    category: "SYSTEMS",
+    title: {
+      en: "Tower Mana, Held Specials and a New Boss Screen",
+      ptBR: "Mana das Torres, Especiais Guardados e Nova Tela de Chefe",
+    },
+    description: {
+      en: "Each tower's special attack is now charged by mana: every attack and every kill fills its bar, and a full bar fires the special on its own, so nothing is lost when you're away. When you're watching, you can hold every special and release them all together on the boss, stronger. The boss fight screen was rebuilt to match.",
+      ptBR: "O ataque especial de cada torre agora é carregado por mana: cada ataque e cada abate enchem a barra, e com ela cheia o especial sai sozinho, então nada se perde quando você está longe. Quando você está olhando, dá para segurar todos os especiais e soltar todos juntos no chefe, mais fortes. A tela da luta contra o chefe foi refeita para combinar.",
+    },
+    highlights: [
+      {
+        en: "A slim mana bar sits under every tower. A tower that keeps attacking fills it in the same time its special used to take, so tower strength is unchanged.",
+        ptBR: "Uma barrinha de mana fica embaixo de cada torre. Uma torre que ataca sem parar enche no mesmo tempo que o especial levava antes, então a força das torres continua a mesma.",
+      },
+      {
+        en: "New SPECIALS panel in the bottom bar (or the E key): HOLD keeps every special charging up to +50% damage, RELEASE ALL fires them together with a golden blast. Holding ends by itself when the wave or boss fight ends.",
+        ptBR: "Novo painel ESPECIAIS na barra de baixo (ou tecla E): SEGURAR deixa todos os especiais carregando até +50% de dano, SOLTAR TUDO dispara todos juntos com uma explosão dourada. Segurar termina sozinho quando a onda ou a luta contra o chefe acaba.",
+      },
+      {
+        en: "Mana upgrade in each tower's panel, paid in Gold: +5% mana per level, up to +50% for that tower type. It resets each Season, like Mastery.",
+        ptBR: "Melhoria de mana no painel de cada torre, paga em ouro: +5% de mana por nível, até +50% para aquele tipo de torre. Reinicia a cada Season, como a Maestria.",
+      },
+      {
+        en: "Paid skins now also charge their tower's mana 10% faster, on top of their Gold and Gem Shard bonus.",
+        ptBR: "As skins pagas agora também carregam a mana da torre 10% mais rápido, além do bônus de ouro e fragmentos.",
+      },
+      {
+        en: "Boss screen rebuilt: one fixed panel with the boss's name, life, assault number and weakness. The clickable runes on the map are gone, and the top bar no longer changes size during the fight, so the map stays still.",
+        ptBR: "Tela do chefe refeita: um painel fixo com nome, vida, número do ataque e fraqueza do chefe. As runas clicáveis do mapa saíram, e a barra do topo não muda mais de tamanho durante a luta, então o mapa fica parado.",
+      },
+      {
+        en: "The Wiki's tower pages now explain each special, mana, and holding and releasing.",
+        ptBR: "As páginas de torres da Wiki agora explicam cada especial, a mana e como segurar e soltar.",
+      },
+    ],
+  },
+  {
     id: "v75",
     dateIso: "2026-11-04",
     category: "BALANCE",
