@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BOSS_RETREAT_RECOVERY, mainBossHpFactor } from "@/config/bossAssault";
+import { BOSS_RETREAT_RECOVERY, mainBossHp } from "@/config/bossAssault";
+import { previousWaveTotalHp } from "./BossManager";
 import { getScaledEnemyStats, ENEMY_TYPES } from "@/config/enemyStats";
 import { getEndgameBossHpMultiplierBonus, getEndgameCycleLapCount } from "@/config/phaseConfig";
 import { specializationEffectScale, SPECIALIZATION_EFFECT_EXPONENT, getSpecializationUpgradeCost, getSpecializationsForTower } from "@/config/specializations";
@@ -286,11 +287,6 @@ function measureDamageBudget(towers: readonly TowerInstance[], def: BossDefiniti
   }
 }
 
-function realBossHp(def: BossDefinition, wave: number): number {
-  const bruteHp = getScaledEnemyStats("BRUTE", wave).hp;
-  return Math.round(bruteHp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(wave));
-}
-
 describe("R4 — Boss Kill Margin contract (U1/U3, real GameEngine)", () => {
   const CHECKPOINTS = [300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800];
   const def = MAIN_BOSSES["hollow-warden"]!;
@@ -306,7 +302,7 @@ describe("R4 — Boss Kill Margin contract (U1/U3, real GameEngine)", () => {
     for (const wave of CHECKPOINTS) {
       const build = f2pBuildForWave(wave);
       const budget = measureDamageBudget(build, def, wave);
-      const bossHp = realBossHp(def, wave) * mainBossHpFactor(def.id, wave);
+      const bossHp = mainBossHp(def.id, previousWaveTotalHp(wave));
       const share = budget / bossHp;
       expect(share, `wave ${wave}`).toBeGreaterThanOrEqual(0.3);
       const assaults = share >= 1 ? 1 : 1 + Math.ceil((1 - share) / (share - BOSS_RETREAT_RECOVERY));

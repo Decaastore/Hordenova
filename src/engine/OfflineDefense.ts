@@ -1,4 +1,7 @@
 import type { TowerLoadoutEntry } from "@/entities/Tower";
+import { waveGoldFactor, waveHpFactor } from "@/config/waveBudget";
+import { mainBossHp } from "@/config/bossAssault";
+import { previousWaveTotalHp } from "./BossManager";
 import { getTowerLevelStats } from "@/config/towerStats";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 import { generateWaveSpawns, isBossMilestone } from "@/config/waveConfig";
@@ -90,10 +93,9 @@ interface WaveThreat {
 
 function estimateWaveThreat(waveNumber: number): WaveThreat {
   if (isBossMilestone(waveNumber)) {
-    const bruteHp = getScaledEnemyStats("BRUTE", waveNumber).hp;
     const mainBoss = getMainBossForWave(waveNumber);
     return {
-      totalHp: bruteHp * mainBoss.hpMultiplierVsBrute,
+      totalHp: mainBossHp(mainBoss.id, previousWaveTotalHp(waveNumber)),
       goldReward: mainBoss.goldReward,
       durationBudgetMs: BOSS_FIGHT_BUDGET_MS,
       isMainBoss: true,
@@ -106,8 +108,8 @@ function estimateWaveThreat(waveNumber: number): WaveThreat {
   let goldReward = 0;
   for (const type of spawns) {
     const stats = getScaledEnemyStats(type, waveNumber);
-    totalHp += stats.hp;
-    goldReward += stats.goldReward;
+    totalHp += stats.hp * waveHpFactor(waveNumber);
+    goldReward += stats.goldReward * waveGoldFactor(waveNumber);
   }
 
   const miniBoss = isMiniBossWave(waveNumber);

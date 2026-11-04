@@ -1,4 +1,5 @@
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
+import { waveGoldFactor, waveHpFactor } from "@/config/waveBudget";
 import { deviceId, recordBalanceEvent, type DefenceSnapshot } from "@/telemetry/balanceTelemetry";
 import {
   BOSS_INTRO_DURATION_MS,
@@ -2036,9 +2037,9 @@ export class GameEngine {
 
       const { enemyTypeToSpawn } = tickWaveManager(this.wave, scaledDt, this.enemies.length);
       if (enemyTypeToSpawn) {
-        this.enemies.push(
-          createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave),
-        );
+        const spawned = createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave, waveHpFactor(this.wave.currentWave));
+        spawned.goldReward = Math.round(spawned.goldReward * waveGoldFactor(this.wave.currentWave));
+        this.enemies.push(spawned);
         this.maybeDiscover(enemyTypeToSpawn);
       }
       this.maybeSpawnMiniBoss(nowMs);
@@ -2394,9 +2395,9 @@ export class GameEngine {
     if (this.eliteSpawnedForWave === this.wave.currentWave) return;
     if (this.wave.phase !== "SPAWNING") return;
     this.eliteSpawnedForWave = this.wave.currentWave;
-    this.enemies.push(
-      createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER),
-    );
+    const elite = createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER, waveHpFactor(this.wave.currentWave));
+    elite.goldReward = Math.round(elite.goldReward * waveGoldFactor(this.wave.currentWave));
+    this.enemies.push(elite);
   }
 
   private maybeDiscover(type: EnemyType): void {

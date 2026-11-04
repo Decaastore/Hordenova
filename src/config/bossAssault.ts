@@ -34,32 +34,22 @@ export const RUNE_STRIKE_FRACTION = 0.03;
 export const RUNE_HIT_RADIUS = 26;
 
 /**
- * Main-boss HP under the siege rules, measured with a 24h greedy-bot
- * simulation (always buys the cheapest upgrade, never clicks runes): the
- * target is a boss falling in about 3 assaults for a player keeping pace,
- * fewer for one who uses the boss's weakness or clicks runes. The old
- * windowed boss-damage bump (config/bossPowerBudget.ts) existed to make
- * waves 300-800 bosses passable when an escaped boss was skipped; with
- * wounds that stay it isn't applied any more.
+ * Main-boss HP follows the regular waves instead of its own curve: it is
+ * MAIN_BOSS_HP_VS_PREVIOUS_WAVE times the total HP of the wave right before
+ * it. Whatever the difficulty curve does, a build that clears the waves
+ * leading up to a boss brings it down in about 3 assaults (measured with a
+ * greedy-bot simulation that never clicks runes) — so bosses are milestones
+ * on the curve, never walls above it. BOSS_HP_TWEAK corrects bosses whose
+ * ability measured clearly tougher than the rest.
  */
-export const BOSS_HP_SCALE = 0.75;
-/** Bosses that measured clearly tougher than the rest at the same point of the game. */
+export const MAIN_BOSS_HP_VS_PREVIOUS_WAVE = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.BOSS_R ?? 1.15);
 export const BOSS_HP_TWEAK: Record<string, number> = {
   "abyssal-maw": 0.7,
-  "iron-burrower-sovereign": 0.85,
+  "iron-burrower-sovereign": 0.75,
 };
 
-/**
- * Past wave ~330 a build that kept pace starts outgrowing the bosses (the
- * same simulation killed them in a single assault from wave 350 on), so
- * late bosses get tougher: +0% at wave 330 rising to +80% by wave 670.
- */
-export function lateBossHpRamp(wave: number): number {
-  return 1 + Math.min(1, Math.max(0, (wave - 330) / 340)) * 0.8;
-}
-
-export function mainBossHpFactor(bossId: string, wave = 0): number {
-  return BOSS_HP_SCALE * (BOSS_HP_TWEAK[bossId] ?? 1) * lateBossHpRamp(wave);
+export function mainBossHp(bossId: string, previousWaveTotalHp: number): number {
+  return Math.max(1, Math.round(previousWaveTotalHp * MAIN_BOSS_HP_VS_PREVIOUS_WAVE * (BOSS_HP_TWEAK[bossId] ?? 1)));
 }
 
 /** Damage multiplier of the boss's weakness tower, which also ignores the boss's SHIELD ability. */

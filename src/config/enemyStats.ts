@@ -551,7 +551,7 @@ export const ENEMY_DEFINITIONS: Record<EnemyType, EnemyDefinition> = {
 };
 
 /** Small reward growth so later waves stay worth playing. */
-const GOLD_GROWTH_PER_WAVE = 0.03;
+export const GOLD_GROWTH_PER_WAVE = 0.03;
 
 /**
  * ============================================================================
@@ -606,7 +606,7 @@ const HP_EARLY_SURGE_SCALE = 80;
 /** Wave scale of the permanent power-law term — larger = gentler early contribution. */
 const HP_LATE_SCALE = 30;
 /** The permanent asymptotic exponent. Deliberately < 1 and, more importantly, below the exponent at which Specialization x Mastery power grows with wave number (~0.95) — that inequality is the structural no-wall guarantee. */
-const HP_LATE_EXPONENT = 0.72;
+const HP_LATE_EXPONENT = Number((globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.HP_EXP ?? 0.72);
 
 /**
  * The HP multiplier for a given (0-indexed) wave. Strictly increasing,

@@ -1,5 +1,7 @@
 import type { BossDefinition } from "@/config/bossConfig";
-import { mainBossHpFactor } from "@/config/bossAssault";
+import { mainBossHp } from "@/config/bossAssault";
+import { generateWaveSpawns } from "@/config/waveConfig";
+import { waveHpFactor } from "@/config/waveBudget";
 import { getScaledEnemyStats } from "@/config/enemyStats";
 import { getEndgameBossHpMultiplierBonus } from "@/config/phaseConfig";
 import { getPointAtDistance, distance } from "@/utils/geometry";
@@ -30,6 +32,12 @@ const DISABLE_DURATION_MS = 2000;
  * Brute (the tankiest regular enemy) rather than a hardcoded number, so
  * bosses automatically scale with the same wave-difficulty curve.
  */
+/** Total HP of the regular enemies of the wave before `waveNumber` — what a main boss's HP is measured against. */
+export function previousWaveTotalHp(waveNumber: number): number {
+  const w = Math.max(1, waveNumber - 1);
+  return generateWaveSpawns(w).reduce((sum, type) => sum + getScaledEnemyStats(type, w).hp, 0) * waveHpFactor(w);
+}
+
 export function createBossInstance(def: BossDefinition, waveNumber: number, nowMs: number): EnemyInstance {
   const bruteBaseline = getScaledEnemyStats("BRUTE", waveNumber);
   const start = getPointAtDistance(getActiveMapLayout().path, 0);
@@ -37,8 +45,10 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
   // slowly-growing multiplier on top of the boss's normal HP baseline once
   // the post-130 endgame rotation is underway (1 = no change everywhere
   // else) — see phaseConfig.ts's own doc comment for the full rationale.
-  const siegeFactor = def.isMainBoss ? mainBossHpFactor(def.id, waveNumber) : 1;
-  const hp = Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber) * siegeFactor);
+  // Main bosses follow the regular waves (config/bossAssault.ts); mini-bosses keep the Brute-based formula.
+  const hp = def.isMainBoss
+    ? mainBossHp(def.id, previousWaveTotalHp(waveNumber))
+    : Math.round(bruteBaseline.hp * def.hpMultiplierVsBrute * getEndgameBossHpMultiplierBonus(waveNumber));
 
   return {
     id: `boss-${nextBossInstanceId++}`,
