@@ -612,6 +612,9 @@ const ENV = (globalThis as { process?: { env?: Record<string, string | undefined
 const HP_PACE_START_INDEX = 30;
 const HP_PACE_SCALE = Number(ENV?.HP_PS ?? 60);
 const HP_PACE_EXPONENT = Number(ENV?.HP_PB ?? 0);
+const HP_PACE2_START_INDEX = Number(ENV?.HP_P2I ?? 90);
+const HP_PACE2_SCALE = Number(ENV?.HP_P2S ?? 90);
+const HP_PACE2_EXPONENT = Number(ENV?.HP_P2B ?? 0);
 
 /**
  * The HP multiplier for a given (0-indexed) wave. Strictly increasing,
@@ -623,7 +626,8 @@ export function hpMultiplierForWaveIndex(waveIndex: number): number {
   const early = 1 + HP_EARLY_SURGE_AMPLITUDE * (1 - Math.exp(-i / HP_EARLY_SURGE_SCALE));
   const late = Math.pow(1 + i / HP_LATE_SCALE, HP_LATE_EXPONENT);
   const pace = Math.pow(1 + Math.max(0, i - HP_PACE_START_INDEX) / HP_PACE_SCALE, HP_PACE_EXPONENT);
-  return early * late * pace;
+  const pace2 = Math.pow(1 + Math.max(0, i - HP_PACE2_START_INDEX) / HP_PACE2_SCALE, HP_PACE2_EXPONENT);
+  return early * late * pace * pace2;
 }
 
 /**
