@@ -65,7 +65,7 @@ export const ptBR: TranslationSchema = {
     footerRights: "© {year} Horde Nova. Todos os direitos reservados.",
   },
   hud: {
-    holdSpecials: "SEGURAR ESPECIAIS",
+    holdSpecials: "SEGURAR",
     releaseSpecials: "SOLTAR TUDO",
     holdSpecialsHint: "Segura o especial de todas as torres: elas continuam carregando além do máximo (até +50% de dano). Solte tudo de uma vez no chefe.",
     releaseSpecialsHint: "Solta agora o especial de todas as torres carregadas, com o bônus acumulado.",
@@ -423,12 +423,18 @@ export const ptBR: TranslationSchema = {
     tryAgain: "TENTAR NOVAMENTE",
     mainMenu: "MENU PRINCIPAL",
   },
+  specials: {
+    title: "ESPECIAIS",
+    ready: "{n}/{total} prontos",
+    holding: "Segurando · +{pct}%",
+  },
   boss: {
+    weakShort: "Fraco contra {tower}",
     weakness: "Fraco contra {tower}: mais dano e atravessa o escudo dele",
     assault: "ATAQUE {n}",
     exhausted: "EXAUSTO",
     returns: "Ataque {n}: ele volta ferido, com {pct}% da vida",
-    runeHint: "Clique nas runas que acendem perto da estrada para golpear o chefe.",
+    volleyHint: "Segure os especiais e solte todos juntos no chefe",
     firstAssault: "Primeira Investida! Bônus de ouro e fragmentos",
     fellOnAssault: "Caiu no ataque {n}",
     siege: "Cerco: {name} volta em {n} onda(s) com {pct}% da vida",
@@ -1051,7 +1057,7 @@ export const ptBR: TranslationSchema = {
     },
     boss: {
       title: "Um chefe!",
-      body: "Chefes têm muito mais vida, mas o dano que você causa neles fica. Se ele aguentar, recua ferido e volta depois de algumas ondas. Use a torre contra a qual ele é fraco e clique nas runas para acabar com ele mais rápido.",
+      body: "Chefes têm muito mais vida, mas o dano que você causa neles fica. Se ele aguentar, recua ferido e volta depois de algumas ondas. Use a torre contra a qual ele é fraco e segure os especiais das torres para soltar todos juntos nele, mais fortes.",
     },
   },
   ascension: {

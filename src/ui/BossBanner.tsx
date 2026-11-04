@@ -1,6 +1,6 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { HudSnapshot } from "@/engine/GameEngine";
-import { PALETTE, STATUS_COLORS } from "@/rendering/theme";
+import { PALETTE, STATUS_COLORS, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getEnragedShieldReduction } from "@/config/enrageShield";
@@ -13,11 +13,11 @@ interface BossBannerProps {
 const ENRAGE_HP_RATIO = 0.3;
 
 /**
- * Boss structure per spec section 9: name + HP bar during the fight, a
- * "boss approaching" beat during BOSS_INTRO before it has even spawned,
- * an ENRAGED tag once it crosses the low-HP threshold, and a defeated +
- * reward beat during the VICTORY pause — the full entrance-to-reward arc
- * in one small always-present readout instead of leaving VICTORY silent.
+ * The boss plate: one solid, fixed-size panel at the top of the map for the
+ * whole fight — the approach (BOSS_INTRO), the fight itself (BOSS_BATTLE)
+ * and the defeat + reward beat (VICTORY). Its size never changes between
+ * those states, so nothing on screen jumps when the boss arrives, enrages
+ * or falls. Purely informative: it never takes a click.
  */
 export function BossBanner({ hud }: BossBannerProps) {
   const { t } = useLanguage();
@@ -26,163 +26,177 @@ export function BossBanner({ hud }: BossBannerProps) {
   if (!hud.bossNameKey) return null;
 
   const bossName = t(`bosses.${hud.bossNameKey}.name` as TranslationKey);
-  const hpRatio = hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1;
-  const isEnraged = hud.phase === "BOSS_BATTLE" && (hud.bossFight ? hud.bossFight.enraged : hpRatio <= ENRAGE_HP_RATIO);
   const fight = hud.bossFight;
-  const weaknessLine = fight?.weakness ? t("boss.weakness", { tower: t(`towers.${fight.weakness}.name` as TranslationKey) }) : null;
-  // SHIELD DURANTE O MODO ENFURECIDO — reuses the same real reduction
-  // function entities/Enemy.ts's applyDamageToEnemy calls (isMainBoss=true
-  // here since this banner only ever shows the main boss), so the
-  // displayed percentage can never drift from the actual damage math.
-  const shieldReduction = getEnragedShieldReduction(true, true, isEnraged);
+  const battle = hud.phase === "BOSS_BATTLE";
+  const assault = fight?.assault ?? 1;
 
   if (victoryReward !== null) {
+    const first = hud.bossVictoryAssaults === 1;
     return (
-      <div style={containerStyle}>
-        <div style={nameStyle}>{t("boss.defeatedLine", { name: bossName })}</div>
-        <div style={{ ...subtitleStyle, color: PALETTE.gold }}>{t("boss.rewardLine", { amount: victoryReward })}</div>
-        {hud.bossVictoryAssaults !== null && (
-          <div style={{ ...hintStyle, color: hud.bossVictoryAssaults === 1 ? PALETTE.gold : PALETTE.uiTextDim, fontWeight: 700 }}>
-            {hud.bossVictoryAssaults === 1 ? t("boss.firstAssault") : t("boss.fellOnAssault", { n: hud.bossVictoryAssaults })}
-          </div>
-        )}
+      <div style={plateStyle} data-testid="boss-plate">
+        <div style={headRowStyle}>
+          <div style={nameStyle}>{t("boss.defeatedLine", { name: bossName })}</div>
+          <Chip tone="gold">{t("boss.rewardLine", { amount: victoryReward })}</Chip>
+        </div>
+        <div style={trackStyle}>
+          <div style={{ ...fillStyle, width: "100%", background: "linear-gradient(90deg,#c99a2e,#ffe08a)" }} />
+        </div>
+        <div style={footRowStyle}>
+          <span style={{ color: first ? PALETTE.gold : PALETTE.uiTextDim, fontWeight: 700 }}>
+            {hud.bossVictoryAssaults === null ? "" : first ? t("boss.firstAssault") : t("boss.fellOnAssault", { n: hud.bossVictoryAssaults })}
+          </span>
+        </div>
       </div>
     );
   }
 
+  // During the approach the bar already shows the wounds carried over from earlier assaults.
+  const hpRatio = battle
+    ? hud.bossMaxHp && hud.bossMaxHp > 0 ? Math.max(0, (hud.bossHp ?? 0) / hud.bossMaxHp) : 1
+    : hud.bossSiege?.hpFraction ?? 1;
+  const enraged = battle && (fight ? fight.enraged : hpRatio <= ENRAGE_HP_RATIO);
+  // SHIELD DURANTE O MODO ENFURECIDO — the same reduction applyDamageToEnemy uses.
+  const shieldReduction = getEnragedShieldReduction(true, true, enraged);
+  const weakness = fight?.weakness ?? null;
+
   return (
-    <div style={containerStyle}>
-      <div style={nameStyle}>{t("boss.introLine", { name: bossName })}</div>
-      {hud.phase === "BOSS_BATTLE" ? (
-        <>
-          {(fight?.assault ?? 1) > 1 || fight?.exhausted ? (
-            <div style={tagRowStyle}>
-              {(fight?.assault ?? 1) > 1 && <div style={assaultTagStyle}>{t("boss.assault", { n: fight!.assault })}</div>}
-              {fight?.exhausted && <div style={assaultTagStyle}>{t("boss.exhausted")}</div>}
-            </div>
-          ) : null}
-          {isEnraged && (
-            <div style={tagRowStyle}>
-              <div style={enragedTagStyle}>{t("boss.enraged")}</div>
-              {shieldReduction > 0 && (
-                <div style={shieldTagStyle}>{t("boss.enrageShield", { percent: Math.round(shieldReduction * 100) })}</div>
-              )}
-            </div>
-          )}
-          <div style={barTrackStyle}>
-            <div style={{ ...barFillStyle, width: `${hpRatio * 100}%`, background: isEnraged ? enragedGradient : barFillStyle.background }} />
-          </div>
-          {/* AUDITORIA E CORREÇÃO GERAL spec section 30 — exact current/max HP, never abbreviated ("12.450 / 25.000", not "12K"). */}
-          <div style={hpTextStyle}>
-            {Math.max(0, Math.ceil(hud.bossHp ?? 0)).toLocaleString()} / {Math.round(hud.bossMaxHp ?? 0).toLocaleString()}
-          </div>
-          {weaknessLine && <div style={hintStyle}>{weaknessLine}</div>}
-        </>
-      ) : (
-        <>
-          <div style={subtitleStyle}>{(fight?.assault ?? 1) > 1 ? t("boss.returns", { n: fight!.assault, pct: Math.round((hud.bossSiege?.hpFraction ?? 1) * 100) }) : t("boss.getReady")}</div>
-          <div style={hintStyle}>{weaknessLine ?? t("boss.compositionHint")}</div>
-          <div style={hintStyle}>{t("boss.runeHint")}</div>
-        </>
-      )}
+    <div style={{ ...plateStyle, borderColor: enraged ? "rgba(255,90,60,0.55)" : plateStyle.borderColor }} data-testid="boss-plate">
+      <div style={headRowStyle}>
+        <div style={nameStyle}>{battle ? bossName : t("boss.introLine", { name: bossName })}</div>
+        <div style={chipRowStyle}>
+          {assault > 1 && <Chip>{t("boss.assault", { n: assault })}</Chip>}
+          {fight?.exhausted && <Chip>{t("boss.exhausted")}</Chip>}
+          {enraged && <Chip tone="danger">{t("boss.enraged")}</Chip>}
+          {enraged && shieldReduction > 0 && <Chip tone="shield">{t("boss.enrageShield", { percent: Math.round(shieldReduction * 100) })}</Chip>}
+        </div>
+      </div>
+
+      <div style={trackStyle}>
+        <div style={{ ...fillStyle, width: `${hpRatio * 100}%`, background: enraged ? "linear-gradient(90deg,#ff2e2e,#ffb347)" : fillStyle.background }} />
+        <span style={hpTextStyle}>
+          {battle
+            ? `${Math.max(0, Math.ceil(hud.bossHp ?? 0)).toLocaleString()} / ${Math.round(hud.bossMaxHp ?? 0).toLocaleString()}`
+            : `${Math.round(hpRatio * 100)}%`}
+        </span>
+      </div>
+
+      <div style={footRowStyle}>
+        {weakness ? (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 4, background: TOWER_THEME[weakness].primary, boxShadow: `0 0 6px ${TOWER_THEME[weakness].glow}` }} />
+            {t("boss.weakShort", { tower: t(`towers.${weakness}.name` as TranslationKey) })}
+          </span>
+        ) : (
+          <span>{t("boss.compositionHint")}</span>
+        )}
+        <span style={{ opacity: 0.8 }}>{battle ? t("boss.volleyHint") : assault > 1 ? t("boss.returns", { n: assault, pct: Math.round(hpRatio * 100) }) : t("boss.getReady")}</span>
+      </div>
     </div>
   );
 }
 
-const assaultTagStyle: CSSProperties = {
-  padding: "2px 8px",
-  borderRadius: 999,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "rgba(0,0,0,0.35)",
-  color: PALETTE.uiAccentBright,
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 0.5,
-};
+function Chip({ children, tone }: { children: ReactNode; tone?: "gold" | "danger" | "shield" }) {
+  const color = tone === "gold" ? PALETTE.gold : tone === "danger" ? "#ff7a5c" : tone === "shield" ? STATUS_COLORS.enrageShield : PALETTE.uiAccentBright;
+  return <span style={{ ...chipStyle, color, borderColor: `${color}66` }}>{children}</span>;
+}
 
-const containerStyle: CSSProperties = {
+const plateStyle: CSSProperties = {
   position: "absolute",
-  top: 14,
+  top: 12,
   left: "50%",
   transform: "translateX(-50%)",
+  width: "min(540px, calc(100% - 32px))",
+  boxSizing: "border-box",
+  padding: "10px 16px 9px",
+  borderRadius: 10,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: "rgba(255,214,140,0.3)",
+  background: "linear-gradient(180deg, rgba(34,22,12,0.94), rgba(20,13,8,0.94))",
+  boxShadow: "0 10px 28px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,235,190,0.08)",
   display: "flex",
   flexDirection: "column",
-  alignItems: "center",
-  gap: 6,
+  gap: 7,
   zIndex: 4,
   pointerEvents: "none",
 };
 
+const headRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  gap: 10,
+  minHeight: 22,
+};
+
 const nameStyle: CSSProperties = {
   fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 18,
+  fontSize: 17,
   fontWeight: 700,
-  letterSpacing: 2,
+  letterSpacing: 0.6,
   color: PALETTE.uiText,
-  textShadow: `0 0 16px ${PALETTE.danger}aa, 0 2px 6px rgba(0,0,0,0.8)`,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
+  textOverflow: "ellipsis",
 };
 
-const subtitleStyle: CSSProperties = {
-  fontSize: 11,
-  letterSpacing: 1,
-  color: PALETTE.uiTextDim,
-  textTransform: "uppercase",
+const chipRowStyle: CSSProperties = {
+  display: "flex",
+  gap: 6,
+  flexShrink: 0,
 };
 
-/** A quiet, generic flavor line — never reads the player's actual composition or names a required build, just informs. */
-const hintStyle: CSSProperties = {
+const chipStyle: CSSProperties = {
+  padding: "2px 8px",
+  borderRadius: 999,
+  borderWidth: 1,
+  borderStyle: "solid",
+  background: "rgba(0,0,0,0.35)",
   fontSize: 10,
-  letterSpacing: 0.3,
-  color: PALETTE.uiTextDim,
-  fontStyle: "italic",
-  opacity: 0.85,
+  fontWeight: 700,
+  letterSpacing: 0.6,
+  whiteSpace: "nowrap",
 };
 
-const barTrackStyle: CSSProperties = {
-  width: 320,
-  height: 10,
-  borderRadius: 6,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "rgba(0,0,0,0.5)",
+const trackStyle: CSSProperties = {
+  position: "relative",
+  height: 14,
+  borderRadius: 7,
+  border: "1px solid rgba(255,214,140,0.25)",
+  background: "rgba(0,0,0,0.55)",
   overflow: "hidden",
 };
 
-const barFillStyle: CSSProperties = {
-  height: "100%",
+const fillStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  right: "auto",
   background: `linear-gradient(90deg, ${PALETTE.danger}, #ff9a6a)`,
-  boxShadow: `0 0 10px ${PALETTE.danger}aa`,
   transition: "width 150ms ease",
 };
 
-const enragedGradient = "linear-gradient(90deg, #ff2e2e, #ffb347)";
-
 const hpTextStyle: CSSProperties = {
-  fontSize: 10.5,
-  fontWeight: 700,
-  letterSpacing: 0.5,
-  color: PALETTE.uiTextDim,
-  textShadow: "0 1px 3px rgba(0,0,0,0.8)",
-};
-
-const enragedTagStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1.5,
-  color: "#ff6a4a",
-  textShadow: "0 0 8px rgba(255,60,30,0.8)",
-};
-
-const tagRowStyle: CSSProperties = {
+  position: "absolute",
+  inset: 0,
   display: "flex",
   alignItems: "center",
-  gap: 10,
+  justifyContent: "center",
+  fontSize: 10.5,
+  fontWeight: 700,
+  letterSpacing: 0.4,
+  color: "#fff6e6",
+  textShadow: "0 1px 2px rgba(0,0,0,0.9)",
+  fontVariantNumeric: "tabular-nums",
 };
 
-/** SHIELD DURANTE O MODO ENFURECIDO — matches drawEnrageShieldRing/the mini-boss bar's own icy-violet so the same buff reads consistently everywhere it's shown. */
-const shieldTagStyle: CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: 1.2,
-  color: STATUS_COLORS.enrageShield,
-  textShadow: `0 0 8px ${STATUS_COLORS.enrageShield}99`,
+const footRowStyle: CSSProperties = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: 12,
+  minHeight: 15,
+  fontSize: 10.5,
+  color: PALETTE.uiTextDim,
+  whiteSpace: "nowrap",
+  overflow: "hidden",
 };

@@ -9,8 +9,9 @@ import { isPaidTowerSkin } from "./towerSkins";
  * adds a little extra. When the bar is full the special fires on its own,
  * so an idle player loses nothing. A tower that keeps attacking fills its
  * bar in exactly its type's special interval (config/towerSpecials.ts),
- * whatever its attack speed — faster towers gain less per hit — so the
- * special keeps the same share of a tower's damage it always had.
+ * whatever its attack speed — each hit adds the time it took — so the
+ * special keeps the same share of a tower's damage it always had. A tower
+ * with nothing in range doesn't charge.
  *
  * HOLD AND RELEASE. The player can hold every special ("Segurar
  * especiais"): towers keep charging past full, up to MANA_OVERCHARGE_MAX,
@@ -40,10 +41,16 @@ const MANA_UPGRADE_COST_GROWTH = 1.6;
 /** +10% mana gain for a tower wearing a paid (non-Prestige) skin. */
 export const SKIN_MANA_GAIN_BONUS = 0.1;
 
-/** Mana one normal attack adds, so continuous attacking fills the bar in the type's special interval. */
-export function manaPerAttack(type: TowerType, attackSpeed: number): number {
+/**
+ * Mana one normal attack adds, from the real time since the tower's previous
+ * attack (capped at two attack intervals, so time spent idle doesn't count):
+ * continuous attacking fills the bar in exactly the type's special interval,
+ * whatever the attack speed or frame rate.
+ */
+export function manaForAttack(type: TowerType, msSinceLastAttack: number, attackSpeed: number): number {
   const attackIntervalMs = 1000 / Math.max(0.01, attackSpeed);
-  return (MANA_MAX * attackIntervalMs) / SPECIAL_ATTACK_COOLDOWN_MS[type];
+  const counted = Math.max(0, Math.min(msSinceLastAttack, attackIntervalMs * 2));
+  return (MANA_MAX * counted) / SPECIAL_ATTACK_COOLDOWN_MS[type];
 }
 
 export function manaGainMultiplier(manaLevel: number, equippedSkinId: string | null | undefined): number {

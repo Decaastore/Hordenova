@@ -134,21 +134,6 @@ describe("GameEngine — Active Idle progression", () => {
     expect(loadSave().bossSiege).toBeNull();
   });
 
-  it("BOSS SIEGE: a lit rune strikes the boss when clicked", () => {
-    updateSave({ currentWave: 30, bestWave: 29, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });
-    const engine = new GameEngine();
-    engine.startRun();
-    for (let i = 0; i < 400 && engine.getHudSnapshot().phase !== "BOSS_BATTLE"; i++) engine.update(100);
-    for (let i = 0; i < 200 && engine.getBossRunes().length === 0; i++) engine.update(100);
-    const rune = engine.getBossRunes()[0]!;
-    expect(rune).toBeDefined();
-    const before = engine.getHudSnapshot().bossHp!;
-    expect(engine.strikeBossRune(rune.id)).toBe(true);
-    expect(engine.strikeBossRune(rune.id)).toBe(false); // used up
-    engine.update(16);
-    expect(engine.getHudSnapshot().bossHp!).toBeLessThan(before);
-  });
-
   it("when the castle falls mid-phase, the run goes back to that phase's Wave 1 — and the save says so, so a reload can't skip it", () => {
     // start in the middle of phase 4 (waves 31-40) with no defence at all
     updateSave({ currentWave: 37, bestWave: 37, towerLoadout: [], mapLayoutId: null, lastPlayedAt: null });

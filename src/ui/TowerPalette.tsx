@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -11,9 +11,11 @@ interface TowerPaletteProps {
   /** The map already holds the maximum number of towers — nothing more can be built. */
   mapFull?: boolean;
   mapFullLabel?: string;
+  /** Always-mounted control shown at the end of the bar (the specials panel). */
+  trailing?: ReactNode;
 }
 
-export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel }: TowerPaletteProps) {
+export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel, trailing }: TowerPaletteProps) {
   const { t } = useLanguage();
   return (
     <div style={containerStyle}>
@@ -38,9 +40,9 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
             }}
           >
             <div style={{ ...swatchStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: 13, color: PALETTE.uiText }}>{t(`towers.${type}.name`)}</div>
-              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim }}>{t(`towers.${type}.role`)}</div>
+              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(`towers.${type}.role`)}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 3 }}>
                 <CoinIcon size={10} color={PALETTE.gold} />
                 <span style={{ fontSize: 11, color: PALETTE.gold, fontWeight: 700 }}>{def.buildCost}</span>
@@ -49,6 +51,7 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
           </button>
         );
       })}
+      {trailing}
     </div>
   );
 }
@@ -74,7 +77,9 @@ const cardStyle: CSSProperties = {
   border: "1px solid",
   background: "#3a2a18",
   textAlign: "left",
+  flex: "1 1 0",
   minWidth: 128,
+  maxWidth: 270,
   transition: "box-shadow 120ms ease, border-color 120ms ease",
 };
 

@@ -26,7 +26,7 @@ import { applySpecializationToSpecial } from "@/config/specializations";
 import { applyMasteryToSpecial } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
-import { MANA_PER_KILL, manaPerAttack } from "@/config/towerMana";
+import { MANA_PER_KILL, manaForAttack } from "@/config/towerMana";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -197,7 +197,8 @@ export function tickCombat(
     if (isTowerReadyToAttack(tower)) {
       // TOWER MANA — every normal attack that finds a target charges the special.
       if (resolveNormalAttack(tower, enemies, dealDamage, projectiles)) {
-        gainTowerMana(tower, manaPerAttack(tower.type, getTowerStats(tower).attackSpeed), specialsHeld);
+        gainTowerMana(tower, manaForAttack(tower.type, tower.msSinceAttack, getTowerStats(tower).attackSpeed), specialsHeld);
+        tower.msSinceAttack = 0;
       }
     }
 
@@ -345,7 +346,7 @@ function resolveSpecialAttack(
 
   if (ultimate === "IRONWOOD") {
     dealDamage(tower, target, damage * IRONWOOD_SPECIAL.damageMultiplier, IRONWOOD_SPECIAL.armorPenetration);
-    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
+    projectiles.push({ ...createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId), power: overcharge });
   } else if (ultimate === "INFERNO") {
     const infernoSpecial = getTowerSpecialAtLevel("INFERNO", tower.level, getEquippedSkinGameplayEffect(tower)) as Extract<
       TowerSpecial,
@@ -358,7 +359,7 @@ function resolveSpecialAttack(
       dealDamage(tower, enemy, damage * INFERNO_SPECIAL.damageMultiplier);
       applyBurn(enemy, infernoSpecial.burnDamagePerSecond, infernoSpecial.burnDurationMs, infernoSpecial.burnMaxStacks);
     }
-    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
+    projectiles.push({ ...createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId), power: overcharge });
   } else if (ultimate === "FROSTBORN") {
     // A nova centered on the TOWER itself, not the target — every enemy in
     // range is fully frozen, not just the primary target (spec: area
@@ -369,7 +370,7 @@ function resolveSpecialAttack(
       dealDamage(tower, enemy, damage * FROSTBORN_SPECIAL.damageMultiplier);
       applySlow(enemy, 1, FROSTBORN_SPECIAL.freezeDurationMs);
     }
-    projectiles.push(createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId));
+    projectiles.push({ ...createProjectile(tower.type, muzzle, target.position, [], true, undefined, tower.equippedSkinId), power: overcharge });
   } else if (ultimate === "STORMCALLER") {
     const stormSpecial = getTowerSpecialAtLevel(
       "STORMCALLER",
@@ -392,6 +393,6 @@ function resolveSpecialAttack(
       alreadyHit.add(next.id);
       chainOrigin = next;
     }
-    projectiles.push(createProjectile(tower.type, muzzle, target.position, chainImpactPoints, true, undefined, tower.equippedSkinId));
+    projectiles.push({ ...createProjectile(tower.type, muzzle, target.position, chainImpactPoints, true, undefined, tower.equippedSkinId), power: overcharge });
   }
 }

@@ -385,17 +385,17 @@ export function drawTower(
  */
 function drawTowerManaBar(ctx: CanvasRenderingContext2D, tower: TowerInstance, visualScale: number, timeMs: number, selected: boolean): void {
   if (tower.mana <= 0) return;
-  const w = 24 * visualScale;
-  const h = selected ? 3.4 : 2.6;
+  const w = 30 * visualScale;
+  const h = selected ? 5 : 4;
   const x = tower.position.x - w / 2;
-  const y = tower.position.y + 25 * visualScale;
+  const y = tower.position.y + 26 * visualScale;
   const fill = Math.min(1, tower.mana / MANA_MAX);
-  const over = Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX)));
+  const over = tower.overcharged ? Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX))) : 0;
   const full = fill >= 1;
   ctx.save();
   ctx.globalAlpha = selected || full ? 1 : 0.8;
-  ctx.fillStyle = "rgba(10,8,20,0.7)";
-  ctx.fillRect(x - 0.8, y - 0.8, w + 1.6, h + 1.6);
+  ctx.fillStyle = "rgba(10,8,20,0.75)";
+  ctx.fillRect(x - 1, y - 1, w + 2, h + 2);
   if (full) {
     const pulse = 0.5 + 0.5 * Math.sin(timeMs / 180);
     ctx.shadowColor = over > 0 ? "rgba(255,214,90,0.95)" : "rgba(150,130,255,0.95)";

@@ -19,11 +19,9 @@ interface HUDProps {
   onOpenStore?: () => void;
   /** Opens/closes the daily missions panel. */
   onToggleMissions?: () => void;
-  /** TOWER MANA — holds every special, or lets them all go at once (config/towerMana.ts). */
-  onToggleSpecials?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleSpecials }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = hud.baseHp / hud.maxBaseHp;
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -63,7 +61,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           value={`${Math.ceil(hud.baseHp)} / ${hud.maxBaseHp}`}
           valueColor={hpColor}
         />
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", minWidth: 92 }}>
           <Stat
             icon={<CoinIcon color={PALETTE.gold} />}
             label={t("hud.gold")}
@@ -96,22 +94,26 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             title={onOpenStore ? undefined : t("gems.purchasedExplainer")}
           />
         </GemsLink>
-        {hud.gemShards > 0 && (
-          <Stat
-            icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
-            label={t("hud.gemShards")}
-            value={`+${hud.gemShards}`}
-            valueColor={PALETTE.uiTextDim}
-            title={t("hud.gemShardsTooltip")}
-          />
-        )}
-        <div style={{ textAlign: "center", minWidth: 100 }}>
+        {/* Always takes its space (empty at 0) so the bar never reflows when the first shard arrives. */}
+        <div style={{ minWidth: 96 }}>
+          {hud.gemShards > 0 && (
+            <Stat
+              icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
+              label={t("hud.gemShards")}
+              value={`+${hud.gemShards}`}
+              valueColor={PALETTE.uiTextDim}
+              title={t("hud.gemShardsTooltip")}
+            />
+          )}
+        </div>
+        {/* Fixed width so a longer state ("BOSS APPROACHING") never pushes the bar onto another line and resizes the map. */}
+        <div style={{ textAlign: "center", width: 200, flexShrink: 0 }}>
           <div style={labelStyle}>{t("hud.state")}</div>
-          <div style={{ ...valueStyle, fontSize: 13 }}>{t(`hud.phase.${hud.phase}`)}</div>
+          <div style={{ ...valueStyle, fontSize: 12.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(`hud.phase.${hud.phase}`)}</div>
         </div>
       </div>
 
-      <div style={groupStyle}>
+      <div style={{ ...groupStyle, flexBasis: "100%" }}>
         <BoltIcon color={PALETTE.uiTextDim} size={13} />
         {GAME_SPEEDS.map((speed) => {
           const active = hud.speed === speed;
@@ -132,9 +134,6 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             </button>
           );
         })}
-        {onToggleSpecials && (
-          <SpecialsButton hud={hud} onToggle={onToggleSpecials} />
-        )}
         {onToggleMissions && (
           <button onClick={onToggleMissions} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="missions-button">
             <ScrollIcon size={13} />
@@ -149,41 +148,6 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
         <SfxControl />
       </div>
     </div>
-  );
-}
-
-/**
- * TOWER MANA — "Segurar especiais" / "Soltar tudo". Holding stops every
- * special and lets the towers overcharge (up to +50% damage); releasing
- * fires them all together. Only usable while a wave or boss fight is on, and
- * it glows during a boss fight, where a timed volley matters most.
- */
-function SpecialsButton({ hud, onToggle }: { hud: HudSnapshot; onToggle: () => void }) {
-  const { t } = useLanguage();
-  const fighting = hud.phase === "RUNNING" || hud.phase === "BOSS_INTRO" || hud.phase === "BOSS_BATTLE";
-  const boss = hud.phase === "BOSS_INTRO" || hud.phase === "BOSS_BATTLE";
-  const held = hud.specialsHeld;
-  return (
-    <button
-      onClick={onToggle}
-      disabled={!fighting && !held}
-      title={t(held ? "hud.releaseSpecialsHint" : "hud.holdSpecialsHint")}
-      data-testid="specials-button"
-      aria-pressed={held}
-      style={{
-        ...inventoryButtonStyle,
-        position: "relative",
-        opacity: fighting || held ? 1 : 0.45,
-        color: held ? "#2b1906" : boss ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-        background: held ? "linear-gradient(180deg,#ffe27a,#e0a92e)" : "#3a2a18",
-        borderColor: held ? "#ffe9a8" : boss ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
-        boxShadow: held ? "0 0 14px rgba(255,210,87,0.65)" : boss ? `0 0 10px ${PALETTE.uiAccent}55` : "none",
-      }}
-    >
-      <BoltIcon size={13} color={held ? "#2b1906" : undefined} />
-      {held ? t("hud.releaseSpecials") : t("hud.holdSpecials")}
-      {hud.specialsReady > 0 && <span style={badgeStyle}>{hud.specialsReady}</span>}
-    </button>
   );
 }
 

@@ -25,7 +25,7 @@ describe("SpecialVfxLayer — tower magic effects", () => {
   it("the pool is bounded however many magics fire at once", () => {
     const layer = new SpecialVfxLayer();
     for (let i = 0; i < 100; i++) layer.spawn(cast("INFERNO"));
-    expect(layer.activeCount).toBeLessThanOrEqual(8);
+    expect(layer.activeCount).toBeLessThanOrEqual(14); // room for a full released volley (12 towers)
   });
 
   it("only a few magics play their full version at once — later ones while the screen is busy play the short reduced version", () => {

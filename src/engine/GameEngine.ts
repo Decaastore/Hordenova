@@ -112,14 +112,10 @@ import {
   bossWeakness,
   FIRST_ASSAULT_BONUS_SHARDS,
   FIRST_ASSAULT_GOLD_MULTIPLIER,
-  RUNE_INTERVAL_MS,
-  RUNE_LIFETIME_MS,
-  RUNE_STRIKE_FRACTION,
   SIEGE_WAVES,
   type BossRecords,
   type BossSiegeState,
 } from "@/config/bossAssault";
-import { getPointAtDistance } from "@/utils/geometry";
 import { SIEGE_DISABLE_ON_DEPLETION_MS } from "@/config/bossSiege";
 import {
   createBattleStats,
@@ -427,10 +423,6 @@ export class GameEngine {
   /** BOSS SIEGE (config/bossAssault.ts): the main boss besieging the map and the wounds it carries; persisted. */
   private bossSiege: BossSiegeState | null = null;
   private bossRecords: BossRecords | null = null;
-  /** Runes lit beside the road during a boss assault (click to strike). In-memory: an assault never survives a reload. */
-  private bossRunes: { id: string; x: number; y: number; expiresAtMs: number }[] = [];
-  private nextRuneAtMs = 0;
-  private runeSeq = 0;
   private lastBossHpFraction = 1;
   private lastBossAssaults: number | null = null;
   /** Balance telemetry is recorded only by the real game screen (see enableTelemetry), never by tests or simulations. */
@@ -2055,8 +2047,6 @@ export class GameEngine {
         }
         this.activeBossId = boss.id;
         this.enemies.push(boss);
-        this.bossRunes = [];
-        this.nextRuneAtMs = nowMs + RUNE_INTERVAL_MS / 2;
         this.phase = "BOSS_BATTLE";
       }
       this.notify();
@@ -2256,7 +2246,6 @@ export class GameEngine {
       recordBossSnapshot(this.battleStats, boss);
       if (boss) {
         this.lastBossHpFraction = Math.max(0, boss.hp / boss.maxHp);
-        this.tickBossRunes(boss, nowMs);
       }
       if (bossDefeatedThisTick) {
         this.phase = "VICTORY";
@@ -2621,7 +2610,6 @@ export class GameEngine {
     this.bossSiege = { wave, hpFraction: left, assaults };
     this.emitAudio({ type: "boss_enrage" });
     this.resetAttemptState();
-    this.bossRunes = [];
     this.lastBossHpFraction = 1;
     // replay the last few regular waves before the boss, then it attacks again
     this.wave.currentWave = Math.max(1, wave - SIEGE_WAVES);
@@ -2648,38 +2636,6 @@ export class GameEngine {
       recordBalanceEvent({ ...this.telemetryBase(wave), type: "boss_defeated", fallsBeforeWin: assaults - 1, defence: this.defenceSnapshot() });
     }
     this.bossSiege = null;
-    this.bossRunes = [];
-  }
-
-  private tickBossRunes(boss: EnemyInstance, nowMs: number): void {
-    this.bossRunes = this.bossRunes.filter((r) => r.expiresAtMs > nowMs);
-    if (nowMs < this.nextRuneAtMs || this.bossRunes.length > 0) return;
-    this.nextRuneAtMs = nowMs + RUNE_INTERVAL_MS;
-    const path = this.layout.path;
-    const ahead = boss.distanceTraveled + 70 + Math.random() * 90;
-    const at = getPointAtDistance(path, ahead);
-    if (at.finished) return;
-    const side = Math.random() < 0.5 ? -1 : 1;
-    const nx = -at.direction.y;
-    const ny = at.direction.x;
-    this.bossRunes.push({ id: `rune-${++this.runeSeq}`, x: at.position.x + nx * 40 * side, y: at.position.y + ny * 40 * side, expiresAtMs: nowMs + RUNE_LIFETIME_MS });
-    this.notify();
-  }
-
-  /** Clicking a lit rune strikes the boss for a share of its max HP. */
-  strikeBossRune(runeId: string): boolean {
-    if (this.phase !== "BOSS_BATTLE") return false;
-    const index = this.bossRunes.findIndex((r) => r.id === runeId);
-    const boss = this.enemies.find((e) => e.id === this.activeBossId);
-    if (index < 0 || !boss || isEnemyDead(boss)) return false;
-    this.bossRunes.splice(index, 1);
-    const amount = Math.min(boss.hp, Math.round(boss.maxHp * RUNE_STRIKE_FRACTION));
-    boss.hp -= amount;
-    boss.msSinceLastDamage = 0;
-    this.emitCombatVfx({ kind: "HIT", enemyId: boss.id, position: boss.position, amount, isCrit: true });
-    this.emitAudio({ type: "stormcaller_chain" });
-    this.notify();
-    return true;
   }
 
   private bossFightInfo(): HudSnapshot["bossFight"] {
@@ -2692,12 +2648,6 @@ export class GameEngine {
       enraged: boss?.boss?.enraged === true,
       exhausted: boss?.boss?.exhausted === true,
     };
-  }
-
-  /** Runes lit right now, with how much of their life is left (1 = just appeared). */
-  getBossRunes(): { id: string; x: number; y: number; lifeLeft: number }[] {
-    if (this.phase !== "BOSS_BATTLE") return [];
-    return this.bossRunes.map((r) => ({ id: r.id, x: r.x, y: r.y, lifeLeft: Math.max(0, Math.min(1, (r.expiresAtMs - this.simClockMs) / RUNE_LIFETIME_MS)) }));
   }
 
   /** Assaults the last main boss took to fall (for the victory banner), or null. */

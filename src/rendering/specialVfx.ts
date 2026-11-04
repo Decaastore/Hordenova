@@ -36,6 +36,8 @@ export interface SpecialCast {
   chainTargets: readonly Vector2[];
   /** INFERNO: the real blast radius. FROSTBORN: the real nova radius (tower range). Unused otherwise. */
   radius: number;
+  /** TOWER MANA — >1 for an overcharged special released after a hold (up to 1.5): drawn bigger, with a golden burst. */
+  power?: number;
 }
 
 interface ActiveCast extends SpecialCast {
@@ -85,7 +87,7 @@ const CAST_COLOR: Record<TowerType, string> = {
   STORMCALLER: "#c08cff",
 };
 
-const MAX_ACTIVE = 8;
+const MAX_ACTIVE = 14;
 
 function rgba(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
@@ -104,7 +106,8 @@ export class SpecialVfxLayer {
 
   spawn(cast: SpecialCast): void {
     const fullActive = this.casts.filter((c) => !c.reduced).length;
-    const reduced = fullActive >= FULL_EFFECT_BUDGET;
+    // An overcharged special (a held volley being released) always plays in full.
+    const reduced = (cast.power ?? 1) <= 1 && fullActive >= FULL_EFFECT_BUDGET;
     this.casts.push({
       ...cast,
       ageMs: 0,
@@ -131,6 +134,7 @@ export class SpecialVfxLayer {
       // tower (flame flare / frost burst, see drawFirestorm/drawAbsoluteZero)
       // instead of a geometric rune ring.
       if (c.type === "IRONWOOD" || c.type === "STORMCALLER") drawRuneCircle(ctx, c, timeMs);
+      if ((c.power ?? 1) > 1) drawOverchargeGround(ctx, c, timeMs);
       if (c.reduced) continue;
       if (c.type === "INFERNO") drawScorch(ctx, c, timeMs);
       else if (c.type === "FROSTBORN") drawFrostGround(ctx, c);
@@ -154,8 +158,80 @@ export class SpecialVfxLayer {
           drawChainOverload(ctx, c);
           break;
       }
+      if ((c.power ?? 1) > 1) drawOverchargeBurst(ctx, c);
     }
   }
+}
+
+// ---------------------------------------------------------------------------
+// TOWER MANA — overcharged special (released after "Segurar especiais").
+// A golden rune ring under the caster and a golden shockwave on the target,
+// both growing with the overcharge, so a released volley reads at a glance.
+// ---------------------------------------------------------------------------
+
+const OVERCHARGE_GOLD = "#ffd75e";
+
+function drawOverchargeGround(ctx: CanvasRenderingContext2D, c: ActiveCast, timeMs: number): void {
+  const life = Math.min(c.totalMs, 700);
+  if (c.ageMs > life) return;
+  const k = clamp01(((c.power ?? 1) - 1) / 0.5);
+  const appear = easeOut(span(c.ageMs, 0, 140));
+  const alpha = appear * (1 - span(c.ageMs, life * 0.5, life));
+  const r = 26 + 10 * k + appear * 6;
+  ctx.save();
+  ctx.translate(c.towerPosition.x, c.towerPosition.y + 10);
+  ctx.scale(1, 0.5);
+  ctx.globalCompositeOperation = "lighter";
+  const glow = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.4);
+  glow.addColorStop(0, rgba(OVERCHARGE_GOLD, 0.4 * alpha));
+  glow.addColorStop(1, rgba(OVERCHARGE_GOLD, 0));
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.rotate(-timeMs / 380);
+  ctx.strokeStyle = rgba(OVERCHARGE_GOLD, 0.95 * alpha);
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawOverchargeBurst(ctx: CanvasRenderingContext2D, c: ActiveCast): void {
+  const life = Math.min(c.totalMs, 650);
+  if (c.ageMs > life) return;
+  const k = clamp01(((c.power ?? 1) - 1) / 0.5);
+  const t = span(c.ageMs, 0, life);
+  const alpha = 1 - t;
+  const r = 10 + (34 + 30 * k) * easeOut(t);
+  const { x, y } = c.to;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const core = ctx.createRadialGradient(x, y, 0, x, y, r * 0.7);
+  core.addColorStop(0, rgba("#fff6d0", 0.75 * alpha));
+  core.addColorStop(1, rgba(OVERCHARGE_GOLD, 0));
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(x, y, r * 0.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = rgba(OVERCHARGE_GOLD, 0.9 * alpha);
+  ctx.lineWidth = 3 * (1 - t) + 1;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.stroke();
+  // Eight golden sparks flying out.
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2 + c.seeds[i]! * 0.4;
+    const d0 = r * 0.55;
+    const d1 = r * (0.9 + 0.3 * c.seeds[i + 8]!);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * d0, y + Math.sin(a) * d0);
+    ctx.lineTo(x + Math.cos(a) * d1, y + Math.sin(a) * d1);
+    ctx.stroke();
+  }
+  ctx.restore();
 }
 
 // ---------------------------------------------------------------------------

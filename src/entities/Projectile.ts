@@ -19,6 +19,8 @@ export interface ProjectileInstance {
   isSpecial: boolean;
   /** TOWER SKIN SYSTEM v2 — the firing tower's equipped skin id at the moment of the shot (or null), so EntityRenderer.drawProjectile can retint/re-theme this cosmetic-only projectile to match. Never read by CombatSystem or anything gameplay-affecting — this struct already carries no gameplay authority (see the doc comment above). */
   skinId: string | null;
+  /** TOWER MANA — damage multiplier of an overcharged special (1 = a normal full bar, up to 1.5 when held). Rendering only. */
+  power?: number;
 }
 
 let nextProjectileId = 1;

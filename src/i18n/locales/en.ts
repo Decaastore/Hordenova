@@ -64,7 +64,7 @@ export const en = {
     footerRights: "© {year} Horde Nova. All rights reserved.",
   },
   hud: {
-    holdSpecials: "HOLD SPECIALS",
+    holdSpecials: "HOLD",
     releaseSpecials: "RELEASE ALL",
     holdSpecialsHint: "Holds every tower's special: they keep charging past full (up to +50% damage). Release them all at once on the boss.",
     releaseSpecialsHint: "Fires every charged tower's special right now, with the bonus built up.",
@@ -422,12 +422,18 @@ export const en = {
     tryAgain: "TRY AGAIN",
     mainMenu: "MAIN MENU",
   },
+  specials: {
+    title: "SPECIALS",
+    ready: "{n}/{total} ready",
+    holding: "Holding · +{pct}%",
+  },
   boss: {
+    weakShort: "Weak to {tower}",
     weakness: "Weak to {tower}: more damage, and it goes through its shield",
     assault: "ASSAULT {n}",
     exhausted: "EXHAUSTED",
     returns: "Assault {n}: it comes back wounded, with {pct}% of its life",
-    runeHint: "Click the runes that light up beside the road to strike the boss.",
+    volleyHint: "Hold the specials, then release them all on the boss",
     firstAssault: "First Assault! Bonus Gold and shards",
     fellOnAssault: "Fell on assault {n}",
     siege: "Siege: {name} returns in {n} wave(s) with {pct}% of its life",
@@ -1050,7 +1056,7 @@ export const en = {
     },
     boss: {
       title: "A boss!",
-      body: "Bosses have far more life, but the damage you deal stays. If one survives, it retreats wounded and comes back after a few waves. Use the tower it's weak to and click the runes to finish it faster.",
+      body: "Bosses have far more life, but the damage you deal stays. If one survives, it retreats wounded and comes back after a few waves. Use the tower it's weak to, and hold your towers' specials to release them all together on it, stronger.",
     },
   },
   ascension: {

@@ -3,8 +3,7 @@ import { tickCombat } from "./CombatSystem";
 import { createTowerInstance, isTowerReadyForSpecial, isTowerReadyToAttack } from "@/entities/Tower";
 import { createEnemyInstance } from "@/entities/Enemy";
 import { SPECIAL_ATTACK_COOLDOWN_MS } from "@/config/towerSpecials";
-import { MANA_MAX, MANA_OVERCHARGE_MAX, getManaUpgradeCost, manaGainMultiplier, manaPerAttack, MANA_UPGRADE_MAX_LEVEL } from "@/config/towerMana";
-import { getTowerStats } from "@/entities/Tower";
+import { MANA_MAX, MANA_OVERCHARGE_MAX, MANA_PER_KILL, getManaUpgradeCost, manaGainMultiplier, MANA_UPGRADE_MAX_LEVEL } from "@/config/towerMana";
 import { TOWER_TYPES } from "@/config/towerStats";
 
 describe("Special Attack system (Master Implementation spec section 26-28)", () => {
@@ -60,19 +59,18 @@ describe("Special Attack system (Master Implementation spec section 26-28)", () 
     expect(tower.cooldownRemainingMs).toBe(350);
   });
 
-  it.each(TOWER_TYPES)("each normal attack that lands on a %s charges the bar so continuous attacking fills it in the type's special interval", (type) => {
-    const tower = createTowerInstance("slot-test", type, { x: 0, y: 0 });
-    tower.cooldownRemainingMs = 0;
-    const target = createEnemyInstance("BRUTE", 1);
-    target.hp = target.maxHp = 1e9; // never dies, so no kill bonus
-    target.position = { x: 20, y: 0 };
-
-    tickCombat([tower], [target], 50);
-
-    const perAttack = manaPerAttack(type, getTowerStats(tower).attackSpeed);
-    expect(tower.mana).toBeCloseTo(perAttack, 6);
-    const attacksToFill = MANA_MAX / perAttack;
-    expect(attacksToFill * (1000 / getTowerStats(tower).attackSpeed)).toBeCloseTo(SPECIAL_ATTACK_COOLDOWN_MS[type], 3);
+  it.each(TOWER_TYPES)("a %s that keeps attacking fires its special once per special interval, whatever the tick size", (type) => {
+    for (const tick of [16, 50, 100]) {
+      const tower = createTowerInstance("slot-test", type, { x: 0, y: 0 }, 20);
+      const target = createEnemyInstance("BRUTE", 1);
+      target.hp = target.maxHp = 1e12; // never dies, so no kill bonus
+      target.position = { x: 20, y: 0 };
+      let specials = 0;
+      const window = SPECIAL_ATTACK_COOLDOWN_MS[type] * 10;
+      for (let t = 0; t < window; t += tick) specials += tickCombat([tower], [target], tick).projectiles.filter((p) => p.isSpecial).length;
+      expect(specials, `tick ${tick}`).toBeGreaterThanOrEqual(9);
+      expect(specials, `tick ${tick}`).toBeLessThanOrEqual(10);
+    }
   });
 
   it("a kill adds extra mana to the tower that landed it", () => {
@@ -83,7 +81,8 @@ describe("Special Attack system (Master Implementation spec section 26-28)", () 
 
     tickCombat([tower], [target], 50);
 
-    expect(tower.mana).toBeGreaterThan(manaPerAttack("IRONWOOD", getTowerStats(tower).attackSpeed));
+    // the very first attack has only this tick behind it, so most of this is the kill
+    expect(tower.mana).toBeGreaterThanOrEqual(MANA_PER_KILL);
   });
 
   it("no target, no mana — an idle tower doesn't charge", () => {

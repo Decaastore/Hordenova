@@ -38,6 +38,10 @@ export interface TowerInstance {
    * freshly built or rebuilt tower starts empty.
    */
   mana: number;
+  /** Time since this tower's last normal attack — what that attack's mana is worth (config/towerMana.ts manaForAttack). */
+  msSinceAttack: number;
+  /** True once the bar went past full while specials were held — only then does the special get the overcharge bonus. */
+  overcharged: boolean;
   /** Season-scoped, per-TYPE Gold mana upgrade level (0..MANA_UPGRADE_MAX_LEVEL), denormalized like `masteryLevel`. */
   manaLevel: number;
   /**
@@ -140,6 +144,8 @@ export function createTowerInstance(
     cooldownRemainingMs: 0,
     // A freshly-built tower must charge up before its first Special Attack.
     mana: 0,
+    msSinceAttack: 0,
+    overcharged: false,
     manaLevel,
     disabledRemainingMs: 0,
     specializationId,
@@ -419,6 +425,7 @@ export function upgradeTower(tower: TowerInstance): void {
 /** Mutates `tower` in place, ticking its attack cooldown and any active jam down. */
 export function tickTowerCooldown(tower: TowerInstance, dtMs: number): void {
   tower.cooldownRemainingMs = Math.max(0, tower.cooldownRemainingMs - dtMs);
+  tower.msSinceAttack += dtMs;
   tower.disabledRemainingMs = Math.max(0, tower.disabledRemainingMs - dtMs);
 }
 
@@ -431,11 +438,19 @@ export function isTowerReadyForSpecial(tower: TowerInstance, specialsHeld = fals
   return !specialsHeld && tower.mana >= MANA_MAX && tower.disabledRemainingMs <= 0;
 }
 
-/** Adds mana from the tower's own hit or kill, capped at full (or at the overcharge cap while specials are held). A bar already above the cap is never drained. */
+/**
+ * Adds mana from the tower's own hit or kill. Outside a hold the bar may run
+ * a little past full for the tick the special fires on, and that surplus is
+ * kept for the next charge (so the special keeps its exact interval, not
+ * "interval rounded up to the next attack"). While specials are held it
+ * charges up to the overcharge cap, and the special then hits harder.
+ */
 export function gainTowerMana(tower: TowerInstance, amount: number, specialsHeld = false): void {
-  const cap = specialsHeld ? MANA_OVERCHARGE_MAX : MANA_MAX;
-  if (tower.mana >= cap) return;
-  tower.mana = Math.min(cap, tower.mana + amount * manaGainMultiplier(tower.manaLevel, tower.equippedSkinId));
+  if (tower.mana >= MANA_OVERCHARGE_MAX) return;
+  const next = Math.min(MANA_OVERCHARGE_MAX, tower.mana + amount * manaGainMultiplier(tower.manaLevel, tower.equippedSkinId));
+  // Snap float dust (ten gains of 10 can sum to 99.9999…) so a bar that is full reads as full.
+  tower.mana = Math.abs(next - MANA_MAX) < 1e-6 ? MANA_MAX : next;
+  if (specialsHeld && tower.mana > MANA_MAX) tower.overcharged = true;
 }
 
 /** Jams the tower for `durationMs` (a DISABLER-archetype hit) — refreshes rather than stacks. */
@@ -449,11 +464,16 @@ export function resetTowerCooldown(tower: TowerInstance): void {
   tower.cooldownRemainingMs = 1000 / stats.attackSpeed;
 }
 
-/** Spends the whole mana bar on a special and returns its damage multiplier (overcharge, config/towerMana.ts). */
+/** Spends a full bar on a special and returns its damage multiplier: the overcharge bonus after a hold (the whole bar goes), otherwise 1 with any surplus kept. */
 export function spendTowerMana(tower: TowerInstance): number {
-  const mult = overchargeMultiplier(tower.mana);
-  tower.mana = 0;
-  return mult;
+  if (tower.overcharged) {
+    const mult = overchargeMultiplier(tower.mana);
+    tower.mana = 0;
+    tower.overcharged = false;
+    return mult;
+  }
+  tower.mana = Math.max(0, tower.mana - MANA_MAX);
+  return 1;
 }
 
 // ---------------------------------------------------------------------------

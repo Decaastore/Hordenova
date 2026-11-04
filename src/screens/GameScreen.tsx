@@ -16,6 +16,7 @@ import { useTabPresence } from "@/hooks/useTabPresence";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { ProgressionStoppedBar, ProgressionStoppedOverlay } from "@/ui/ProgressionStoppedOverlay";
 import { BossBanner } from "@/ui/BossBanner";
+import { SpecialsPanel } from "@/ui/SpecialsPanel";
 import { WelcomeBackOverlay } from "@/ui/WelcomeBackOverlay";
 import { PhaseBanner } from "@/ui/PhaseBanner";
 import { EnemyDiscoveryBanner } from "@/ui/EnemyDiscoveryBanner";
@@ -329,7 +330,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleSpecials={() => engine.setSpecialsHeld(!engine.isSpecialsHeld())} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -597,6 +598,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
         onSelect={setPendingTowerType}
         mapFull={hud.towerCount + hud.deployBench.length >= MAX_TOWERS_ON_MAP}
         mapFullLabel={t("deploy.mapFull", { max: MAX_TOWERS_ON_MAP })}
+        trailing={<SpecialsPanel engine={engine} hud={hud} />}
       />
     </div>
   );

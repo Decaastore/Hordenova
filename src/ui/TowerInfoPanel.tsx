@@ -616,7 +616,7 @@ function ManaSection({
   const cost = getManaUpgradeCost(tower.type, tower.manaLevel);
   const affordable = cost !== null && gold >= cost;
   const fill = Math.min(1, tower.mana / MANA_MAX);
-  const over = Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX)));
+  const over = tower.overcharged ? Math.max(0, Math.min(1, (tower.mana - MANA_MAX) / (MANA_OVERCHARGE_MAX - MANA_MAX))) : 0;
   const bonusPct = Math.round((manaGainMultiplier(tower.manaLevel, tower.equippedSkinId) - 1) * 100);
   return (
     <>

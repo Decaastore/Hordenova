@@ -14,10 +14,8 @@ import type { TowerType } from "./towerStats";
  *  - THE GAME DOESN'T STOP. After a retreat the map is "under siege": the
  *    last SIEGE_WAVES regular waves before the boss are played again (they
  *    pay Gold, missions and Pass XP as usual), then the boss attacks again.
- *  - BEING THERE PAYS. During an assault, runes light up beside the road;
- *    clicking one strikes the boss for RUNE_STRIKE_FRACTION of its max HP.
- *    An idle player still wins over a few assaults; an attentive one wins
- *    sooner.
+ *  - BEING THERE PAYS. An attentive player can hold every tower's special
+ *    and release them together on the boss, overcharged (config/towerMana.ts).
  *  - STRATEGY PAYS. Every boss has a weakness: one tower type hits it
  *    harder and ignores its ability shield (shown when the boss arrives).
  *  - COMPETITIVE. Killing a boss on its first assault pays a bonus; the
@@ -26,12 +24,6 @@ import type { TowerType } from "./towerStats";
 
 export const BOSS_RETREAT_RECOVERY = 0.1;
 export const SIEGE_WAVES = 3;
-
-export const RUNE_INTERVAL_MS = 9000;
-export const RUNE_LIFETIME_MS = 3500;
-export const RUNE_STRIKE_FRACTION = 0.03;
-/** Click radius around a rune, in world units. */
-export const RUNE_HIT_RADIUS = 26;
 
 /**
  * Main-boss HP follows the regular waves instead of its own curve: it is
