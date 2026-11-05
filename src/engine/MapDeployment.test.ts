@@ -1,3 +1,4 @@
+import { TOWER_TYPES } from "@/config/towerStats";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
@@ -191,7 +192,8 @@ describe("moving onto a new map (real GameEngine)", () => {
     const engine = new GameEngine();
     engine.startRun();
     const sites = engine.getMapLayout().sites;
-    for (const site of sites) engine.placeTower(site.id, "IRONWOOD");
+    // Round-robin over the types: the per-type limit (MAX_TOWERS_PER_TYPE) is never what stops it here.
+    sites.forEach((site, i) => engine.placeTower(site.id, TOWER_TYPES[i % TOWER_TYPES.length]!));
     expect(engine.getRenderSnapshot().towers).toHaveLength(MAX_TOWERS_ON_MAP);
     expect(engine.getAvailableSlotIds()).toEqual([]);
   });

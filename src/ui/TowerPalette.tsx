@@ -13,9 +13,12 @@ interface TowerPaletteProps {
   mapFullLabel?: string;
   /** Always-mounted control shown at the end of the bar (the specials panel). */
   trailing?: ReactNode;
+  /** Towers of each type already built (map + bench) and the per-type limit — a type at its limit can't be picked. */
+  typeCounts?: Partial<Record<TowerType, number>>;
+  typeLimit?: number;
 }
 
-export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel, trailing }: TowerPaletteProps) {
+export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel, trailing, typeCounts, typeLimit }: TowerPaletteProps) {
   const { t } = useLanguage();
   return (
     <div style={containerStyle}>
@@ -23,7 +26,9 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
       {TOWER_TYPES.map((type) => {
         const def = TOWER_DEFINITIONS[type];
         const theme = TOWER_THEME[type];
-        const affordable = gold >= def.buildCost && !mapFull;
+        const built = typeCounts?.[type] ?? 0;
+        const atLimit = typeLimit !== undefined && built >= typeLimit;
+        const affordable = gold >= def.buildCost && !mapFull && !atLimit;
         const active = pendingTowerType === type;
         return (
           <button
@@ -31,7 +36,7 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
             data-tutorial={`tower-${type}`}
             disabled={!affordable}
             onClick={() => onSelect(active ? null : type)}
-            title={t(`towers.${type}.description`)}
+            title={atLimit && typeLimit !== undefined ? t("deploy.typeLimitReached", { max: typeLimit }) : t(`towers.${type}.description`)}
             style={{
               ...cardStyle,
               borderColor: active ? theme.accent : PALETTE.uiPanelBorder,
@@ -46,6 +51,14 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 3 }}>
                 <CoinIcon size={10} color={PALETTE.gold} />
                 <span style={{ fontSize: 11, color: PALETTE.gold, fontWeight: 700 }}>{def.buildCost}</span>
+                {typeLimit !== undefined && (
+                  <span
+                    data-testid={`tower-count-${type}`}
+                    style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, fontVariantNumeric: "tabular-nums", color: atLimit ? PALETTE.uiAccentBright : PALETTE.uiTextDim }}
+                  >
+                    {t("deploy.typeCount", { n: built, max: typeLimit })}
+                  </span>
+                )}
               </div>
             </div>
           </button>

@@ -47,6 +47,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     missionsKey: "",
     specialsHeld: false,
     specialsReady: 0,
+    towersByType: { IRONWOOD: 0, INFERNO: 0, FROSTBORN: 0, STORMCALLER: 0 },
     missionsClaimable: 0,
     ...overrides,
   };

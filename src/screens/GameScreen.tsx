@@ -54,7 +54,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { flushBalanceEvents } from "@/telemetry/balanceTelemetry";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { PHASES } from "@/config/phaseConfig";
-import { HIGH_GROUND_RANGE_MULT, MAX_TOWERS_ON_MAP, RUNE_ALTAR_DAMAGE_MULT } from "@/data/mapLayouts";
+import { HIGH_GROUND_RANGE_MULT, MAX_TOWERS_ON_MAP, MAX_TOWERS_PER_TYPE, RUNE_ALTAR_DAMAGE_MULT } from "@/data/mapLayouts";
 import type { TowerType } from "@/config/towerStats";
 import { syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import type { DualGemPrice } from "@/config/gemsEconomy";
@@ -598,6 +598,8 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
         onSelect={setPendingTowerType}
         mapFull={hud.towerCount + hud.deployBench.length >= MAX_TOWERS_ON_MAP}
         mapFullLabel={t("deploy.mapFull", { max: MAX_TOWERS_ON_MAP })}
+        typeCounts={hud.towersByType}
+        typeLimit={MAX_TOWERS_PER_TYPE}
         trailing={<SpecialsPanel engine={engine} hud={hud} />}
       />
     </div>

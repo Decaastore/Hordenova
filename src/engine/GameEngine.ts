@@ -10,8 +10,8 @@ import {
   SAVE_STORAGE_KEY,
   type GameSpeed,
 } from "@/config/gameBalance";
-import { TOWER_DEFINITIONS, type TowerType } from "@/config/towerStats";
-import { getMapLayout, getSite, MAX_TOWERS_ON_MAP, setActiveMapLayout, type MapLayout } from "@/data/mapLayouts";
+import { TOWER_DEFINITIONS, TOWER_TYPES, type TowerType } from "@/config/towerStats";
+import { getMapLayout, getSite, MAX_TOWERS_ON_MAP, MAX_TOWERS_PER_TYPE, setActiveMapLayout, type MapLayout } from "@/data/mapLayouts";
 import { autoArrange } from "./MapDeployment";
 import { enemyCountForWave, isBossMilestone, isBonusEliteWave } from "@/config/waveConfig";
 import { isMiniBossWave, getMainBossForWave, getMiniBossForWave, getBossDefinitionById } from "@/config/bossConfig";
@@ -210,6 +210,8 @@ export interface HudSnapshot {
   specialsHeld: boolean;
   /** Towers whose mana bar is full (their special is ready or held). */
   specialsReady: number;
+  /** Towers of each type on the map + bench, for the per-type build limit (MAX_TOWERS_PER_TYPE). */
+  towersByType: Record<TowerType, number>;
   /** BOSS SIEGE: about the main boss being announced/fought now — its weakness, which assault this is, and its state. Null outside a boss fight. */
   bossFight: { weakness: TowerType | null; assault: number; enraged: boolean; exhausted: boolean } | null;
   /** Set during VICTORY: how many assaults the boss took (1 = first-assault kill, which pays a bonus). */
@@ -334,6 +336,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bossVictoryAssaults === b.bossVictoryAssaults &&
     a.specialsHeld === b.specialsHeld &&
     a.specialsReady === b.specialsReady &&
+    TOWER_TYPES.every((type) => a.towersByType[type] === b.towersByType[type]) &&
     a.missionsKey === b.missionsKey &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
@@ -884,10 +887,19 @@ export class GameEngine {
     return tower;
   }
 
+  /** Towers of `type` on the map plus on the deploy bench — what MAX_TOWERS_PER_TYPE counts. */
+  countTowersOfType(type: TowerType): number {
+    let n = 0;
+    for (const t of this.towers) if (t.type === type) n++;
+    for (const t of this.deployBench) if (t.type === type) n++;
+    return n;
+  }
+
   placeTower(slotId: string, type: TowerType): boolean {
     if (!this.canModifyLoadout()) return false;
     if (this.towers.some((t) => t.slotId === slotId)) return false;
     if (this.towers.length + this.deployBench.length >= MAX_TOWERS_ON_MAP) return false;
+    if (this.countTowersOfType(type) >= MAX_TOWERS_PER_TYPE) return false;
 
     const slot = getSite(this.layout, slotId);
     if (!slot) return false;
@@ -2801,6 +2813,7 @@ export class GameEngine {
         : null,
       specialsHeld: this.specialsHeld,
       specialsReady: this.towers.filter((t) => t.mana >= MANA_MAX).length,
+      towersByType: Object.fromEntries(TOWER_TYPES.map((type) => [type, this.countTowersOfType(type)])) as Record<TowerType, number>,
       missionsKey: this.missionsKey(),
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
     };

@@ -33,6 +33,12 @@ export type SiteTrait = "NONE" | "HIGH_GROUND" | "RUNE_ALTAR";
 export const HIGH_GROUND_RANGE_MULT = 1.15;
 export const RUNE_ALTAR_DAMAGE_MULT = 1.1;
 export const MAX_TOWERS_ON_MAP = 12;
+/**
+ * At most this many towers of the SAME type on the map (bench included), the
+ * same rule for every player: a full map always mixes at least three types.
+ * Towers placed before the rule existed stay; only new builds are blocked.
+ */
+export const MAX_TOWERS_PER_TYPE = 4;
 export const SITES_PER_MAP = 14;
 
 export interface BuildSite extends TowerSlotDefinition {

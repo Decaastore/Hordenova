@@ -4,6 +4,7 @@ import { GameEngine } from "./GameEngine";
 import { BOSS_RETREAT_RECOVERY, SIEGE_WAVES } from "@/config/bossAssault";
 import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
+import { MAX_TOWERS_PER_TYPE } from "@/data/mapLayouts";
 
 const TICK_MS = 50;
 
@@ -46,6 +47,18 @@ describe("GameEngine — Active Idle progression", () => {
 
     // Can't double-place on the same slot.
     expect(engine.placeTower(slotId, "IRONWOOD")).toBe(false);
+  });
+
+  it("allows at most MAX_TOWERS_PER_TYPE towers of the same type; other types can still be built", () => {
+    updateSave({ gold: 100_000 });
+    const engine = new GameEngine();
+    engine.startRun();
+    const slots = engine.getAvailableSlotIds();
+    for (let i = 0; i < MAX_TOWERS_PER_TYPE; i++) expect(engine.placeTower(slots[i]!, "INFERNO")).toBe(true);
+    expect(engine.countTowersOfType("INFERNO")).toBe(MAX_TOWERS_PER_TYPE);
+    expect(engine.placeTower(slots[MAX_TOWERS_PER_TYPE]!, "INFERNO")).toBe(false);
+    expect(engine.getHudSnapshot().towersByType.INFERNO).toBe(MAX_TOWERS_PER_TYPE);
+    expect(engine.placeTower(slots[MAX_TOWERS_PER_TYPE]!, "FROSTBORN")).toBe(true);
   });
 
   it("stops progression (not a plain defeat) when undefended enemies reach the base, with a diagnostic report attached", () => {

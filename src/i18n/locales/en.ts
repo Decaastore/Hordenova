@@ -1013,6 +1013,8 @@ export const en = {
     allPlaced: "Every tower is on the map",
     placeAllFirst: "Place every tower to start",
     start: "Start phase",
+    typeCount: "{n}/{max}",
+    typeLimitReached: "Limit of {max} towers of this type on the map",
     mapFull: "Map full: {max} towers",
     hidePanel: "Show the map",
     showPanel: "Show panel",

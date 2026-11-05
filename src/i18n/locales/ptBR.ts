@@ -1014,6 +1014,8 @@ export const ptBR: TranslationSchema = {
     allPlaced: "Todas as torres estão no mapa",
     placeAllFirst: "Coloque todas as torres para começar",
     start: "Começar fase",
+    typeCount: "{n}/{max}",
+    typeLimitReached: "Limite de {max} torres deste tipo no mapa",
     mapFull: "Mapa cheio: {max} torres",
     hidePanel: "Ver o mapa",
     showPanel: "Mostrar painel",

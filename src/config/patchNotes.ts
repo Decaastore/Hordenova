@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v77",
+    dateIso: "2026-11-05",
+    category: "BALANCE",
+    title: {
+      en: "Up to 4 Towers of Each Type",
+      ptBR: "Até 4 Torres de Cada Tipo",
+    },
+    description: {
+      en: "A map now holds at most 4 towers of the same type, the same rule for every player. A full map of 12 always mixes at least three tower types, so no defence is just one tower copied over and over.",
+      ptBR: "Um mapa agora aceita no máximo 4 torres do mesmo tipo, a mesma regra para todos os jogadores. Um mapa cheio de 12 sempre mistura pelo menos três tipos de torre, então nenhuma defesa é só a mesma torre repetida.",
+    },
+    highlights: [
+      {
+        en: "Each tower card in the build bar shows how many of that type you have, like 2/4. At 4/4 the card is greyed out and can't be picked.",
+        ptBR: "Cada carta de torre na barra de construção mostra quantas daquele tipo você tem, como 2/4. Em 4/4 a carta fica apagada e não pode ser escolhida.",
+      },
+      {
+        en: "Towers already on the map before this change stay where they are; the limit only stops new builds.",
+        ptBR: "Torres que já estavam no mapa antes desta mudança continuam onde estão; o limite só impede construir novas.",
+      },
+    ],
+  },
+  {
     id: "v76",
     dateIso: "2026-11-04",
     category: "SYSTEMS",
