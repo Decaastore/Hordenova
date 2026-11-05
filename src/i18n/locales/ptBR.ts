@@ -932,7 +932,7 @@ export const ptBR: TranslationSchema = {
     testingReset: {
       button: "RESETAR PROGRESSÃO DA SEASON (TESTE)",
       confirm:
-        "Isso reseta TODA a progressão da season para zero: Best Wave, wave atual, Gold, e REMOVE toda torre atualmente colocada no mapa (levando junto seus Níveis, Níveis de Maestria e Níveis de Especialização). Você começa o teste como se nunca tivesse colocado uma torre nesta Season. Ownership de Maestria/Especialização, Gems, skins, conquistas, Prestígio, slots de equipamento desbloqueados e seu inventário NÃO são afetados — você pode colocar torres novamente na hora. Isso não pode ser desfeito.",
+        "Isso reseta TODA a progressão da season para zero: Best Wave, wave atual, Gold, e REMOVE toda torre atualmente colocada no mapa (levando junto seus Níveis, Níveis de Maestria e Níveis de Especialização), e o castelo volta à vida base (a vida extra ganha na Roleta é removida). Você começa o teste como se nunca tivesse colocado uma torre nesta Season. Ownership de Maestria/Especialização, Gems, skins, conquistas, Prestígio, slots de equipamento desbloqueados e seu inventário NÃO são afetados — você pode colocar torres novamente na hora. Isso não pode ser desfeito.",
       confirmYes: "RESETAR AGORA",
       confirmNo: "Cancelar",
       done: "Progressão da season resetada.",

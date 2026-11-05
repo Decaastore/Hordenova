@@ -396,6 +396,12 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     expect(main.gold).toBe(RUN_START.startingGold);
   });
 
+  it("puts the castle back to its base life — the Roulette's extra Castle HP is removed", () => {
+    updateSave({ castleHpBonus: 35 });
+    resetSeasonProgressionForTesting();
+    expect(loadSave().castleHpBonus).toBe(0);
+  });
+
   /**
    * CORRECTION (this describe block's own earlier version had this
    * backwards): a real Season boundary (syncSeasonIfNeeded) keeps every
