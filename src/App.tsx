@@ -7,6 +7,7 @@ import { WikiScreen } from "./screens/WikiScreen";
 import { NovidadesScreen } from "./screens/NovidadesScreen";
 import { MarketplaceScreen } from "./screens/MarketplaceScreen";
 import { StoreScreen } from "./screens/StoreScreen";
+import { PassScreen } from "./screens/PassScreen";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { audioManager } from "./audio/AudioManager";
 import type { NavView } from "./ui/TopNav";
@@ -81,6 +82,8 @@ export default function App() {
         <NovidadesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "STORE" ? (
         <StoreScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
+      ) : view === "PASS" ? (
+        <PassScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "MARKETPLACE" ? (
         <MarketplaceScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : (

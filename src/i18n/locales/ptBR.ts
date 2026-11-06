@@ -29,6 +29,8 @@ export const ptBR: TranslationSchema = {
     novidades: "Novidades",
     marketplace: "Marketplace",
     store: "Loja",
+    pass: "Passe",
+    passReady: "{n} recompensa(s) do Passe para resgatar",
   },
   menu: {
     subtitle: "Construa. Evolua. Sobreviva.",
@@ -807,6 +809,7 @@ export const ptBR: TranslationSchema = {
     claimed: "Resgatado",
     claimAll: "Resgatar tudo ({n})",
     premiumSoon: "A trilha Premium ({price} por Season) chega junto com a compra por Pix e cartão. Até lá, a trilha Grátis já está valendo.",
+    pageLead: "Ganhe XP jogando e resgate uma recompensa a cada nível. O Passe recomeça na próxima Season, em {time}.",
     premiumOn: "A trilha Premium custa {price} por Season.",
   },
   tab: {

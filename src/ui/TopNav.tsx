@@ -1,11 +1,13 @@
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { MusicControl } from "./MusicControl";
 import { BrandLogo } from "./BrandLogo";
+import { getPassView } from "@/engine/SeasonPassService";
+import { PASS_CHANGED_EVENT } from "./SeasonPassSection";
 
-export type NavView = "HOME" | "SEASON" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE";
+export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE";
 
 interface TopNavProps {
   active: NavView;
@@ -32,6 +34,14 @@ interface TopNavProps {
  */
 export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   const { t } = useLanguage();
+  // Free Pass levels reached but not claimed yet — a dot on PASSE says there's something to pick up.
+  const [, refresh] = useState(0);
+  useEffect(() => {
+    const onChange = () => refresh((n) => n + 1);
+    window.addEventListener(PASS_CHANGED_EVENT, onChange);
+    return () => window.removeEventListener(PASS_CHANGED_EVENT, onChange);
+  }, []);
+  const passClaimable = getPassView().claimable.length;
 
   return (
     <nav style={navStyle}>
@@ -43,6 +53,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
           {t("nav.play")}
         </button>
         <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
+        <NavLink label={t("nav.pass")} isActive={active === "PASS"} onClick={() => onNavigate("PASS")} dot={passClaimable > 0} dotTitle={t("nav.passReady", { n: passClaimable })} />
         <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
         <NavLink label={t("nav.store")} isActive={active === "STORE"} onClick={() => onNavigate("STORE")} />
         <NavLink label={t("nav.marketplace")} isActive={active === "MARKETPLACE"} onClick={() => onNavigate("MARKETPLACE")} />
@@ -62,12 +73,14 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   );
 }
 
-function NavLink({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) {
+function NavLink({ label, isActive, onClick, dot, dotTitle }: { label: string; isActive: boolean; onClick: () => void; dot?: boolean; dotTitle?: string }) {
   return (
     <button
       onClick={onClick}
+      title={dot ? dotTitle : undefined}
       style={{
         ...linkStyle,
+        position: "relative",
         color: isActive ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
         borderBottomColor: isActive ? PALETTE.uiAccent : "transparent",
       }}
@@ -79,9 +92,21 @@ function NavLink({ label, isActive, onClick }: { label: string; isActive: boolea
       }}
     >
       {label}
+      {dot && <span aria-hidden="true" style={dotStyle} />}
     </button>
   );
 }
+
+const dotStyle: CSSProperties = {
+  position: "absolute",
+  top: 2,
+  right: -6,
+  width: 7,
+  height: 7,
+  borderRadius: "50%",
+  background: PALETTE.uiAccentBright,
+  boxShadow: `0 0 6px ${PALETTE.uiAccent}`,
+};
 
 const navStyle: CSSProperties = {
   position: "relative",

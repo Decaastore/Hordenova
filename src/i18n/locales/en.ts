@@ -28,6 +28,8 @@ export const en = {
     novidades: "News",
     marketplace: "Marketplace",
     store: "Store",
+    pass: "Pass",
+    passReady: "{n} Pass reward(s) to claim",
   },
   menu: {
     subtitle: "Build. Upgrade. Survive.",
@@ -806,6 +808,7 @@ export const en = {
     claimed: "Claimed",
     claimAll: "Claim all ({n})",
     premiumSoon: "The Premium track ({price} per Season) arrives together with Pix and card payments. Until then, the Free track already counts.",
+    pageLead: "Earn XP by playing and claim a reward at every level. The Pass starts over next Season, in {time}.",
     premiumOn: "The Premium track costs {price} per Season.",
   },
   tab: {

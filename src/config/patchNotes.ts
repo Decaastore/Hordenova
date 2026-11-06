@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v80",
+    dateIso: "2026-11-06",
+    category: "INTERFACE",
+    title: {
+      en: "Season Pass in the Top Bar",
+      ptBR: "Passe da Season na Barra do Topo",
+    },
+    description: {
+      en: "The Season Pass now has its own page, one click away from anywhere on the site: PASS in the top bar.",
+      ptBR: "O Passe da Season agora tem página própria, a um clique de qualquer lugar do site: PASSE na barra do topo.",
+    },
+    highlights: [
+      {
+        en: "A small dot on PASS shows when there are rewards waiting to be claimed, and it goes away once you claim them.",
+        ptBR: "Um pontinho em PASSE avisa quando tem recompensa esperando para resgatar, e some quando você resgata.",
+      },
+      {
+        en: "The Pass is still on the Season page too.",
+        ptBR: "O Passe continua também na página Season.",
+      },
+    ],
+  },
+  {
     id: "v79",
     dateIso: "2026-11-06",
     category: "INTERFACE",

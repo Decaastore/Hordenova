@@ -12,7 +12,10 @@ import { RewardPartsLabel, REWARD_CSS } from "./RewardPartsLabel";
  * top (claimable once reached), the premium reward underneath (locked until
  * real payments exist — shown so players know what's coming).
  */
-export function SeasonPassSection() {
+/** Fired after a claim so other parts of the page (the PASSE dot in the top nav) refresh. */
+export const PASS_CHANGED_EVENT = "hn-pass-changed";
+
+export function SeasonPassSection({ showTitle = true }: { showTitle?: boolean } = {}) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [tick, setTick] = useState(0);
@@ -28,7 +31,7 @@ export function SeasonPassSection() {
     <section className="sp" aria-labelledby="sp-title">
       <style>{PASS_CSS + REWARD_CSS}</style>
       <div className="pg-head">
-        <h2 className="pg-h2" id="sp-title">
+        <h2 className={showTitle ? "pg-h2" : "pg-h2 sp-title-hidden"} id="sp-title">
           {t("pass.title")}
         </h2>
         {view.claimable.length > 0 && (
@@ -38,6 +41,7 @@ export function SeasonPassSection() {
             onClick={() => {
               claimAllFreePassLevels();
               setTick((n) => n + 1);
+              window.dispatchEvent(new Event(PASS_CHANGED_EVENT));
             }}
           >
             {t("pass.claimAll", { n: view.claimable.length })}
@@ -75,6 +79,7 @@ export function SeasonPassSection() {
                     onClick={() => {
                       claimFreePassLevel(level);
                       setTick((n) => n + 1);
+              window.dispatchEvent(new Event(PASS_CHANGED_EVENT));
                     }}
                   >
                     {t("pass.claim")}
@@ -94,6 +99,7 @@ export function SeasonPassSection() {
 }
 
 const PASS_CSS = `
+.sp-title-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .sp { padding: 44px 0 8px; border-bottom: 1px solid var(--line); }
 .sp-claim-all { padding: 10px 20px; font-size: 14px; }
 .sp-progress { display: flex; align-items: center; gap: 16px; margin: 4px 0 18px; font-size: 13.5px; color: var(--ash); max-width: 640px; }
