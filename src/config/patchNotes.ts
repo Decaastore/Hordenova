@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v82",
+    dateIso: "2026-11-06",
+    category: "FIXES",
+    title: {
+      en: "Tower Panel Text Fits Again",
+      ptBR: "Texto do Painel da Torre Cabe na Tela",
+    },
+    description: {
+      en: "In the tower panel you open during a match, the skin section squeezed its name and description into a thin column, and some buttons ran past the panel's edge. It's all laid out properly now.",
+      ptBR: "No painel da torre que abre durante a partida, a seção de skins espremia o nome e a descrição numa coluna fininha, e alguns botões passavam da borda do painel. Agora está tudo organizado.",
+    },
+    highlights: [
+      {
+        en: "Skins: the preview sits on top and the name, description and cosmetic effect read across the full width below it.",
+        ptBR: "Skins: a prévia fica em cima, e o nome, a descrição e o efeito cosmético aparecem embaixo, com a largura toda.",
+      },
+      {
+        en: "Upgrade, Mastery, Mana, Specialization and Reposition buttons show the action on the left and the price on the right, without spilling out.",
+        ptBR: "Os botões de Melhorar, Maestria, Mana, Especialização e Reposicionar mostram a ação à esquerda e o preço à direita, sem sair da borda.",
+      },
+    ],
+  },
+  {
     id: "v81",
     dateIso: "2026-11-06",
     category: "FIXES",

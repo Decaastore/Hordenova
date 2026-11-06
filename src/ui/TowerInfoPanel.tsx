@@ -203,11 +203,10 @@ export function TowerInfoPanel({
               opacity: canAfford ? 1 : 0.5,
             }}
           >
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-              {t("towerInfo.upgrade")}
-              <span style={{ opacity: 0.6 }}>·</span>
-              {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {upgradeCost}
-            </span>
+            <CostLabel
+              label={t("towerInfo.upgrade")}
+              cost={<><CoinIcon size={11} color={PALETTE.gold} /> {upgradeCost}</>}
+            />
           </button>
         </>
       ) : (
@@ -484,15 +483,10 @@ function RepositionSection({
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.reposition.title")}</div>
       <button onClick={onStart} style={{ ...upgradeButtonStyle, borderColor: theme.primary, marginTop: 6 }}>
-        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-          {t("towerInfo.reposition.action")}
-          <span style={{ opacity: 0.6 }}>·</span>
-          {freeAvailable ? (
-            t("towerInfo.reposition.free")
-          ) : (
-            <>🔒 {REPOSITION_GEM_PRICE.free} / 💎 {REPOSITION_GEM_PRICE.purchased}</>
-          )}
-        </span>
+        <CostLabel
+          label={t("towerInfo.reposition.action")}
+          cost={freeAvailable ? t("towerInfo.reposition.free") : <>🔒 {REPOSITION_GEM_PRICE.free} / 💎 {REPOSITION_GEM_PRICE.purchased}</>}
+        />
       </button>
     </>
   );
@@ -547,11 +541,10 @@ function MasterySection({
           disabled={!affordable}
           style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
         >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            {t("towerInfo.masteryUnlock")}
-            <span style={{ opacity: 0.6 }}>·</span>
-            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {unlockCost}
-          </span>
+          <CostLabel
+            label={t("towerInfo.masteryUnlock")}
+            cost={<><CoinIcon size={11} color={PALETTE.gold} /> {unlockCost}</>}
+          />
         </button>
       </>
     );
@@ -585,11 +578,10 @@ function MasterySection({
           disabled={!affordable}
           style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }}
         >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            {t("towerInfo.masteryUpgrade")}
-            <span style={{ opacity: 0.6 }}>·</span>
-            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
-          </span>
+          <CostLabel
+            label={t("towerInfo.masteryUpgrade")}
+            cost={<><CoinIcon size={11} color={PALETTE.gold} /> {cost}</>}
+          />
         </button>
       )}
     </>
@@ -635,11 +627,10 @@ function ManaSection({
       )}
       {cost !== null ? (
         <button onClick={onUpgrade} disabled={!affordable} style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: affordable ? 1 : 0.5 }} data-testid="mana-upgrade">
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            {t("towerInfo.manaUpgrade", { pct: Math.round(MANA_UPGRADE_GAIN_PER_LEVEL * 100) })}
-            <span style={{ opacity: 0.6 }}>·</span>
-            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {cost}
-          </span>
+          <CostLabel
+            label={t("towerInfo.manaUpgrade", { pct: Math.round(MANA_UPGRADE_GAIN_PER_LEVEL * 100) })}
+            cost={<><CoinIcon size={11} color={PALETTE.gold} /> {cost}</>}
+          />
         </button>
       ) : (
         <button disabled style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: 0.5 }}>
@@ -769,11 +760,10 @@ function SpecializationSection({
           disabled={!specAffordable}
           style={{ ...upgradeButtonStyle, borderColor: theme.primary, opacity: specAffordable ? 1 : 0.5 }}
         >
-          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-            {t("towerInfo.specializationUpgrade")}
-            <span style={{ opacity: 0.6 }}>·</span>
-            {t("towerInfo.cost")} <CoinIcon size={11} color={PALETTE.gold} /> {specCost}
-          </span>
+          <CostLabel
+            label={t("towerInfo.specializationUpgrade")}
+            cost={<><CoinIcon size={11} color={PALETTE.gold} /> {specCost}</>}
+          />
         </button>
       )}
 
@@ -815,11 +805,10 @@ function SpecializationSection({
                 disabled={!switchAffordable}
                 style={{ ...switchButtonStyle, borderColor: theme.accent, opacity: switchAffordable ? 1 : 0.5 }}
               >
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
-                  {t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
-                  <span style={{ opacity: 0.6 }}>·</span>
-                  🔒 {SPECIALIZATION_CHANGE_GEM_PRICE.free} / 💎 {SPECIALIZATION_CHANGE_GEM_PRICE.purchased}
-                </span>
+                <CostLabel
+                  label={t("towerInfo.specializationSwitch", { name: t(`specializations.${id}.name`) })}
+                  cost={<>🔒 {SPECIALIZATION_CHANGE_GEM_PRICE.free} / 💎 {SPECIALIZATION_CHANGE_GEM_PRICE.purchased}</>}
+                />
               </button>
             ))
           )}
@@ -958,9 +947,10 @@ function SkinSection({
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.skinSection")}</div>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 6 }}>
+      {/* Stacked, not side by side: the panel is only ~200px wide, so a text column next to the 150px preview was squeezed to one word per line. */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <SkinPreviewCanvas tower={tower} skinId={previewSkinId} previewLevel={previewLevel} />
-        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 3, minWidth: 0 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, width: "100%", overflowWrap: "anywhere" }}>
           <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>
             {previewSkin ? t(`towerSkins.${previewSkin.id}.name` as TranslationKey) : t("towerInfo.skinDefault")}
           </div>
@@ -1182,6 +1172,20 @@ function renderSpecialLines(type: TowerType, level: number, t: Translate, skinEf
           : { label: t("towerInfo.specialLines.STORMCALLER.armorPenetration"), value: t("towerInfo.specialLines.IRONWOOD.locked", { level: 10 }), locked: true },
       ];
   }
+}
+
+/**
+ * A cost button's content: the action on the left (allowed to wrap onto two
+ * lines) and its price on the right, never wrapped. The panel is narrow, so
+ * one long "ACTION · Cost X" line used to run past the panel's edge.
+ */
+function CostLabel({ label, cost }: { label: ReactNode; cost: ReactNode }) {
+  return (
+    <span style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, width: "100%", textAlign: "left" }}>
+      <span style={{ minWidth: 0, lineHeight: 1.25 }}>{label}</span>
+      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0, whiteSpace: "nowrap", fontSize: 11, color: PALETTE.gold }}>{cost}</span>
+    </span>
+  );
 }
 
 function Row({ label, value, dim }: { label: string; value: string; dim?: boolean }) {
