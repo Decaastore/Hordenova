@@ -56,16 +56,27 @@ export interface CombatTickResult {
 }
 
 /** The enemy furthest along the path within range — classic "first" TD targeting. */
+/**
+ * Who a tower shoots: a boss or mini-boss in range comes first (main boss
+ * over mini-boss), so it never goes unhurt while weaker creatures walk ahead
+ * of it; otherwise the creature furthest along the road. Splash, chains and
+ * specials still hit everything around the target.
+ */
 export function findPrimaryTarget(
   origin: Vector2,
   range: number,
   enemies: readonly EnemyInstance[],
 ): EnemyInstance | null {
   let best: EnemyInstance | null = null;
+  let bestRank = -1;
   for (const enemy of enemies) {
     if (isEnemyDead(enemy)) continue;
     if (distance(origin, enemy.position) > range) continue;
-    if (!best || enemy.distanceTraveled > best.distanceTraveled) best = enemy;
+    const rank = enemy.boss ? (enemy.boss.isMainBoss ? 2 : 1) : 0;
+    if (!best || rank > bestRank || (rank === bestRank && enemy.distanceTraveled > best.distanceTraveled)) {
+      best = enemy;
+      bestRank = rank;
+    }
   }
   return best;
 }

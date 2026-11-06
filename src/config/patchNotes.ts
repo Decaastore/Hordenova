@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v81",
+    dateIso: "2026-11-06",
+    category: "FIXES",
+    title: {
+      en: "Bosses Always Take Damage",
+      ptBR: "Chefes Sempre Levam Dano",
+    },
+    description: {
+      en: "Bosses and Mini-Bosses could sometimes walk through a tower's range without getting hit, because the tower kept shooting at other creatures. Now every tower that can reach a boss shoots it first.",
+      ptBR: "Chefes e Mini-Chefes às vezes passavam pelo alcance de uma torre sem levar dano, porque a torre continuava atirando em outros bichos. Agora toda torre que alcança um chefe atira nele primeiro.",
+    },
+    highlights: [
+      {
+        en: "Priority order: the main Boss, then the Mini-Boss, then the creature furthest along the road.",
+        ptBR: "Ordem de prioridade: o Chefe principal, depois o Mini-Chefe, depois o bicho mais adiantado na estrada.",
+      },
+      {
+        en: "Regular creatures are targeted exactly as before, and the game's overall pace stays the same.",
+        ptBR: "Os bichos comuns continuam sendo mirados do mesmo jeito, e o ritmo geral do jogo continua igual.",
+      },
+    ],
+  },
+  {
     id: "v80",
     dateIso: "2026-11-06",
     category: "INTERFACE",

@@ -263,3 +263,30 @@ describe("CombatSystem", () => {
     });
   });
 });
+
+describe("target priority — a boss in range is never left unhurt", () => {
+  it("shoots a mini-boss or boss in range before weaker creatures that walk ahead of it, main boss first", async () => {
+    const { findPrimaryTarget } = await import("./CombatSystem");
+    const ahead = createEnemyInstance("RUNNER", 10);
+    ahead.position = { x: 10, y: 0 };
+    ahead.distanceTraveled = 500;
+    const mini = createEnemyInstance("BRUTE", 10);
+    mini.position = { x: 20, y: 0 };
+    mini.distanceTraveled = 100;
+    mini.boss = { isMainBoss: false } as never;
+    const main = createEnemyInstance("BRUTE", 10);
+    main.position = { x: 30, y: 0 };
+    main.distanceTraveled = 50;
+    main.boss = { isMainBoss: true } as never;
+
+    expect(findPrimaryTarget({ x: 0, y: 0 }, 100, [ahead, mini])).toBe(mini);
+    expect(findPrimaryTarget({ x: 0, y: 0 }, 100, [ahead, mini, main])).toBe(main);
+    // out of range, the boss doesn't pull the tower off what it can reach
+    expect(findPrimaryTarget({ x: 0, y: 0 }, 15, [ahead, mini, main])).toBe(ahead);
+    // with no boss around, the creature furthest along the road comes first
+    const behind = createEnemyInstance("CRAWLER", 10);
+    behind.position = { x: 5, y: 0 };
+    behind.distanceTraveled = 10;
+    expect(findPrimaryTarget({ x: 0, y: 0 }, 100, [behind, ahead])).toBe(ahead);
+  });
+});
