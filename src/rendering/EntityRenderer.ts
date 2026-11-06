@@ -10,10 +10,10 @@ import { ENEMY_DISPLAY_SCALE, ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
-import { BOSS_CREATURE_RENDERERS, NEW_ENEMY_RENDERERS } from "./biomeCreatures";
-import type { LocomotionState } from "./biomeCreatures/helpers";
-import { gaitBounce, gaitPhase, gaitSwing } from "./biomeCreatures/helpers";
-import { drawEnemySprite, ensureEnemySpritesLoading, getEnemySprite, spriteHeadroom } from "./enemySprites";
+import type { LocomotionState } from "./locomotion";
+import { gaitPhase } from "./locomotion";
+import { bossHeadroom, drawEnemySprite, ensureEnemySpritesLoading, getBossSprite, getEnemySprite, sheetFootprint, spriteHeadroom } from "./enemySprites";
+import { BOSS_ATTACK_ANIM_MS, BOSS_SHEETS, type BossEffect } from "./bossSheets";
 import { getTowerAim, getTowerSprite, TOWER_VIEW_SIN_ELEV, type LoadedTowerSprite } from "./towerSprites";
 import { drawEmbers, drawFire, drawSmokeColumn } from "./fireFx";
 
@@ -2946,26 +2946,20 @@ function drawMovementVfx(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, an
 // read on screen — the concrete cause of the "sprites deslizando" complaint
 // this pass exists to fix. Alpha raised alongside so the bigger puff still
 // looks like soft dust, not a hard-edged decal.
-// CREATURE PRESENTATION PASS — the original 8-archetype roster (CRAWLER,
-// RUNNER, BRUTE, SHIELDBEARER, SWARMLING, REGENERATOR, IRONCLAD, DISABLER —
-// the ORIGINAL_ROSTER_SHADOW set below) only ever drew a ground shadow for
-// CRAWLER; every other one of these — including the two HEAVY archetypes —
-// rendered with no ground contact at all, the single biggest concrete cause
-// of "parece estar deslizando" for the waves most players actually spend
-// their early game in. Every 10-biome creature already draws its own
-// contact shadow inside its own draw function (see biomeCreatures/*.ts), so
-// this only needed to close the gap for this original set, weight-scaled
-// the same way the rest of the VFX pass already scales by weight class.
-const ORIGINAL_ROSTER_SHADOW: Record<string, { radiusX: number; radiusY: number; opacity: number }> = {
-  CRAWLER: { radiusX: 10, radiusY: 4.5, opacity: 0.32 },
-  RUNNER: { radiusX: 8, radiusY: 3.4, opacity: 0.26 },
-  BRUTE: { radiusX: 13, radiusY: 5.5, opacity: 0.44 },
-  SHIELDBEARER: { radiusX: 13, radiusY: 5.5, opacity: 0.44 },
-  SWARMLING: { radiusX: 7, radiusY: 3, opacity: 0.24 },
-  REGENERATOR: { radiusX: 10, radiusY: 4.3, opacity: 0.32 },
-  IRONCLAD: { radiusX: 12.5, radiusY: 5.3, opacity: 0.42 },
-  DISABLER: { radiusX: 9.5, radiusY: 4, opacity: 0.3 },
-};
+// Ground contact for every creature, sized from its real sheet: heavy
+// creatures cast a wider, darker shadow, fliers a smaller, fainter one (they
+// float above it). Bosses get a broad pool of shadow under their bulk.
+function enemyShadow(enemy: EnemyInstance): { radiusX: number; radiusY: number; opacity: number } {
+  if (enemy.boss) {
+    const entry = BOSS_SHEETS[enemy.boss.bossId];
+    const h = entry?.worldHeight ?? 34;
+    const k = entry?.hover ? 0.75 : 1;
+    return { radiusX: h * 0.42 * k, radiusY: h * 0.15 * k, opacity: entry?.hover ? 0.32 : 0.5 };
+  }
+  const h = (spriteHeadroom(enemy.type, 1) ?? 17) / (1 - 0.36);
+  const flier = getEnemySprite(enemy.type)?.def.hover !== undefined;
+  return { radiusX: h * (flier ? 0.26 : 0.36), radiusY: h * (flier ? 0.1 : 0.15), opacity: flier ? 0.22 : 0.34 };
+}
 
 // VISIBILITY PASS — the big flat pale discs these used to be covered whole
 // crowds of creatures; footfalls are now small, soft dust only for heavy
@@ -3080,8 +3074,8 @@ export function drawEnemy(
   timeMs: number,
   hitFlashMs = Infinity,
   scale = 1,
-  /** CHEFE MAIOR — the active biome's accent color, used only for the MAIN boss's "Void Colossus" body (see drawMainBossColossus) so it recolors per biome/boss instead of a fixed palette. Ignored for every other enemy. */
-  bossColor?: string,
+  /** Kept for call-site compatibility: bosses now carry their own glow color (bossSheets.ts). */
+  _bossColor?: string,
   /**
    * FASE 3 — a heading CanvasRenderer has already smoothed frame-to-frame
    * (lerped toward the path's raw tangent instead of snapping to it), so a
@@ -3093,7 +3087,6 @@ export function drawEnemy(
   /** FASE 3 — signed radians/ms turn rate from that same smoothing, ~0 on straight stretches. Forwarded into LocomotionState for banking/lean. Defaults to 0 when omitted. */
   turnRate = 0,
 ): void {
-  const theme = ENEMY_THEME[enemy.type];
   const angle = smoothedAngle ?? Math.atan2(enemy.direction.y, enemy.direction.x);
   const speedRatio = enemy.baseSpeed > 0 ? Math.max(0, Math.min(1, getEffectiveSpeed(enemy) / enemy.baseSpeed)) : 0;
   const locomotion: LocomotionState = { distance: enemy.distanceTraveled, speedRatio, turnRate };
@@ -3111,10 +3104,8 @@ export function drawEnemy(
   // closes the one real gap left, the original roster, which previously
   // only special-cased CRAWLER and rendered every other archetype —
   // including both HEAVY ones — with no ground shadow at all.
-  const originalRosterShadow = ORIGINAL_ROSTER_SHADOW[enemy.type];
-  if (originalRosterShadow) {
-    drawContactShadow(ctx, originalRosterShadow.radiusX, originalRosterShadow.radiusY, originalRosterShadow.opacity);
-  }
+  const shadow = enemyShadow(enemy);
+  drawContactShadow(ctx, shadow.radiusX, shadow.radiusY, shadow.opacity);
 
   // AUDITORIA E CORREÇÃO GERAL spec sections 33-38 — archetype movement VFX
   // (config/movementVfx.ts). Drawn in the same untranslated-but-unrotated
@@ -3149,87 +3140,31 @@ export function drawEnemy(
     ctx.filter = `brightness(${(1 + hitReact * hitReactProfile.brightness).toFixed(2)})`;
   }
 
-  // 10-biome expansion — a bossId registered in BOSS_CREATURE_RENDERERS
-  // (rendering/biomeCreatures/) gets its own bespoke shared mini/main body
-  // instead of the universal Colossus; any bossId NOT registered there
-  // (every one of the original 6 biomes) falls straight through to the
-  // exact original drawMainBossColossus/drawMiniBossColossus calls below —
-  // zero visual change for existing content.
-  const customBossCreature = enemy.boss ? BOSS_CREATURE_RENDERERS[enemy.boss.bossId] : undefined;
-  if (enemy.boss?.isMainBoss) {
-    // CHEFE MAIOR — "Void Colossus" identity replaces the old scaled-up
-    // Brute body for every MAIN boss. Colored per biome/boss via
-    // `bossColor` rather than ENEMY_THEME's fixed BRUTE palette.
-    if (customBossCreature) {
-      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MAIN", locomotion);
-    } else {
-      drawMainBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
-    }
-  } else if (enemy.boss) {
-    // MINI CHEFE — "Void Colossus, Jr." (see drawMiniBossColossus's own doc
-    // comment): a deliberately simplified/smaller build of the EXACT SAME
-    // creature, not a different archetype (the old SHIELDBEARER-based look
-    // this replaces was a completely unrelated humanoid-with-a-shield —
-    // the "mini boss doesn't even look related to the main boss" bug this
-    // fixes). Same per-biome `bossColor`, same real enrage/hp reads.
-    if (customBossCreature) {
-      customBossCreature(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp, "MINI", locomotion);
-    } else {
-      drawMiniBossColossus(ctx, bossColor ?? theme.accent, timeMs, enemy.boss.enraged, enemy.hp / enemy.maxHp);
-    }
-  } else if (getEnemySprite(enemy.type)) {
-    // PAINTED ENEMY SPRITES — hand-painted art with procedural walk
-    // animation (see enemySprites.ts). The art is a side view, so it is
-    // drawn back in unrotated space and mirrors to face its direction
-    // instead of spinning with the path; the hit recoil applied above in
-    // the rotated frame still pushes it back along its travel axis.
+  if (enemy.boss) {
+    // BOSS SHEETS — every boss and mini-boss is an animated baked creature
+    // with its own live effects (drawBossBody below).
     ctx.rotate(-angle);
-    drawEnemySprite(ctx, getEnemySprite(enemy.type)!, enemy.id, angle, locomotion, timeMs, {
-      slowPercent: enemy.slow?.percent ?? 0,
-      burning: !!enemy.burn,
-    });
+    drawBossBody(ctx, enemy, angle, locomotion, timeMs);
   } else {
     ensureEnemySpritesLoading();
-    const customEnemy = NEW_ENEMY_RENDERERS[enemy.type];
-    if (customEnemy) {
-      customEnemy(ctx, theme, timeMs, hitFlashMs, locomotion);
-    } else {
-      switch (enemy.type) {
-        case "CRAWLER":
-          drawCrawler(ctx, theme, timeMs, hitFlashMs, 1, locomotion);
-          break;
-        case "RUNNER":
-          drawRunner(ctx, theme, timeMs, locomotion);
-          break;
-        case "BRUTE":
-          drawBrute(ctx, theme, timeMs, locomotion);
-          break;
-        case "SHIELDBEARER":
-          drawShieldbearer(ctx, theme, timeMs, locomotion);
-          break;
-        // CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — each Content
-        // Progression archetype now has its own bespoke silhouette (see their
-        // draw* functions' own doc comments) instead of reusing one of the
-        // original 4 shapes with just a different theme color/scale.
-        case "SWARMLING":
-          drawSwarmling(ctx, theme, timeMs);
-          break;
-        case "REGENERATOR":
-          drawRegenerator(ctx, theme, timeMs);
-          break;
-        case "IRONCLAD":
-          drawIronclad(ctx, theme);
-          break;
-        case "DISABLER":
-          drawDisabler(ctx, theme, timeMs);
-          break;
-      }
+    const sprite = getEnemySprite(enemy.type);
+    if (sprite) {
+      // The art is a three-quarter view, so it is drawn back in unrotated
+      // space and mirrors to face its direction instead of spinning with the
+      // path; the hit recoil applied above in the rotated frame still pushes
+      // it back along its travel axis.
+      ctx.rotate(-angle);
+      drawEnemySprite(ctx, sprite, enemy.id, angle, locomotion, timeMs, {
+        slowPercent: enemy.slow?.percent ?? 0,
+        burning: !!enemy.burn,
+      });
     }
   }
   if (hitReact > 0) ctx.filter = "none";
   ctx.restore();
 
-  const paintedSprite = !enemy.boss && getEnemySprite(enemy.type) !== undefined;
+  // Sheet-drawn creatures carry their freeze/burn tint on the body itself.
+  const paintedSprite = enemy.boss ? getBossSprite(enemy.boss.bossId) !== undefined : getEnemySprite(enemy.type) !== undefined;
   // Status cues that never box the creature in: frost settling at its feet
   // when slowed, small flames licking up from the ground when burning.
   if (enemy.slow && !paintedSprite) {
@@ -3285,6 +3220,258 @@ export function drawEnemyHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstan
   if (enemy.hp >= enemy.maxHp) return;
   if (enemy.type === "CRAWLER") drawHpBarPremium(ctx, enemy);
   else drawHpBar(ctx, enemy);
+}
+
+// ---------------------------------------------------------------------------
+// BOSS BODY — the baked, animated creature (bossSheets.ts) plus its live
+// effects, all derived from real state every frame (no particle pool to leak):
+//  - a rune circle turning under its feet (main bosses: two counter-rotating
+//    rings with runes; mini-bosses: one),
+//  - its signature particles rising around the body (embers, frost, spores,
+//    souls... per boss),
+//  - a glowing outline in its color, pulsing faster and red-hot when enraged,
+//  - a shockwave of dust at every heavy footfall,
+//  - its ATTACK animation + a burst ring whenever it uses its ability,
+//  - flames licking up around it while enraged, a hex bubble while shielded.
+// ---------------------------------------------------------------------------
+
+const BOSS_PARTICLE: Record<BossEffect, { color: string; core: string; rise: number; sway: number; size: number; shape: "dot" | "flake" | "spark" | "wisp" }> = {
+  spore: { color: "#b8f07a", core: "#f4ffd6", rise: 0.55, sway: 7, size: 1.6, shape: "dot" },
+  ember: { color: "#ff7a2a", core: "#ffe0a0", rise: 1, sway: 3, size: 1.4, shape: "spark" },
+  frost: { color: "#bfe8ff", core: "#ffffff", rise: 0.4, sway: 6, size: 1.8, shape: "flake" },
+  sand: { color: "#e8c27a", core: "#fff0c8", rise: 0.35, sway: 9, size: 1.2, shape: "dot" },
+  soul: { color: "#c79bff", core: "#f4e8ff", rise: 0.7, sway: 5, size: 2.2, shape: "wisp" },
+  void: { color: "#7f6bff", core: "#d8d0ff", rise: 0.6, sway: 4, size: 2, shape: "wisp" },
+  spark: { color: "#ffb35c", core: "#fff2d0", rise: 0.9, sway: 2, size: 1.2, shape: "spark" },
+  bone: { color: "#e8dcc0", core: "#ffffff", rise: 0.3, sway: 6, size: 1.4, shape: "flake" },
+  wind: { color: "#bfe2ff", core: "#ffffff", rise: 0.5, sway: 12, size: 1.3, shape: "wisp" },
+  sun: { color: "#ffd25a", core: "#fffbe0", rise: 0.8, sway: 3, size: 1.6, shape: "spark" },
+  crystal: { color: "#7ff0ff", core: "#ffffff", rise: 0.45, sway: 4, size: 1.8, shape: "flake" },
+  ash: { color: "#b8aca0", core: "#ffb070", rise: 0.5, sway: 8, size: 1.6, shape: "dot" },
+  moon: { color: "#d9d2ff", core: "#ffffff", rise: 0.35, sway: 6, size: 1.7, shape: "flake" },
+  blood: { color: "#ff4a5a", core: "#ffc0c8", rise: 0.65, sway: 4, size: 1.6, shape: "wisp" },
+  tide: { color: "#6fffe0", core: "#e0fff8", rise: 0.5, sway: 7, size: 1.8, shape: "dot" },
+  stone: { color: "#c8c4bc", core: "#f4f0e8", rise: 0.25, sway: 5, size: 1.5, shape: "dot" },
+};
+
+/** World-clock time the boss last used its ability (BossManager schedules `nextAbilityAtMs = trigger + interval`). */
+function bossAttackProgress(enemy: EnemyInstance, timeMs: number): number | null {
+  const boss = enemy.boss!;
+  if (boss.ability === "NONE" || boss.abilityIntervalMs <= 0) return null;
+  const since = timeMs - (boss.nextAbilityAtMs - boss.abilityIntervalMs);
+  if (since < 0 || since >= BOSS_ATTACK_ANIM_MS) return null;
+  return since / BOSS_ATTACK_ANIM_MS;
+}
+
+function drawBossBody(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, angle: number, locomotion: LocomotionState, timeMs: number): void {
+  const boss = enemy.boss!;
+  const entry = BOSS_SHEETS[boss.bossId];
+  const sprite = getBossSprite(boss.bossId);
+  const main = boss.isMainBoss;
+  const glow = boss.enraged ? "#ff4a1a" : entry?.glow ?? "#b48cff";
+  const effect = entry?.effect ?? "void";
+  const seed = enemy.id.length * 1.7;
+  const height = entry?.worldHeight ?? 34;
+  const foot = sprite ? sheetFootprint(sprite, timeMs, enemy.id) : { cellWorld: height, footY: height * 0.36, hover: 0 };
+  const groundY = height * 0.36; // where the feet / shadow sit, even for a hovering flier
+  const attack = bossAttackProgress(enemy, timeMs);
+
+  // 1. Rune circle under the feet.
+  drawBossRuneCircle(ctx, groundY, height, glow, timeMs, main, boss.enraged);
+
+  // 2. Footfall shockwave — twice per walk cycle, only for walkers.
+  if (!entry?.hover && locomotion.speedRatio > 0.05 && entry) {
+    const half = (((locomotion.distance / (entry.stride / 2)) % 1) + 1) % 1;
+    if (half < 0.35) {
+      const t = half / 0.35;
+      ctx.save();
+      ctx.globalAlpha = (1 - t) * (main ? 0.45 : 0.3);
+      ctx.strokeStyle = "rgba(225,210,185,0.9)";
+      ctx.lineWidth = 1.6 * (1 - t) + 0.4;
+      ctx.beginPath();
+      ctx.ellipse(0, groundY, height * (0.25 + 0.4 * t), height * (0.09 + 0.14 * t), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // 3. Particles behind the body (the back half of the swarm).
+  drawBossParticles(ctx, effect, height, groundY, timeMs, seed, main ? 14 : 8, boss.enraged, false);
+
+  // 4. The body, with its glowing outline.
+  const pulse = 0.5 + 0.5 * Math.sin(timeMs / (boss.enraged ? 120 : 420));
+  if (sprite) {
+    drawEnemySprite(ctx, sprite, enemy.id, angle, locomotion, timeMs, {
+      slowPercent: enemy.slow?.percent ?? 0,
+      burning: !!enemy.burn,
+      attackProgress: attack,
+      glowAlpha: (main ? 0.36 : 0.26) + pulse * (boss.enraged ? 0.3 : 0.14),
+      glowScale: (main ? 1.09 : 1.07) + pulse * 0.02,
+    });
+  }
+
+  // 5. Particles in front of the body.
+  drawBossParticles(ctx, effect, height, groundY, timeMs, seed + 31, main ? 8 : 4, boss.enraged, true);
+
+  // 6. Ability burst: a ring blasting out from the boss as the attack lands.
+  if (attack !== null) {
+    const t = attack;
+    const chestY = foot.footY - height * 0.55;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = Math.max(0, 1 - t) * 0.85;
+    ctx.strokeStyle = glow;
+    ctx.lineWidth = 3.2 * (1 - t) + 0.6;
+    ctx.beginPath();
+    ctx.ellipse(0, groundY, height * (0.3 + 1.1 * t), height * (0.11 + 0.4 * t), 0, 0, Math.PI * 2);
+    ctx.stroke();
+    const flash = ctx.createRadialGradient(0, chestY, 0, 0, chestY, height * 0.7);
+    flash.addColorStop(0, hexToRgbaLocal(glow, 0.55 * Math.max(0, 1 - t * 1.6)));
+    flash.addColorStop(1, hexToRgbaLocal(glow, 0));
+    ctx.fillStyle = flash;
+    ctx.beginPath();
+    ctx.arc(0, chestY, height * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 7. Enraged: flames licking up around its feet.
+  if (boss.enraged) {
+    const w = height * 0.32;
+    drawFire(ctx, -w, groundY, timeMs, 0.3, main ? 12 : 9);
+    drawFire(ctx, w * 0.9, groundY, timeMs + 140, 0.26, main ? 13 : 9);
+    if (main) drawFire(ctx, 0, groundY + 1, timeMs + 300, 0.22, 10);
+  }
+
+  // 8. Shield ability: a hexagonal energy bubble while it holds.
+  if (boss.shieldUntilMs !== null && timeMs < boss.shieldUntilMs) {
+    const r = height * 0.62;
+    const cy = foot.footY - height * 0.5;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = hexToRgbaLocal(entry?.glow ?? "#9fdcff", 0.55 + 0.25 * pulse);
+    ctx.fillStyle = hexToRgbaLocal(entry?.glow ?? "#9fdcff", 0.08);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    for (let k = 0; k < 6; k++) {
+      const a = (k / 6) * Math.PI * 2 + timeMs / 2400;
+      const x = Math.cos(a) * r;
+      const y = cy + Math.sin(a) * r * 0.92;
+      if (k === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+function drawBossRuneCircle(ctx: CanvasRenderingContext2D, groundY: number, height: number, color: string, timeMs: number, main: boolean, enraged: boolean): void {
+  const rx = height * (main ? 0.6 : 0.46);
+  const ry = rx * 0.36;
+  const spin = timeMs / (enraged ? 900 : 2600);
+  ctx.save();
+  ctx.translate(0, groundY);
+  ctx.globalCompositeOperation = "lighter";
+  const pool = ctx.createRadialGradient(0, 0, 0, 0, 0, rx * 1.2);
+  pool.addColorStop(0, hexToRgbaLocal(color, main ? 0.28 : 0.2));
+  pool.addColorStop(1, hexToRgbaLocal(color, 0));
+  ctx.fillStyle = pool;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, rx * 1.2, ry * 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+  const ring = (radius: number, dir: number, ticks: number, alpha: number) => {
+    ctx.strokeStyle = hexToRgbaLocal(color, alpha);
+    ctx.lineWidth = 1.1;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, radius, radius * 0.36, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let k = 0; k < ticks; k++) {
+      const a = (k / ticks) * Math.PI * 2 + spin * dir;
+      const x = Math.cos(a) * radius;
+      const y = Math.sin(a) * radius * 0.36;
+      ctx.beginPath();
+      // a small rune glyph: a tick with a crossbar
+      ctx.moveTo(x - 1.6, y);
+      ctx.lineTo(x + 1.6, y);
+      ctx.moveTo(x, y - 1.2);
+      ctx.lineTo(x, y + 1.2);
+      ctx.stroke();
+    }
+  };
+  ring(rx, 1, main ? 12 : 8, main ? 0.55 : 0.42);
+  if (main) ring(rx * 0.68, -1.6, 7, 0.38);
+  ctx.restore();
+}
+
+function drawBossParticles(
+  ctx: CanvasRenderingContext2D,
+  effect: BossEffect,
+  height: number,
+  groundY: number,
+  timeMs: number,
+  seed: number,
+  count: number,
+  enraged: boolean,
+  front: boolean,
+): void {
+  const p = BOSS_PARTICLE[effect];
+  const period = 2600 / (p.rise * (enraged ? 1.6 : 1));
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (let k = 0; k < count; k++) {
+    const r1 = Math.abs(Math.sin(seed * 12.9898 + k * 78.233)) % 1;
+    const r2 = Math.abs(Math.sin(seed * 39.425 + k * 11.135)) % 1;
+    const t = (((timeMs / period + r1) % 1) + 1) % 1; // 0 at the ground → 1 at the top
+    const side = (r2 - 0.5) * 2;
+    const x = side * height * 0.45 + Math.sin(timeMs / 600 + k) * p.sway * 0.4;
+    const y = groundY - t * height * 1.25;
+    // keep the "front" particles on the near side of the body
+    if (front !== Math.cos(r2 * Math.PI * 2 + k) > 0) continue;
+    const alpha = Math.sin(t * Math.PI) * (enraged ? 0.95 : 0.75);
+    if (alpha <= 0.02) continue;
+    const color = enraged && (effect === "ember" || effect === "blood") ? "#ff5a2a" : p.color;
+    const size = p.size * (0.7 + r1 * 0.6);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.strokeStyle = color;
+    switch (p.shape) {
+      case "spark":
+        ctx.lineWidth = size * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x - side * 1.2, y + size * 3);
+        ctx.stroke();
+        break;
+      case "flake":
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        for (let a = 0; a < 3; a++) {
+          const ang = (a / 3) * Math.PI + timeMs / 900 + k;
+          ctx.moveTo(x - Math.cos(ang) * size, y - Math.sin(ang) * size);
+          ctx.lineTo(x + Math.cos(ang) * size, y + Math.sin(ang) * size);
+        }
+        ctx.stroke();
+        break;
+      case "wisp": {
+        const g = ctx.createRadialGradient(x, y, 0, x, y, size * 2.4);
+        g.addColorStop(0, hexToRgbaLocal(p.core, 0.9));
+        g.addColorStop(0.4, hexToRgbaLocal(color, 0.6));
+        g.addColorStop(1, hexToRgbaLocal(color, 0));
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(x, y, size * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+      default:
+        ctx.beginPath();
+        ctx.arc(x, y, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+  }
+  ctx.restore();
 }
 
 /** Pulsing aura ring behind a boss/mini-boss, drawn before the enemy body so it reads as a glow, not an outline. */
@@ -3510,7 +3697,9 @@ function drawMiniBossHpBar(ctx: CanvasRenderingContext2D, enemy: EnemyInstance):
   const barWidth = radius * 2.8;
   const barHeight = 7;
   const barX = enemy.position.x - barWidth / 2;
-  const barY = enemy.position.y - radius - 14;
+  // Just above the creature's head (CanvasRenderer draws mini-bosses at ENEMY_DISPLAY_SCALE × 1.4).
+  const headroom = enemy.boss ? bossHeadroom(enemy.boss.bossId, ENEMY_DISPLAY_SCALE * 1.4) : null;
+  const barY = enemy.position.y - (headroom !== null ? headroom + 8 : radius + 14);
   const fillColor =
     hpRatio > 0.6 ? STATUS_COLORS.hpHealthy : hpRatio > 0.3 ? STATUS_COLORS.hpWounded : STATUS_COLORS.hpCritical;
   const r = barHeight / 2;
@@ -3573,1112 +3762,6 @@ function roundedRect(
   ctx.arcTo(x, y, x + width, y, radius);
   ctx.closePath();
 }
-
-/**
- * PREMIUM TIER — Visual Design System proof piece. Rebuilt again per the
- * "eliminate the mascote/toy feeling" direction: the old smooth ellipse
- * body + one big cute eye read as a friendly bug. This is an angular,
- * jagged carapace instead — dorsal spikes, forward mandibles, a cluster
- * of small glowing eyes (alien, not cute), and sharp-jointed legs. Dark
- * oily chitin carries almost no color; the only saturated color is the
- * toxic-green glow at the eyes/mandible tips/joints, so the danger reads
- * through light, not through a friendly palette.
- */
-const CRAWLER_STRIDE = 6;
-export function drawCrawler(
-  ctx: CanvasRenderingContext2D,
-  theme: (typeof ENEMY_THEME)["CRAWLER"],
-  timeMs: number,
-  hitFlashMs: number,
-  /**
-   * Scales mandible/eye motion beyond the normal gameplay idle — gameplay
-   * callers never pass this (default 1 = unchanged), so combat feel is
-   * untouched. Decorative contexts (the main menu hero scene) can push
-   * this above 1 for a more aggressive, restless idle without a second
-   * copy of the draw code.
-   */
-  intensity = 1,
-  locomotion?: LocomotionState,
-): void {
-  const speedRatio = locomotion?.speedRatio ?? 1;
-  const legPhase = gaitSwing(gaitPhase(locomotion?.distance ?? 0, CRAWLER_STRIDE), speedRatio, 1);
-  const bob = gaitBounce(gaitPhase(locomotion?.distance ?? 0, CRAWLER_STRIDE), speedRatio, 0.4);
-  const mandibleTwitch = Math.sin(timeMs / (260 / intensity)) * 0.15 * intensity;
-  const hitFlash = hitFlashMs < 120 ? 1 - hitFlashMs / 120 : 0;
-
-  ctx.save();
-  ctx.translate(0, bob);
-
-  // Legs — sharp-jointed (elbowed), not smooth curves: reads as scuttling, not walking.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1]) {
-    for (let i = -1; i <= 1; i++) {
-      const kneeX = i * 3 + legPhase * side * 0.6;
-      const kneeY = side * 6.5;
-      const footX = i * 3 + legPhase * side;
-      const footY = side * (9 + Math.abs(legPhase) * 2.2);
-      ctx.beginPath();
-      ctx.moveTo(i * 2.6, side * 4.5);
-      ctx.lineTo(kneeX, kneeY);
-      ctx.lineTo(footX, footY);
-      ctx.stroke();
-    }
-  }
-
-  // Body — an elongated, angular carapace (not an ellipse): jagged silhouette front-to-back.
-  const bodyGradient = ctx.createLinearGradient(-4, -3, 6, 4);
-  bodyGradient.addColorStop(0, theme.accent);
-  bodyGradient.addColorStop(0.35, theme.body);
-  bodyGradient.addColorStop(1, theme.dark);
-  ctx.fillStyle = bodyGradient;
-  ctx.beginPath();
-  ctx.moveTo(11, 0);
-  ctx.lineTo(6, -5.5);
-  ctx.lineTo(-2, -6.5);
-  ctx.lineTo(-9, -3.5);
-  ctx.lineTo(-10.5, 0);
-  ctx.lineTo(-9, 3.5);
-  ctx.lineTo(-2, 6.5);
-  ctx.lineTo(6, 5.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#000000";
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  rimHighlight(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(6, -5.5);
-      ctx.lineTo(-2, -6.5);
-      ctx.lineTo(-9, -3.5);
-    },
-    theme.accent,
-    0.8,
-    0.3,
-  );
-
-  // Dorsal spikes along the back ridge — the silhouette cue that reads
-  // "dangerous" even in a small on-screen size.
-  ctx.fillStyle = theme.dark;
-  for (const [bx, by, h] of [
-    [-6, -5.2, 4.5],
-    [-1, -6.4, 5.5],
-    [4, -5.5, 4.5],
-  ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(bx - 1.6, by);
-    ctx.lineTo(bx, by - h);
-    ctx.lineTo(bx + 1.6, by);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  // Mandibles — reaching forward, twitching, an explicit threat cue absent before.
-  ctx.save();
-  ctx.translate(9, 0);
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.6;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(0, -1.5);
-  ctx.quadraticCurveTo(4, -3.5 - mandibleTwitch, 5.5, -1 - mandibleTwitch);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(0, 1.5);
-  ctx.quadraticCurveTo(4, 3.5 + mandibleTwitch, 5.5, 1 + mandibleTwitch);
-  ctx.stroke();
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.7;
-  ctx.beginPath();
-  ctx.arc(5.5, -1 - mandibleTwitch, 0.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(5.5, 1 + mandibleTwitch, 0.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.restore();
-
-  // Eye cluster — several small glowing points instead of one cute round
-  // eye: reads as alien/insectile rather than a mascot's face.
-  const eyeFlicker = 0.65 + 0.35 * Math.sin(timeMs / (300 / intensity));
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = Math.min(1, eyeFlicker * (0.85 + 0.15 * intensity));
-  for (const [ex, ey, er] of [
-    [4.5, -2, 1.1],
-    [5.5, 0, 1.3],
-    [4.5, 2, 1.1],
-    [2, -3.2, 0.7],
-    [2, 3.2, 0.7],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(ex, ey, er, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  ctx.restore();
-
-  if (hitFlash > 0) {
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.globalAlpha = hitFlash * 0.85;
-    ctx.fillStyle = STATUS_COLORS.hitFlash;
-    ctx.beginPath();
-    ctx.ellipse(0, bob, 10.5, 7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-/**
- * PRODUÇÃO VISUAL spec section 13 — this used to be a bare triangle with a
- * dot for an eye (exactly the "forma geométrica" complaint). Rebuilt to the
- * same anatomy tier as Crawler: a lean, low-slung sprinting body on four
- * long jointed legs in a full gallop stride, a tapering whip-tail, and a
- * distinct head with a forward jaw and a single glowing eye.
- */
-const RUNNER_STRIDE = 7;
-function drawRunner(
-  ctx: CanvasRenderingContext2D,
-  theme: (typeof ENEMY_THEME)["RUNNER"],
-  timeMs: number,
-  locomotion?: LocomotionState,
-): void {
-  const speedRatio = locomotion?.speedRatio ?? 1;
-  const gallopPhase = gaitPhase(locomotion?.distance ?? 0, RUNNER_STRIDE);
-  const stride = gaitSwing(gallopPhase, speedRatio, 1);
-  const bob = gaitBounce(gallopPhase, speedRatio, 0.7);
-
-  ctx.save();
-  ctx.translate(0, -bob);
-
-  // Speed lines trailing a real sprinting body, not a floating shape.
-  ctx.strokeStyle = `rgba(217,194,70,${0.3 + 0.15 * Math.sin(timeMs / 80)})`;
-  ctx.lineWidth = 1.2;
-  ctx.lineCap = "round";
-  for (const offset of [-3, 0, 3]) {
-    ctx.beginPath();
-    ctx.moveTo(-8, offset);
-    ctx.lineTo(-15, offset * 1.4);
-    ctx.stroke();
-  }
-
-  // Four long, jointed legs in a full gallop stride — the front pair
-  // reaching forward while the back pair drives backward (and vice versa
-  // on the next phase), the read that separates a sprinting hound from a
-  // static wedge.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.3;
-  ctx.lineCap = "round";
-  const legs: ReadonlyArray<readonly [number, number, number]> = [
-    [5, 1, stride],
-    [5, -1, -stride],
-    [-4, 1, -stride],
-    [-4, -1, stride],
-  ];
-  for (const [hipX, side, phase] of legs) {
-    const kneeX = hipX + phase * 3;
-    const kneeY = side * 5;
-    const footX = hipX + phase * 5.5;
-    const footY = side * 8.5;
-    ctx.beginPath();
-    ctx.moveTo(hipX, side * 2.2);
-    ctx.lineTo(kneeX, kneeY);
-    ctx.lineTo(footX, footY);
-    ctx.stroke();
-  }
-
-  // Low, lean torso, tapering front-to-back like a sprinting hound.
-  const bodyGradient = ctx.createLinearGradient(-9, -3.5, 9, 3.5);
-  bodyGradient.addColorStop(0, theme.dark);
-  bodyGradient.addColorStop(0.5, theme.body);
-  bodyGradient.addColorStop(1, theme.accent);
-  ctx.fillStyle = bodyGradient;
-  ctx.beginPath();
-  ctx.moveTo(9, 0);
-  ctx.quadraticCurveTo(7, -3.6, 1, -3.2);
-  ctx.quadraticCurveTo(-6, -3, -9, -1);
-  ctx.quadraticCurveTo(-6, 3, 1, 3.2);
-  ctx.quadraticCurveTo(7, 3.6, 9, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#000000";
-  ctx.globalAlpha = 0.3;
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  rimHighlight(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(1, -3.2);
-      ctx.lineTo(-6, -3);
-    },
-    theme.accent,
-    0.7,
-    0.35,
-  );
-
-  // Tapering tail whipping with the stride.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(-8, 0);
-  ctx.quadraticCurveTo(-11, stride * 2.2, -14, stride * 3.8);
-  ctx.stroke();
-
-  // Narrow head with a forward-jutting jaw and a single glowing eye.
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.moveTo(8.5, -2);
-  ctx.lineTo(14, 0);
-  ctx.lineTo(8.5, 2);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.globalAlpha = 0.5;
-  ctx.lineWidth = 0.7;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.6 + 0.4 * Math.sin(timeMs / 150);
-  ctx.beginPath();
-  ctx.arc(10.5, 0, 1, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  ctx.restore();
-}
-
-/**
- * PRODUÇÃO VISUAL spec section 13 — this used to be a plain ellipse with a
- * diamond chest plate glued on and a stray triangle "snout" floating off
- * to the side (a shape with a sticker, not a creature). Rebuilt with real
- * anatomy: stumpy stomping legs, thick hanging forearms with clenched
- * knuckles, and a distinct sunken head with a heavy jaw and two eyes,
- * while keeping the riveted chest plate that already read well.
- */
-const BRUTE_STRIDE = 14;
-function drawBrute(
-  ctx: CanvasRenderingContext2D,
-  theme: (typeof ENEMY_THEME)["BRUTE"],
-  timeMs: number,
-  locomotion?: LocomotionState,
-): void {
-  const speedRatio = locomotion?.speedRatio ?? 1;
-  const breathe = Math.sin(timeMs / 500) * 0.4;
-  const stompPhase = gaitPhase(locomotion?.distance ?? 0, BRUTE_STRIDE);
-  const stomp = gaitSwing(stompPhase, speedRatio, 1);
-  // CREATURE PRESENTATION PASS — a heavy creature's torso should settle
-  // into each footfall (two compressions per stride, doubled phase)
-  // instead of gliding at a fixed height while only the legs animate
-  // underneath it (the concrete "parece deslizando" symptom this pass
-  // targets). Legs stay planted at their own footY below; only the
-  // torso-up body lifts/settles, so the silhouette still reads as feet
-  // making real ground contact rather than the whole creature bobbing
-  // as one rigid block.
-  const bruteSettle = gaitBounce(stompPhase, speedRatio, 0.7);
-
-  ctx.save();
-
-  // Thick, stumpy legs — a slow, heavy stomping gait.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1] as const) {
-    const footY = side * (9 + stomp * side * 1.2);
-    ctx.beginPath();
-    ctx.moveTo(-2, side * 6.5);
-    ctx.lineTo(-3, footY);
-    ctx.stroke();
-  }
-
-  ctx.save();
-  ctx.translate(0, -bruteSettle);
-
-  // Squat, hunched torso.
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.ellipse(-1, 0, 11, 8.5 + breathe, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.fillStyle = theme.dark;
-  ctx.beginPath();
-  ctx.ellipse(-3, -6.5, 5.5, 3.2, -0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.ellipse(-3, 6.5, 5.5, 3.2, 0.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Riveted chest plate — armored bulk, not just a bigger blob.
-  ctx.fillStyle = "#8a8272";
-  ctx.beginPath();
-  ctx.moveTo(-7, -5.5);
-  ctx.lineTo(4, -4.8);
-  ctx.lineTo(2.5, 5.5);
-  ctx.lineTo(-5, 5.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.fillStyle = theme.dark;
-  for (const [px, py] of [
-    [-5, -3],
-    [1.5, -2],
-    [-3, 3],
-    [0.5, 3.8],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(px, py, 0.9, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Two thick forearms hanging low with clenched knuckles — the "brute
-  // strength" read a bare ellipse never had.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 3;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1] as const) {
-    ctx.beginPath();
-    ctx.moveTo(2, side * 6.5);
-    ctx.quadraticCurveTo(7, side * 9.5 + stomp * side * 0.8, 6, side * 12.5);
-    ctx.stroke();
-    ctx.fillStyle = theme.dark;
-    ctx.beginPath();
-    ctx.arc(6, side * 12.5, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Small sunken head set low into the shoulders — a heavy jaw and two
-  // dim, glowing eyes instead of a stray floating triangle.
-  ctx.fillStyle = theme.dark;
-  ctx.beginPath();
-  ctx.ellipse(9.5, 0, 3.6, 4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.ellipse(9, 2.4, 2.6, 1.6, 0.3, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.85;
-  ctx.beginPath();
-  ctx.arc(11, -1.3, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(11, 1.3, 0.9, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  ctx.restore();
-  ctx.restore();
-}
-
-/**
- * CHEFE MAIOR — "Void Colossus" identity (concept art reference): an
- * ancient rock-and-crystal guardian, recolored per biome/boss instead of
- * one fixed palette, reusing the same 4-layer magic language as the
- * towers/castle (veios de energia / núcleo / runas / partículas). Replaces
- * the old "scaled-up Brute" body for every MAIN boss only — mini-bosses
- * keep their existing SHIELDBEARER-based look untouched. Drawn at the same
- * base scale other creatures use; the real size read still comes from
- * CanvasRenderer's own boss scale multiplier (1.9x), exactly like before.
- */
-function drawMainBossColossus(
-  ctx: CanvasRenderingContext2D,
-  color: string,
-  timeMs: number,
-  enraged: boolean,
-  hpPercent: number,
-): void {
-  const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 260 : 550));
-  const rage = enraged ? 1.5 : 1;
-  const damageIntensity = Math.max(0, 1 - hpPercent); // veins/core burn brighter as the colossus is worn down.
-
-  drawContactShadow(ctx, 22, 10, 0.48);
-
-  // --- Four heavy clawed limbs radiating from the core, dark weathered
-  // stone with a pale crystal claw-tip — the "ancient guardian" stance. ---
-  for (const a of [-2.35, -0.75, 0.75, 2.35]) {
-    const lx = Math.cos(a) * 17;
-    const ly = Math.sin(a) * 17;
-    const limbGrad = ctx.createLinearGradient(0, 0, lx, ly);
-    limbGrad.addColorStop(0, "#4a4650");
-    limbGrad.addColorStop(1, "#1c1a20");
-    ctx.strokeStyle = limbGrad;
-    ctx.lineWidth = 5;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
-    ctx.lineTo(lx, ly);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.8 + damageIntensity * 0.2;
-    ctx.beginPath();
-    ctx.moveTo(lx + Math.cos(a) * 3, ly + Math.sin(a) * 3);
-    ctx.lineTo(lx + Math.cos(a + 1.9) * 2, ly + Math.sin(a + 1.9) * 2);
-    ctx.lineTo(lx + Math.cos(a - 1.9) * 2, ly + Math.sin(a - 1.9) * 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // --- Body: a broad, irregular boulder mass — angular, not a clean circle. ---
-  const bodyGrad = ctx.createRadialGradient(-3, -4, 2, 0, 0, 15);
-  bodyGrad.addColorStop(0, "#4e4a56");
-  bodyGrad.addColorStop(0.6, "#2c2932");
-  bodyGrad.addColorStop(1, "#141218");
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.moveTo(0, -14);
-  ctx.lineTo(10, -8);
-  ctx.lineTo(13, 2);
-  ctx.lineTo(8, 12);
-  ctx.lineTo(-8, 13);
-  ctx.lineTo(-13, 3);
-  ctx.lineTo(-10, -9);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // CAMADA 1 — Veios de Energia: cracks running through the rock, burning
-  // brighter the more damage the colossus has taken.
-  const veinAlpha = 0.5 + damageIntensity * 0.4 + (enraged ? 0.25 : 0);
-  drawEnergyCrack(ctx, -9, -3, -4, -8, 2, -12, color, veinAlpha);
-  drawEnergyCrack(ctx, 9, 4, 5, 9, -3, 11, color, veinAlpha * 0.85);
-  drawEnergyCrack(ctx, -11, 2, -6, 6, -1, 9, color, veinAlpha * 0.7);
-
-  // CAMADA 3 — Runas Gravadas: engraved facet-lines on the shoulders.
-  ctx.save();
-  ctx.globalAlpha = 0.35 + 0.25 * pulse;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 0.9;
-  for (const [sx, sy, r] of [
-    [-8, -6, 2.4],
-    [8, 6, 2.4],
-  ] as const) {
-    ctx.beginPath();
-    ctx.moveTo(sx - r, sy);
-    ctx.lineTo(sx, sy - r);
-    ctx.lineTo(sx + r, sy);
-    ctx.lineTo(sx, sy + r);
-    ctx.closePath();
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // --- Crystal crown: pale stone shards jutting from the shoulders/head,
-  // echoing the reference's crystal head/back growths. ---
-  for (const [sx, sy, tipAngle, len] of [
-    [-3, -13, -1.75, 8],
-    [4, -12, -1.15, 6.5],
-    [-9, -8, -2.3, 5],
-    [10, -6, -0.6, 5],
-  ] as const) {
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(tipAngle);
-    const shardGrad = ctx.createLinearGradient(0, 0, 0, -len);
-    shardGrad.addColorStop(0, "#7a7684");
-    shardGrad.addColorStop(1, "#d8d4e0");
-    ctx.fillStyle = shardGrad;
-    ctx.beginPath();
-    ctx.moveTo(-1.6, 0);
-    ctx.lineTo(0, -len);
-    ctx.lineTo(1.6, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // CAMADA 2 — Núcleo: the colossus's power heart, a bright diamond core
-  // set in the chest — the reference's single strongest focal point.
-  glowBlob(ctx, 0, 0, (13 + damageIntensity * 6) * rage, color);
-  const coreGrad = ctx.createRadialGradient(-0.8, -1, 0, 0, 0, 5.5);
-  coreGrad.addColorStop(0, "#ffffff");
-  coreGrad.addColorStop(0.45, color);
-  coreGrad.addColorStop(1, "rgba(0,0,0,0.4)");
-  ctx.fillStyle = coreGrad;
-  ctx.globalAlpha = 0.85 + 0.15 * pulse;
-  ctx.beginPath();
-  ctx.moveTo(0, -6.5);
-  ctx.lineTo(4.2, 0);
-  ctx.lineTo(0, 6.5);
-  ctx.lineTo(-4.2, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = "rgba(255,255,255,0.7)";
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // CAMADA 4 — Partículas Flutuantes: broken rock fragments orbiting the
-  // core (spec's "Invocação de Fragmentos" flavor) — angular chips, not
-  // round motes, each on its own slow independent orbit.
-  for (let i = 0; i < 5; i++) {
-    const orbitSpeed = 1400 + i * 260;
-    const orbitRadius = 19 + (i % 2) * 4;
-    const a = timeMs / orbitSpeed + i * ((Math.PI * 2) / 5);
-    const fx = Math.cos(a) * orbitRadius;
-    const fy = Math.sin(a) * orbitRadius * 0.55; // squashed for the top-down read
-    ctx.save();
-    ctx.translate(fx, fy);
-    ctx.rotate(a * 2);
-    ctx.fillStyle = "#3a3640";
-    ctx.beginPath();
-    ctx.moveTo(-1.4, -1.4);
-    ctx.lineTo(1.6, -1);
-    ctx.lineTo(1.2, 1.6);
-    ctx.lineTo(-1.6, 1.1);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.6;
-    ctx.beginPath();
-    ctx.arc(0, 0, 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.restore();
-  }
-}
-
-/**
- * MINI CHEFE — "Void Colossus, Jr.": a deliberately miniaturized, simplified
- * build of the exact same creature as `drawMainBossColossus` above, not a
- * different monster and not that function merely called at a smaller
- * `ctx.scale`. It reuses every element that makes the Void Colossus
- * recognizable — the angular weathered-rock body, the pale crystal
- * shoulder-shards, the glowing diamond core, the orbiting rock fragments,
- * the same two-tone stone gradient and the same per-biome `color` — but
- * each layer is hand-simplified rather than uniformly scaled: fewer limbs
- * (3, not 4), a smaller/plainer body silhouette, a single faint vein crack
- * instead of three, NO engraved rune facets at all (the mini has no
- * ornamentation layer), only 2 shoulder crystals instead of 4, and only 2
- * orbiting fragments instead of 5. The result reads as "the same guardian,
- * but young/lesser" rather than "a different rock monster" or "the boss
- * shrunk in Photoshop." Combined with CanvasRenderer's own smaller boss
- * scale multiplier for mini-bosses (1.4x vs the main boss's 1.9x), the main
- * boss stays unmistakably the larger, more elaborate, more imposing of the
- * two. `enraged`/`hpPercent` mirror the main boss's own real, gameplay-
- * driven inputs (BossManager's Enrage applies to mini-bosses too) so a
- * mini-boss visibly "wears down" and enrages exactly like its big sibling —
- * purely cosmetic reads of real state, same as the main boss's version.
- */
-function drawMiniBossColossus(
-  ctx: CanvasRenderingContext2D,
-  color: string,
-  timeMs: number,
-  enraged: boolean,
-  hpPercent: number,
-): void {
-  const pulse = 0.5 + 0.5 * Math.sin(timeMs / (enraged ? 260 : 550));
-  const rage = enraged ? 1.35 : 1;
-  const damageIntensity = Math.max(0, 1 - hpPercent);
-
-  drawContactShadow(ctx, 13, 6, 0.42);
-
-  // --- Three shorter, thinner clawed limbs (main boss has four, longer
-  // ones) — an immediately smaller, less elaborate stance. ---
-  for (const a of [-Math.PI / 2, Math.PI / 2 - 0.9, Math.PI / 2 + 0.9]) {
-    const lx = Math.cos(a) * 10;
-    const ly = Math.sin(a) * 10;
-    const limbGrad = ctx.createLinearGradient(0, 0, lx, ly);
-    limbGrad.addColorStop(0, "#4a4650");
-    limbGrad.addColorStop(1, "#1c1a20");
-    ctx.strokeStyle = limbGrad;
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(a) * 3.5, Math.sin(a) * 3.5);
-    ctx.lineTo(lx, ly);
-    ctx.stroke();
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.8 + damageIntensity * 0.2;
-    ctx.beginPath();
-    ctx.moveTo(lx + Math.cos(a) * 1.8, ly + Math.sin(a) * 1.8);
-    ctx.lineTo(lx + Math.cos(a + 1.9) * 1.2, ly + Math.sin(a + 1.9) * 1.2);
-    ctx.lineTo(lx + Math.cos(a - 1.9) * 1.2, ly + Math.sin(a - 1.9) * 1.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // --- Body: the same irregular boulder-mass silhouette language, at
-  // roughly 60% of the main boss's size and with fewer facets (6, not 7). ---
-  const bodyGrad = ctx.createRadialGradient(-2, -2.5, 1, 0, 0, 9);
-  bodyGrad.addColorStop(0, "#4e4a56");
-  bodyGrad.addColorStop(0.6, "#2c2932");
-  bodyGrad.addColorStop(1, "#141218");
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.moveTo(0, -8.5);
-  ctx.lineTo(7.5, -3);
-  ctx.lineTo(7, 6.5);
-  ctx.lineTo(-6.5, 7.5);
-  ctx.lineTo(-7.5, -2.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-
-  // A single faint vein crack — the main boss has three; the mini reads as
-  // "less power coursing through it" as much as "less ornamented."
-  const veinAlpha = 0.4 + damageIntensity * 0.35 + (enraged ? 0.2 : 0);
-  drawEnergyCrack(ctx, -5.5, -1.5, -2.5, -4.5, 1, -6.5, color, veinAlpha);
-
-  // No rune-facet layer at all (spec: "menos ornamentações") — the mini
-  // skips straight from body to crystal crown and core.
-
-  // --- Crystal crown: 2 shards instead of 4, shorter. ---
-  for (const [sx, sy, tipAngle, len] of [
-    [-2, -7.5, -1.75, 5],
-    [3, -7, -1.0, 4],
-  ] as const) {
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(tipAngle);
-    const shardGrad = ctx.createLinearGradient(0, 0, 0, -len);
-    shardGrad.addColorStop(0, "#7a7684");
-    shardGrad.addColorStop(1, "#d8d4e0");
-    ctx.fillStyle = shardGrad;
-    ctx.beginPath();
-    ctx.moveTo(-1, 0);
-    ctx.lineTo(0, -len);
-    ctx.lineTo(1, 0);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // CAMADA 2 — Núcleo: same diamond-core focal point, smaller and with a
-  // plainer (2-stop, no white-hot highlight) gradient than the main boss's.
-  glowBlob(ctx, 0, 0, (7.5 + damageIntensity * 3.5) * rage, color);
-  const coreGrad = ctx.createRadialGradient(-0.5, -0.6, 0, 0, 0, 3.4);
-  coreGrad.addColorStop(0, color);
-  coreGrad.addColorStop(1, "rgba(0,0,0,0.4)");
-  ctx.fillStyle = coreGrad;
-  ctx.globalAlpha = 0.8 + 0.15 * pulse;
-  ctx.beginPath();
-  ctx.moveTo(0, -4);
-  ctx.lineTo(2.6, 0);
-  ctx.lineTo(0, 4);
-  ctx.lineTo(-2.6, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
-  ctx.strokeStyle = "rgba(255,255,255,0.6)";
-  ctx.lineWidth = 0.6;
-  ctx.stroke();
-
-  // CAMADA 4 — 2 orbiting rock fragments instead of 5, on a tighter orbit.
-  for (let i = 0; i < 2; i++) {
-    const orbitSpeed = 1500 + i * 300;
-    const orbitRadius = 11 + i * 2.5;
-    const a = timeMs / orbitSpeed + i * Math.PI;
-    const fx = Math.cos(a) * orbitRadius;
-    const fy = Math.sin(a) * orbitRadius * 0.55;
-    ctx.save();
-    ctx.translate(fx, fy);
-    ctx.rotate(a * 2);
-    ctx.fillStyle = "#3a3640";
-    ctx.beginPath();
-    ctx.moveTo(-0.9, -0.9);
-    ctx.lineTo(1, -0.6);
-    ctx.lineTo(0.75, 1);
-    ctx.lineTo(-1, 0.7);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-}
-
-/**
- * PRODUÇÃO VISUAL spec section 13 — this used to be a body blob with a
- * shield polygon glued beside it and a single floating eye (no arm holding
- * the shield, no legs, no head). Rebuilt with real anatomy: sturdy legs, a
- * bent arm gripping the shield from behind, and a small head peeking above
- * it — the shield reads as equipment a creature carries, not a sticker.
- */
-const SHIELDBEARER_STRIDE = 16;
-function drawShieldbearer(
-  ctx: CanvasRenderingContext2D,
-  theme: (typeof ENEMY_THEME)["SHIELDBEARER"],
-  timeMs: number,
-  locomotion?: LocomotionState,
-): void {
-  const speedRatio = locomotion?.speedRatio ?? 1;
-  const shufflePhase = gaitPhase(locomotion?.distance ?? 0, SHIELDBEARER_STRIDE);
-  const breathe = Math.sin(timeMs / 600) * 0.3;
-  const shuffle = gaitSwing(shufflePhase, speedRatio, 0.5);
-  // CREATURE PRESENTATION PASS — same torso-settles-into-each-footfall fix
-  // as drawBrute above; legs shuffle below but the body itself never
-  // reacted to its own steps.
-  const shieldbearerSettle = gaitBounce(shufflePhase, speedRatio, 0.5);
-
-  ctx.save();
-
-  // Sturdy legs — a slow defensive shuffle, not a static float.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1] as const) {
-    ctx.beginPath();
-    ctx.moveTo(-2, side * 5);
-    ctx.lineTo(-3 + shuffle * side, side * 8.5);
-    ctx.stroke();
-  }
-
-  ctx.save();
-  ctx.translate(0, -shieldbearerSettle);
-
-  // Torso.
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.ellipse(-2, 0, 7.5, 6.2 + breathe, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.globalAlpha = 0.35;
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // Bent arm gripping the shield from behind — a real limb, not a floating panel.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 2.4;
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  ctx.moveTo(2, -3);
-  ctx.quadraticCurveTo(6, -2, 6.5, 1);
-  ctx.stroke();
-
-  // Large shield facing the direction of travel.
-  const shieldGradient = ctx.createLinearGradient(6, -9, 6, 9);
-  shieldGradient.addColorStop(0, theme.accent);
-  shieldGradient.addColorStop(1, theme.dark);
-  ctx.fillStyle = shieldGradient;
-  ctx.beginPath();
-  ctx.moveTo(4, -9);
-  ctx.lineTo(11, -5);
-  ctx.lineTo(11, 5);
-  ctx.lineTo(4, 9);
-  ctx.lineTo(2, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  // A rivet boss at the shield's center — the material read.
-  ctx.fillStyle = theme.dark;
-  ctx.beginPath();
-  ctx.arc(6.5, 0, 1.3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Small head peeking above the shoulders, behind the shield's rim.
-  ctx.fillStyle = theme.dark;
-  ctx.beginPath();
-  ctx.ellipse(-2, -6.5, 3, 3.4, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = theme.accent;
-  ctx.beginPath();
-  ctx.arc(-0.5, -7, 1, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
-  ctx.restore();
-}
-
-/**
- * CORREÇÃO DE REQUISITOS (redesenho visual dos inimigos) — SWARMLING,
- * REGENERATOR, IRONCLAD and DISABLER used to literally reuse drawCrawler/
- * drawBrute/drawShieldbearer/drawRunner verbatim (only their own theme
- * color and a scale multiplier told them apart — see drawEnemy's dispatch
- * switch below), which is exactly the "still looks like a recolored shape"
- * complaint. Each gets its own bespoke silhouette here, at the same
- * detail tier as drawCrawler (jointed limbs / distinct silhouette / an
- * identity-specific detail), so all 8 archetypes read as genuinely
- * different creatures, not palette swaps of 4 base shapes.
- */
-
-/** Small, many-legged swarm creature — reads as a pack hunter, not a shrunken Crawler: rounder/lumpier body, more (thinner, faster) legs, a tight eye cluster instead of Crawler's mandibles. */
-function drawSwarmling(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["SWARMLING"], timeMs: number): void {
-  const jitter = Math.sin(timeMs / 70) * 0.5;
-  const legPhase = Math.sin(timeMs / 60);
-
-  // Six thin, fast-twitching legs — noticeably more and faster than Crawler's, the "swarm" read.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1;
-  ctx.lineCap = "round";
-  for (const side of [-1, 1]) {
-    for (let i = -1; i <= 1; i++) {
-      const baseX = i * 2.2;
-      const footX = baseX + legPhase * side * 1.4;
-      const footY = side * (6.5 + Math.abs(legPhase) * 1.6);
-      ctx.beginPath();
-      ctx.moveTo(baseX, side * 2.5);
-      ctx.lineTo(baseX + legPhase * side * 0.5, side * 4.5);
-      ctx.lineTo(footX, footY);
-      ctx.stroke();
-    }
-  }
-
-  // Lumpy, irregular body — an uneven blob rather than Crawler's sharp
-  // angular carapace. BUG FIX (identidade visual audit): this used to fill
-  // with a single flat `theme.body` tone and only a 0.4-alpha outline for
-  // relief — at SWARMLING's small on-screen scale (archetypeScale 0.65,
-  // CanvasRenderer.tsx) that read as a solid dark silhouette with no visible
-  // shape. A lit gradient + rim highlight (matching Crawler/Ironclad's own
-  // construction) gives it the same top-left-lit material read every other
-  // enemy already has.
-  const bodyPath = () => {
-    ctx.beginPath();
-    ctx.moveTo(5.5 + jitter, 0);
-    ctx.bezierCurveTo(5, -4.5, 1.5, -6, -1.5, -5);
-    ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
-    ctx.bezierCurveTo(-6, 3, -3.5, 5, 0, 5);
-    ctx.bezierCurveTo(3, 4.8, 5.5, 2.5, 5.5 + jitter, 0);
-    ctx.closePath();
-  };
-  const bodyGradient = ctx.createLinearGradient(-4, -5, 4, 4);
-  bodyGradient.addColorStop(0, theme.accent);
-  bodyGradient.addColorStop(0.4, theme.body);
-  bodyGradient.addColorStop(1, theme.dark);
-  ctx.fillStyle = bodyGradient;
-  bodyPath();
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.globalAlpha = 0.4;
-  ctx.lineWidth = 0.8;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  rimHighlight(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(-1.5, -5);
-      ctx.bezierCurveTo(-5, -4, -6.5, -1, -6, 0.5 + jitter);
-    },
-    theme.accent,
-    0.8,
-    0.4,
-  );
-
-  // A tight cluster of small glowing eyes — the "many of me" identity cue.
-  const flicker = 0.6 + 0.4 * Math.sin(timeMs / 180);
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = flicker;
-  for (const [ex, ey, er] of [
-    [2.5, -1.4, 0.75],
-    [3.2, 0, 0.85],
-    [2.5, 1.4, 0.75],
-    [0.5, -2.3, 0.5],
-    [0.5, 2.3, 0.5],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(ex, ey, er, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-}
-
-/** Organic, moss/root-covered creature that visibly heals — an asymmetric fleshy body with growth tendrils and a pulsing healing core, never a symmetric ellipse. */
-function drawRegenerator(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["REGENERATOR"], timeMs: number): void {
-  const pulse = 0.55 + 0.45 * Math.sin(timeMs / 260);
-  const swaySway = Math.sin(timeMs / 400) * 2;
-
-  // Root/vine tendrils trailing from the body, each tipped with a small leaf.
-  ctx.strokeStyle = theme.dark;
-  ctx.lineWidth = 1.1;
-  ctx.lineCap = "round";
-  for (const [ox, oy, len, dir] of [
-    [-6, -4, 7, -1],
-    [-7, 2, 6, 0.3],
-    [-4, 6, 5.5, 1],
-  ] as const) {
-    const tipX = ox - len + swaySway * dir * 0.3;
-    const tipY = oy + dir * 3;
-    ctx.beginPath();
-    ctx.moveTo(ox, oy);
-    ctx.quadraticCurveTo(ox - len * 0.5, oy + dir * 1.5, tipX, tipY);
-    ctx.stroke();
-    ctx.fillStyle = theme.accent;
-    ctx.globalAlpha = 0.75;
-    ctx.beginPath();
-    ctx.ellipse(tipX, tipY, 1.6, 0.9, dir * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1;
-  }
-
-  // Asymmetric fleshy body — deliberately lopsided, like a growth/mound
-  // rather than a creature with clean bilateral symmetry. Lit gradient
-  // (matching the SWARMLING fix above) instead of a flat fill, so the shape
-  // still reads clearly even where the healing core's glow doesn't reach.
-  const regenGradient = ctx.createLinearGradient(-6, -6, 6, 5);
-  regenGradient.addColorStop(0, theme.accent);
-  regenGradient.addColorStop(0.4, theme.body);
-  regenGradient.addColorStop(1, theme.dark);
-  ctx.fillStyle = regenGradient;
-  ctx.beginPath();
-  ctx.moveTo(7, -1);
-  ctx.bezierCurveTo(6.5, -6, 1, -8, -3, -6);
-  ctx.bezierCurveTo(-7.5, -4, -8, 1, -6, 4.5);
-  ctx.bezierCurveTo(-4, 8, 2, 8.5, 5.5, 5.5);
-  ctx.bezierCurveTo(8, 3, 7.5, 1.5, 7, -1);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = theme.dark;
-  ctx.globalAlpha = 0.4;
-  ctx.lineWidth = 0.9;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // Moss tufts on the back.
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.6;
-  for (const [mx, my, r] of [
-    [-2, -6, 1.6],
-    [1.5, -6.5, 1.2],
-    [-4.5, -3.5, 1.1],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(mx, my, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.globalAlpha = 1;
-
-  // Pulsing healing core — the "visibly regenerating" identity cue, brighter/dimmer over time.
-  drawMagicCore(ctx, 0, 0, 3.5 * pulse, theme.accent);
-}
-
-/** Full-body heavy plate armor — thicker and more encasing than Shieldbearer's single hand-shield, a slower hunched posture reading as "walking fortress" rather than a soldier with a shield item. */
-function drawIronclad(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["IRONCLAD"]): void {
-  // Broader, lower-slung body than Shieldbearer — the weight/bulk read.
-  ctx.fillStyle = theme.body;
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 10, 8, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Full-body plating: front chest plate, shoulder plates, AND a rear back
-  // plate — armor wraps the whole creature, not a shield it happens to carry.
-  const plateGradient = ctx.createLinearGradient(-8, -8, 8, 8);
-  plateGradient.addColorStop(0, "#9a9aa2");
-  plateGradient.addColorStop(0.5, theme.body);
-  plateGradient.addColorStop(1, theme.dark);
-  ctx.fillStyle = plateGradient;
-  ctx.beginPath();
-  ctx.moveTo(-9, -6);
-  ctx.lineTo(-2, -8.5);
-  ctx.lineTo(8, -5);
-  ctx.lineTo(9, 0);
-  ctx.lineTo(8, 5);
-  ctx.lineTo(-2, 8.5);
-  ctx.lineTo(-9, 6);
-  ctx.lineTo(-10.5, 0);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = "#000000";
-  ctx.globalAlpha = 0.3;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-  rimHighlight(
-    ctx,
-    () => {
-      ctx.beginPath();
-      ctx.moveTo(-2, -8.5);
-      ctx.lineTo(8, -5);
-    },
-    "#d8d8de",
-    1,
-    0.5,
-  );
-
-  // Rivets across every plate seam — the material read, not just a flat gray fill.
-  ctx.fillStyle = theme.dark;
-  for (const [px, py] of [
-    [-5, -5],
-    [2, -6],
-    [6, -2],
-    [6, 2],
-    [2, 6],
-    [-5, 5],
-    [-8, 0],
-  ] as const) {
-    ctx.beginPath();
-    ctx.arc(px, py, 0.85, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // A narrow visor slit — the only "face" a fully-encased creature needs.
-  ctx.fillStyle = theme.accent;
-  ctx.globalAlpha = 0.85;
-  ctx.beginPath();
-  ctx.ellipse(6.5, 0, 1.3, 2.6, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.globalAlpha = 1;
-}
-
-/** Spectral, levitating disruptor — no legs (a tapering shadow base instead), drifting tentacle appendages, and a pulsing violet aura in place of Runner's simple speed-lined diamond. */
-function drawDisabler(ctx: CanvasRenderingContext2D, theme: (typeof ENEMY_THEME)["DISABLER"], timeMs: number): void {
-  const drift = Math.sin(timeMs / 500) * 1.2;
-  const pulse = 0.5 + 0.5 * Math.sin(timeMs / 240);
-
-  // Pulsing interference aura — the "disrupts nearby towers" identity cue.
-  ctx.save();
-  ctx.globalAlpha = 0.22 + 0.18 * pulse;
-  ctx.strokeStyle = theme.accent;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.arc(0, drift * 0.3, 10 + pulse * 1.5, 0, Math.PI * 2);
-  ctx.stroke();
-  ctx.restore();
-
-  // Drifting tentacle-like appendages trailing behind — no legs, it floats.
-  ctx.strokeStyle = theme.dark;
-  ctx.globalAlpha = 0.75;
-  ctx.lineWidth = 1;
-  ctx.lineCap = "round";
-  for (const [oy, len, phase] of [
-    [-4, 8, 0],
-    [0, 9, 1.4],
-    [4, 7.5, 2.6],
-  ] as const) {
-    const wobble = Math.sin(timeMs / 260 + phase) * 2.2;
-    ctx.beginPath();
-    ctx.moveTo(-2, oy);
-    ctx.quadraticCurveTo(-2 - len * 0.5, oy + wobble, -2 - len, oy + wobble * 1.6);
-    ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-
-  // Semi-transparent spectral body — a tapering hood shape, not a solid diamond, with no ground contact (it levitates).
-  ctx.globalAlpha = 0.72;
-  const bodyGradient = ctx.createLinearGradient(-8, 0, 6, 0);
-  bodyGradient.addColorStop(0, "rgba(0,0,0,0)");
-  bodyGradient.addColorStop(0.35, theme.dark);
-  bodyGradient.addColorStop(1, theme.body);
-  ctx.fillStyle = bodyGradient;
-  ctx.beginPath();
-  ctx.moveTo(7, drift * 0.3);
-  ctx.quadraticCurveTo(2, -6.5, -6, -3.5 + drift * 0.4);
-  ctx.quadraticCurveTo(-9, 0, -6, 3.5 + drift * 0.4);
-  ctx.quadraticCurveTo(2, 6.5, 7, drift * 0.3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.globalAlpha = 1;
-
-  // Single glowing violet eye — the one solid, focal point on an otherwise translucent creature.
-  drawMagicCore(ctx, 4.5, drift * 0.3, 2.2 + pulse * 0.4, theme.accent);
-}
-
-// ---------------------------------------------------------------------------
-// Projectiles / attack effects.
-// ---------------------------------------------------------------------------
 
 /**
  * Attack VFX (spec section 11): each tower's projectile now has its own

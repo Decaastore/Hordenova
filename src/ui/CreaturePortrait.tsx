@@ -2,6 +2,7 @@ import type { CSSProperties } from "react";
 import type { EnemyType } from "@/config/enemyStats";
 import { PHASES } from "@/config/phaseConfig";
 import { BIOME_ENEMY_SHEETS } from "@/rendering/biomeEnemySheets";
+import { BOSS_SHEETS } from "@/rendering/bossSheets";
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 
@@ -42,6 +43,23 @@ export function CreaturePortrait({ type, biomeId, size, className, title }: Crea
     backgroundImage: `url(${assetBase}sprites/enemies/${entry.file})`,
     backgroundSize: `${entry.frames * size}px ${size * 3}px`,
     backgroundPosition: "0 0",
+    "--frames": entry.frames,
+    "--strip": `${-entry.frames * size}px`,
+  };
+  return <span className={`hn-creature ${className ?? ""}`} style={style} title={title} role={title ? "img" : undefined} aria-label={title} />;
+}
+
+/** A boss or mini-boss from its baked sheet (side view); walks on hover like CreaturePortrait. */
+export function BossPortrait({ bossId, size, className, title }: { bossId: string; size: number; className?: string; title?: string }) {
+  const entry = BOSS_SHEETS[bossId];
+  if (!entry) return <span className={`hn-creature is-empty ${className ?? ""}`} style={{ width: size, height: size }} title={title} />;
+  const style: CSSProperties & Record<"--frames" | "--strip", string | number> = {
+    width: size,
+    height: size,
+    backgroundImage: `url(${assetBase}sprites/enemies/${entry.file})`,
+    backgroundSize: `${entry.frames * size}px ${size * entry.rows}px`,
+    backgroundPosition: "0 0",
+    filter: `drop-shadow(0 0 6px ${entry.glow}88)`,
     "--frames": entry.frames,
     "--strip": `${-entry.frames * size}px`,
   };

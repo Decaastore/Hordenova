@@ -6,7 +6,7 @@ import { MAIN_BOSSES, MINI_BOSSES, type BossDefinition } from "@/config/bossConf
 import { PHASES } from "@/config/phaseConfig";
 import { DROP_TABLES } from "@/config/dropTables";
 import { ENRAGE_SHIELD_DAMAGE_REDUCTION } from "@/config/enrageShield";
-import { CreaturePortrait, hasCreatureArt } from "@/ui/CreaturePortrait";
+import { BossPortrait, CreaturePortrait, hasCreatureArt } from "@/ui/CreaturePortrait";
 import { ItemGlyph } from "@/ui/ItemGlyph";
 import { CORE_PHASE_COUNT, phaseOfMainBoss, phaseOfMiniBoss } from "./wikiData";
 
@@ -153,7 +153,10 @@ function BossRow({ boss }: { boss: BossDefinition }) {
     ? t(boss.isMainBoss ? "wiki.bossOfPhase" : "wiki.miniBossOfPhase", { number: home.number, name: t(`phases.${home.phase.i18nKey}.name` as TranslationKey) })
     : t("wiki.miniBossRotation", { from: 1, to: CORE_PHASE_COUNT });
   return (
-    <article className="wk-row is-boss" id={`boss-${boss.id}`}>
+    <article className="wk-row is-boss hn-walk-trigger" id={`boss-${boss.id}`} tabIndex={0}>
+      <div className="wk-row-art is-boss-art">
+        <BossPortrait bossId={boss.id} size={boss.isMainBoss ? 112 : 92} />
+      </div>
       <div className="wk-row-main">
         <p className="wk-where">{where}</p>
         <h4>{t(`bosses.${boss.i18nKey}.name` as TranslationKey)}</h4>

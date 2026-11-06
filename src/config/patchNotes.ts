@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v78",
+    dateIso: "2026-11-06",
+    category: "BOSSES",
+    title: {
+      en: "Every Boss Reborn, and Only the New Creatures Left",
+      ptBR: "Todos os Chefes Refeitos, e Só as Criaturas Novas",
+    },
+    description: {
+      en: "All 16 main bosses and 16 mini-bosses are now fully animated creatures with their own walk and attack, surrounded by live effects in their own color. The last of the old hand-drawn creatures are gone: every enemy, in every biome, is one of the new animated creatures.",
+      ptBR: "Os 16 chefes principais e os 16 mini-chefes agora são criaturas totalmente animadas, com caminhada e ataque próprios, cercadas de efeitos ao vivo na cor de cada um. As últimas criaturas antigas desenhadas à mão saíram: todo inimigo, em todo bioma, é uma das criaturas novas animadas.",
+    },
+    highlights: [
+      {
+        en: "Each boss has a turning rune circle under its feet, its own particles (embers, frost, spores, souls, sand, crystal...), a glowing outline and a shockwave at every heavy step.",
+        ptBR: "Cada chefe tem um círculo de runas girando sob os pés, partículas próprias (brasas, gelo, esporos, almas, areia, cristal...), um contorno brilhante e uma onda de choque a cada passo pesado.",
+      },
+      {
+        en: "When a boss uses its ability it plays its attack animation with a blast of light; enraged, it burns with flames and its glow turns red; shielded, it sits inside an energy bubble.",
+        ptBR: "Quando um chefe usa a habilidade, faz a animação de ataque com uma explosão de luz; enfurecido, pega fogo e o brilho fica vermelho; com escudo, fica dentro de uma bolha de energia.",
+      },
+      {
+        en: "A biome's mini-boss is a smaller build of its main boss, so the pair reads as one family; the six original mini-bosses each have their own creature.",
+        ptBR: "O mini-chefe de cada bioma é uma versão menor do chefe principal, então os dois parecem da mesma família; os seis mini-chefes originais têm cada um a sua criatura.",
+      },
+      {
+        en: "The ten later biomes now also have their own colouring of the classic creatures that join them in the endless rotation.",
+        ptBR: "Os dez biomas mais avançados agora também têm suas próprias cores das criaturas clássicas que aparecem neles na rotação infinita.",
+      },
+      {
+        en: "The Wiki's Bestiary now shows every boss and mini-boss, walking on hover.",
+        ptBR: "O Bestiário da Wiki agora mostra cada chefe e mini-chefe, andando quando você passa o mouse.",
+      },
+    ],
+  },
+  {
     id: "v77",
     dateIso: "2026-11-05",
     category: "BALANCE",

@@ -132,7 +132,8 @@ export const WIKI_CSS = `
   scroll-margin-top: 80px;
 }
 .wk-row:hover, .wk-row:focus-visible { background: rgba(239,229,210,0.03); }
-.wk-row.is-boss { grid-template-columns: minmax(0, 1fr) auto; }
+.wk-row.is-boss { grid-template-columns: auto minmax(0, 1fr) auto; }
+.wk-row-art.is-boss-art { width: 120px; height: 120px; }
 .wk-row-art { width: 92px; height: 92px; display: flex; align-items: center; justify-content: center; border-radius: 10px; background: radial-gradient(circle at 50% 66%, rgba(232,176,75,0.12), transparent 65%); }
 .wk-row-art.is-item { background: none; }
 .wk-row-main h4 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.1; }
