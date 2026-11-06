@@ -7,8 +7,8 @@ import { DROP_TABLES } from "@/config/dropTables";
 import { PRESTIGE_TOWER_SKINS, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATIONS_BY_TOWER } from "@/config/specializations";
 
-export type WikiCategory = "TOWERS" | "BESTIARY" | "CASTLE" | "ITEMS" | "PROGRESSION" | "ECONOMY" | "ASCENSION" | "PROJECTIONS";
-export const WIKI_CATEGORIES: readonly WikiCategory[] = ["TOWERS", "BESTIARY", "CASTLE", "ITEMS", "PROGRESSION", "ECONOMY", "ASCENSION", "PROJECTIONS"];
+export type WikiCategory = "TOWERS" | "BESTIARY" | "BATTLE" | "CASTLE" | "ITEMS" | "PROGRESSION" | "DAILY" | "ECONOMY" | "STORE" | "ASCENSION" | "PROJECTIONS";
+export const WIKI_CATEGORIES: readonly WikiCategory[] = ["TOWERS", "BESTIARY", "BATTLE", "CASTLE", "ITEMS", "PROGRESSION", "DAILY", "ECONOMY", "STORE", "ASCENSION", "PROJECTIONS"];
 
 /** The six original phases share one roster of 8 archetypes (each biome has its own creature for each). */
 export const CORE_PHASE_COUNT = 6;
@@ -72,6 +72,22 @@ export function buildSearchIndex(): SearchEntry[] {
   PHASES.forEach((p, i) =>
     out.push({ nameKey: `phases.${p.i18nKey}.name`, kindKey: "wiki.kinds.phase", target: { category: "BESTIARY", anchor: i < CORE_PHASE_COUNT ? "phase-core" : `phase-${p.id}` } }),
   );
+  // Game systems: each section of the Battle, Missions & Pass and Store pages.
+  const topics: [string, WikiCategory, string][] = [
+    ["wiki.battle.mapTitle", "BATTLE", "battle-map"],
+    ["wiki.battle.phasesTitle", "BATTLE", "battle-phases"],
+    ["wiki.battle.siegeTitle", "BATTLE", "battle-siege"],
+    ["wiki.battle.manaTitle", "BATTLE", "battle-mana"],
+    ["wiki.battle.rouletteTitle", "BATTLE", "battle-roulette"],
+    ["wiki.battle.offlineTitle", "BATTLE", "battle-offline"],
+    ["wiki.daily.missionsTitle", "DAILY", "daily-missions"],
+    ["wiki.daily.passTitle", "DAILY", "daily-pass"],
+    ["wiki.store.gemTypesTitle", "STORE", "store-gems"],
+    ["store.starterTitle", "STORE", "store-starter"],
+    ["store.giftTitle", "STORE", "store-gift"],
+    ["wiki.store.skinsTitle", "STORE", "store-skins"],
+  ];
+  for (const [nameKey, category, anchor] of topics) out.push({ nameKey, kindKey: "wiki.kinds.topic", target: { category, anchor } as SearchEntry["target"] });
   return out;
 }
 

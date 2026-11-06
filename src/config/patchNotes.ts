@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v79",
+    dateIso: "2026-11-06",
+    category: "INTERFACE",
+    title: {
+      en: "The Wiki Now Covers Every System",
+      ptBR: "A Wiki Agora Explica Todos os Sistemas",
+    },
+    description: {
+      en: "Three new Wiki pages explain everything added recently, with the numbers read straight from the game, so they never go out of date.",
+      ptBR: "Três páginas novas na Wiki explicam tudo o que entrou recentemente, com os números lidos direto do jogo, então nunca ficam desatualizados.",
+    },
+    highlights: [
+      {
+        en: "Battle: the map limits (12 towers, 4 of each type), phases and checkpoints, the Boss Siege, specials and mana, the Roulette odds and what happens while the game is closed.",
+        ptBR: "Batalha: os limites do mapa (12 torres, 4 de cada tipo), fases e pontos de recomeço, o Cerco do Chefe, especial e mana, as chances da Roleta e o que acontece com o jogo fechado.",
+      },
+      {
+        en: "Missions & Pass: every daily mission and its rewards, how Pass XP is earned, and all 30 levels of both tracks.",
+        ptBR: "Missões e Passe: todas as missões do dia e suas recompensas, como se ganha XP do Passe e os 30 níveis das duas trilhas.",
+      },
+      {
+        en: "Store: the two kinds of Gem, every Gem pack, the starter pack, the daily gift and what a paid skin gives.",
+        ptBR: "Loja: os dois tipos de Gema, todos os pacotes, o pacote inicial, o presente do dia e o que uma skin paga dá.",
+      },
+      {
+        en: "The Wiki search also finds these topics, like Boss Siege or Season Pass.",
+        ptBR: "A busca da Wiki também encontra esses assuntos, como Cerco do Chefe ou Passe da Season.",
+      },
+    ],
+  },
+  {
     id: "v78",
     dateIso: "2026-11-06",
     category: "BOSSES",

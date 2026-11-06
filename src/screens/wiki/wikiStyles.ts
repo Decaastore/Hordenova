@@ -86,6 +86,10 @@ export const WIKI_CSS = `
 .wk-figures dt { font-size: 12px; color: var(--ash); }
 .wk-figures dd { margin: 4px 0 0; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; font-variant-numeric: lining-nums tabular-nums; }
 .wk-figures.is-wide { max-width: 320px; margin-bottom: 18px; }
+.wk-rewards { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.wk-rewards.is-list { margin: 8px 0 0; font-size: 14px; }
+.wk-table td.wk-rewards { display: table-cell; }
+.wk-table td.wk-rewards > span + span::before { content: " + "; color: var(--ash); font-weight: 400; }
 .wk-meta { margin: 16px 0 0; font-size: 14px; color: var(--ash); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
 .wk-sep { width: 1px; height: 14px; background: var(--line); }
 

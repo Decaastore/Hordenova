@@ -1,3 +1,5 @@
+import { REWARD_CSS } from "@/ui/RewardPartsLabel";
+import { BattlePage, DailyPage, StorePage } from "./wiki/SystemsPages";
 import { useEffect, useMemo, useRef, useState } from "react";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
@@ -84,7 +86,7 @@ export function WikiScreen({ onNavigate, onPlay }: WikiScreenProps) {
 
   return (
     <div className="wk-root">
-      <style>{WIKI_CSS + CREATURE_PORTRAIT_CSS}</style>
+      <style>{WIKI_CSS + CREATURE_PORTRAIT_CSS + REWARD_CSS}</style>
       <TopNav active="WIKI" onNavigate={onNavigate} onPlay={onPlay} />
       <div className="wk-scroll" ref={contentRef}>
         <header className="wk-hero">
@@ -151,6 +153,9 @@ export function WikiScreen({ onNavigate, onPlay }: WikiScreenProps) {
                 {category === "PROGRESSION" && <ProgressionPage />}
                 {category === "ECONOMY" && <EconomyPage />}
                 {category === "ASCENSION" && <AscensionPage />}
+                {category === "BATTLE" && <BattlePage />}
+                {category === "DAILY" && <DailyPage />}
+                {category === "STORE" && <StorePage />}
                 {category === "PROJECTIONS" && <ProjectionsPage />}
               </section>
             )}
