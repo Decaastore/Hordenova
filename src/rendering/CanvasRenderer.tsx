@@ -1,3 +1,5 @@
+import type { ProjectileInstance } from "@/entities/Projectile";
+import { CombatFx } from "./combatFx";
 import { drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
 import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
@@ -222,6 +224,9 @@ export function CanvasRenderer({
 
     let rafId: number;
     const vfx = new VfxManager();
+    // REALISTIC COMBAT EFFECTS (rendering/combatFx.ts) — each landed shot gets its own tower's impact.
+    const combatFx = new CombatFx();
+    let flyingProjectiles = new Map<string, ProjectileInstance>();
     // TOWER MAGIC VFX — see specialVfx.ts. `seenSpecialIds` makes each
     // special projectile spawn its signature effect exactly once (rebuilt
     // every frame from the live projectiles, so it never grows).
@@ -352,6 +357,22 @@ export function CanvasRenderer({
       prevTowerLevels = new Map(snapshot.towers.map((t) => [t.id, t.level]));
       prevTowerHp = new Map(snapshot.towers.map((t) => [t.id, t.hp]));
       vfx.update(frameDt);
+      combatFx.update(frameDt);
+      {
+        const now = new Map<string, ProjectileInstance>();
+        for (const p of snapshot.projectiles) now.set(p.id, p);
+        let impacts = 0;
+        for (const [id, p] of flyingProjectiles) {
+          if (now.has(id) || impacts >= 30) continue;
+          impacts += 1;
+          combatFx.impact(p.towerType, p.from, p.to, p.chainTargets, p.isSpecial);
+        }
+        for (const p of snapshot.projectiles) {
+          const k = p.totalMs > 0 ? 1 - p.remainingMs / p.totalMs : 1;
+          combatFx.trail(p.towerType, { x: p.from.x + (p.to.x - p.from.x) * k, y: p.from.y + (p.to.y - p.from.y) * k });
+        }
+        flyingProjectiles = now;
+      }
 
       const liveSpecialIds = new Set<string>();
       for (const projectile of snapshot.projectiles) {
@@ -456,6 +477,7 @@ export function CanvasRenderer({
 
       // Magic ground layer (rune circles, scorched crater, frozen ground) — under towers and enemies.
       specialVfx.drawGround(ctx, timestamp);
+      combatFx.drawGround(ctx);
 
       for (const tower of snapshot.towers) {
         const attackFlashMs = timestamp - (towerAttackTimestamps.get(tower.id) ?? -Infinity);
@@ -550,6 +572,7 @@ export function CanvasRenderer({
         if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
+      combatFx.drawSolid(ctx);
       // Magic air layer (piercing lance, firestorm, frost nova, sky strikes) — over units, under damage numbers.
       specialVfx.drawAir(ctx, timestamp);
 
@@ -614,11 +637,13 @@ export function CanvasRenderer({
           else if (e.burn) lights.push({ x: e.position.x, y: e.position.y, r: 34, rgb: [255, 130, 50], intensity: 0.5 });
           else if (e.elite) lights.push({ x: e.position.x, y: e.position.y, r: 40, rgb: [255, 220, 160], intensity: 0.35 });
         }
+        lights.push(...combatFx.lights());
         drawLighting(ctx, biome, visibleBounds, tod, lights);
         if (groundBake && tod.night > 0.02) drawGroundEmissive(ctx, groundBake, biome, timestamp, tod.night * 0.85);
         drawFireflies(ctx, biome, tod, timestamp);
         drawSkyLife(ctx, biome, tod, timestamp);
       }
+      combatFx.drawEmissive(ctx);
       vfx.draw(ctx);
 
       // AUDITORIA E CORREÇÃO GERAL spec section 33 — HP bars are drawn in

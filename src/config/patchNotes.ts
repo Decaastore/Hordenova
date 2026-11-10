@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v85",
+    dateIso: "2026-11-10",
+    category: "TOWERS",
+    title: {
+      en: "Realistic Impacts for Every Tower",
+      ptBR: "Impactos Realistas para Cada Torre",
+    },
+    description: {
+      en: "Every shot that lands now has its own physical impact, with sparks, debris, fire, smoke, ice and lightning that move with gravity and fade naturally. Explosions and lightning also light up the map at night.",
+      ptBR: "Cada tiro que acerta agora tem um impacto físico próprio, com faíscas, lascas, fogo, fumaça, gelo e raios que caem com a gravidade e somem de forma natural. Explosões e raios também iluminam o mapa à noite.",
+    },
+    highlights: [
+      {
+        en: "Ironwood: metal sparks, wood splinters and earth that bounce on the ground, plus a puff of dust.",
+        ptBR: "Ironwood: faíscas de metal, lascas de madeira e terra que quicam no chão, mais uma nuvem de poeira.",
+      },
+      {
+        en: "Inferno: a white-hot flash, a billowing fireball that cools to red and turns into rising smoke, falling embers and a scorch mark on the ground.",
+        ptBR: "Inferno: um clarão branco, uma bola de fogo que cresce, esfria para vermelho e vira fumaça subindo, brasas caindo e marca de queimado no chão.",
+      },
+      {
+        en: "Frostborn: ice shards that spin and tumble, a cold mist, glints and a patch of frost left behind.",
+        ptBR: "Frostborn: estilhaços de gelo que giram e caem, névoa gelada, brilhos e uma marca de geada no chão.",
+      },
+      {
+        en: "Stormcaller: a jagged, branching lightning bolt that flickers as it fades, jumping between chained targets, with electric sparks.",
+        ptBR: "Stormcaller: um raio irregular e ramificado que pisca ao sumir, saltando entre os alvos da corrente, com faíscas elétricas.",
+      },
+      {
+        en: "Specials hit with bigger versions of the same effects. A particle limit keeps the game smooth even in heavy 4x fights.",
+        ptBR: "Os especiais usam versões maiores dos mesmos efeitos. Um limite de partículas mantém o jogo leve mesmo em lutas pesadas no 4x.",
+      },
+    ],
+  },
+  {
     id: "v84",
     dateIso: "2026-11-10",
     category: "CONTENT",
