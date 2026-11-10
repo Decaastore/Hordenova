@@ -1,22 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
-import { SITE, SITE_DISPLAY_FONT, SITE_TEXT_FONT } from "@/ui/siteFonts";
-
-/** Blackletter capitals are unreadable in a row, so shouted strings are set as a normal word. */
-function sentenceCase(text: string): string {
-  return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
-}
-
-/** The game palette re-pointed at the site's colors (pine / bone / ember), so this page matches the rest of the site. */
-const P = {
-  ...PALETTE,
-  uiText: SITE.bone,
-  uiTextDim: SITE.sage,
-  uiAccent: SITE.ember,
-  uiAccentBright: SITE.bone,
-  uiPanelBorder: "rgba(159,196,180,0.28)",
-  gold: SITE.sun,
-};
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -163,8 +146,8 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
 
       <div className="mkt-body" style={bodyStyle}>
         <div style={heroStyle}>
-          <div style={heroKickerStyle}>{sentenceCase(t("marketplace.hero.kicker"))}</div>
-          <div style={heroTitleStyle}>{sentenceCase(t("marketplace.hero.title"))}</div>
+          <div style={heroKickerStyle}>{t("marketplace.hero.kicker")}</div>
+          <div style={heroTitleStyle}>{t("marketplace.hero.title")}</div>
           <p style={heroTaglineStyle}>{t("marketplace.hero.tagline")}</p>
           <div style={heroRowStyle}>
             <div style={gemsBadgeStyle}>
@@ -322,8 +305,8 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
       onClick={onClick}
       style={{
         ...tabButtonStyle,
-        color: active ? P.uiAccentBright : P.uiTextDim,
-        borderBottomColor: active ? P.uiAccent : "transparent",
+        color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
+        borderBottomColor: active ? PALETTE.uiAccent : "transparent",
       }}
     >
       {label}
@@ -346,9 +329,8 @@ const rootStyle: CSSProperties = {
   height: "100%",
   display: "flex",
   flexDirection: "column",
-  background: SITE.pine,
-  color: P.uiText,
-  fontFamily: SITE_TEXT_FONT,
+  background: `radial-gradient(ellipse at top, #241610 0%, #120b06 55%, #0a0604 100%)`,
+  color: PALETTE.uiText,
   overflow: "hidden",
 };
 
@@ -372,22 +354,25 @@ const heroStyle: CSSProperties = {
 };
 
 const heroKickerStyle: CSSProperties = {
-  fontSize: 14,
-  fontWeight: 700,
-  color: SITE.ember,
+  fontSize: 10.5,
+  fontWeight: 800,
+  letterSpacing: 3,
+  textTransform: "uppercase",
+  color: PALETTE.danger,
 };
 
 const heroTitleStyle: CSSProperties = {
-  fontFamily: SITE_DISPLAY_FONT,
-  fontSize: "clamp(44px, 6vw, 72px)",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: "clamp(28px, 5vw, 40px)",
   fontWeight: 800,
-  lineHeight: 0.95,
-  color: SITE.bone,
+  letterSpacing: 3,
+  color: PALETTE.uiAccentBright,
+  textShadow: `0 0 30px ${PALETTE.uiAccent}55`,
 };
 
 const heroTaglineStyle: CSSProperties = {
   fontSize: 12.5,
-  color: P.uiTextDim,
+  color: PALETTE.uiTextDim,
   maxWidth: 480,
   lineHeight: 1.6,
   margin: 0,
@@ -402,19 +387,19 @@ const heroRowStyle: CSSProperties = {
 
 const gemsBadgeStyle: CSSProperties = {
   padding: "8px 16px",
-  borderRadius: 3,
-  border: `1px solid ${P.gem}`,
-  background: "rgba(159,196,180,0.1)",
-  color: P.uiText,
+  borderRadius: 999,
+  border: `1px solid ${PALETTE.gem}`,
+  background: "rgba(200,138,255,0.1)",
+  color: PALETTE.uiText,
   fontSize: 12,
 };
 
 const createCtaStyle: CSSProperties = {
   padding: "9px 20px",
-  borderRadius: 3,
-  border: `2px solid ${P.gold}`,
-  background: SITE.ember,
-  color: SITE.emberInk,
+  borderRadius: 999,
+  border: `2px solid ${PALETTE.gold}`,
+  background: `linear-gradient(180deg, #ffe9a0, ${PALETTE.gold} 60%, #d98a2a)`,
+  color: "#3a2408",
   fontWeight: 800,
   fontSize: 12,
   letterSpacing: 0.6,
@@ -425,23 +410,23 @@ const tradeLockedBoxStyle: CSSProperties = {
   maxWidth: 480,
   margin: "0 auto 24px",
   padding: "20px 24px",
-  borderRadius: 4,
-  border: `1px solid ${P.gem}`,
-  background: "rgba(16,42,38,0.9)",
+  borderRadius: 14,
+  border: `1px solid ${PALETTE.gem}`,
+  background: "rgba(200,138,255,0.06)",
   textAlign: "center",
 };
 
 const tradeLockedTitleStyle: CSSProperties = {
-  fontFamily: SITE_TEXT_FONT,
+  fontFamily: "Georgia, 'Times New Roman', serif",
   fontSize: 18,
   fontWeight: 800,
-  color: P.uiAccentBright,
+  color: PALETTE.uiAccentBright,
   marginBottom: 8,
 };
 
 const tradeLockedExplainerStyle: CSSProperties = {
   fontSize: 11.5,
-  color: P.uiTextDim,
+  color: PALETTE.uiTextDim,
   lineHeight: 1.6,
   marginBottom: 10,
 };
@@ -449,7 +434,7 @@ const tradeLockedExplainerStyle: CSSProperties = {
 const tabRowStyle: CSSProperties = {
   display: "flex",
   gap: 6,
-  borderBottom: `1px solid ${P.uiPanelBorder}`,
+  borderBottom: `1px solid ${PALETTE.uiPanelBorder}`,
   marginBottom: 20,
 };
 
@@ -467,10 +452,10 @@ const tabButtonStyle: CSSProperties = {
 };
 
 const sectionTitleStyle: CSSProperties = {
-  fontFamily: SITE_TEXT_FONT,
+  fontFamily: "Georgia, 'Times New Roman', serif",
   fontSize: 16,
   fontWeight: 700,
-  color: P.uiAccentBright,
+  color: PALETTE.uiAccentBright,
   marginBottom: 12,
   marginTop: 8,
 };
@@ -486,18 +471,18 @@ const searchInputStyle: CSSProperties = {
   flex: "1 1 200px",
   padding: "8px 12px",
   borderRadius: 8,
-  border: `1px solid ${P.uiPanelBorder}`,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
   background: "rgba(0,0,0,0.3)",
-  color: P.uiText,
+  color: PALETTE.uiText,
   fontSize: 12,
 };
 
 const selectStyle: CSSProperties = {
   padding: "8px 10px",
   borderRadius: 8,
-  border: `1px solid ${P.uiPanelBorder}`,
+  border: `1px solid ${PALETTE.uiPanelBorder}`,
   background: "rgba(0,0,0,0.3)",
-  color: P.uiText,
+  color: PALETTE.uiText,
   fontSize: 11.5,
 };
 
@@ -519,7 +504,7 @@ const emptyStateStyle: CSSProperties = {
 
 const emptyTextStyle: CSSProperties = {
   fontSize: 12.5,
-  color: P.uiTextDim,
+  color: PALETTE.uiTextDim,
   maxWidth: 380,
   lineHeight: 1.6,
 };

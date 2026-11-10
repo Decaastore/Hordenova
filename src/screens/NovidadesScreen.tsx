@@ -12,14 +12,14 @@ interface NovidadesScreenProps {
 
 const CATEGORY_COLOR: Record<PatchNoteCategory, string> = {
   CONTENT: "#8ed39b",
-  TOWERS: "#ff8a66",
+  TOWERS: "#f2c873",
   BOSSES: "#e2685a",
   CASTLE: "#d9b27a",
   ITEMS: "#c79bff",
   ASCENSION: "#c79bff",
   INTERFACE: "#8fc6ff",
-  SYSTEMS: "#f2ecdc",
-  BALANCE: "#ff8a66",
+  SYSTEMS: "#efe5d2",
+  BALANCE: "#f2c873",
   FIXES: "#e2685a",
 };
 
@@ -135,10 +135,10 @@ const NEWS_CSS = `
 .nv-date { position: sticky; top: 16px; align-self: start; font-family: var(--display); font-weight: 700; font-size: 22px; line-height: 1.15; color: var(--gold-hi); }
 .nv-entries { display: grid; gap: 36px; max-width: 760px; }
 .nv-meta { margin: 0; display: flex; align-items: center; gap: 12px; font-size: 13px; font-weight: 600; }
-.nv-latest { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--gold); color: #1a0a05; }
+.nv-latest { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--gold); color: #2b1906; }
 .nv-entry h2 { margin: 6px 0 0; font-family: var(--display); font-weight: 700; font-size: clamp(24px, 2.4vw, 30px); line-height: 1.12; color: var(--bone); }
 .nv-entry.is-latest h2 { font-size: clamp(28px, 3vw, 38px); color: var(--gold-hi); }
-.nv-desc { margin: 10px 0 0; font-size: 15.5px; line-height: 1.7; color: #cdd8cc; max-width: 68ch; }
+.nv-desc { margin: 10px 0 0; font-size: 15.5px; line-height: 1.7; color: #d9cdb6; max-width: 68ch; }
 .nv-entry ul { margin: 14px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
 .nv-entry li { position: relative; padding-left: 20px; font-size: 14.5px; line-height: 1.6; color: var(--ash); max-width: 70ch; }
 .nv-entry li::before { content: ""; position: absolute; left: 2px; top: 0.7em; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); opacity: 0.7; }

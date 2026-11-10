@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
+import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { MusicControl } from "./MusicControl";
-import { SiteWordmark } from "./SiteWordmark";
-import { SITE, SITE_TEXT_FONT } from "./siteFonts";
+import { BrandLogo } from "./BrandLogo";
 import { getPassView } from "@/engine/SeasonPassService";
 import { PASS_CHANGED_EVENT } from "./SeasonPassSection";
 
@@ -43,104 +43,134 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   }, []);
   const passClaimable = getPassView().claimable.length;
 
-  const link = (view: NavView, label: string, extra?: { dot?: boolean; dotTitle?: string }) => (
-    <button
-      key={view}
-      className={`tn-link${active === view ? " is-active" : ""}`}
-      aria-current={active === view ? "page" : undefined}
-      title={extra?.dot ? extra.dotTitle : undefined}
-      onClick={() => onNavigate(view)}
-    >
-      {label}
-      {extra?.dot && <span aria-hidden="true" className="tn-dot" />}
-    </button>
-  );
-
   return (
-    <nav className="tn">
-      <style>{TOP_NAV_CSS}</style>
-      <button className="tn-brand" onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
-        <SiteWordmark fontSize={30} decorative />
+    <nav style={navStyle}>
+      <button style={brandStyle} onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
+        <BrandLogo height={24} decorative />
       </button>
-      <div className="tn-links">
-        {link("SEASON", t("nav.season"))}
-        {link("PASS", t("nav.pass"), { dot: passClaimable > 0, dotTitle: t("nav.passReady", { n: passClaimable }) })}
-        {link("RANKING", t("nav.ranking"))}
-        {link("STORE", t("nav.store"))}
-        {link("MARKETPLACE", t("nav.marketplace"))}
-        {link("WIKI", t("nav.wiki"))}
-        {link("NOVIDADES", t("nav.novidades"))}
-      </div>
-      {/* MÚSICA GLOBAL spec section 22 — the music control and the language
-          selector must be reachable from every page the global track plays
-          on, so they live here unconditionally. */}
-      <div className="tn-tools">
-        <LanguageSelector inline />
-        <MusicControl />
-        <button className="tn-play" onClick={onPlay}>
+      <div style={linksStyle}>
+        <button style={playLinkStyle} onClick={onPlay}>
           {t("nav.play")}
         </button>
+        <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
+        <NavLink label={t("nav.pass")} isActive={active === "PASS"} onClick={() => onNavigate("PASS")} dot={passClaimable > 0} dotTitle={t("nav.passReady", { n: passClaimable })} />
+        <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
+        <NavLink label={t("nav.store")} isActive={active === "STORE"} onClick={() => onNavigate("STORE")} />
+        <NavLink label={t("nav.marketplace")} isActive={active === "MARKETPLACE"} onClick={() => onNavigate("MARKETPLACE")} />
+        <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
+        <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
+        {/* MÚSICA GLOBAL spec section 22 — the ambient-music control (and the
+            language selector alongside it) needs to be reachable from every
+            page the global track now plays on, not just Home, so this lives
+            here unconditionally instead of being an opt-in slot each screen
+            has to remember to fill. */}
+        <div style={rightSlotStyle}>
+          <LanguageSelector inline />
+          <MusicControl />
+        </div>
       </div>
     </nav>
   );
 }
 
-/**
- * The bar is a wall: solid pine with a row of merlons hanging from its lower
- * edge. The page you are on is a pennant hung on it — ember cloth with a
- * swallowtail cut — and "Jogar" is a block of cut stone, chamfered instead
- * of rounded.
- */
-const TOP_NAV_CSS = `
-.tn {
-  --tn-bg: ${SITE.pine};
-  position: relative; z-index: 5; flex-shrink: 0; box-sizing: border-box; width: 100%;
-  display: flex; align-items: stretch; gap: 0 clamp(12px, 2vw, 28px);
-  min-height: 62px; padding: 0 clamp(14px, 2.4vw, 32px);
-  background: var(--tn-bg); color: ${SITE.bone};
-  font-family: ${SITE_TEXT_FONT};
+function NavLink({ label, isActive, onClick, dot, dotTitle }: { label: string; isActive: boolean; onClick: () => void; dot?: boolean; dotTitle?: string }) {
+  return (
+    <button
+      onClick={onClick}
+      title={dot ? dotTitle : undefined}
+      style={{
+        ...linkStyle,
+        position: "relative",
+        color: isActive ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
+        borderBottomColor: isActive ? PALETTE.uiAccent : "transparent",
+      }}
+      onMouseEnter={(e) => {
+        if (!isActive) e.currentTarget.style.color = PALETTE.uiAccentBright;
+      }}
+      onMouseLeave={(e) => {
+        if (!isActive) e.currentTarget.style.color = PALETTE.uiTextDim;
+      }}
+    >
+      {label}
+      {dot && <span aria-hidden="true" style={dotStyle} />}
+    </button>
+  );
 }
-.tn::after {
-  content: ""; position: absolute; left: 0; right: 0; top: 100%; height: 7px; pointer-events: none;
-  background: var(--tn-bg);
-  -webkit-mask: repeating-linear-gradient(90deg, #000 0 16px, transparent 16px 30px);
-  mask: repeating-linear-gradient(90deg, #000 0 16px, transparent 16px 30px);
-}
-.tn button { font-family: inherit; }
-.tn :focus-visible { outline: 2px solid ${SITE.emberHi}; outline-offset: 2px; }
-.tn-brand { display: flex; align-items: center; padding: 0 4px 0 0; background: none; border: none; cursor: pointer; color: ${SITE.bone}; }
-.tn-brand:hover { color: #fff; }
-.tn-links { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; }
-.tn-links::-webkit-scrollbar { display: none; }
-.tn-link {
-  position: relative; flex-shrink: 0; display: flex; align-items: center;
-  padding: 0 clamp(9px, 1.1vw, 15px); background: none; border: none; cursor: pointer;
-  font-size: 15px; font-weight: 600; color: ${SITE.sage}; white-space: nowrap;
-  transition: color 140ms ease;
-}
-.tn-link:hover { color: ${SITE.bone}; }
-.tn-link.is-active {
-  color: ${SITE.emberInk}; font-weight: 800; background: ${SITE.ember};
-  padding-bottom: 9px;
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 9px), 0 100%);
-}
-.tn-dot { position: absolute; top: 16px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: ${SITE.sun}; }
-.tn-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.tn-tools > div button, .tn-tools > button:not(.tn-play) {
-  background: transparent !important; border-color: rgba(159,196,180,0.3) !important; color: ${SITE.bone} !important; box-shadow: none !important;
-}
-.tn-play {
-  margin-left: 6px; padding: 10px 22px; border: none; cursor: pointer;
-  background: ${SITE.ember}; color: ${SITE.emberInk}; font-size: 15px; font-weight: 800;
-  clip-path: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
-  transition: background 140ms ease, transform 140ms ease;
-}
-.tn-play:hover { background: ${SITE.emberHi}; transform: translateY(-1px); }
-.tn-play:active { transform: translateY(1px); }
-@media (max-width: 860px) {
-  .tn { flex-wrap: wrap; padding-top: 8px; }
-  .tn-brand { min-height: 44px; }
-  .tn-tools { margin-left: auto; }
-  .tn-links { order: 3; flex-basis: 100%; min-height: 44px; margin: 4px -14px 0; padding: 0 6px; }
-}
-`;
+
+const dotStyle: CSSProperties = {
+  position: "absolute",
+  top: 2,
+  right: -6,
+  width: 7,
+  height: 7,
+  borderRadius: "50%",
+  background: PALETTE.uiAccentBright,
+  boxShadow: `0 0 6px ${PALETTE.uiAccent}`,
+};
+
+const navStyle: CSSProperties = {
+  position: "relative",
+  zIndex: 5,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "space-between",
+  flexWrap: "wrap",
+  rowGap: 8,
+  padding: "14px 20px",
+  background: "linear-gradient(180deg, rgba(20,14,7,0.82), rgba(20,14,7,0.4) 80%, transparent)",
+  boxSizing: "border-box",
+  width: "100%",
+  flexShrink: 0,
+};
+
+const brandStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  cursor: "pointer",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 17,
+  fontWeight: 800,
+  letterSpacing: 3,
+  color: PALETTE.uiAccentBright,
+  textShadow: `0 0 14px ${PALETTE.uiAccent}88`,
+  padding: 0,
+};
+
+const linksStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: "clamp(12px, 2vw, 26px)",
+  // Narrow screens: the row scrolls sideways instead of cutting links off.
+  maxWidth: "100%",
+  overflowX: "auto",
+  scrollbarWidth: "none",
+};
+
+const linkStyle: CSSProperties = {
+  background: "none",
+  border: "none",
+  borderBottom: "2px solid transparent",
+  cursor: "pointer",
+  fontSize: 12.5,
+  fontWeight: 700,
+  letterSpacing: 1.6,
+  textTransform: "uppercase",
+  padding: "6px 2px",
+  transition: "color 140ms ease, border-color 140ms ease",
+};
+
+const playLinkStyle: CSSProperties = {
+  ...linkStyle,
+  borderBottom: "none",
+  color: "#3a2408",
+  background: `linear-gradient(180deg, #ffe9a0, ${PALETTE.gold} 60%, #d98a2a)`,
+  padding: "8px 18px",
+  borderRadius: 8,
+  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
+};
+
+const rightSlotStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  marginLeft: "clamp(4px, 1vw, 10px)",
+};
