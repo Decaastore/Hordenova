@@ -1,6 +1,6 @@
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { CombatFx, preloadCombatFxArt } from "./combatFx";
-import { drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
+import { drawGrimGrade, drawGroundMist, drawLightningFlash, drawWeather, drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
 import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
 import { getCityPlots } from "@/data/cityPlots";
@@ -613,6 +613,9 @@ export function CanvasRenderer({
       // shafts by day, a flock crossing now and then, fireflies at night.
       {
         const tod = timeOfDay(Date.now());
+        // CLIMA SOMBRIO — grade the world cold and heavy first; lights and effects drawn after stay vivid.
+        drawGrimGrade(ctx, biome, visibleBounds);
+        drawGroundMist(ctx, visibleBounds, tod, timestamp);
         drawSunShafts(ctx, biome, visibleBounds, tod, timestamp);
         const lights: LightSource[] = [];
         const flick = (seed: number) => 0.85 + 0.15 * Math.sin(timestamp / 90 + seed) * Math.sin(timestamp / 37 + seed * 2);
@@ -646,6 +649,7 @@ export function CanvasRenderer({
         lights.push(...combatFx.lights());
         drawLighting(ctx, biome, visibleBounds, tod, lights);
         if (groundBake && tod.night > 0.02) drawGroundEmissive(ctx, groundBake, biome, timestamp, tod.night * 0.85);
+        drawLightningFlash(ctx, visibleBounds, drawWeather(ctx, biome, visibleBounds, timestamp));
         drawFireflies(ctx, biome, tod, timestamp);
         drawSkyLife(ctx, biome, tod, timestamp);
       }

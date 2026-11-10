@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v90",
+    dateIso: "2026-11-10",
+    category: "CONTENT",
+    title: {
+      en: "A Darker, Heavier World: New Colour, Mist and Weather",
+      ptBR: "Um Mundo Mais Sombrio: Nova Cor, Névoa e Clima",
+    },
+    description: {
+      en: "Every map now has a grimmer, more realistic look: colder, less saturated colours and deeper shadows, so fire, lava and torches stand out as the warm points of the scene. Mist creeps over the ground and weather comes and goes.",
+      ptBR: "Todos os mapas ganharam um visual mais sombrio e realista: cores mais frias e menos saturadas e sombras mais fundas, para que fogo, lava e tochas se destaquem como os pontos quentes da cena. Uma névoa rasteira cobre o chão e o clima vai e volta.",
+    },
+    highlights: [
+      {
+        en: "New colour grade on every map, with darker edges framing the battlefield.",
+        ptBR: "Nova coloração em todos os mapas, com bordas mais escuras emoldurando o campo de batalha.",
+      },
+      {
+        en: "Low mist drifts slowly across the ground, thicker at night.",
+        ptBR: "Névoa baixa passando devagar pelo chão, mais densa à noite.",
+      },
+      {
+        en: "Weather that builds and passes: rain with splashes and distant lightning in the forests, coasts and ruins; falling ash in the volcanic and burnt lands; snow in the tundra.",
+        ptBR: "Clima que chega e passa: chuva com respingos e relâmpagos distantes nas florestas, costas e ruínas; cinzas caindo nas terras vulcânicas e queimadas; neve na tundra.",
+      },
+    ],
+  },
+  {
     id: "v89",
     dateIso: "2026-11-10",
     category: "INTERFACE",
