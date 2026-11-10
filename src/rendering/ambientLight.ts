@@ -210,7 +210,7 @@ export function drawSunShafts(ctx: CanvasRenderingContext2D, biome: BiomeDefinit
     const drift = ((timeMs / 90000 + i / shafts + n01(i * 13) * 0.2) % 1) * 1500 - 300;
     const width = 70 + n01(i * 7) * 90;
     const breathe = 0.6 + 0.4 * Math.sin(timeMs / 7000 + i * 2.1);
-    const a = 0.085 * day * breathe * (1 + tod.golden * 0.8);
+    const a = 0.05 * day * breathe * (1 + tod.golden * 0.8);
     const x = bounds.x0 + drift;
     // a beam falling from the upper left: a slanted band
     const g = ctx.createLinearGradient(x, 0, x + width, 0);
@@ -322,4 +322,212 @@ export function rgbOf(color: string): [number, number, number] {
   const hex = color.replace("#", "");
   if (hex.length >= 6) return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)];
   return [255, 200, 120];
+}
+
+// ---------------------------------------------------------------------------
+// CLIMA SOMBRIO — the grim, weathered look: the world is pulled toward cold,
+// low-saturation tones with deeper shadows (fire and light, drawn afterwards,
+// stay vivid and become the warm points of the picture), mist creeps over the
+// ground, and weather passes through — rain with distant lightning in the wet
+// lands, falling ash in the burnt ones. Purely cosmetic and derived from time.
+// ---------------------------------------------------------------------------
+
+type Weather = "rain" | "ash" | "snow" | "none";
+
+const WEATHER: Record<string, Weather> = {
+  ANCIENT_FOREST: "rain",
+  MOON_GARDENS: "rain",
+  DARK_RUINS: "rain",
+  LEVIATHAN_COAST: "rain",
+  CRYSTAL_SEA: "rain",
+  COLOSSUS_GRAVEYARD: "rain",
+  DEFILED_CATHEDRAL: "rain",
+  FLOATING_ISLES: "rain",
+  FROZEN_TUNDRA: "snow",
+  VOLCANIC_WASTES: "ash",
+  ASHEN_VALLEY: "ash",
+  DWARVEN_UNDERCITY: "ash",
+  ABYSS: "ash",
+  ABYSSAL_FORTRESS: "ash",
+};
+
+/** The cold tone the scene is multiplied by, per biome family (white = untouched). */
+function gradeTone(biomeId: string): readonly [number, number, number] {
+  const w = WEATHER[biomeId];
+  if (w === "ash") return [214, 196, 190];
+  if (biomeId === "CURSED_DESERT" || biomeId === "LOST_SUN_TEMPLE") return [214, 204, 190];
+  return [196, 206, 220];
+}
+
+/**
+ * The color grade: drains some saturation, cools and darkens the mid-tones,
+ * deepens the shadows and closes the frame with a heavy vignette. Call after
+ * the world and its units are drawn, before lights and effects.
+ */
+export function drawGrimGrade(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, bounds: VisibleBounds): void {
+  const w = bounds.x1 - bounds.x0;
+  const h = bounds.y1 - bounds.y0;
+  const [r, g, b] = gradeTone(biome.id);
+  ctx.save();
+  // 1. less color
+  ctx.globalCompositeOperation = "saturation";
+  ctx.fillStyle = "rgba(128,128,128,0.34)";
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  // 2. colder and darker
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  // 3. harder contrast: shadows sink, highlights hold
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.fillStyle = "rgba(20,22,30,0.38)";
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  // 4. heavy vignette
+  ctx.globalCompositeOperation = "multiply";
+  const v = ctx.createRadialGradient(500, 300, 240, 500, 300, 820);
+  v.addColorStop(0, "rgba(255,255,255,1)");
+  v.addColorStop(0.6, "rgba(150,150,160,1)");
+  v.addColorStop(1, "rgba(40,40,52,1)");
+  ctx.fillStyle = v;
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  ctx.restore();
+}
+
+let mistSprite: HTMLCanvasElement | null = null;
+function getMistSprite(): HTMLCanvasElement {
+  if (mistSprite) return mistSprite;
+  const s = 128;
+  const c = document.createElement("canvas");
+  c.width = c.height = s;
+  const g = c.getContext("2d")!;
+  let seed = 5;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
+  for (let i = 0; i < 10; i++) {
+    const x = s / 2 + (rnd() - 0.5) * s * 0.4;
+    const y = s / 2 + (rnd() - 0.5) * s * 0.3;
+    const rad = s * (0.18 + rnd() * 0.2);
+    const grad = g.createRadialGradient(x, y, 0, x, y, rad);
+    grad.addColorStop(0, "rgba(205,214,226,0.5)");
+    grad.addColorStop(1, "rgba(205,214,226,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, s, s);
+  }
+  mistSprite = c;
+  return c;
+}
+
+/** Low mist drifting slowly over the ground, thicker at night. */
+export function drawGroundMist(ctx: CanvasRenderingContext2D, bounds: VisibleBounds, tod: TimeOfDay, timeMs: number): void {
+  const sprite = getMistSprite();
+  const span = bounds.x1 - bounds.x0 + 500;
+  ctx.save();
+  for (let i = 0; i < 14; i++) {
+    const speed = 5 + n01(i * 3.3) * 9;
+    const x = bounds.x0 - 250 + ((n01(i * 7.1) * span + (timeMs / 1000) * speed) % span);
+    const y = 60 + n01(i * 11.7) * 520 + Math.sin(timeMs / 9000 + i) * 10;
+    const size = 220 + n01(i * 5.9) * 260;
+    ctx.globalAlpha = (0.1 + 0.1 * tod.night) * (0.6 + 0.4 * Math.sin(timeMs / 13000 + i * 1.7));
+    ctx.drawImage(sprite, x - size / 2, y - size * 0.22, size, size * 0.44);
+  }
+  ctx.restore();
+}
+
+/** How hard the weather is coming down right now, 0..1 — it builds and passes over a few minutes. */
+export function weatherIntensity(timeMs: number): number {
+  const pinned = typeof window !== "undefined" ? (window as unknown as { __hordenovaWeather?: number }).__hordenovaWeather : undefined;
+  if (typeof pinned === "number") return pinned;
+  const wave = Math.sin(timeMs / 97000) * 0.6 + Math.sin(timeMs / 41000 + 1.3) * 0.4;
+  return Math.max(0, Math.min(1, (wave + 0.25) * 1.1));
+}
+
+/**
+ * Weather over the whole map: slanted rain with splashes on the ground and
+ * the odd sheet of distant lightning, or grey ash sifting down. Returns the
+ * lightning flash strength (0..1) so the caller can light the scene with it.
+ */
+export function drawWeather(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, bounds: VisibleBounds, timeMs: number): number {
+  const kind = WEATHER[biome.id] ?? "none";
+  if (kind === "none") return 0;
+  const k = weatherIntensity(timeMs);
+  if (k <= 0.02) return 0;
+  const w = bounds.x1 - bounds.x0;
+  const h = bounds.y1 - bounds.y0;
+  ctx.save();
+  if (kind === "rain") {
+    const drops = Math.round(170 * k);
+    ctx.strokeStyle = "rgba(190,205,225,0.34)";
+    ctx.lineWidth = 0.9;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (let i = 0; i < drops; i++) {
+      const fall = 620 + n01(i * 1.7) * 260; // world units / s
+      const cycle = (h + 120) / fall;
+      const t = (timeMs / 1000 + n01(i * 9.1) * cycle) % cycle;
+      const x = bounds.x0 + ((n01(i * 3.7) * (w + 160) + t * 150) % (w + 160)) - 80;
+      const y = bounds.y0 - 40 + t * fall;
+      const len = 12 + n01(i * 4.3) * 10;
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - len * 0.24, y - len);
+    }
+    ctx.stroke();
+    // splashes where drops meet the ground
+    ctx.strokeStyle = "rgba(200,214,232,0.3)";
+    ctx.lineWidth = 0.7;
+    const splashes = Math.round(26 * k);
+    for (let i = 0; i < splashes; i++) {
+      const life = 420;
+      const slot = Math.floor((timeMs + i * 137) / life);
+      const p = ((timeMs + i * 137) % life) / life;
+      const x = bounds.x0 + n01(slot * 1.31 + i * 7.7) * w;
+      const y = bounds.y0 + n01(slot * 2.17 + i * 3.3) * h;
+      ctx.globalAlpha = 1 - p;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 1 + p * 5, 0.5 + p * 2.2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // distant lightning: a double flicker every so often while the rain is heavy
+    if (k < 0.6) return 0;
+    const PERIOD = 23000;
+    const cycle = Math.floor(timeMs / PERIOD);
+    const at = n01(cycle * 5.3) * (PERIOD - 900);
+    const dt = timeMs - cycle * PERIOD - at;
+    if (dt < 0 || dt > 520) return 0;
+    const flash = dt < 90 ? 1 - dt / 90 : dt > 180 && dt < 300 ? 0.7 * (1 - (dt - 180) / 120) : 0;
+    return flash;
+  }
+  // ash: slow grey flakes with a few still-glowing ones; snow: soft white flakes
+  const snow = kind === "snow";
+  const flakes = Math.round((snow ? 120 : 70) * k);
+  for (let i = 0; i < flakes; i++) {
+    const fall = 26 + n01(i * 1.9) * 30;
+    const cycle = (h + 60) / fall;
+    const t = (timeMs / 1000 + n01(i * 8.3) * cycle) % cycle;
+    const x = bounds.x0 + ((n01(i * 3.1) * w + t * 14 + Math.sin(timeMs / 1700 + i) * 14) % w);
+    const y = bounds.y0 - 20 + t * fall;
+    if (snow) {
+      ctx.globalAlpha = 0.5 + n01(i * 2.9) * 0.35;
+      ctx.fillStyle = "rgb(236,242,250)";
+      const r = 0.9 + n01(i * 6.1) * 1.3;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      continue;
+    }
+    const glowing = i % 9 === 0;
+    ctx.globalAlpha = glowing ? 0.8 : 0.42;
+    ctx.fillStyle = glowing ? "rgb(255,150,70)" : "rgb(178,172,168)";
+    ctx.fillRect(x, y, glowing ? 1.4 : 1.8, glowing ? 1.4 : 1.2);
+  }
+  ctx.restore();
+  return 0;
+}
+
+/** A sheet of lightning over the whole frame (strength 0..1). */
+export function drawLightningFlash(ctx: CanvasRenderingContext2D, bounds: VisibleBounds, strength: number): void {
+  if (strength <= 0.01) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.fillStyle = `rgba(190,205,255,${0.3 * strength})`;
+  ctx.fillRect(bounds.x0, bounds.y0, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
+  ctx.restore();
 }
