@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v87",
+    dateIso: "2026-11-10",
+    category: "TOWERS",
+    title: {
+      en: "Absolute Zero Gets Real Ice",
+      ptBR: "Zero Absoluto com Gelo de Verdade",
+    },
+    description: {
+      en: "The Frostborn special now raises real ice: crystal clusters modeled in 3D, faceted and translucent, with reflections and a cold inner glow. They burst out of the ground as the frost wave passes and shatter into real ice fragments.",
+      ptBR: "O especial do Frostborn agora levanta gelo de verdade: aglomerados de cristais modelados em 3D, facetados e translúcidos, com reflexos e brilho frio por dentro. Eles brotam do chão quando a onda de frio passa e se quebram em pedaços de gelo de verdade.",
+    },
+    highlights: [
+      {
+        en: "Six different crystal clusters, each splaying outward like an ice eruption, rising with a burst of cold light.",
+        ptBR: "Seis aglomerados de cristais diferentes, cada um se abrindo para fora como uma erupção de gelo, nascendo com um clarão de luz fria.",
+      },
+      {
+        en: "The frost now creeps across the ground with the wave and fades with a soft edge, under a thin cold mist and light snow.",
+        ptBR: "A geada agora se espalha pelo chão junto com a onda e some com a borda suave, sob uma névoa fria leve e neve fina.",
+      },
+      {
+        en: "Ice shards from normal Frostborn hits use the same real ice.",
+        ptBR: "Os estilhaços dos tiros normais do Frostborn usam o mesmo gelo de verdade.",
+      },
+    ],
+  },
+  {
     id: "v86",
     dateIso: "2026-11-10",
     category: "TOWERS",

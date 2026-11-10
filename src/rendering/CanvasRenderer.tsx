@@ -1,5 +1,5 @@
 import type { ProjectileInstance } from "@/entities/Projectile";
-import { CombatFx } from "./combatFx";
+import { CombatFx, preloadCombatFxArt } from "./combatFx";
 import { drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
 import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
@@ -226,6 +226,7 @@ export function CanvasRenderer({
     const vfx = new VfxManager();
     // REALISTIC COMBAT EFFECTS (rendering/combatFx.ts) — each landed shot gets its own tower's impact.
     const combatFx = new CombatFx();
+    preloadCombatFxArt();
     combatFx.onShake = (m, ms) => vfx.triggerShake(m, ms);
     let flyingProjectiles = new Map<string, ProjectileInstance>();
     // TOWER MAGIC VFX — see specialVfx.ts. `seenSpecialIds` makes each

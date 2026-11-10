@@ -55,6 +55,8 @@ interface Decal {
   kind: "scorch" | "frost";
   /** Seconds the scorch keeps glowing with embers (0 = cold mark). */
   hot?: number;
+  /** Seconds the mark takes to spread out from its center (frost creeping over the ground); 0 = appears whole. */
+  spread?: number;
   x: number;
   y: number;
   r: number;
@@ -78,6 +80,31 @@ interface Flash {
   rgb: [number, number, number];
   age: number;
   life: number;
+}
+
+// ---------------------------------------------------------------------------
+// Baked 3D ice (public/sprites/fx): faceted, translucent crystal clusters and
+// broken shards rendered offline with real ice lighting and reflections.
+// ---------------------------------------------------------------------------
+const ICE_CLUSTERS = 6;
+const ICE_SHARDS = 4;
+/** Where a cluster's ground point sits in its square image (fraction, y down). */
+const ICE_CLUSTER_BASE_Y = 0.787;
+const iceImages = new Map<string, HTMLImageElement>();
+function iceImage(name: string): HTMLImageElement | undefined {
+  let img = iceImages.get(name);
+  if (!img && typeof Image !== "undefined") {
+    img = new Image();
+    img.decoding = "async";
+    img.src = `${(import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/")}sprites/fx/${name}.webp`;
+    iceImages.set(name, img);
+  }
+  return img && img.complete && img.naturalWidth > 0 ? img : undefined;
+}
+/** Start loading the ice art before the first special so it's ready in time. */
+export function preloadCombatFxArt(): void {
+  for (let i = 0; i < ICE_CLUSTERS; i++) iceImage(`ice_cluster_${i}`);
+  for (let i = 0; i < ICE_SHARDS; i++) iceImage(`ice_shard_${i}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -174,7 +201,7 @@ function frostSprite(): HTMLCanvasElement {
       const y = s / 2 + Math.sin(a) * d;
       const r = s * (0.08 + rnd() * 0.16);
       const grad = g.createRadialGradient(x, y, 0, x, y, r);
-      grad.addColorStop(0, "rgba(225,244,255,0.32)");
+      grad.addColorStop(0, "rgba(215,238,255,0.22)");
       grad.addColorStop(1, "rgba(225,244,255,0)");
       g.fillStyle = grad;
       g.fillRect(0, 0, s, s);
@@ -357,7 +384,8 @@ export class CombatFx {
       const a = Math.random() * Math.PI * 2;
       this.add({ kind: "mist", x: center.x, y: center.y, z: 6, vx: Math.cos(a) * 40, vy: Math.sin(a) * 20, vz: 6, life: 1.2, size: 10, grow: 34, color: "rgb(230,246,255)", alpha: 0.55 });
     }
-    this.decal("frost", center, R * 1.05, 2.8);
+    this.decals.push({ kind: "frost", x: center.x, y: center.y, r: R * 1.08, rot: Math.random() * Math.PI * 2, age: 0, life: 3.2, spread: 0.5 });
+    if (this.decals.length > MAX_DECALS) this.decals.shift();
     this.onShake?.(1.4, 160);
   }
 
@@ -588,7 +616,7 @@ export class CombatFx {
           if (Math.random() > 0.28) continue;
           const a = Math.random() * Math.PI * 2;
           const d = front * (0.9 + Math.random() * 0.12);
-          this.add({ kind: "mist", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 3, vx: Math.cos(a) * 34, vy: Math.sin(a) * 18, vz: 2, life: 1.0 + Math.random() * 0.6, size: 10, grow: 30, color: "rgb(226,242,255)", alpha: 0.28 });
+          this.add({ kind: "mist", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 3, vx: Math.cos(a) * 34, vy: Math.sin(a) * 18, vz: 2, life: 1.1 + Math.random() * 0.7, size: 12, grow: 34, color: "rgb(214,236,255)", alpha: 0.22 });
         }
         for (const sp of n.spikes) {
           if (sp.done || sp.d > front) continue;
@@ -598,11 +626,11 @@ export class CombatFx {
         }
       }
       // snow drifting down over the frozen area
-      if (n.age < n.expand + 1) {
-        for (let i = 0; i < 2; i++) {
+      if (n.age < n.expand + 1 && Math.random() < 0.5) {
+        for (let i = 0; i < 1; i++) {
           const a = Math.random() * Math.PI * 2;
           const d = Math.sqrt(Math.random()) * n.radius;
-          this.add({ kind: "snow", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 30 + Math.random() * 40, vx: 8, vy: 0, vz: -18 - Math.random() * 14, life: 2.2, size: 1.2 + Math.random() * 1.2, grow: 0, color: "", alpha: 1, spin: Math.random() * 6 });
+          this.add({ kind: "snow", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 30 + Math.random() * 40, vx: 8, vy: 0, vz: -18 - Math.random() * 14, life: 2.2, size: 0.7 + Math.random() * 0.9, grow: 0, color: "", alpha: 0.5 + Math.random() * 0.5, spin: Math.random() * 6 });
         }
       }
     }
@@ -676,11 +704,13 @@ export class CombatFx {
       const fade = k < 0.08 ? k / 0.08 : 1 - Math.max(0, (k - 0.5) / 0.5);
       const img = d.kind === "scorch" ? scorchSprite() : frostSprite();
       ctx.save();
-      ctx.globalAlpha = fade;
+      ctx.globalAlpha = d.spread ? Math.min(0.85, fade * 1.3) : fade;
       ctx.translate(d.x, d.y);
       ctx.scale(1, 0.55);
+      // frost creeps outward with the cold wave (its soft edge grows with it) instead of popping in
+      const r = d.spread ? d.r * Math.max(0.15, Math.min(1, Math.pow(d.age / d.spread, 0.6))) : d.r;
       ctx.rotate(d.rot);
-      ctx.drawImage(img, -d.r, -d.r, d.r * 2, d.r * 2);
+      ctx.drawImage(img, -r, -r, r * 2, r * 2);
       ctx.restore();
     }
   }
@@ -693,11 +723,13 @@ export class CombatFx {
       const k = p.age / p.life;
       const sy = p.y - p.z;
       if (p.kind === "spike") {
-        drawIceSpike(ctx, p, k);
+        const cluster = iceImage(`ice_cluster_${Math.floor(p.spin * ICE_CLUSTERS) % ICE_CLUSTERS}`);
+        if (cluster) drawIceCluster(ctx, cluster, p, k);
+        else drawIceSpike(ctx, p, k);
         continue;
       }
       if (p.kind === "snow") {
-        ctx.globalAlpha = k > 0.8 ? (1 - k) / 0.2 : 0.9;
+        ctx.globalAlpha = (k > 0.8 ? (1 - k) / 0.2 : 0.85) * p.alpha;
         ctx.fillStyle = "rgba(250,253,255,1)";
         ctx.beginPath();
         ctx.arc(p.x, sy, p.size, 0, Math.PI * 2);
@@ -723,6 +755,16 @@ export class CombatFx {
         }
       } else if (p.kind === "shard") {
         ctx.globalAlpha = k > 0.7 ? (1 - k) / 0.3 : 1;
+        const shardImg = iceImage(`ice_shard_${Math.floor((p.rot * 7 + p.size * 13) % ICE_SHARDS + ICE_SHARDS) % ICE_SHARDS}`);
+        if (shardImg) {
+          ctx.save();
+          ctx.translate(p.x, sy);
+          ctx.rotate(p.rot);
+          const w = p.size * 5;
+          ctx.drawImage(shardImg, -w / 2, -w / 2, w, w);
+          ctx.restore();
+          continue;
+        }
         ctx.save();
         ctx.translate(p.x, sy);
         ctx.rotate(p.rot);
@@ -959,5 +1001,42 @@ function drawIceSpike(ctx: CanvasRenderingContext2D, p: Particle, k: number): vo
     ctx.lineTo(tx, ty);
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+/**
+ * A baked ice cluster bursting out of the frozen ground: it rises with a
+ * slight overshoot, a burst of cold light at its foot, holds with a faint
+ * shimmer, then thins out just before it shatters (see shatterSpike).
+ */
+function drawIceCluster(ctx: CanvasRenderingContext2D, img: HTMLImageElement, p: Particle, k: number): void {
+  const t = Math.min(1, k / 0.14);
+  // ease-out-back: shoots up a touch past full height and settles
+  const rise = 1 + 2.2 * Math.pow(t - 1, 3) + 1.2 * Math.pow(t - 1, 2);
+  const fade = k > 0.88 ? (1 - k) / 0.12 : 1;
+  const size = p.size * 2.1;
+  ctx.save();
+  // contact shadow
+  ctx.globalAlpha = 0.1 * fade * t;
+  ctx.fillStyle = "#0a1a28";
+  ctx.beginPath();
+  ctx.ellipse(p.x + size * 0.08, p.y + 1, size * 0.28, size * 0.09, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalAlpha = fade;
+  ctx.translate(p.x, p.y);
+  ctx.scale(p.spin > 0.5 ? -1 : 1, Math.max(0.05, rise));
+  ctx.drawImage(img, -size / 2, -size * ICE_CLUSTER_BASE_Y, size, size);
+  ctx.restore();
+  // cold burst at the foot as it breaks through, and a faint shimmer after
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const burst = Math.max(0, 1 - k / 0.2);
+  const shimmer = 0.12 + 0.06 * Math.sin(k * 40 + p.spin * 9);
+  const a = (burst * 0.6 + shimmer) * fade;
+  const g = ctx.createRadialGradient(p.x, p.y - size * 0.15, 0, p.x, p.y - size * 0.15, size * 0.55);
+  g.addColorStop(0, `rgba(170,225,255,${a})`);
+  g.addColorStop(1, "rgba(170,225,255,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(p.x - size * 0.55, p.y - size * 0.7, size * 1.1, size * 1.1);
   ctx.restore();
 }
