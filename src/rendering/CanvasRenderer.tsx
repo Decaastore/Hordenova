@@ -402,7 +402,7 @@ export function CanvasRenderer({
         }
         // the big fire and ice specials are full particle sequences (rendering/combatFx.ts)
         if (projectile.towerType === "INFERNO") combatFx.firestorm(projectile.to, radius, projectile.power ?? 1);
-        else if (projectile.towerType === "FROSTBORN") combatFx.frostNova(caster?.position ?? projectile.from, radius, projectile.power ?? 1);
+        else if (projectile.towerType === "FROSTBORN") combatFx.frostStrike(projectile.to, 70, projectile.power ?? 1);
         specialVfx.spawn({
           type: projectile.towerType,
           towerPosition: caster?.position ?? projectile.from,

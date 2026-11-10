@@ -282,6 +282,8 @@ function jagged(a: Vector2, b: Vector2, detail: number, roughness: number): Vect
 // The manager
 // ---------------------------------------------------------------------------
 interface Meteor {
+  /** fire = Inferno's burning meteor, ice = Frostborn's falling ice lance. */
+  element: "fire" | "ice";
   from: Vector2;
   to: Vector2;
   age: number;
@@ -323,7 +325,7 @@ export class CombatFx {
     }
     for (const m of this.meteors) {
       const k = Math.min(1, m.age / m.fall);
-      out.push({ x: m.from.x + (m.to.x - m.from.x) * k, y: m.from.y + (m.to.y - m.from.y) * k, r: 110, rgb: [255, 150, 60], intensity: 0.9 });
+      out.push({ x: m.from.x + (m.to.x - m.from.x) * k, y: m.from.y + (m.to.y - m.from.y) * k, r: 110, rgb: m.element === "ice" ? [160, 215, 255] : [255, 150, 60], intensity: 0.9 });
     }
     for (const b of this.burns) out.push({ x: b.x, y: b.y, r: b.r * 2.2, rgb: [255, 130, 50], intensity: 0.8 * (1 - b.age / b.life) });
     for (const n of this.novas) {
@@ -360,7 +362,7 @@ export class CombatFx {
    */
   firestorm(to: Vector2, radius: number, power = 1): void {
     const r = Math.max(40, radius) * (0.85 + 0.15 * power);
-    this.meteors.push({ from: { x: to.x - 150, y: to.y - 330 }, to, age: 0, fall: 0.34, radius: r, power });
+    this.meteors.push({ element: "fire", from: { x: to.x - 150, y: to.y - 330 }, to, age: 0, fall: 0.34, radius: r, power });
   }
 
   /**
@@ -387,6 +389,56 @@ export class CombatFx {
     this.decals.push({ kind: "frost", x: center.x, y: center.y, r: R * 1.08, rot: Math.random() * Math.PI * 2, age: 0, life: 3.2, spread: 0.5 });
     if (this.decals.length > MAX_DECALS) this.decals.shift();
     this.onShake?.(1.4, 160);
+  }
+
+  /**
+   * FROSTBORN special "Absolute Zero" — a lance of ice drops onto the target
+   * (the same kind of focused strike as the Firestorm, never a screen-wide
+   * wave): cold flash, crystals bursting out of the ground at the point of
+   * impact, ice fragments flying, a column of freezing vapour, frost.
+   */
+  frostStrike(to: Vector2, radius: number, power = 1): void {
+    const r = Math.max(40, Math.min(80, radius)) * (0.85 + 0.15 * power);
+    this.meteors.push({ element: "ice", from: { x: to.x + 130, y: to.y - 320 }, to, age: 0, fall: 0.3, radius: r, power });
+  }
+
+  private shatterIceLance(m: Meteor): void {
+    const p = m.to;
+    const R = m.radius;
+    this.onShake?.(1.6 * m.power, 180);
+    this.flash(p, R * 2.6, [170, 225, 255], 0.3);
+    this.flash(p, R * 0.8, [240, 250, 255], 0.08);
+    // a ring of frozen air rolling out along the ground
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2 + Math.random() * 0.2;
+      const v = R * (1.8 + Math.random() * 0.7);
+      this.add({ kind: "mist", x: p.x + Math.cos(a) * R * 0.15, y: p.y + Math.sin(a) * R * 0.1, z: 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.55, vz: 3, life: 0.8 + Math.random() * 0.4, size: R * 0.12, grow: R * 0.45, color: "rgb(222,240,255)", alpha: 0.28 });
+    }
+    // the ice itself: one big cluster at the heart, a crown of smaller ones around it
+    const crown = 5;
+    this.add({ kind: "spike", x: p.x, y: p.y, z: 0, vx: 0, vy: 0, vz: 0, life: 1.5, size: R * 0.62, grow: 0, color: "", alpha: 1, spin: Math.random() });
+    for (let i = 0; i < crown; i++) {
+      const a = (i / crown) * Math.PI * 2 + Math.random() * 0.5;
+      const d = R * (0.38 + Math.random() * 0.25);
+      this.add({ kind: "spike", x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d * 0.6, z: 0, vx: 0, vy: 0, vz: 0, life: 1.2 + Math.random() * 0.3, size: R * (0.28 + Math.random() * 0.16), grow: 0, color: "", alpha: 1, spin: Math.random() });
+    }
+    // fragments flying out in arcs
+    for (let i = 0; i < 18; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = R * (1 + Math.random() * 1.8);
+      this.add({ kind: "shard", x: p.x, y: p.y, z: 10, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: 90 + Math.random() * 130, life: 0.8 + Math.random() * 0.5, size: 2.2 + Math.random() * 2.2, grow: 0, color: "", alpha: 1, spin: (Math.random() - 0.5) * 16 });
+    }
+    // a column of freezing vapour climbing out of the impact, like the fire's smoke but cold and pale
+    for (let i = 0; i < 14; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * R * 0.4;
+      this.add({ kind: "mist", x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d * 0.5, z: 10 + Math.random() * 16, vx: Math.cos(a) * 10 + 5, vy: Math.sin(a) * 5, vz: 34 + Math.random() * 46, life: 1.6 + Math.random() * 1, size: R * 0.18, grow: R * 0.7, color: Math.random() < 0.5 ? "rgb(232,244,255)" : "rgb(196,224,248)", alpha: 0.3 });
+    }
+    for (let i = 0; i < 12; i++) {
+      this.add({ kind: "glint", x: p.x + (Math.random() - 0.5) * R * 1.2, y: p.y + (Math.random() - 0.5) * R * 0.7, z: 4 + Math.random() * 30, vx: 0, vy: 0, vz: 8, life: 0.5 + Math.random() * 0.6, size: 2.6, grow: 0, color: "", alpha: 1 });
+    }
+    this.decals.push({ kind: "frost", x: p.x, y: p.y, r: R * 1.4, rot: Math.random() * Math.PI * 2, age: 0, life: 4, spread: 0.35 });
+    if (this.decals.length > MAX_DECALS) this.decals.shift();
   }
 
   private explodeMeteor(m: Meteor): void {
@@ -585,10 +637,19 @@ export class CombatFx {
         const kk = k0 + ((k - k0) * (i + Math.random())) / steps;
         const px = m.from.x + (m.to.x - m.from.x) * kk + (Math.random() - 0.5) * 4;
         const py = m.from.y + (m.to.y - m.from.y) * kk + (Math.random() - 0.5) * 4;
+        if (m.element === "ice") {
+          // a lance of ice leaves a wake of freezing vapour and glittering frost
+          if (i % 2 === 0) this.add({ kind: "mist", x: px, y: py, z: 0, vx: (Math.random() - 0.5) * 10, vy: -6, vz: 4, life: 0.9 + Math.random() * 0.4, size: 4, grow: 20, color: "rgb(220,240,255)", alpha: 0.42 });
+          if (i % 3 === 0) this.add({ kind: "glint", x: px + (Math.random() - 0.5) * 8, y: py + (Math.random() - 0.5) * 8, z: 0, vx: 0, vy: 0, vz: 0, life: 0.35, size: 2.2, grow: 0, color: "", alpha: 1 });
+          continue;
+        }
         this.add({ kind: "fire", x: px, y: py, z: 0, vx: (Math.random() - 0.5) * 14, vy: -14, vz: 0, life: 0.22 + Math.random() * 0.12, size: 5 * m.power, grow: 18, color: "", alpha: 0.75 });
         if (i % 2 === 0) this.add({ kind: "smoke", x: px, y: py, z: 0, vx: (Math.random() - 0.5) * 8, vy: -8, vz: 8, life: 1.2 + Math.random() * 0.5, size: 5, grow: 26, color: "rgb(54,46,42)", alpha: 0.38 });
       }
-      if (m.age >= m.fall) this.explodeMeteor(m);
+      if (m.age >= m.fall) {
+        if (m.element === "ice") this.shatterIceLance(m);
+        else this.explodeMeteor(m);
+      }
     }
     this.meteors = this.meteors.filter((m) => m.age < m.fall);
     for (const b of this.burns) {
@@ -860,8 +921,12 @@ export class CombatFx {
         ctx.stroke();
       }
     }
-    // the meteors themselves: a molten rock wrapped in fire
+    // the meteors themselves: a molten rock wrapped in fire (or a lance of ice)
     for (const m of this.meteors) {
+      if (m.element === "ice") {
+        drawIceLance(ctx, m, soft);
+        continue;
+      }
       const k = Math.min(1, m.age / m.fall);
       const x = m.from.x + (m.to.x - m.from.x) * k;
       const y = m.from.y + (m.to.y - m.from.y) * k;
@@ -1039,4 +1104,39 @@ function drawIceCluster(ctx: CanvasRenderingContext2D, img: HTMLImageElement, p:
   ctx.fillStyle = g;
   ctx.fillRect(p.x - size * 0.55, p.y - size * 0.7, size * 1.1, size * 1.1);
   ctx.restore();
+}
+
+/** The falling ice lance: a pale freezing streak, a bright cold core and a real ice shard at its head. */
+function drawIceLance(ctx: CanvasRenderingContext2D, m: Meteor, soft: HTMLCanvasElement): void {
+  const k = Math.min(1, m.age / m.fall);
+  const x = m.from.x + (m.to.x - m.from.x) * k;
+  const y = m.from.y + (m.to.y - m.from.y) * k;
+  const ang = Math.atan2(m.to.y - m.from.y, m.to.x - m.from.x);
+  const tail = 140 * m.power;
+  const sg = ctx.createLinearGradient(x, y, x - Math.cos(ang) * tail, y - Math.sin(ang) * tail);
+  sg.addColorStop(0, "rgba(235,248,255,0.85)");
+  sg.addColorStop(0.3, "rgba(150,210,255,0.4)");
+  sg.addColorStop(1, "rgba(120,180,255,0)");
+  ctx.globalAlpha = 1;
+  ctx.strokeStyle = sg;
+  ctx.lineCap = "round";
+  ctx.lineWidth = 6 * m.power;
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(x - Math.cos(ang) * tail, y - Math.sin(ang) * tail);
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.globalAlpha = 0.9;
+  ctx.drawImage(soft, -16 * m.power, -16 * m.power, 32 * m.power, 32 * m.power);
+  const shard = iceImage("ice_shard_0");
+  ctx.rotate(ang + Math.PI / 2);
+  if (shard) {
+    const w = 34 * m.power;
+    ctx.globalCompositeOperation = "source-over";
+    ctx.globalAlpha = 1;
+    ctx.drawImage(shard, -w / 2, -w / 2, w, w);
+  }
+  ctx.restore();
+  ctx.globalCompositeOperation = "lighter";
 }

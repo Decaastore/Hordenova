@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v88",
+    dateIso: "2026-11-10",
+    category: "TOWERS",
+    title: {
+      en: "Absolute Zero Becomes a Focused Ice Strike",
+      ptBR: "Zero Absoluto Vira um Golpe de Gelo Concentrado",
+    },
+    description: {
+      en: "The Frostborn special no longer covers the screen. Like the Inferno's meteor, it is now a focused strike on the target: a lance of ice falls from the sky and shatters on impact.",
+      ptBR: "O especial do Frostborn não cobre mais a tela. Como o meteoro do Inferno, agora é um golpe concentrado no alvo: uma lança de gelo cai do céu e se estilhaça no impacto.",
+    },
+    highlights: [
+      {
+        en: "The lance streaks down with a trail of freezing vapour and glittering frost.",
+        ptBR: "A lança desce com um rastro de vapor gelado e brilhos de geada.",
+      },
+      {
+        en: "On impact: a cold flash, a light camera shake, real 3D ice crystals bursting up at the point of impact, ice fragments flying and a column of cold vapour rising.",
+        ptBR: "No impacto: clarão frio, tremor leve na tela, cristais de gelo 3D brotando no ponto atingido, pedaços de gelo voando e uma coluna de vapor frio subindo.",
+      },
+      {
+        en: "A small patch of frost is left on the ground.",
+        ptBR: "Fica uma pequena marca de geada no chão.",
+      },
+    ],
+  },
+  {
     id: "v87",
     dateIso: "2026-11-10",
     category: "TOWERS",
