@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v89",
+    dateIso: "2026-11-10",
+    category: "INTERFACE",
+    title: {
+      en: "A More Polished Top Bar and Play Buttons",
+      ptBR: "Barra do Topo e Botões de Jogar com Mais Acabamento",
+    },
+    description: {
+      en: "The site keeps its black and gold look, with a finer finish: a more elegant top bar and action buttons that stand out.",
+      ptBR: "O site mantém o visual preto e dourado, com mais acabamento: uma barra do topo mais elegante e botões de ação que se destacam.",
+    },
+    highlights: [
+      {
+        en: "Top bar: a larger logo, a gold line with a diamond at its center, and the current page marked by a small gold diamond.",
+        ptBR: "Barra do topo: logo maior, uma linha dourada com um losango no centro e a página atual marcada por um pequeno losango dourado.",
+      },
+      {
+        en: "Play is now a crimson button with a gold frame, always at the right of the bar; the main buttons on Home and Season follow the same style.",
+        ptBR: "O Jogar agora é um botão carmesim com moldura dourada, sempre à direita da barra; os botões principais da Home e da Season seguem o mesmo estilo.",
+      },
+    ],
+  },
+  {
     id: "v88",
     dateIso: "2026-11-10",
     category: "TOWERS",

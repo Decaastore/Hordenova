@@ -379,14 +379,15 @@ const HOME_CSS = `
 
 .hn-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
 .hn-play {
-  position: relative; padding: 16px 34px; border-radius: 10px; cursor: pointer;
-  border: 1px solid #f2c873;
-  background: linear-gradient(180deg, #f6cf7a 0%, var(--gold) 55%, #c58a2c 100%);
-  color: #2b1906 !important; font-size: 16px !important; font-weight: 800; letter-spacing: 0.02em;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 10px 30px rgba(232,176,75,0.28), 0 2px 0 #7a4f14;
+  position: relative; padding: 16px 36px; border-radius: 8px; cursor: pointer;
+  border: 1px solid #e8b04b; color: #fff2c9 !important; font-weight: 800; letter-spacing: 0.04em;
+  background: linear-gradient(180deg, #e2313f 0%, #b3121f 55%, #7d0a14 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 26px rgba(226,49,63,0.45), 0 3px 0 #3d0508;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
   transition: transform 140ms ease, box-shadow 140ms ease, filter 140ms ease;
+  font-size: 16px !important;
 }
-.hn-play:hover { transform: translateY(-1px); filter: brightness(1.06); box-shadow: inset 0 1px 0 rgba(255,255,255,0.6), 0 14px 36px rgba(232,176,75,0.4), 0 2px 0 #7a4f14; }
+.hn-play:hover { transform: translateY(-1px); filter: brightness(1.15); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 38px rgba(226,49,63,0.7), 0 3px 0 #3d0508; }
 .hn-play:active { transform: translateY(1px); }
 .hn-ghost {
   padding: 15px 24px; border-radius: 10px; cursor: pointer;

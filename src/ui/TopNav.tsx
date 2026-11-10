@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties } from "react";
+import { useEffect, useState } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
@@ -43,134 +43,97 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
   }, []);
   const passClaimable = getPassView().claimable.length;
 
+  const link = (view: NavView, label: string, extra?: { dot?: boolean; dotTitle?: string }) => (
+    <button
+      key={view}
+      className={`tn-link${active === view ? " is-active" : ""}`}
+      aria-current={active === view ? "page" : undefined}
+      title={extra?.dot ? extra.dotTitle : undefined}
+      onClick={() => onNavigate(view)}
+    >
+      {label}
+      {extra?.dot && <span aria-hidden="true" className="tn-dot" />}
+    </button>
+  );
+
   return (
-    <nav style={navStyle}>
-      <button style={brandStyle} onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
-        <BrandLogo height={24} decorative />
+    <nav className="tn">
+      <style>{TOP_NAV_CSS}</style>
+      <button className="tn-brand" onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
+        <BrandLogo height={30} decorative />
       </button>
-      <div style={linksStyle}>
-        <button style={playLinkStyle} onClick={onPlay}>
+      <div className="tn-links">
+        {link("SEASON", t("nav.season"))}
+        {link("PASS", t("nav.pass"), { dot: passClaimable > 0, dotTitle: t("nav.passReady", { n: passClaimable }) })}
+        {link("RANKING", t("nav.ranking"))}
+        {link("STORE", t("nav.store"))}
+        {link("MARKETPLACE", t("nav.marketplace"))}
+        {link("WIKI", t("nav.wiki"))}
+        {link("NOVIDADES", t("nav.novidades"))}
+      </div>
+      {/* MÚSICA GLOBAL spec section 22 — the music control and the language
+          selector must be reachable from every page the global track plays
+          on, so they live here unconditionally. */}
+      <div className="tn-tools">
+        <LanguageSelector inline />
+        <MusicControl />
+        <button className="tn-play" onClick={onPlay}>
           {t("nav.play")}
         </button>
-        <NavLink label={t("nav.season")} isActive={active === "SEASON"} onClick={() => onNavigate("SEASON")} />
-        <NavLink label={t("nav.pass")} isActive={active === "PASS"} onClick={() => onNavigate("PASS")} dot={passClaimable > 0} dotTitle={t("nav.passReady", { n: passClaimable })} />
-        <NavLink label={t("nav.ranking")} isActive={active === "RANKING"} onClick={() => onNavigate("RANKING")} />
-        <NavLink label={t("nav.store")} isActive={active === "STORE"} onClick={() => onNavigate("STORE")} />
-        <NavLink label={t("nav.marketplace")} isActive={active === "MARKETPLACE"} onClick={() => onNavigate("MARKETPLACE")} />
-        <NavLink label={t("nav.wiki")} isActive={active === "WIKI"} onClick={() => onNavigate("WIKI")} />
-        <NavLink label={t("nav.novidades")} isActive={active === "NOVIDADES"} onClick={() => onNavigate("NOVIDADES")} />
-        {/* MÚSICA GLOBAL spec section 22 — the ambient-music control (and the
-            language selector alongside it) needs to be reachable from every
-            page the global track now plays on, not just Home, so this lives
-            here unconditionally instead of being an opt-in slot each screen
-            has to remember to fill. */}
-        <div style={rightSlotStyle}>
-          <LanguageSelector inline />
-          <MusicControl />
-        </div>
       </div>
+      <span className="tn-rule" aria-hidden="true" />
     </nav>
   );
 }
 
-function NavLink({ label, isActive, onClick, dot, dotTitle }: { label: string; isActive: boolean; onClick: () => void; dot?: boolean; dotTitle?: string }) {
-  return (
-    <button
-      onClick={onClick}
-      title={dot ? dotTitle : undefined}
-      style={{
-        ...linkStyle,
-        position: "relative",
-        color: isActive ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-        borderBottomColor: isActive ? PALETTE.uiAccent : "transparent",
-      }}
-      onMouseEnter={(e) => {
-        if (!isActive) e.currentTarget.style.color = PALETTE.uiAccentBright;
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) e.currentTarget.style.color = PALETTE.uiTextDim;
-      }}
-    >
-      {label}
-      {dot && <span aria-hidden="true" style={dotStyle} />}
-    </button>
-  );
+/**
+ * The same black-and-gold identity, finished like a big dark-fantasy title:
+ * a solid bar closed by a gold rule with a diamond at its center, the
+ * current page marked by a small gold diamond, and "Jogar" as the one
+ * crimson, gold-framed button on the page.
+ */
+const TOP_NAV_CSS = `
+.tn {
+  position: relative; z-index: 5; flex-shrink: 0; box-sizing: border-box; width: 100%;
+  display: flex; align-items: center; gap: 0 clamp(14px, 2.2vw, 34px);
+  min-height: 68px; padding: 0 clamp(14px, 2.4vw, 32px);
+  background: linear-gradient(180deg, rgba(14,9,5,0.97), rgba(20,14,7,0.9));
 }
-
-const dotStyle: CSSProperties = {
-  position: "absolute",
-  top: 2,
-  right: -6,
-  width: 7,
-  height: 7,
-  borderRadius: "50%",
-  background: PALETTE.uiAccentBright,
-  boxShadow: `0 0 6px ${PALETTE.uiAccent}`,
-};
-
-const navStyle: CSSProperties = {
-  position: "relative",
-  zIndex: 5,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-  flexWrap: "wrap",
-  rowGap: 8,
-  padding: "14px 20px",
-  background: "linear-gradient(180deg, rgba(20,14,7,0.82), rgba(20,14,7,0.4) 80%, transparent)",
-  boxSizing: "border-box",
-  width: "100%",
-  flexShrink: 0,
-};
-
-const brandStyle: CSSProperties = {
-  background: "none",
-  border: "none",
-  cursor: "pointer",
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 17,
-  fontWeight: 800,
-  letterSpacing: 3,
-  color: PALETTE.uiAccentBright,
-  textShadow: `0 0 14px ${PALETTE.uiAccent}88`,
-  padding: 0,
-};
-
-const linksStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: "clamp(12px, 2vw, 26px)",
-  // Narrow screens: the row scrolls sideways instead of cutting links off.
-  maxWidth: "100%",
-  overflowX: "auto",
-  scrollbarWidth: "none",
-};
-
-const linkStyle: CSSProperties = {
-  background: "none",
-  border: "none",
-  borderBottom: "2px solid transparent",
-  cursor: "pointer",
-  fontSize: 12.5,
-  fontWeight: 700,
-  letterSpacing: 1.6,
-  textTransform: "uppercase",
-  padding: "6px 2px",
-  transition: "color 140ms ease, border-color 140ms ease",
-};
-
-const playLinkStyle: CSSProperties = {
-  ...linkStyle,
-  borderBottom: "none",
-  color: "#3a2408",
-  background: `linear-gradient(180deg, #ffe9a0, ${PALETTE.gold} 60%, #d98a2a)`,
-  padding: "8px 18px",
-  borderRadius: 8,
-  boxShadow: "0 2px 10px rgba(0,0,0,0.35)",
-};
-
-const rightSlotStyle: CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  marginLeft: "clamp(4px, 1vw, 10px)",
-};
+.tn-rule { position: absolute; left: 0; right: 0; bottom: 0; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(232,176,75,0.55) 18%, #f7dc9c 50%, rgba(232,176,75,0.55) 82%, transparent); }
+.tn-rule::after { content: ""; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; background: #f7dc9c;
+  transform: translate(-50%, -50%) rotate(45deg); box-shadow: 0 0 10px rgba(247,220,156,0.8), 0 0 0 3px #140e07; }
+.tn :focus-visible { outline: 2px solid #f7dc9c; outline-offset: 3px; }
+nav.tn .tn-brand { display: flex; align-items: center; padding: 0; background: none; border: none; cursor: pointer; filter: drop-shadow(0 0 10px rgba(232,176,75,0.25)); }
+nav.tn .tn-links { display: flex; align-items: center; justify-content: safe center; gap: clamp(4px, 1vw, 14px); flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; align-self: stretch; }
+nav.tn .tn-links::-webkit-scrollbar { display: none; }
+nav.tn .tn-link {
+  position: relative; flex-shrink: 0; align-self: stretch; display: flex; align-items: center;
+  padding: 0 8px; background: none; border: none; cursor: pointer;
+  font: 700 12.5px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 1.6px; text-transform: uppercase; white-space: nowrap;
+  color: ${PALETTE.uiTextDim}; transition: color 140ms ease, text-shadow 140ms ease;
+}
+nav.tn .tn-link:hover { color: ${PALETTE.uiAccentBright}; text-shadow: 0 0 12px rgba(255,207,94,0.5); }
+nav.tn .tn-link.is-active { color: ${PALETTE.uiAccentBright}; text-shadow: 0 0 12px rgba(255,207,94,0.45); }
+nav.tn .tn-link.is-active::after { content: ""; position: absolute; left: 50%; bottom: 10px; width: 6px; height: 6px; background: ${PALETTE.uiAccent};
+  transform: translateX(-50%) rotate(45deg); box-shadow: 0 0 8px ${PALETTE.uiAccent}; }
+.tn-dot { position: absolute; top: 20px; right: -2px; width: 7px; height: 7px; border-radius: 50%; background: ${PALETTE.uiAccentBright}; box-shadow: 0 0 6px ${PALETTE.uiAccent}; }
+.tn-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+nav.tn .tn-play {
+  margin-left: 8px; padding: 10px 26px; cursor: pointer; border-radius: 6px;
+  font: 800 13px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #fff2c9;
+  border: 1px solid #e8b04b;
+  background: linear-gradient(180deg, #e2313f 0%, #b3121f 55%, #7d0a14 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 18px rgba(226,49,63,0.45), 0 2px 0 #3d0508;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  transition: filter 140ms ease, transform 140ms ease, box-shadow 140ms ease;
+}
+nav.tn .tn-play:hover { filter: brightness(1.15); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 28px rgba(226,49,63,0.7), 0 2px 0 #3d0508; }
+nav.tn .tn-play:active { transform: translateY(1px); }
+@media (max-width: 900px) {
+  .tn { flex-wrap: wrap; padding-top: 8px; }
+  .tn-tools { margin-left: auto; }
+  nav.tn .tn-links { order: 3; flex: 0 0 100%; justify-content: flex-start; min-height: 44px; }
+  nav.tn .tn-brand img { height: 24px !important; }
+}
+`;
