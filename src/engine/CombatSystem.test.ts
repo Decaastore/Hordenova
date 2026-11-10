@@ -289,4 +289,27 @@ describe("target priority — a boss in range is never left unhurt", () => {
     behind.distanceTraveled = 10;
     expect(findPrimaryTarget({ x: 0, y: 0 }, 100, [behind, ahead])).toBe(ahead);
   });
+
+  it("A Horda que aprende: the adaptation multiplier scales a tower's damage and Inferno's burn", () => {
+    const hitWith = (mult: number) => {
+      const tower = createTowerInstance("slot", "IRONWOOD", { x: 0, y: 0 });
+      const enemy = createEnemyInstance("BRUTE", 1);
+      enemy.position = { x: 10, y: 0 };
+      const before = enemy.hp;
+      vi.spyOn(Math, "random").mockReturnValue(0.99); // no crit
+      tickCombat([tower], [enemy], 10_000, 0, false, { IRONWOOD: mult, INFERNO: 1, FROSTBORN: 1, STORMCALLER: 1 });
+      vi.restoreAllMocks();
+      return before - enemy.hp;
+    };
+    const plain = hitWith(1);
+    expect(plain).toBeGreaterThan(0);
+    expect(hitWith(0.8)).toBeCloseTo(plain * 0.8, 3);
+
+    const burning = (mult: number) => {
+      const enemy = createEnemyInstance("BRUTE", 1);
+      enemy.burn = { damagePerSecond: 10, remainingMs: 5000, stacks: 1 };
+      return advanceEnemy(enemy, 1000, mult).burnDamageDealt;
+    };
+    expect(burning(0.75)).toBeCloseTo(burning(1) * 0.75);
+  });
 });

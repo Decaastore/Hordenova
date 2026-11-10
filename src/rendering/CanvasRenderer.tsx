@@ -1,3 +1,6 @@
+import { drawCity } from "./citySprites";
+import { getCityPlots } from "@/data/cityPlots";
+import { builtBuildings, type CityBuildingId } from "@/config/city";
 import { useEffect, useRef, type RefObject } from "react";
 import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
@@ -24,6 +27,7 @@ import {
   drawPath,
   drawPathEndpoints,
   getPortalAnchor,
+  getFortressAnchor,
   drawRangeCircle,
   drawSlot,
   drawVignette,
@@ -268,6 +272,9 @@ export function CanvasRenderer({
     if (canvas.parentElement) resizeObserver.observe(canvas.parentElement);
 
 
+    // O CASTELO VIRA CIDADE — remembers which buildings already stood, so only a newly raised one plays its rise.
+    let cityKnown: Set<CityBuildingId> | null = null;
+    const cityRaisedAt = new Map<CityBuildingId, number>();
     const draw = (timestamp: number) => {
       const frameDt = lastFrameTimestamp === null ? 16 : Math.min(timestamp - lastFrameTimestamp, 100);
       lastFrameTimestamp = timestamp;
@@ -417,7 +424,16 @@ export function CanvasRenderer({
       // keeps the parameter at its default (false).
       const emergingIds: string[] = [];
       for (const e of snapshot.enemies) if (emergenceProgress(e.distanceTraveled) < 1) emergingIds.push(e.id);
+      const cityPlots = getCityPlots(layout);
+      const cityBuilt = new Set(builtBuildings(hud.seasonBestWave).map((b) => b.id));
+      if (cityKnown === null) cityKnown = new Set(cityBuilt);
+      for (const id of cityBuilt) if (!cityKnown.has(id)) { cityKnown.add(id); cityRaisedAt.set(id, timestamp); }
+      for (const id of cityKnown) if (!cityBuilt.has(id)) { cityKnown.delete(id); cityRaisedAt.delete(id); }
+      const cityState = { built: cityBuilt, burning: hud.city.burning, raisedAt: cityRaisedAt };
+      const castleBaseY = getFortressAnchor(roadPath).position.y;
+      drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, false);
       drawPathEndpoints(ctx, roadPath, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
+      drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, true);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       pruneTowerAims(new Set(snapshot.towers.map((t) => t.id)));

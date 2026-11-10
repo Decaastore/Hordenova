@@ -7,7 +7,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
 import { BrandLogo } from "./BrandLogo";
-import { BagIcon, BoltIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -19,9 +19,11 @@ interface HUDProps {
   onOpenStore?: () => void;
   /** Opens/closes the daily missions panel. */
   onToggleMissions?: () => void;
+  /** Opens/closes the city panel (config/city.ts). */
+  onToggleCity?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity }: HUDProps) {
   const { t, language } = useLanguage();
   const stateWidth = useMemo(() => widestStateLabel(STATE_PHASES.map((p) => t(`hud.phase.${p}`))), [language, t]);
   const hpRatio = hud.baseHp / hud.maxBaseHp;
@@ -137,6 +139,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             <ScrollIcon size={13} />
             {t("missions.button")}
             {hud.missionsClaimable > 0 && <span style={badgeStyle}>{hud.missionsClaimable}</span>}
+          </button>
+        )}
+        {onToggleCity && (
+          <button onClick={onToggleCity} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="city-button">
+            <CastleIcon size={13} />
+            {t("city.button")}
+            {Object.keys(hud.city.burning).length > 0 && <span style={{ ...badgeStyle, background: PALETTE.danger }}>{Object.keys(hud.city.burning).length}</span>}
           </button>
         )}
         <button onClick={onOpenInventory} style={inventoryButtonStyle}>

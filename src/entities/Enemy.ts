@@ -172,12 +172,13 @@ export interface AdvanceResult {
 }
 
 /** Mutates `enemy` in place: moves it along the path and ticks status effects. */
-export function advanceEnemy(enemy: EnemyInstance, dtMs: number): AdvanceResult {
+export function advanceEnemy(enemy: EnemyInstance, dtMs: number, burnTakenMultiplier = 1): AdvanceResult {
   const dtSeconds = dtMs / 1000;
   let burnDamageDealt = 0;
 
   if (enemy.burn) {
-    const tickDamage = enemy.burn.damagePerSecond * dtSeconds;
+    // burnTakenMultiplier: the horde's adaptation to fire (config/hordeAdaptation.ts), 1 = none.
+    const tickDamage = enemy.burn.damagePerSecond * dtSeconds * burnTakenMultiplier;
     enemy.hp = Math.max(0, enemy.hp - tickDamage);
     burnDamageDealt = tickDamage;
     enemy.burn.remainingMs -= dtMs;

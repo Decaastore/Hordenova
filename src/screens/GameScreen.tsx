@@ -1,3 +1,7 @@
+import { CityPanel } from "@/ui/CityPanel";
+import { HordeAdaptationBadge } from "@/ui/HordeAdaptationBadge";
+import { VictoryClipCard } from "@/ui/clip/VictoryClipCard";
+import { isClipRecordingSupported, VictoryClipRecorder, type FinishedClip } from "@/ui/clip/victoryClip";
 import type { CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -100,6 +104,18 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const [reportDismissed, setReportDismissed] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [missionsOpen, setMissionsOpen] = useState(false);
+  const [cityOpen, setCityOpen] = useState(false);
+  const mapAreaRef = useRef<HTMLDivElement>(null);
+
+  // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
+  // kill the last seconds plus an end card become a shareable video.
+  const clipRecorderRef = useRef<VictoryClipRecorder | null>(null);
+  const clipSupported = useMemo(() => isClipRecordingSupported(), []);
+  const [victoryClip, setVictoryClip] = useState<{ clip: FinishedClip; bossName: string; wave: number } | null>(null);
+
+  // O CASTELO VIRA CIDADE — a short notice when a building rises, burns or is rebuilt.
+  const [cityNotice, setCityNotice] = useState<string | null>(null);
+  const lastCitySeqRef = useRef<number>(hud.city.lastEvent?.seq ?? 0);
 
   // INIMIGOS 3D — pilot scope: only BRUTE gets a 3D model (see
   // rendering3d/BruteEnemyLayer.tsx). `enable3DEnemies` starts as the
@@ -141,6 +157,52 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   // (defaults to the strongest one still waiting).
   const [deployPick, setDeployPick] = useState<string | null>(null);
   const { t, language } = useLanguage();
+
+  // CLIPE DA VITÓRIA — start recording when a main-boss fight begins, cut the clip at the kill, drop it if the boss retreats.
+  useEffect(() => {
+    const phase = hud.phase;
+    if (phase === "BOSS_INTRO" || phase === "BOSS_BATTLE") {
+      if (!clipRecorderRef.current && clipSupported && mapAreaRef.current && !document.hidden) {
+        try {
+          const recorder = new VictoryClipRecorder(mapAreaRef.current);
+          recorder.start();
+          clipRecorderRef.current = recorder;
+        } catch {
+          clipRecorderRef.current = null;
+        }
+      }
+      return;
+    }
+    const recorder = clipRecorderRef.current;
+    if (!recorder) return;
+    clipRecorderRef.current = null;
+    if (phase !== "VICTORY") {
+      recorder.cancel();
+      return;
+    }
+    const bossName = hud.bossNameKey ? t(`bosses.${hud.bossNameKey}.name` as TranslationKey) : "";
+    const wave = hud.wave;
+    void recorder
+      .finish({ title: t("clip.overlayTitle"), subtitle: bossName, wave: t("clip.overlayWave", { wave }) })
+      .then((clip) => {
+        if (clip) setVictoryClip({ clip, bossName, wave });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hud.phase]);
+  useEffect(() => () => clipRecorderRef.current?.cancel(), []);
+
+  // O CASTELO VIRA CIDADE — announce buildings rising, burning and being rebuilt (not the routine income).
+  const cityEvent = hud.city.lastEvent;
+  useEffect(() => {
+    if (!cityEvent || cityEvent.seq <= lastCitySeqRef.current) return;
+    lastCitySeqRef.current = cityEvent.seq;
+    if (cityEvent.kind === "INCOME") return;
+    const names = cityEvent.ids.map((id) => t(`city.buildings.${id}` as TranslationKey)).join(", ");
+    setCityNotice(t(`city.events.${cityEvent.kind}` as TranslationKey, { name: names }));
+    const timer = window.setTimeout(() => setCityNotice(null), 4200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityEvent?.seq]);
   const deploying = hud.phase === "DEPLOY";
   const benchSelectedId = deploying
     ? (hud.deployBench.find((b) => b.id === deployPick)?.id ?? [...hud.deployBench].sort((a, b) => b.level - a.level)[0]?.id ?? null)
@@ -330,7 +392,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -345,7 +407,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
         other child here keeps its default `auto` z-index and stacks by
         DOM order exactly as before — this changes nothing for them.
       */}
-      <div style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
+      <div ref={mapAreaRef} style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
         {enableWorldLayer && (
           <Enemy3DErrorBoundary
             onError={() => {
@@ -387,6 +449,15 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
         )}
 
         <AscensionHudBadge />
+        <HordeAdaptationBadge multipliers={hud.horde.multipliers} changeSeq={hud.horde.changeSeq} />
+        {cityNotice && (
+          <div style={{ ...cityNoticeStyle, top: hud.phase === "BOSS_INTRO" || hud.phase === "BOSS_BATTLE" || hud.phase === "VICTORY" ? 92 : 12 }} role="status" data-testid="city-notice">
+            {cityNotice}
+          </div>
+        )}
+        {victoryClip && (
+          <VictoryClipCard clip={victoryClip.clip} bossName={victoryClip.bossName} wave={victoryClip.wave} onClose={() => setVictoryClip(null)} />
+        )}
         <BossBanner hud={hud} />
         <PhaseBanner phaseId={hud.phaseId} phaseI18nKey={hud.phaseI18nKey} />
         {engine.getEndgameWallReport() && (
@@ -567,6 +638,10 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           />
         )}
 
+        {cityOpen && (
+          <CityPanel seasonBestWave={hud.seasonBestWave} burning={hud.city.burning} goldShare={hud.city.goldShare} onClose={() => setCityOpen(false)} />
+        )}
+
         {missionsOpen && (
           <DailyMissionsPanel missions={engine.getDailyMissions()} onClaim={(i) => engine.claimDailyMission(i)} onClose={() => setMissionsOpen(false)} />
         )}
@@ -674,3 +749,21 @@ const tabSummaryStyle: CSSProperties = {
 };
 
 const tabSummaryCloseStyle: CSSProperties = { background: "none", border: "none", color: PALETTE.uiTextDim, fontSize: 18, cursor: "pointer", lineHeight: 1 };
+
+const cityNoticeStyle: CSSProperties = {
+  position: "absolute",
+  left: "50%",
+  transform: "translateX(-50%)",
+  zIndex: 7,
+  padding: "8px 16px",
+  borderRadius: 999,
+  border: `1px solid ${PALETTE.uiAccent}77`,
+  background: "linear-gradient(160deg, rgba(54,36,22,0.95), rgba(30,20,12,0.96))",
+  color: PALETTE.uiAccentBright,
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: 14,
+  fontWeight: 700,
+  boxShadow: "0 6px 18px rgba(0,0,0,0.45)",
+  pointerEvents: "none",
+  whiteSpace: "nowrap",
+};

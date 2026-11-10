@@ -133,6 +133,8 @@ import { loadSave, recordRunResult, updateSave } from "./SaveSystem";
 import type { RunPhase } from "./types";
 import type { CombatVfxEvent } from "./CombatVfxEvents";
 import { getMilestoneUnlockForLevel } from "@/config/towerStats";
+import { adaptAfterWave, createHordeAdaptation, emptyShares, strongestResistance, ADAPTATION_ANNOUNCE_STEP, type DamageShares, type HordeAdaptation } from "@/config/hordeAdaptation";
+import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FIRES_PER_BOSS_BREACH, CITY_FIRES_PER_LEAKED_WAVE, igniteBuildings, type CityBuildingId, type CityState } from "@/config/city";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 
 /** Elite spec (section 5): real stat multipliers plus a passive-regen "special ability", not just a bigger HP number. */
@@ -219,6 +221,14 @@ export interface HudSnapshot {
   /** Daily missions: changes whenever any progress/claim changes (for re-rendering), and how many are done but not yet claimed. */
   missionsKey: string;
   missionsClaimable: number;
+  /** A HORDA QUE APRENDE — damage-taken multiplier per element for the current wave, plus a counter bumped on every change worth announcing. */
+  horde: { multipliers: Readonly<Record<TowerType, number>>; changeSeq: number };
+  /** O CASTELO VIRA CIDADE — burning buildings (clean waves left) and the latest city event (seq bumps on each). */
+  city: {
+    burning: Readonly<Partial<Record<CityBuildingId, number>>>;
+    goldShare: number;
+    lastEvent: { seq: number; kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME"; ids: readonly CityBuildingId[]; amount: number } | null;
+  };
 }
 
 /** The Welcome Back summary: the offline simulation plus everything it was turned into. */
@@ -338,6 +348,11 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.specialsReady === b.specialsReady &&
     TOWER_TYPES.every((type) => a.towersByType[type] === b.towersByType[type]) &&
     a.missionsKey === b.missionsKey &&
+    a.horde.changeSeq === b.horde.changeSeq &&
+    TOWER_TYPES.every((type) => a.horde.multipliers[type] === b.horde.multipliers[type]) &&
+    a.city.lastEvent?.seq === b.city.lastEvent?.seq &&
+    a.city.goldShare === b.city.goldShare &&
+    JSON.stringify(a.city.burning) === JSON.stringify(b.city.burning) &&
     a.deployBench.length === b.deployBench.length &&
     a.deployBench.every((t, i) => t.id === b.deployBench[i]!.id && t.level === b.deployBench[i]!.level)
   );
@@ -481,6 +496,22 @@ export class GameEngine {
   private towerManaLevels: Partial<Record<TowerType, number>> = {};
   /** TOWER MANA — the player is holding every special; cleared when the wave it started in ends. */
   private specialsHeld = false;
+  /** A HORDA QUE APRENDE — see config/hordeAdaptation.ts. */
+  private hordeAdaptation: HordeAdaptation = createHordeAdaptation();
+  /** Damage each tower element dealt in the wave in progress (fed into the horde's memory when it ends). */
+  private waveDamageByType: DamageShares = emptyShares();
+  /** Bumped whenever the horde's strongest resistance changes enough to tell the player. */
+  private hordeChangeSeq = 0;
+  /** O CASTELO VIRA CIDADE — see config/city.ts. */
+  private city: CityState = createCityState();
+  /** Gold from kills in the wave in progress — the city pays a share of it when the wave is cleared. */
+  private waveKillGold = 0;
+  /** True once any creature reached the castle during the wave in progress. */
+  private waveLeaked = false;
+  /** Last wave whose end was already processed (adaptation + city), so it's never applied twice. */
+  private lastFinishedWave: number | null = null;
+  private cityEventSeq = 0;
+  private lastCityEvent: { seq: number; kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME"; ids: CityBuildingId[]; amount: number } | null = null;
   private specialsHeldWave = 0;
   /** Permanent per-TYPE Mastery ownership (the one-time Gold purchase, FASE 6) — never reset by a Season boundary. */
   private masteryUnlocked: Partial<Record<TowerType, boolean>> = {};
@@ -581,6 +612,9 @@ export class GameEngine {
     // level and equipped skin.
     this.towerMasteryLevels = { ...save.towerMasteryLevels };
     this.towerManaLevels = { ...save.towerManaLevels };
+    this.hordeAdaptation = { memory: { ...save.hordeAdaptation.memory }, multipliers: { ...save.hordeAdaptation.multipliers } };
+    this.city = { burning: { ...save.city.burning }, firesStarted: save.city.firesStarted };
+    this.cityBuiltCount = builtBuildings(save.seasonBestWave).length;
     this.masteryUnlocked = { ...save.masteryUnlocked };
     // Deep-copy each per-type array for the same reason as
     // unlockedSpecializationIds below — a shallow spread would leave every
@@ -2142,8 +2176,9 @@ export class GameEngine {
 
     const reachedBaseIds = new Set<string>();
     for (const enemy of this.enemies) {
-      const { reachedEnd, burnDamageDealt } = advanceEnemy(enemy, scaledDt);
+      const { reachedEnd, burnDamageDealt } = advanceEnemy(enemy, scaledDt, this.hordeAdaptation.multipliers.INFERNO);
       if (reachedEnd) reachedBaseIds.add(enemy.id);
+      this.waveDamageByType.INFERNO += burnDamageDealt;
       // Floating Damage Numbers rewrite — burn previously applied smoothly
       // to enemy.hp every single tick with NO event of any kind reaching
       // the render layer; CanvasRenderer's old per-frame hp-diff fallback
@@ -2162,8 +2197,9 @@ export class GameEngine {
     if (this.specialsHeld && (this.wave.currentWave !== this.specialsHeldWave || this.phase === "WAVE_TRANSITION")) {
       this.specialsHeld = false;
     }
-    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave, this.specialsHeld);
+    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave, this.specialsHeld, this.hordeAdaptation.multipliers);
     this.projectiles.push(...newProjectiles);
+    for (const e of damageEvents) this.waveDamageByType[e.towerType] += e.amount;
     recordDamageEvents(this.battleStats, damageEvents);
 
     // Real-event audio derivation (Audio spec sections 2/3) — read directly
@@ -2224,7 +2260,9 @@ export class GameEngine {
         // applies here, at the one real per-kill Gold grant. Never touches
         // enemy.goldReward itself (the frozen wave-scaling formula), only
         // the amount the player actually receives.
-        this.gold += this.withSkinGoldBonus(Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier));
+        const killGold = this.withSkinGoldBonus(Math.round(enemy.goldReward * getPrestigeBonuses(this.prestigeLevel).goldMultiplier));
+        this.gold += killGold;
+        this.waveKillGold += killGold;
         this.enemiesDefeated += 1;
         this.trackMission("KILL_ENEMIES");
         if (enemy.boss && !enemy.boss.isMainBoss) {
@@ -2252,6 +2290,7 @@ export class GameEngine {
     // número de sons") — AudioManager's own cooldown throttles this
     // further across consecutive ticks.
     if (reachedBaseIds.size > 0) this.emitAudio({ type: "castle_damage", count: reachedBaseIds.size });
+    if (reachedBaseIds.size > 0) this.onCastleBreached(reachedBaseIds.has(this.activeBossId ?? ""));
 
     if (this.phase === "BOSS_BATTLE") {
       const boss = this.enemies.find((e) => e.id === this.activeBossId) ?? null;
@@ -2264,6 +2303,7 @@ export class GameEngine {
         this.victoryRemainingMs = BOSS_VICTORY_DURATION_MS;
         this.emitAudio({ type: "victory" });
         this.advanceBestWave(this.wave.currentWave);
+        this.finishWave(this.wave.currentWave);
         // CORREÇÃO DE REQUISITOS (BOSS STALL FIX, Option B) — a real kill is
         // proof this exact build/boss matchup is NOT a wall, whatever the
         // streak was before it.
@@ -2317,6 +2357,7 @@ export class GameEngine {
       this.phase = this.wave.phase === "TRANSITIONING" ? "WAVE_TRANSITION" : "RUNNING";
       if (this.wave.phase === "TRANSITIONING") {
         this.advanceBestWave(this.wave.currentWave);
+        this.finishWave(this.wave.currentWave);
         if (this.waveCompleteAudioFiredForWave !== this.wave.currentWave) {
           this.waveCompleteAudioFiredForWave = this.wave.currentWave;
           this.emitAudio({ type: "wave_complete" });
@@ -2355,6 +2396,62 @@ export class GameEngine {
    * afterward. Now nothing is rolled/granted until the player explicitly
    * calls spinPendingRoulette() (their own ROLETAR click).
    */
+  /**
+   * A wave was cleared (a plain wave reaching its transition, or a boss
+   * defeated): the horde learns from it and the city pays out and rebuilds.
+   * Runs once per wave number.
+   */
+  private finishWave(wave: number): void {
+    if (this.lastFinishedWave === wave) return;
+    this.lastFinishedWave = wave;
+
+    const before = strongestResistance(this.hordeAdaptation);
+    this.hordeAdaptation = adaptAfterWave(this.hordeAdaptation, this.waveDamageByType, wave);
+    const after = strongestResistance(this.hordeAdaptation);
+    if (
+      (before?.type ?? null) !== (after?.type ?? null) ||
+      Math.floor((after?.resist ?? 0) / ADAPTATION_ANNOUNCE_STEP) !== Math.floor((before?.resist ?? 0) / ADAPTATION_ANNOUNCE_STEP)
+    ) {
+      this.hordeChangeSeq += 1;
+    }
+
+    const builtBefore = this.cityBuiltCount;
+    const rebuilt = this.waveLeaked ? [] : advanceRebuild(this.city);
+    const income = Math.round(this.waveKillGold * cityGoldShare(this.seasonBestWave, this.city));
+    if (income > 0) this.gold += income;
+    const built = builtBuildings(this.seasonBestWave);
+    this.cityBuiltCount = built.length;
+    if (built.length > builtBefore && builtBefore >= 0) {
+      this.pushCityEvent("BUILT", built.slice(builtBefore).map((b) => b.id), income);
+    } else if (rebuilt.length > 0) {
+      this.pushCityEvent("REBUILT", rebuilt, income);
+    } else if (income > 0) {
+      this.pushCityEvent("INCOME", [], income);
+    }
+
+    this.waveDamageByType = emptyShares();
+    this.waveKillGold = 0;
+    this.waveLeaked = false;
+  }
+
+  /** Creatures reached the castle: the first breach of a wave sets a building alight, a main boss one more. */
+  private onCastleBreached(bossBreached: boolean): void {
+    let fires = 0;
+    if (!this.waveLeaked) fires += CITY_FIRES_PER_LEAKED_WAVE;
+    if (bossBreached) fires += CITY_FIRES_PER_BOSS_BREACH;
+    this.waveLeaked = true;
+    if (fires === 0) return;
+    const lit = igniteBuildings(this.seasonBestWave, this.city, fires);
+    if (lit.length > 0) this.pushCityEvent("BURNED", lit, 0);
+  }
+
+  private cityBuiltCount = -1;
+
+  private pushCityEvent(kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME", ids: CityBuildingId[], amount: number): void {
+    this.cityEventSeq += 1;
+    this.lastCityEvent = { seq: this.cityEventSeq, kind, ids, amount };
+  }
+
   private advanceBestWave(wave: number): void {
     // Season high-water mark (PRÓXIMA GRANDE FASE spec — "Season possui seu
     // próprio seasonBestWave") tracked completely independently of the
@@ -2761,6 +2858,8 @@ export class GameEngine {
         seasonPass: this.seasonPass,
         bossSiege: this.bossSiege,
         bossRecords: this.bossRecords,
+        hordeAdaptation: this.hordeAdaptation,
+        city: this.city,
       },
       this.storageKey,
     );
@@ -2816,6 +2915,8 @@ export class GameEngine {
       towersByType: Object.fromEntries(TOWER_TYPES.map((type) => [type, this.countTowersOfType(type)])) as Record<TowerType, number>,
       missionsKey: this.missionsKey(),
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
+      horde: { multipliers: this.hordeAdaptation.multipliers, changeSeq: this.hordeChangeSeq },
+      city: { burning: { ...this.city.burning }, goldShare: cityGoldShare(this.seasonBestWave, this.city), lastEvent: this.lastCityEvent },
     };
 
     const prev = this.cachedHud;

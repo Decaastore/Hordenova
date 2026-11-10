@@ -35,6 +35,11 @@ const DRESSING_FOR_BIOME: Record<string, string> = {
   ABYSSAL_FORTRESS: "abyss",
 };
 
+/** The rendered look (dressing) a biome uses — the city buildings share it. */
+export function castleDressingFor(biomeId: string): string {
+  return DRESSING_FOR_BIOME[biomeId] ?? "ancient_forest";
+}
+
 /** World-space size the rendered square image is drawn at (the render framed 148x148 model units; drawn ~16% larger so the castle keeps the presence of the old one). */
 export const CASTLE_SPRITE_SIZE = 172;
 /** Local y (fortress space) where the castle's ground center sits — matches the old platform. */

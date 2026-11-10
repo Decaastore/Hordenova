@@ -49,6 +49,8 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     specialsReady: 0,
     towersByType: { IRONWOOD: 0, INFERNO: 0, FROSTBORN: 0, STORMCALLER: 0 },
     missionsClaimable: 0,
+    horde: { multipliers: { IRONWOOD: 1, INFERNO: 1, FROSTBORN: 1, STORMCALLER: 1 }, changeSeq: 0 },
+    city: { burning: {}, goldShare: 0, lastEvent: null },
     ...overrides,
   };
 }

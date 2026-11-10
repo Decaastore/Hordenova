@@ -89,7 +89,7 @@ export function WorldSceneOverlay({ engine }: { engine: GameEngine }) {
         shadows
         orthographic
         camera={{ near: 0.1, far: 4000 }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, preserveDrawingBuffer: true }}
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />

@@ -65,7 +65,7 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
       <Canvas
         orthographic
         camera={{ near: 0.1, far: 4000 }}
-        gl={{ alpha: true, antialias: true }}
+        gl={{ alpha: true, antialias: true, preserveDrawingBuffer: true }}
         // react-three-fiber sets its own canvas element's pointer-events to
         // "auto" by default (for its internal raycasting), which OVERRIDES
         // the inherited "none" from the wrapping div above — this canvas

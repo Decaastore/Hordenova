@@ -1,3 +1,5 @@
+import { createHordeAdaptation, sanitizeHordeAdaptation, type HordeAdaptation } from "@/config/hordeAdaptation";
+import { createCityState, sanitizeCityState, type CityState } from "@/config/city";
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { parseDailyMissionsState, type DailyMissionsState } from "@/config/dailyMissions";
 import { parseSeasonPassState, type SeasonPassState } from "@/config/seasonPass";
@@ -246,6 +248,10 @@ export interface SaveData {
   bossSiege: BossSiegeState | null;
   /** BOSS SIEGE — assaults each main boss took to fall this Season. */
   bossRecords: BossRecords | null;
+  /** A HORDA QUE APRENDE — the horde's memory of this run's damage split (config/hordeAdaptation.ts). Season-scoped; optional on old saves. */
+  hordeAdaptation: HordeAdaptation;
+  /** O CASTELO VIRA CIDADE — which buildings are burning (config/city.ts); the buildings themselves derive from seasonBestWave. Season-scoped. */
+  city: CityState;
 
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
@@ -341,6 +347,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   seasonPass: null,
   bossSiege: null,
   bossRecords: null,
+  hordeAdaptation: createHordeAdaptation(),
+  city: createCityState(),
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -879,6 +887,8 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       seasonPass: parseSeasonPassState(parsed.seasonPass),
       bossSiege: parseBossSiegeState(parsed.bossSiege),
       bossRecords: parseBossRecords(parsed.bossRecords),
+      hordeAdaptation: sanitizeHordeAdaptation(parsed.hordeAdaptation),
+      city: sanitizeCityState(parsed.city),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has

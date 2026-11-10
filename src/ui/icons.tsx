@@ -184,6 +184,18 @@ export function ScrollIcon({ size = 14, color = "currentColor", style }: IconPro
   );
 }
 
+/** A small walled town: a house roof beside a tower — the city behind the castle. */
+export function CastleIcon({ size = 14, color = "currentColor", style }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>
+      <path d="M3 20V12l4-3 4 3v8" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M13 20V7h2V5h2v2h2V5h2v15" stroke={color} strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M2 20h20" stroke={color} strokeWidth="1.6" strokeLinecap="round" />
+      <path d="M6 20v-3h2v3M16.5 11h1" stroke={color} strokeWidth="1.3" strokeLinecap="round" opacity="0.8" />
+    </svg>
+  );
+}
+
 export function SkullIcon({ size = 14, color = "currentColor", style }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" style={style}>

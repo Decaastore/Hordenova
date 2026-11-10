@@ -14,6 +14,8 @@ import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENAB
 import { SKIN_REWARD_BONUS_PER_TYPE } from "@/config/towerSkins";
 import { seasonClock } from "@/engine/SeasonClock";
 import { RewardPartsLabel } from "@/ui/RewardPartsLabel";
+import { ADAPTATION_FAIR_SHARE, ADAPTATION_MAX_RESIST, ADAPTATION_START_WAVE, ADAPTATION_WEAKNESS_RATIO } from "@/config/hordeAdaptation";
+import { CITY_BUILDINGS, CITY_REBUILD_WAVES } from "@/config/city";
 
 const pct = (x: number) => Math.round(x * 100);
 
@@ -83,6 +85,48 @@ export function BattlePage() {
             skin: pct(SKIN_MANA_GAIN_BONUS),
           })}
         </p>
+      </section>
+
+      <section className="wk-block" id="battle-horde">
+        <h3 className="wk-h3">{t("wiki.battle.hordeTitle")}</h3>
+        <p className="wk-prose">
+          {t("wiki.battle.hordeBody", {
+            wave: ADAPTATION_START_WAVE,
+            fair: pct(ADAPTATION_FAIR_SHARE),
+            max: pct(ADAPTATION_MAX_RESIST),
+            max2: pct(ADAPTATION_MAX_RESIST * ADAPTATION_WEAKNESS_RATIO),
+          })}
+        </p>
+      </section>
+
+      <section className="wk-block" id="battle-city">
+        <h3 className="wk-h3">{t("wiki.battle.cityTitle")}</h3>
+        <p className="wk-prose">{t("wiki.battle.cityBody", { n: CITY_REBUILD_WAVES })}</p>
+        <div className="wk-table-wrap">
+          <table className="wk-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("wiki.battle.cityBuildingCol")}</th>
+                <th scope="col">{t("wiki.battle.cityWaveCol")}</th>
+                <th scope="col">{t("wiki.battle.cityGoldCol")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CITY_BUILDINGS.map((b) => (
+                <tr key={b.id}>
+                  <th scope="row">{t(`city.buildings.${b.id}` as TranslationKey)}</th>
+                  <td>{b.unlockWave}</td>
+                  <td>+{pct(b.goldShare)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="wk-block" id="battle-clip">
+        <h3 className="wk-h3">{t("wiki.battle.clipTitle")}</h3>
+        <p className="wk-prose">{t("wiki.battle.clipBody")}</p>
       </section>
 
       <section className="wk-block" id="battle-roulette">

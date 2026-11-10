@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v83",
+    dateIso: "2026-11-10",
+    category: "CONTENT",
+    title: {
+      en: "The Horde Learns, Your City Grows, Your Victories Get Clips",
+      ptBR: "A Horda Aprende, sua Cidade Cresce e suas Vitórias Viram Clipe",
+    },
+    description: {
+      en: "Three new systems. The horde now adapts to the towers that hurt it most, a city rises behind your castle and pays part of every wave's gold, and every main boss you defeat becomes a short video you can share.",
+      ptBR: "Três sistemas novos. A horda agora se adapta às torres que mais a ferem, uma cidade surge atrás do seu castelo e rende parte do ouro de cada onda, e cada chefe principal que você derrota vira um vídeo curto para compartilhar.",
+    },
+    highlights: [
+      {
+        en: "The horde that learns: from wave 20, an element doing more than its share of your damage is resisted (up to 25% less), and the horde grows weak to the one you use least. A card on the map shows what it adapted to.",
+        ptBR: "A horda que aprende: a partir da onda 20, o tipo de torre que faz dano demais passa a ser resistido (até 25% menos), e a horda fica fraca contra o que você menos usa. Um cartão no mapa mostra a que ela se adaptou.",
+      },
+      {
+        en: "The city: 8 buildings rise around the castle as your Season best grows, from Houses at wave 10 to the Royal Treasury at wave 160, paying up to +12% of each wave's kill gold. Open it from the new CITY button.",
+        ptBR: "A cidade: 8 prédios surgem em volta do castelo conforme sua melhor onda da Temporada sobe, das Casas na onda 10 ao Tesouro Real na onda 160, rendendo até +12% do ouro de cada onda. Veja tudo no novo botão CIDADE.",
+      },
+      {
+        en: "When a creature reaches the castle, a building catches fire and stops paying until 3 waves pass with no creature getting through.",
+        ptBR: "Quando um bicho chega ao castelo, um prédio pega fogo e para de render até passarem 3 ondas sem nenhum bicho passar.",
+      },
+      {
+        en: "Victory clip: the end of every main boss fight is recorded in your browser, with a closing card, ready to share or download.",
+        ptBR: "Clipe da vitória: o final de cada luta contra chefe principal é gravado no seu navegador, com um cartão final, pronto para compartilhar ou baixar.",
+      },
+      {
+        en: "Overall pace is unchanged: the horde's resistance and the city's income balance each other out.",
+        ptBR: "O ritmo geral do jogo continua o mesmo: a resistência da horda e a renda da cidade se equilibram.",
+      },
+    ],
+  },
+  {
     id: "v82",
     dateIso: "2026-11-06",
     category: "FIXES",

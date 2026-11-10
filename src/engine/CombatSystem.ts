@@ -153,6 +153,8 @@ export function tickCombat(
   waveNumber = 0,
   /** TOWER MANA — while true no special fires and mana keeps charging past full (config/towerMana.ts). */
   specialsHeld = false,
+  /** A HORDA QUE APRENDE — damage-taken multiplier per tower element (config/hordeAdaptation.ts); omitted = no adaptation. */
+  damageTakenMultiplier?: Readonly<Record<TowerType, number>>,
 ): CombatTickResult {
   const projectiles: ProjectileInstance[] = [];
   const damageEvents: DamageEvent[] = [];
@@ -171,7 +173,7 @@ export function tickCombat(
     // (the old windowed main-boss damage bump is no longer applied: under the
     // BOSS SIEGE rules a boss's wounds stay, see config/bossAssault.ts)
     void waveNumber;
-    let effectiveDamage = rawDamage;
+    let effectiveDamage = rawDamage * (damageTakenMultiplier?.[tower.type] ?? 1);
     // BOSS SIEGE — the boss's weakness tower hits harder and goes through
     // its ability shield (config/bossAssault.ts).
     if (enemy.boss?.isMainBoss && bossWeakness(enemy.boss.bossId) === tower.type) {

@@ -1,3 +1,5 @@
+import { createHordeAdaptation } from "@/config/hordeAdaptation";
+import { createCityState } from "@/config/city";
 import { loadSave, updateSave } from "./SaveSystem";
 import { seasonClock } from "./SeasonClock";
 import {
@@ -267,6 +269,8 @@ export function syncSeasonIfNeeded(): void {
     towerMasteryLevels: {},
     towerManaLevels: {},
     castleHpBonus: 0,
+    hordeAdaptation: createHordeAdaptation(),
+    city: createCityState(),
   });
 }
 
@@ -335,5 +339,7 @@ export function resetSeasonProgressionForTesting(): void {
     towerMasteryLevels: {},
     towerManaLevels: {},
     castleHpBonus: 0,
+    hordeAdaptation: createHordeAdaptation(),
+    city: createCityState(),
   });
 }
