@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v89",
+    dateIso: "2026-11-10",
+    category: "INTERFACE",
+    title: {
+      en: "A New Look for the Whole Site",
+      ptBR: "Visual Novo no Site Inteiro",
+    },
+    description: {
+      en: "The site was redesigned with its own identity: new colors, new lettering and a new top bar on every page. The animations on the home page and the game screen itself are unchanged.",
+      ptBR: "O site foi redesenhado com identidade própria: cores novas, letras novas e uma barra do topo nova em todas as páginas. As animações da página inicial e a tela do jogo continuam iguais.",
+    },
+    highlights: [
+      {
+        en: "Colors: black and gold give way to deep pine green, bone white and an ember orange for actions.",
+        ptBR: "Cores: o preto com dourado dá lugar a verde-pinho profundo, branco-osso e um laranja-brasa nas ações.",
+      },
+      {
+        en: "Lettering: big titles and the game's name use a banner-style gothic face; everything else uses a clean, easy-to-read one.",
+        ptBR: "Letras: os títulos grandes e o nome do jogo usam uma gótica de estandarte; todo o resto usa uma letra limpa e fácil de ler.",
+      },
+      {
+        en: "Top bar: a wall with battlements along its lower edge, the current page marked by a hanging pennant, and Play always in the same corner.",
+        ptBR: "Barra do topo: uma muralha com ameias na borda de baixo, a página atual marcada por uma flâmula pendurada e o Jogar sempre no mesmo canto.",
+      },
+      {
+        en: "Buttons have chamfered corners, like cut stone, across Home, Season, Pass, Ranking, Store, Marketplace, Wiki and News.",
+        ptBR: "Os botões têm cantos chanfrados, como pedra talhada, na Home, Season, Passe, Ranking, Loja, Marketplace, Wiki e Novidades.",
+      },
+    ],
+  },
+  {
     id: "v88",
     dateIso: "2026-11-10",
     category: "TOWERS",

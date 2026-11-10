@@ -113,10 +113,10 @@ const PASS_CSS = `
 .sp-col.is-reached .sp-num { color: var(--gold-hi); }
 .sp-col.is-next .sp-num { color: var(--bone); text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 4px; }
 .sp-cell { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 6px; border-radius: 9px; background: var(--night-2); border: 1px solid var(--line-soft); font-size: 12.5px; text-align: center; color: var(--bone); }
-.sp-col.is-reached .sp-cell:not(.is-premium) { border-color: rgba(232,176,75,0.45); }
+.sp-col.is-reached .sp-cell:not(.is-premium) { border-color: rgba(255,90,54,0.45); }
 .sp-cell.is-claimed { opacity: 0.55; }
-.sp-cell.is-premium { color: var(--ash); background: rgba(24,18,12,0.4); border-style: dashed; }
+.sp-cell.is-premium { color: var(--ash); background: rgba(16,42,38,0.4); border-style: dashed; }
 .sp-cell.is-premium > span { opacity: 0.85; }
-.sp-claim { margin-top: 2px; padding: 3px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 800; border: 1px solid #f2c873; color: #2b1906 !important; background: var(--gold); }
+.sp-claim { margin-top: 2px; padding: 3px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 800; border: 1px solid #ff8a66; color: #1a0a05 !important; background: var(--gold); }
 .sp-done { font-size: 11.5px; color: var(--ok); font-weight: 600; }
 `;

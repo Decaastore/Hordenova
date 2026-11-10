@@ -244,26 +244,26 @@ const STORE_CSS = `
 .st-section { padding: 40px 0 8px; }
 .st-section:last-child { padding-bottom: 96px; }
 
-.st-starter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-bottom: 18px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(232,176,75,0.55); background: linear-gradient(100deg, rgba(232,176,75,0.14), rgba(24,18,12,0.6) 60%); }
+.st-starter { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-bottom: 18px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(255,90,54,0.55); background: linear-gradient(100deg, rgba(255,90,54,0.14), rgba(16,42,38,0.6) 60%); }
 .st-starter h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: var(--gold-hi); }
-.st-starter p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 56ch; }
+.st-starter p { margin: 4px 0 0; font-size: 14px; color: #cdd8cc; max-width: 56ch; }
 .st-starter-list { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 10px; font-size: 14px; }
 .st-starter-buy { display: grid; justify-items: center; gap: 6px; min-width: 170px; }
 .st-starter-buy .st-price { margin: 0; }
 .st-starter-buy small { font-size: 12px; color: var(--ash); }
 .st-packs { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 14px; }
-.st-pack { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 16px 18px; border-radius: 12px; background: linear-gradient(180deg, rgba(60,90,120,0.16), rgba(24,18,12,0.6)); border: 1px solid rgba(159,211,255,0.18); }
-.st-pack.is-tagged { border-color: rgba(232,176,75,0.55); }
-.st-tag { position: absolute; top: -10px; padding: 2px 10px; border-radius: 999px; background: var(--gold); color: #2b1906; font-size: 12px; font-weight: 800; }
+.st-pack { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; padding: 26px 16px 18px; border-radius: 12px; background: linear-gradient(180deg, rgba(60,90,120,0.16), rgba(16,42,38,0.6)); border: 1px solid rgba(159,211,255,0.18); }
+.st-pack.is-tagged { border-color: rgba(255,90,54,0.55); }
+.st-tag { position: absolute; top: -10px; padding: 2px 10px; border-radius: 999px; background: var(--gold); color: #1a0a05; font-size: 12px; font-weight: 800; }
 .st-amount { margin: 10px 0 0; font-family: var(--display); font-weight: 700; font-size: 40px; line-height: 1; color: var(--bone); font-variant-numeric: lining-nums tabular-nums; }
 .st-bonus { margin: 6px 0 0; min-height: 1.4em; font-size: 13px; font-weight: 600; color: var(--ok); }
 .st-price { margin: 12px 0 14px; font-size: 18px; font-weight: 700; color: var(--gold-hi); }
-.st-buy { width: 100%; padding: 10px 12px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #f2c873; color: #2b1906 !important; background: linear-gradient(180deg, #f6cf7a 0%, var(--gold) 55%, #c58a2c 100%); }
+.st-buy { width: 100%; padding: 10px 12px; border-radius: 9px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #ff8a66; color: #1a0a05 !important; background: linear-gradient(180deg, #ff7a55 0%, var(--gold) 55%, #e0431f 100%); }
 .st-buy:disabled { cursor: default; background: rgba(239,229,210,0.06); border-color: rgba(239,229,210,0.2); color: var(--ash) !important; }
 
 .st-skins { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 0 32px; margin-top: 8px; }
 .st-skin { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 18px; padding: 22px 0; border-top: 1px solid var(--line-soft); }
-.st-portrait canvas { display: block; border-radius: 10px; background: radial-gradient(circle at 50% 70%, rgba(60,48,36,0.55), rgba(0,0,0,0.35)); }
+.st-portrait canvas { display: block; border-radius: 10px; background: radial-gradient(circle at 50% 70%, rgba(34,78,70,0.55), rgba(0,0,0,0.35)); }
 .st-type { margin: 0; font-size: 12.5px; color: var(--ash); }
 .st-skin h3 { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1.1; color: var(--bone); }
 .st-desc { margin: 6px 0 0; font-size: 13.5px; line-height: 1.55; color: var(--ash); }
@@ -273,7 +273,7 @@ const STORE_CSS = `
 .st-reward { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: var(--gold); }
 .st-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin-top: 12px; }
 .st-small { padding: 8px 16px; font-size: 13px; }
-.st-pay { display: inline-flex; gap: 6px; align-items: baseline; padding: 8px 12px; border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 800; background: rgba(24,18,12,0.6); border: 1px solid rgba(239,229,210,0.28); font-variant-numeric: tabular-nums; }
+.st-pay { display: inline-flex; gap: 6px; align-items: baseline; padding: 8px 12px; border-radius: 9px; cursor: pointer; font-size: 14px; font-weight: 800; background: rgba(16,42,38,0.6); border: 1px solid rgba(239,229,210,0.28); font-variant-numeric: tabular-nums; }
 .st-pay span { font-size: 12px; font-weight: 600; color: var(--ash); }
 .st-pay.is-gem { border-color: rgba(159,211,255,0.45); }
 .st-pay:hover:not(:disabled) { border-color: var(--gold); }

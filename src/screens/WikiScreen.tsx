@@ -1,8 +1,7 @@
 import { REWARD_CSS } from "@/ui/RewardPartsLabel";
 import { BattlePage, DailyPage, StorePage } from "./wiki/SystemsPages";
 import { useEffect, useMemo, useRef, useState } from "react";
-import "@fontsource/cormorant-garamond/600.css";
-import "@fontsource/cormorant-garamond/700.css";
+import "@/ui/siteFonts";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";

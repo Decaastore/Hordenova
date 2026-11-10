@@ -164,7 +164,7 @@ const RANKING_CSS = `
 .rk-mine { padding: 9px 16px; font-size: 14px; }
 .rk-table tbody tr { cursor: pointer; }
 .rk-table tbody tr:hover td, .rk-table tbody tr:hover th { background: rgba(239,229,210,0.03); }
-.rk-table tbody tr.is-me td, .rk-table tbody tr.is-me th { background: rgba(232,176,75,0.08); }
+.rk-table tbody tr.is-me td, .rk-table tbody tr.is-me th { background: rgba(255,90,54,0.08); }
 .rk-table tbody th { width: 56px; }
 .rk-name { padding: 0; background: none; border: none; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--bone); text-align: left; }
 .rk-name:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offset: 3px; }
