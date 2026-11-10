@@ -1,3 +1,5 @@
+import { drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
+import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
 import { getCityPlots } from "@/data/cityPlots";
 import { builtBuildings, type CityBuildingId } from "@/config/city";
@@ -14,7 +16,7 @@ import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
-import { drawBakedGround, getGroundBake, hasGroundBake } from "./groundBakes";
+import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
 import { pruneTowerAims, steerTowerAim } from "./towerSprites";
@@ -577,6 +579,46 @@ export function CanvasRenderer({
         ctx.restore();
       }
 
+      // LUZ E CICLO DO DIA (rendering/ambientLight.ts) — dusk dims the map a
+      // little and every light source cuts its pool out of the dark; sun
+      // shafts by day, a flock crossing now and then, fireflies at night.
+      {
+        const tod = timeOfDay(Date.now());
+        drawSunShafts(ctx, biome, visibleBounds, tod, timestamp);
+        const lights: LightSource[] = [];
+        const flick = (seed: number) => 0.85 + 0.15 * Math.sin(timestamp / 90 + seed) * Math.sin(timestamp / 37 + seed * 2);
+        for (const d of getMapDecorations(biome)) {
+          if (d.kind === "TORCH") lights.push({ x: d.position.x, y: d.position.y + 4 * d.scale, r: 95, rgb: [255, 160, 70], intensity: flick(d.position.x) });
+        }
+        const castle = getFortressAnchor(roadPath).position;
+        lights.push({ x: castle.x, y: castle.y - 30, r: 190, rgb: [255, 170, 90], intensity: 0.9 * Math.max(0.35, castleHpPercent) });
+        lights.push({ x: portalAnchor.x, y: portalAnchor.y, r: 130, rgb: [180, 110, 255], intensity: 0.85 });
+        for (const plot of cityPlots) {
+          if (!cityBuilt.has(plot.id)) continue;
+          const burning = (hud.city.burning[plot.id] ?? 0) > 0;
+          lights.push(
+            burning
+              ? { x: plot.position.x, y: plot.position.y - 20, r: 120, rgb: [255, 120, 40], intensity: flick(plot.position.y) }
+              : { x: plot.position.x, y: plot.position.y - 12, r: 62, rgb: [255, 190, 110], intensity: 0.6 },
+          );
+        }
+        for (const tower of snapshot.towers) {
+          lights.push({ x: tower.position.x, y: tower.position.y - 10, r: 82, rgb: rgbOf(TOWER_THEME[tower.type].glow), intensity: 0.62 });
+        }
+        for (const p of snapshot.projectiles) {
+          const k = p.totalMs > 0 ? 1 - p.remainingMs / p.totalMs : 1;
+          lights.push({ x: p.from.x + (p.to.x - p.from.x) * k, y: p.from.y + (p.to.y - p.from.y) * k, r: p.isSpecial ? 80 : 36, rgb: rgbOf(TOWER_THEME[p.towerType].glow), intensity: 0.55 });
+        }
+        for (const e of snapshot.enemies) {
+          if (e.boss) lights.push({ x: e.position.x, y: e.position.y, r: 110, rgb: rgbOf(biome.palette.accentGlow), intensity: 0.55 });
+          else if (e.burn) lights.push({ x: e.position.x, y: e.position.y, r: 34, rgb: [255, 130, 50], intensity: 0.5 });
+          else if (e.elite) lights.push({ x: e.position.x, y: e.position.y, r: 40, rgb: [255, 220, 160], intensity: 0.35 });
+        }
+        drawLighting(ctx, biome, visibleBounds, tod, lights);
+        if (groundBake && tod.night > 0.02) drawGroundEmissive(ctx, groundBake, biome, timestamp, tod.night * 0.85);
+        drawFireflies(ctx, biome, tod, timestamp);
+        drawSkyLife(ctx, biome, tod, timestamp);
+      }
       vfx.draw(ctx);
 
       // AUDITORIA E CORREÇÃO GERAL spec section 33 — HP bars are drawn in

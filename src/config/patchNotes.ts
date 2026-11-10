@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v84",
+    dateIso: "2026-11-10",
+    category: "CONTENT",
+    title: {
+      en: "Day, Night and Living Light on Every Map",
+      ptBR: "Dia, Noite e Luz Viva em Todos os Mapas",
+    },
+    description: {
+      en: "The maps now go through a slow day and night cycle, shared by every player, and everything that glows lights up the ground around it. The night is gentle, so creatures always stay easy to see.",
+      ptBR: "Os mapas agora passam por um ciclo lento de dia e noite, igual para todos os jogadores, e tudo que brilha ilumina o chão em volta. A noite é suave, então os bichos continuam fáceis de ver.",
+    },
+    highlights: [
+      {
+        en: "A full day lasts 20 minutes: daylight, a golden dusk, a moonlit night tinted for each biome, then dawn.",
+        ptBR: "Um dia completo dura 20 minutos: dia claro, um entardecer dourado, uma noite de luar com o tom de cada bioma e o amanhecer.",
+      },
+      {
+        en: "Torches, the castle, the city's windows, tower cores, the rift, shots in flight, bosses, burning buildings and lava all cast light.",
+        ptBR: "Tochas, o castelo, as janelas da cidade, o núcleo das torres, o portal, os tiros, os chefes, os prédios em chamas e a lava iluminam o chão.",
+      },
+      {
+        en: "Sunbeams drift across sunny maps by day; flocks of birds (gulls by the sea, crows over graveyards) cross the sky with their shadows, bats come out at night, and fireflies light up the forests.",
+        ptBR: "Raios de sol passam pelos mapas ensolarados durante o dia; bandos de pássaros (gaivotas no mar, corvos nos cemitérios) cruzam o céu com a sombra no chão, morcegos saem à noite e vaga-lumes acendem as florestas.",
+      },
+    ],
+  },
+  {
     id: "v83",
     dateIso: "2026-11-10",
     category: "CONTENT",

@@ -143,7 +143,7 @@ export function drawBakedGround(
   bounds: VisibleBounds,
   timeMs: number,
 ): void {
-  const { def, ground, emissive } = bake;
+  const { def, ground } = bake;
   // Anything beyond the baked rectangle (very wide screens) gets the biome's shadowed ground tone.
   ctx.fillStyle = biome.palette.groundShadowed;
   ctx.fillRect(bounds.x0, bounds.y0, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
@@ -151,13 +151,25 @@ export function drawBakedGround(
   const h = def.y1 - def.y0;
   ctx.drawImage(ground, def.x0, def.y0, w, h);
 
-  if (!emissive) return;
+  drawGroundEmissive(ctx, bake, biome, timeMs, 1);
+}
+
+/**
+ * The baked ground's glowing parts (lava, ice, crystals, veins), added on
+ * top with a slow pulse. `gain` scales it — the night lighting pass calls
+ * this again so lava and crystals keep shining through the dark.
+ */
+export function drawGroundEmissive(ctx: CanvasRenderingContext2D, bake: LoadedGroundBake, biome: BiomeDefinition, timeMs: number, gain: number): void {
+  const { def, emissive } = bake;
+  if (!emissive || gain <= 0) return;
+  const w = def.x1 - def.x0;
+  const h = def.y1 - def.y0;
   const sx = emissive.naturalWidth / w;
   const sy = emissive.naturalHeight / h;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   if (def.glow === "global") {
-    ctx.globalAlpha = 0.1 + 0.3 * (0.5 + 0.5 * Math.sin(timeMs / 2100) * (0.7 + 0.3 * Math.sin(timeMs / 730)));
+    ctx.globalAlpha = gain * (0.1 + 0.3 * (0.5 + 0.5 * Math.sin(timeMs / 2100) * (0.7 + 0.3 * Math.sin(timeMs / 730))));
     ctx.drawImage(emissive, def.x0, def.y0, w, h);
     ctx.restore();
     return;
@@ -165,7 +177,7 @@ export function drawBakedGround(
   for (const g of glowRegions(biome)) {
     // Slow, uneven breathing: two incommensurate sines so it never looks like a metronome.
     const pulse = 0.5 + 0.5 * Math.sin(timeMs / 1300 + g.phase) * (0.7 + 0.3 * Math.sin(timeMs / 470 + g.phase * 2));
-    ctx.globalAlpha = 0.15 + 0.45 * pulse;
+    ctx.globalAlpha = Math.min(1, gain * (0.15 + 0.45 * pulse));
     const x = Math.max(def.x0, g.x - g.r);
     const y = Math.max(def.y0, g.y - g.r);
     const x2 = Math.min(def.x1, g.x + g.r);
