@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v86",
+    dateIso: "2026-11-10",
+    category: "TOWERS",
+    title: {
+      en: "Firestorm and Absolute Zero, Remade",
+      ptBR: "Tempestade de Fogo e Zero Absoluto Refeitos",
+    },
+    description: {
+      en: "The Inferno and Frostborn specials were rebuilt from scratch with real physics. The old glowing circles are gone: now a meteor falls and explodes, and a wave of frost rolls across the ground and covers it in ice.",
+      ptBR: "Os especiais do Inferno e do Frostborn foram refeitos do zero, com física de verdade. Saem os círculos brilhantes: agora um meteoro cai e explode, e uma onda de frio rola pelo chão e cobre tudo de gelo.",
+    },
+    highlights: [
+      {
+        en: "Firestorm: a burning meteor streaks down from the sky and hits with a blinding flash, a camera shake, a dust shockwave, a huge fireball and a mushroom of black smoke.",
+        ptBR: "Tempestade de Fogo: um meteoro em chamas risca o céu e acerta com um clarão, a tela treme, sobe uma onda de poeira, uma bola de fogo enorme e um cogumelo de fumaça preta.",
+      },
+      {
+        en: "Glowing rocks fly out, the ground keeps burning with real flames, and a crater with live embers is left behind.",
+        ptBR: "Pedras incandescentes voam, o chão continua pegando fogo com chamas de verdade e fica uma cratera com brasas acesas.",
+      },
+      {
+        en: "Absolute Zero: a cold wave rolls out from the tower to its whole range, with mist hugging the ground.",
+        ptBR: "Zero Absoluto: uma onda de frio sai da torre e rola até todo o alcance, com névoa rente ao chão.",
+      },
+      {
+        en: "Faceted, translucent ice crystals, each one different, burst up where the wave passes and then shatter. Snow falls and the ground is left covered in frost.",
+        ptBR: "Cristais de gelo facetados e translúcidos, cada um diferente, brotam onde a onda passa e depois se estilhaçam. Cai neve e o chão fica coberto de geada.",
+      },
+      {
+        en: "Both effects also light up the map at night.",
+        ptBR: "Os dois efeitos também iluminam o mapa à noite.",
+      },
+    ],
+  },
+  {
     id: "v85",
     dateIso: "2026-11-10",
     category: "TOWERS",

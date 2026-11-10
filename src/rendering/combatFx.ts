@@ -1,6 +1,7 @@
 import type { TowerType } from "@/config/towerStats";
 import type { Vector2 } from "@/utils/geometry";
 import type { LightSource } from "./ambientLight";
+import { drawFire } from "./fireFx";
 
 /**
  * REALISTIC COMBAT EFFECTS — what a shot does when it lands, per tower:
@@ -25,11 +26,11 @@ import type { LightSource } from "./ambientLight";
  * bright (fire, sparks, flashes, lightning).
  */
 
-const MAX_PARTICLES = 1400;
+export const MAX_PARTICLES = 1800;
 const MAX_DECALS = 70;
 const GRAVITY = 260; // world units / s² on the screen-space "height" axis
 
-type Kind = "spark" | "debris" | "smoke" | "fire" | "shard" | "mist" | "flash" | "ring" | "glint" | "ember";
+type Kind = "spark" | "debris" | "smoke" | "fire" | "shard" | "mist" | "flash" | "ring" | "glint" | "ember" | "flame" | "spike" | "snow" | "dust" | "rock";
 
 interface Particle {
   kind: Kind;
@@ -52,6 +53,8 @@ interface Particle {
 
 interface Decal {
   kind: "scorch" | "frost";
+  /** Seconds the scorch keeps glowing with embers (0 = cold mark). */
+  hot?: number;
   x: number;
   y: number;
   r: number;
@@ -160,34 +163,45 @@ function scorchSprite(): HTMLCanvasElement {
 }
 
 function frostSprite(): HTMLCanvasElement {
-  return sprite("frostDecal", 96, (g, s) => {
-    const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
-    grad.addColorStop(0, "rgba(220,245,255,0.55)");
-    grad.addColorStop(0.6, "rgba(180,225,255,0.25)");
-    grad.addColorStop(1, "rgba(180,225,255,0)");
-    g.fillStyle = grad;
-    g.fillRect(0, 0, s, s);
+  return sprite("frostDecal2", 128, (g, s) => {
     let seed = 11;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646;
-    g.strokeStyle = "rgba(255,255,255,0.6)";
+    // a soft, uneven bloom of rime
+    for (let i = 0; i < 18; i++) {
+      const a = rnd() * Math.PI * 2;
+      const d = Math.sqrt(rnd()) * s * 0.3;
+      const x = s / 2 + Math.cos(a) * d;
+      const y = s / 2 + Math.sin(a) * d;
+      const r = s * (0.08 + rnd() * 0.16);
+      const grad = g.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, "rgba(225,244,255,0.32)");
+      grad.addColorStop(1, "rgba(225,244,255,0)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, s, s);
+    }
+    // frost speckle, denser toward the middle
+    for (let i = 0; i < 700; i++) {
+      const a = rnd() * Math.PI * 2;
+      const d = Math.pow(rnd(), 0.7) * s * 0.46;
+      g.fillStyle = `rgba(255,255,255,${0.15 + rnd() * 0.45 * (1 - d / (s * 0.46))})`;
+      g.fillRect(s / 2 + Math.cos(a) * d, s / 2 + Math.sin(a) * d, 1, 1);
+    }
+    // fine random ice cracks (no symmetry)
     g.lineCap = "round";
-    for (let i = 0; i < 9; i++) {
-      const a = (i / 9) * Math.PI * 2 + rnd() * 0.4;
-      const len = s * (0.22 + rnd() * 0.22);
-      const x1 = s / 2 + Math.cos(a) * len;
-      const y1 = s / 2 + Math.sin(a) * len;
-      g.lineWidth = 1.2;
+    for (let i = 0; i < 26; i++) {
+      let x = s / 2 + (rnd() - 0.5) * s * 0.6;
+      let y = s / 2 + (rnd() - 0.5) * s * 0.6;
+      let a = rnd() * Math.PI * 2;
+      g.strokeStyle = `rgba(240,250,255,${0.18 + rnd() * 0.25})`;
+      g.lineWidth = 0.5 + rnd() * 0.7;
       g.beginPath();
-      g.moveTo(s / 2, s / 2);
-      g.lineTo(x1, y1);
-      // little side crystals
-      for (const k of [0.45, 0.7]) {
-        const bx = s / 2 + Math.cos(a) * len * k;
-        const by = s / 2 + Math.sin(a) * len * k;
-        for (const side of [-1, 1]) {
-          g.moveTo(bx, by);
-          g.lineTo(bx + Math.cos(a + side * 0.7) * len * 0.22, by + Math.sin(a + side * 0.7) * len * 0.22);
-        }
+      g.moveTo(x, y);
+      for (let k = 0; k < 4; k++) {
+        a += (rnd() - 0.5) * 1.2;
+        const len = 3 + rnd() * 7;
+        x += Math.cos(a) * len;
+        y += Math.sin(a) * len;
+        g.lineTo(x, y);
       }
       g.stroke();
     }
@@ -240,7 +254,30 @@ function jagged(a: Vector2, b: Vector2, detail: number, roughness: number): Vect
 // ---------------------------------------------------------------------------
 // The manager
 // ---------------------------------------------------------------------------
+interface Meteor {
+  from: Vector2;
+  to: Vector2;
+  age: number;
+  fall: number;
+  radius: number;
+  power: number;
+}
+
+interface Nova {
+  center: Vector2;
+  radius: number;
+  age: number;
+  expand: number;
+  spikes: { x: number; y: number; d: number; h: number; done: boolean }[];
+  power: number;
+}
+
 export class CombatFx {
+  /** Set by the renderer: a camera shake for the big blasts. */
+  onShake: ((magnitude: number, ms: number) => void) | null = null;
+  private meteors: Meteor[] = [];
+  private novas: Nova[] = [];
+  private burns: { x: number; y: number; r: number; age: number; life: number }[] = [];
   private particles: Particle[] = [];
   private decals: Decal[] = [];
   private bolts: Bolt[] = [];
@@ -256,6 +293,15 @@ export class CombatFx {
     for (const b of this.bolts) {
       const end = b.points[b.points.length - 1]!;
       out.push({ x: end.x, y: end.y, r: 120, rgb: [170, 200, 255], intensity: (1 - b.age / b.life) * 0.9 });
+    }
+    for (const m of this.meteors) {
+      const k = Math.min(1, m.age / m.fall);
+      out.push({ x: m.from.x + (m.to.x - m.from.x) * k, y: m.from.y + (m.to.y - m.from.y) * k, r: 110, rgb: [255, 150, 60], intensity: 0.9 });
+    }
+    for (const b of this.burns) out.push({ x: b.x, y: b.y, r: b.r * 2.2, rgb: [255, 130, 50], intensity: 0.8 * (1 - b.age / b.life) });
+    for (const n of this.novas) {
+      const k = Math.min(1, n.age / n.expand);
+      out.push({ x: n.center.x, y: n.center.y, r: n.radius * (0.5 + k), rgb: [150, 210, 255], intensity: 0.7 * (1 - Math.max(0, (n.age - n.expand) / 1.2)) });
     }
     return out;
   }
@@ -278,6 +324,89 @@ export class CombatFx {
         this.lightning(from, to, chain, scale);
         break;
     }
+  }
+
+  /**
+   * INFERNO special "Firestorm": a burning meteor drops onto `to` and blows
+   * up across the real blast `radius` — fireball, mushroom of smoke, flying
+   * rocks, a burning field and a glowing crater.
+   */
+  firestorm(to: Vector2, radius: number, power = 1): void {
+    const r = Math.max(40, radius) * (0.85 + 0.15 * power);
+    this.meteors.push({ from: { x: to.x - 150, y: to.y - 330 }, to, age: 0, fall: 0.34, radius: r, power });
+  }
+
+  /**
+   * FROSTBORN special "Absolute Zero": a wave of cold rolls out from the
+   * tower to its real range — mist hugging the ground, faceted ice crystals
+   * bursting up where it passes and shattering, falling snow, a frost-white
+   * ground.
+   */
+  frostNova(center: Vector2, radius: number, power = 1): void {
+    const R = Math.max(60, radius);
+    const spikes: Nova["spikes"] = [];
+    const count = Math.round(7 + R / 22);
+    for (let i = 0; i < count; i++) {
+      const a = (i / count) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+      const d = R * (0.35 + 0.65 * Math.random());
+      spikes.push({ x: center.x + Math.cos(a) * d, y: center.y + Math.sin(a) * d * 0.62, d, h: (20 + Math.random() * 26) * power, done: false });
+    }
+    this.novas.push({ center, radius: R, age: 0, expand: 0.5, spikes, power });
+    this.flash(center, 140 * power, [170, 225, 255], 0.3);
+    for (let i = 0; i < 10; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.add({ kind: "mist", x: center.x, y: center.y, z: 6, vx: Math.cos(a) * 40, vy: Math.sin(a) * 20, vz: 6, life: 1.2, size: 10, grow: 34, color: "rgb(230,246,255)", alpha: 0.55 });
+    }
+    this.decal("frost", center, R * 1.05, 2.8);
+    this.onShake?.(1.4, 160);
+  }
+
+  private explodeMeteor(m: Meteor): void {
+    const p = m.to;
+    const R = m.radius;
+    this.onShake?.(2.6 * m.power, 260);
+    this.flash(p, R * 3.2, [255, 200, 120], 0.35);
+    this.flash(p, R * 1.4, [255, 250, 230], 0.12);
+    // ground shockwaves: a bright heat ring and a slower ring of dust
+    this.add({ kind: "ring", x: p.x, y: p.y, z: 0, vx: 0, vy: 0, vz: 0, life: 0.3, size: R * 1.5, grow: 0, color: "255,225,170", alpha: 0.35 });
+    for (let i = 0; i < 26; i++) {
+      const a = (i / 26) * Math.PI * 2 + Math.random() * 0.2;
+      const v = R * (2.2 + Math.random() * 0.8);
+      this.add({ kind: "dust", x: p.x + Math.cos(a) * R * 0.2, y: p.y + Math.sin(a) * R * 0.12, z: 2, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.55, vz: 6, life: 0.9 + Math.random() * 0.4, size: R * 0.14, grow: R * 0.5, color: "rgb(120,98,78)", alpha: 0.5 });
+    }
+    // the fireball: white-hot core lobes, then a billow of fire
+    for (let i = 0; i < 7; i++) {
+      const a = Math.random() * Math.PI * 2;
+      this.add({ kind: "fire", x: p.x + Math.cos(a) * 6, y: p.y + Math.sin(a) * 4, z: 10, vx: Math.cos(a) * 26, vy: Math.sin(a) * 12, vz: 40, life: 0.42, size: R * 0.32, grow: R * 0.7, color: "", alpha: 1 });
+    }
+    for (let i = 0; i < 26; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = R * (0.8 + Math.random() * 1.6);
+      this.add({ kind: "fire", x: p.x, y: p.y, z: 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.55, vz: 30 + Math.random() * 70, life: 0.55 + Math.random() * 0.45, size: R * (0.16 + Math.random() * 0.16), grow: R * 0.55, color: "", alpha: 0.9 });
+    }
+    // the mushroom: a column of fire climbing into a dark plume
+    for (let i = 0; i < 9; i++) {
+      this.add({ kind: "fire", x: p.x + (Math.random() - 0.5) * R * 0.3, y: p.y, z: 12, vx: (Math.random() - 0.5) * 16, vy: 0, vz: 120 + Math.random() * 90, life: 0.55 + Math.random() * 0.3, size: R * 0.2, grow: R * 0.45, color: "", alpha: 0.9 });
+    }
+    for (let i = 0; i < 24; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const d = Math.random() * R * 0.55;
+      this.add({ kind: "smoke", x: p.x + Math.cos(a) * d, y: p.y + Math.sin(a) * d * 0.5, z: 18 + Math.random() * 30, vx: Math.cos(a) * 22 + 10, vy: Math.sin(a) * 8, vz: 45 + Math.random() * 70, life: 2.4 + Math.random() * 1.6, size: R * 0.24, grow: R * 1.05, color: Math.random() < 0.5 ? "rgb(34,30,28)" : "rgb(58,50,44)", alpha: 0.74 });
+    }
+    // rocks thrown out, glowing hot as they fly
+    for (let i = 0; i < 16; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = R * (1 + Math.random() * 1.8);
+      this.add({ kind: "rock", x: p.x, y: p.y, z: 8, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.55, vz: 120 + Math.random() * 170, life: 1.2 + Math.random() * 0.6, size: 1.8 + Math.random() * 2.6, grow: 0, color: "#2a1e18", alpha: 1, spin: (Math.random() - 0.5) * 14 });
+    }
+    for (let i = 0; i < 36; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = R * (0.8 + Math.random() * 2.4);
+      this.add({ kind: "ember", x: p.x, y: p.y, z: 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: 120 + Math.random() * 200, life: 1 + Math.random() * 1.2, size: 1.8, grow: 0, color: "255,170,60", alpha: 1 });
+    }
+    this.burns.push({ x: p.x, y: p.y, r: R, age: 0, life: 1.6 });
+    this.decals.push({ kind: "scorch", x: p.x, y: p.y, r: R * 1.35, rot: Math.random() * Math.PI * 2, age: 0, life: 8, hot: 2.4 });
+    if (this.decals.length > MAX_DECALS) this.decals.shift();
   }
 
   /** Trail left by a projectile in flight (call once per frame per projectile). */
@@ -407,27 +536,108 @@ export class CombatFx {
     this.particles.push({ ...p, age: 0, rot: Math.random() * Math.PI * 2, spin: p.spin ?? 0 });
   }
 
+  private shatterSpike(p: Particle): void {
+    for (let i = 0; i < 5; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const v = 30 + Math.random() * 70;
+      this.add({ kind: "shard", x: p.x, y: p.y, z: p.size * (0.3 + Math.random() * 0.6), vx: Math.cos(a) * v, vy: Math.sin(a) * v * 0.6, vz: 30 + Math.random() * 60, life: 0.6 + Math.random() * 0.4, size: 1.8 + Math.random() * 1.8, grow: 0, color: "", alpha: 1, spin: (Math.random() - 0.5) * 16 });
+    }
+    this.add({ kind: "mist", x: p.x, y: p.y, z: 4, vx: 0, vy: 0, vz: 4, life: 0.8, size: 6, grow: 16, color: "rgb(235,248,255)", alpha: 0.4 });
+  }
+
   update(dtMs: number): void {
     const dt = Math.min(0.05, dtMs / 1000);
+    for (const m of this.meteors) {
+      const k0 = Math.min(1, m.age / m.fall);
+      m.age += dt;
+      const k = Math.min(1, m.age / m.fall);
+      // a continuous trail: puffs laid all along the stretch flown this frame
+      const steps = 7;
+      for (let i = 0; i < steps; i++) {
+        const kk = k0 + ((k - k0) * (i + Math.random())) / steps;
+        const px = m.from.x + (m.to.x - m.from.x) * kk + (Math.random() - 0.5) * 4;
+        const py = m.from.y + (m.to.y - m.from.y) * kk + (Math.random() - 0.5) * 4;
+        this.add({ kind: "fire", x: px, y: py, z: 0, vx: (Math.random() - 0.5) * 14, vy: -14, vz: 0, life: 0.22 + Math.random() * 0.12, size: 5 * m.power, grow: 18, color: "", alpha: 0.75 });
+        if (i % 2 === 0) this.add({ kind: "smoke", x: px, y: py, z: 0, vx: (Math.random() - 0.5) * 8, vy: -8, vz: 8, life: 1.2 + Math.random() * 0.5, size: 5, grow: 26, color: "rgb(54,46,42)", alpha: 0.38 });
+      }
+      if (m.age >= m.fall) this.explodeMeteor(m);
+    }
+    this.meteors = this.meteors.filter((m) => m.age < m.fall);
+    for (const b of this.burns) {
+      b.age += dt;
+      // the blast field keeps burning: flame tongues licking up here and there
+      const rate = 26 * (1 - b.age / b.life);
+      if (Math.random() < rate * dt * 0.9) {
+        for (let i = 0; i < 1; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = Math.sqrt(Math.random()) * b.r * 0.75;
+          this.add({ kind: "flame", x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.6, z: 0, vx: 0, vy: 0, vz: 0, life: 0.6 + Math.random() * 0.6, size: 4 + Math.random() * 5, grow: 0, color: "", alpha: 1, spin: Math.random() });
+          if (Math.random() < 0.4) this.add({ kind: "smoke", x: b.x + Math.cos(a) * d, y: b.y + Math.sin(a) * d * 0.6, z: 14, vx: 6, vy: 0, vz: 30, life: 1.4, size: 6, grow: 20, color: "rgb(48,42,38)", alpha: 0.4 });
+        }
+      }
+    }
+    this.burns = this.burns.filter((b) => b.age < b.life);
+    for (const n of this.novas) {
+      const prevFront = Math.min(1, n.age / n.expand) ** 0.6 * n.radius;
+      n.age += dt;
+      const front = Math.min(1, n.age / n.expand) ** 0.6 * n.radius;
+      if (front > prevFront) {
+        // mist rolling along the front
+        const steps = Math.round(10 + front / 9);
+        for (let i = 0; i < steps; i++) {
+          if (Math.random() > 0.28) continue;
+          const a = Math.random() * Math.PI * 2;
+          const d = front * (0.9 + Math.random() * 0.12);
+          this.add({ kind: "mist", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 3, vx: Math.cos(a) * 34, vy: Math.sin(a) * 18, vz: 2, life: 1.0 + Math.random() * 0.6, size: 10, grow: 30, color: "rgb(226,242,255)", alpha: 0.28 });
+        }
+        for (const sp of n.spikes) {
+          if (sp.done || sp.d > front) continue;
+          sp.done = true;
+          this.add({ kind: "spike", x: sp.x, y: sp.y, z: 0, vx: 0, vy: 0, vz: 0, life: 1.1 + Math.random() * 0.35, size: sp.h, grow: 0, color: "", alpha: 1, spin: Math.random() });
+          this.add({ kind: "glint", x: sp.x, y: sp.y, z: sp.h * 0.8, vx: 0, vy: 0, vz: 4, life: 0.5, size: 3, grow: 0, color: "", alpha: 1 });
+        }
+      }
+      // snow drifting down over the frozen area
+      if (n.age < n.expand + 1) {
+        for (let i = 0; i < 2; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const d = Math.sqrt(Math.random()) * n.radius;
+          this.add({ kind: "snow", x: n.center.x + Math.cos(a) * d, y: n.center.y + Math.sin(a) * d * 0.62, z: 30 + Math.random() * 40, vx: 8, vy: 0, vz: -18 - Math.random() * 14, life: 2.2, size: 1.2 + Math.random() * 1.2, grow: 0, color: "", alpha: 1, spin: Math.random() * 6 });
+        }
+      }
+    }
+    this.novas = this.novas.filter((n) => n.age < n.expand + 1.4);
     const alive: Particle[] = [];
     for (const p of this.particles) {
       p.age += dt;
-      if (p.age >= p.life) continue;
+      if (p.age >= p.life) {
+        if (p.kind === "spike") this.shatterSpike(p);
+        continue;
+      }
       p.x += p.vx * dt;
       p.y += p.vy * dt;
       p.z += p.vz * dt;
       p.rot += p.spin * dt;
       switch (p.kind) {
+        case "snow":
+          p.x += Math.sin(p.age * 3 + p.spin) * 12 * dt;
+          if (p.z <= 0) {
+            p.z = 0;
+            p.vz = 0;
+            p.vx = 0;
+          }
+          break;
         case "spark":
         case "ember":
         case "debris":
+        case "rock":
         case "shard":
           p.vz -= GRAVITY * dt;
           if (p.z <= 0) {
             p.z = 0;
             // bounce with loss; sparks die on the ground
             if (p.kind === "spark") p.age = p.life;
-            p.vz = Math.abs(p.vz) * (p.kind === "debris" ? 0.35 : 0.25);
+            p.vz = Math.abs(p.vz) * (p.kind === "debris" || p.kind === "rock" ? 0.35 : 0.25);
             p.vx *= 0.55;
             p.vy *= 0.55;
             p.spin *= 0.5;
@@ -437,11 +647,12 @@ export class CombatFx {
           break;
         case "smoke":
         case "mist":
+        case "dust":
         case "fire":
           // buoyant, slowed by the air, drifting with a light wind
           p.vx = p.vx * (1 - 2.2 * dt) + 6 * dt;
           p.vy *= 1 - 2.2 * dt;
-          if (p.kind === "mist") p.vz *= 1 - 3 * dt;
+          if (p.kind === "mist" || p.kind === "dust") p.vz *= 1 - 3 * dt;
           break;
         default:
           break;
@@ -481,11 +692,23 @@ export class CombatFx {
     for (const p of this.particles) {
       const k = p.age / p.life;
       const sy = p.y - p.z;
-      if (p.kind === "smoke" || p.kind === "mist") {
+      if (p.kind === "spike") {
+        drawIceSpike(ctx, p, k);
+        continue;
+      }
+      if (p.kind === "snow") {
+        ctx.globalAlpha = k > 0.8 ? (1 - k) / 0.2 : 0.9;
+        ctx.fillStyle = "rgba(250,253,255,1)";
+        ctx.beginPath();
+        ctx.arc(p.x, sy, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
+      if (p.kind === "smoke" || p.kind === "mist" || p.kind === "dust") {
         const size = p.size + p.grow * k;
         ctx.globalAlpha = p.alpha * (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85);
         ctx.drawImage(tinted(smoke, "smoke", p.color), p.x - size, sy - size, size * 2, size * 2);
-      } else if (p.kind === "debris") {
+      } else if (p.kind === "debris" || p.kind === "rock") {
         ctx.globalAlpha = k > 0.75 ? (1 - k) / 0.25 : 1;
         ctx.fillStyle = p.color;
         ctx.save();
@@ -558,6 +781,21 @@ export class CombatFx {
         ctx.moveTo(p.x, sy);
         ctx.lineTo(p.x - tx, sy - ty);
         ctx.stroke();
+      } else if (p.kind === "rock") {
+        // still glowing from the blast as it flies
+        const heat = Math.max(0, 1 - k * 1.6);
+        if (heat > 0) {
+          ctx.globalAlpha = heat * 0.9;
+          const r = p.size * 3;
+          ctx.drawImage(fire, p.x - r, sy - r, r * 2, r * 2);
+        }
+      } else if (p.kind === "flame") {
+        // real layered flames (same as a burning building) rising and dying down
+        const life = Math.sin(k * Math.PI);
+        if (life > 0.05) {
+          ctx.globalAlpha = 1;
+          drawFire(ctx, p.x, sy, p.age * 1000 + p.spin * 5000, (1 + p.size * 0.12) * life, p.spin * 97);
+        }
       } else if (p.kind === "glint") {
         const a = Math.sin(k * Math.PI);
         ctx.globalAlpha = a;
@@ -579,6 +817,42 @@ export class CombatFx {
         ctx.ellipse(p.x, p.y, r, r * 0.5, 0, 0, Math.PI * 2);
         ctx.stroke();
       }
+    }
+    // the meteors themselves: a molten rock wrapped in fire
+    for (const m of this.meteors) {
+      const k = Math.min(1, m.age / m.fall);
+      const x = m.from.x + (m.to.x - m.from.x) * k;
+      const y = m.from.y + (m.to.y - m.from.y) * k;
+      const ang = Math.atan2(m.to.y - m.from.y, m.to.x - m.from.x);
+      // the streak of burning air behind it
+      const tail = 150 * m.power;
+      const sg = ctx.createLinearGradient(x, y, x - Math.cos(ang) * tail, y - Math.sin(ang) * tail);
+      sg.addColorStop(0, "rgba(255,230,170,0.85)");
+      sg.addColorStop(0.25, "rgba(255,140,50,0.45)");
+      sg.addColorStop(1, "rgba(200,60,20,0)");
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = sg;
+      ctx.lineCap = "round";
+      ctx.lineWidth = 7 * m.power;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x - Math.cos(ang) * tail, y - Math.sin(ang) * tail);
+      ctx.stroke();
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      ctx.globalAlpha = 0.95;
+      ctx.drawImage(FIRE_COOL(), -46 * m.power, -13 * m.power, 56 * m.power, 26 * m.power);
+      ctx.drawImage(fire, -28 * m.power, -11 * m.power, 40 * m.power, 22 * m.power);
+      ctx.drawImage(soft, -7 * m.power, -7 * m.power, 14 * m.power, 14 * m.power);
+      ctx.restore();
+    }
+    // a crater still glowing with embers
+    for (const d of this.decals) {
+      if (!d.hot || d.age > d.hot) continue;
+      const heat = 1 - d.age / d.hot;
+      ctx.globalAlpha = 0.55 * heat * (0.85 + 0.15 * Math.sin(d.age * 9));
+      ctx.drawImage(FIRE_COOL(), d.x - d.r * 0.7, d.y - d.r * 0.38, d.r * 1.4, d.r * 0.76);
     }
     // lightning: wide soft glow + bright core, flickering as it fades
     for (const b of this.bolts) {
@@ -607,4 +881,83 @@ export class CombatFx {
     }
     ctx.restore();
   }
+}
+
+/**
+ * A cluster of faceted ice crystals bursting out of the ground: each prism
+ * has a lit face and a shaded face, a bright ridge, a translucent body and a
+ * soft cold glow at its foot. Grows fast, holds, then (on expiry) shatters.
+ */
+function drawIceSpike(ctx: CanvasRenderingContext2D, p: Particle, k: number): void {
+  const grow = Math.min(1, k / 0.12);
+  const ease = 1 - Math.pow(1 - grow, 3);
+  const fade = k > 0.85 ? (1 - k) / 0.15 : 1;
+  const H = p.size * ease;
+  if (H < 0.5) return;
+  ctx.save();
+  ctx.globalAlpha = fade;
+  // shadow + frost at the foot
+  ctx.fillStyle = "rgba(20,40,60,0.22)";
+  ctx.beginPath();
+  ctx.ellipse(p.x + H * 0.25, p.y + 1, H * 0.45, H * 0.14, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // every cluster is different: 2-4 prisms of varied height, width and lean, seeded by p.spin
+  const r = (i: number) => {
+    const v = Math.sin((p.spin + 1) * 9301 * (i + 1)) * 43758.5453;
+    return v - Math.floor(v);
+  };
+  const n = 2 + Math.floor(r(1) * 3);
+  const prisms = Array.from({ length: n }, (_, i) => ({
+    dx: i === 0 ? 0 : (r(i + 2) - 0.5) * 0.6,
+    h: i === 0 ? 1 : 0.4 + r(i + 5) * 0.45,
+    w: 0.12 + r(i + 8) * 0.12,
+    lean: i === 0 ? (r(11) - 0.5) * 0.3 : (r(i + 12) - 0.5) * 1.1,
+  })).sort((a, b) => a.h - b.h);
+  // cold glow at the foot
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  const gl = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, H * 0.7);
+  gl.addColorStop(0, `rgba(150,215,255,${0.35 * fade})`);
+  gl.addColorStop(1, "rgba(150,215,255,0)");
+  ctx.fillStyle = gl;
+  ctx.fillRect(p.x - H * 0.7, p.y - H * 0.7, H * 1.4, H * 1.4);
+  ctx.restore();
+  for (const pr of prisms) {
+    const h = H * pr.h;
+    const w = H * pr.w;
+    const bx = p.x + pr.dx * H;
+    const by = p.y;
+    const tx = bx + pr.lean * h;
+    const ty = by - h;
+    // shaded right face
+    ctx.fillStyle = "rgba(60,140,200,0.62)";
+    ctx.beginPath();
+    ctx.moveTo(bx, by + w * 0.15);
+    ctx.lineTo(bx + w, by - w * 0.1);
+    ctx.lineTo(tx + w * 0.15, ty + h * 0.12);
+    ctx.lineTo(tx, ty);
+    ctx.closePath();
+    ctx.fill();
+    // lit left face
+    const g = ctx.createLinearGradient(bx, by, tx, ty);
+    g.addColorStop(0, "rgba(130,200,240,0.55)");
+    g.addColorStop(0.7, "rgba(215,242,255,0.8)");
+    g.addColorStop(1, "rgba(255,255,255,0.95)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(bx, by + w * 0.15);
+    ctx.lineTo(bx - w, by - w * 0.1);
+    ctx.lineTo(tx - w * 0.15, ty + h * 0.12);
+    ctx.lineTo(tx, ty);
+    ctx.closePath();
+    ctx.fill();
+    // bright ridge
+    ctx.strokeStyle = "rgba(255,255,255,0.9)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(bx, by + w * 0.1);
+    ctx.lineTo(tx, ty);
+    ctx.stroke();
+  }
+  ctx.restore();
 }

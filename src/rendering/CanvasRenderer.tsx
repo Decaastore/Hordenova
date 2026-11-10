@@ -226,6 +226,7 @@ export function CanvasRenderer({
     const vfx = new VfxManager();
     // REALISTIC COMBAT EFFECTS (rendering/combatFx.ts) — each landed shot gets its own tower's impact.
     const combatFx = new CombatFx();
+    combatFx.onShake = (m, ms) => vfx.triggerShake(m, ms);
     let flyingProjectiles = new Map<string, ProjectileInstance>();
     // TOWER MAGIC VFX — see specialVfx.ts. `seenSpecialIds` makes each
     // special projectile spawn its signature effect exactly once (rebuilt
@@ -364,6 +365,7 @@ export function CanvasRenderer({
         let impacts = 0;
         for (const [id, p] of flyingProjectiles) {
           if (now.has(id) || impacts >= 30) continue;
+          if (p.isSpecial && (p.towerType === "INFERNO" || p.towerType === "FROSTBORN")) continue; // their special has its own sequence
           impacts += 1;
           combatFx.impact(p.towerType, p.from, p.to, p.chainTargets, p.isSpecial);
         }
@@ -397,6 +399,9 @@ export function CanvasRenderer({
         } else if (caster && projectile.towerType === "FROSTBORN") {
           radius = getTowerStats(caster).range;
         }
+        // the big fire and ice specials are full particle sequences (rendering/combatFx.ts)
+        if (projectile.towerType === "INFERNO") combatFx.firestorm(projectile.to, radius, projectile.power ?? 1);
+        else if (projectile.towerType === "FROSTBORN") combatFx.frostNova(caster?.position ?? projectile.from, radius, projectile.power ?? 1);
         specialVfx.spawn({
           type: projectile.towerType,
           towerPosition: caster?.position ?? projectile.from,
