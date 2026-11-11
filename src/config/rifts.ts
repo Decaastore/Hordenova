@@ -49,7 +49,7 @@ export const RIFT_BASE_SHARDS = 3;
 /** Share of the Rift wave's own kill Gold paid again as a bonus, before curses. */
 export const RIFT_BASE_GOLD_SHARE = 0.5;
 /** The drop table Rift item rolls use (shown in the panel). */
-export const RIFT_DROP_TABLE_ID = "hollow-warden";
+export const RIFT_DROP_TABLE_ID = "rift";
 
 export interface RiftState {
   charges: number;
@@ -100,7 +100,7 @@ export function riftReward(mods: readonly RiftModId[], waveKillGold: number): Ri
   return {
     shards: Math.round(RIFT_BASE_SHARDS * k),
     gold: Math.round(waveKillGold * RIFT_BASE_GOLD_SHARE * k),
-    itemRolls: 1 + (pct >= 60 ? 1 : 0) + (pct >= 110 ? 1 : 0),
+    itemRolls: 1 + (pct >= 100 ? 1 : 0),
   };
 }
 

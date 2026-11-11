@@ -24,24 +24,43 @@ export interface DropTableEntry {
 
 export interface DropTable {
   id: string;
-  sourceType: "BOSS" | "MINI_BOSS" | "PHASE_MILESTONE";
+  sourceType: "BOSS" | "MINI_BOSS" | "PHASE_MILESTONE" | "RIFT";
   /** BossDefinition.id (or a future phase-milestone id) this table belongs to. */
   sourceId: string;
   entries: DropTableEntry[];
 }
 
+/*
+ * RARIDADE COM VALOR — Epic and better are meant to be genuinely rare: one of
+ * them dropping should be an event, not a wave's routine. Rifts roll their
+ * own table, rarer still at the top, so stacking curses buys more rolls of
+ * mostly common loot, never a reliable stream of top items.
+ */
 export const DROP_TABLES: Record<string, DropTable> = {
   "hollow-warden": {
     id: "hollow-warden",
     sourceType: "BOSS",
     sourceId: "hollow-warden",
     entries: [
-      { itemId: "warden_fragment", weightPercent: 55 },
-      { itemId: "mosswood_charm", weightPercent: 25 },
-      { itemId: "ancient_core", weightPercent: 12 },
-      { itemId: "hollow_sigil", weightPercent: 6.5 },
-      { itemId: "wardens_eye", weightPercent: 1.4 },
-      { itemId: "crown_of_the_hollow_king", weightPercent: 0.1 },
+      { itemId: "warden_fragment", weightPercent: 72 },
+      { itemId: "mosswood_charm", weightPercent: 21 },
+      { itemId: "ancient_core", weightPercent: 5.5 },
+      { itemId: "hollow_sigil", weightPercent: 1.2 },
+      { itemId: "wardens_eye", weightPercent: 0.28 },
+      { itemId: "crown_of_the_hollow_king", weightPercent: 0.02 },
+    ],
+  },
+  rift: {
+    id: "rift",
+    sourceType: "RIFT",
+    sourceId: "rift",
+    entries: [
+      { itemId: "warden_fragment", weightPercent: 78 },
+      { itemId: "mosswood_charm", weightPercent: 17 },
+      { itemId: "ancient_core", weightPercent: 4 },
+      { itemId: "hollow_sigil", weightPercent: 0.8 },
+      { itemId: "wardens_eye", weightPercent: 0.18 },
+      { itemId: "crown_of_the_hollow_king", weightPercent: 0.02 },
     ],
   },
 };

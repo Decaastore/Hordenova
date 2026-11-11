@@ -167,7 +167,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     tradable: true,
     visualAssetId: "wardens_eye",
   },
-  // The Mythic. Extremely low weight in the drop table (0.10%) is the
+  // The Mythic. Extremely low weight in the drop table (0.02%) is the
   // ENTIRE reason this feels rare — no hidden pity, no separate "guaranteed
   // after N kills" system quietly boosting the real number (spec sections
   // 10/12/33 are explicit that would be a lie).

@@ -10,10 +10,10 @@ describe("dropTables", () => {
 
   it("rollDropTable is a pure function of its rng: a fixed sequence always resolves to the expected item", () => {
     const table = DROP_TABLES["hollow-warden"]!;
-    // Just past cumulative 55 (warden_fragment) -> lands in mosswood_charm's [55,80) band.
-    expect(rollDropTable(table, () => 0.56)).toBe("mosswood_charm");
+    // Just past cumulative 72 (warden_fragment) -> lands in mosswood_charm's [72,93) band.
+    expect(rollDropTable(table, () => 0.8)).toBe("mosswood_charm");
     // Near the very top -> the extremely-rare last entry.
-    expect(rollDropTable(table, () => 0.9995)).toBe("crown_of_the_hollow_king");
+    expect(rollDropTable(table, () => 0.99995)).toBe("crown_of_the_hollow_king");
     // roll=0 always lands in the first entry.
     expect(rollDropTable(table, () => 0)).toBe("warden_fragment");
   });
@@ -38,7 +38,14 @@ describe("dropTables", () => {
       counts[item] = (counts[item] ?? 0) + 1;
     }
     const commonRate = (counts["warden_fragment"] ?? 0) / N;
-    expect(commonRate).toBeGreaterThan(0.5);
-    expect(commonRate).toBeLessThan(0.6);
+    expect(commonRate).toBeGreaterThan(0.67);
+    expect(commonRate).toBeLessThan(0.77);
+  });
+
+  it("Epic or better is genuinely rare: under 1.6% per boss roll and under 1.1% per Rift roll", () => {
+    const topShare = (id: string) =>
+      DROP_TABLES[id]!.entries.filter((e) => ["hollow_sigil", "wardens_eye", "crown_of_the_hollow_king"].includes(e.itemId)).reduce((s, e) => s + e.weightPercent, 0);
+    expect(topShare("hollow-warden")).toBeLessThan(1.6);
+    expect(topShare("rift")).toBeLessThan(1.1);
   });
 });

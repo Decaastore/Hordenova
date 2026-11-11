@@ -17,7 +17,7 @@ describe("rifts", () => {
     const heavy = riftReward(["HASTE", "TOUGH", "HORDE", "FRAGILE"], 200);
     expect(heavy.shards).toBeGreaterThan(light.shards);
     expect(heavy.gold).toBeGreaterThan(light.gold);
-    expect(heavy.itemRolls).toBe(3);
+    expect(heavy.itemRolls).toBe(2);
     expect(light.itemRolls).toBe(1);
   });
 

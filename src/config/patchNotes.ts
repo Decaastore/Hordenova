@@ -153,8 +153,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Quatro maldições para combinar: Pressa (+25% de velocidade dos inimigos), Couraça (+50% de vida), Horda (+50% de inimigos) e Muralha Rachada (o dobro de dano no castelo).",
       },
       {
-        en: "Each curse adds to the reward: more shards, more bonus gold and up to 3 item rolls on the table shown in the panel, with its real chances.",
-        ptBR: "Cada maldição aumenta o prêmio: mais fragmentos, mais ouro extra e até 3 sorteios de item na tabela mostrada no painel, com as chances reais.",
+        en: "Each curse adds to the reward: more shards, more bonus gold and, with enough curses, a second item roll. Rifts have their own item table, shown in the panel with its real chances: Epic 0.8%, Legendary 0.18%, Mythic 0.02% per roll.",
+        ptBR: "Cada maldição aumenta o prêmio: mais fragmentos, mais ouro extra e, com maldições suficientes, um segundo sorteio de item. As Fendas têm tabela de itens própria, mostrada no painel com as chances reais: Épico 0,8%, Lendário 0,18%, Mítico 0,02% por sorteio.",
       },
       {
         en: "A Rift never lands on a boss or mini-boss wave, and you can back out before it starts. If the castle falls during it, the Rift is lost.",
@@ -221,6 +221,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
       {
         en: "Re-roll values in the item's details: from 4 shards (Uncommon) to 60 (Mythic). It can come out better or worse.",
         ptBR: "Refaça os valores nos detalhes do item: de 4 fragmentos (Incomum) a 60 (Mítico). Pode sair melhor ou pior.",
+      },
+      {
+        en: "Epic and better are now much rarer, so finding one is worth something: from the Hollow Warden, Epic 1.2% (was 6.5%), Legendary 0.28% (was 1.4%) and Mythic 0.02% (was 0.1%).",
+        ptBR: "Épico ou melhor ficou bem mais raro, para encontrar um ter valor: do Guardião Oco, Épico 1,2% (era 6,5%), Lendário 0,28% (era 1,4%) e Mítico 0,02% (era 0,1%).",
       },
       {
         en: "Items you already had get the new listed values.",
