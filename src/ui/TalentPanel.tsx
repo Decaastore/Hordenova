@@ -12,6 +12,7 @@ import {
   type TalentBranch,
   type TalentId,
   type TalentRanks,
+  type TalentStat,
 } from "@/config/talents";
 
 interface TalentPanelProps {
@@ -21,6 +22,14 @@ interface TalentPanelProps {
   onRaise: (id: TalentId) => void;
   onReset: () => void;
   onClose: () => void;
+}
+
+type T = ReturnType<typeof useLanguage>["t"];
+
+/** "+3% tower damage" / "−2% gold per enemy" — sign first, value, then what it changes. */
+function statLine(t: T, stat: TalentStat, value: number): string {
+  const v = Math.round(Math.abs(value) * 10) / 10;
+  return `${value >= 0 ? "+" : "−"}${v}% ${t(`talents.stat.${stat}` as TranslationKey)}`;
 }
 
 const BRANCH_COLOR: Record<TalentBranch, string> = { WAR: "#e0644b", GOLD: "#e8c15a", WALL: "#7fb6ff" };
@@ -84,12 +93,11 @@ export function TalentPanel({ ranks, free, seasonBestWave, onRaise, onReset, onC
                           {rank}/{d.maxRank}
                         </span>
                       </span>
-                      <span style={{ fontSize: 10.5, color: PALETTE.uiTextDim, lineHeight: 1.35, textAlign: "left" }}>
-                        {t(`talents.nodes.${d.id}.desc` as TranslationKey, { v: d.perRank })}
+                      <span style={{ fontSize: 10.5, lineHeight: 1.35, textAlign: "left", color: "#9fe08a" }}>{statLine(t, d.stat, d.perRank)}</span>
+                      <span style={{ fontSize: 10.5, lineHeight: 1.35, textAlign: "left", color: "#ff8f7a" }}>{statLine(t, d.downStat, d.downPerRank)}</span>
+                      <span style={{ fontSize: 10, color: PALETTE.uiTextDim, textAlign: "left" }}>
+                        {rank > 0 ? t("talents.nowTotal", { up: statLine(t, d.stat, d.perRank * rank), down: statLine(t, d.downStat, d.downPerRank * rank) }) : t("talents.perPoint")}
                       </span>
-                      {rank > 0 && (
-                        <span style={{ fontSize: 10.5, color, fontWeight: 700, textAlign: "left" }}>{t("talents.now", { v: Math.round(rank * d.perRank * 10) / 10 })}</span>
-                      )}
                       <span style={{ display: "flex", gap: 3, marginTop: 2 }}>
                         {Array.from({ length: d.maxRank }, (_, k) => (
                           <span key={k} style={{ width: 14, height: 4, borderRadius: 1, background: k < rank ? color : "rgba(255,255,255,0.12)" }} />

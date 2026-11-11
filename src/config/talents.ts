@@ -8,8 +8,8 @@
  * reset, and the whole tree resets with the Season (it follows the Season
  * record). Same rules for everyone.
  *
- * Every effect is small and per rank; numbers here are the whole truth and
- * the panel shows them as they are.
+ * Every talent is a trade (an upside and a smaller downside); numbers here
+ * are the whole truth and the panel shows them as they are.
  */
 export type TalentBranch = "WAR" | "GOLD" | "WALL";
 
@@ -51,27 +51,38 @@ export interface TalentDefinition {
   /** Position in its branch, 0 = first. A talent needs the previous one in its branch to have a point. */
   tier: number;
   maxRank: number;
+  /** What it gives, per rank (percent, or percentage points for the "P" stats). */
   stat: TalentStat;
-  /** Effect per rank (percent, or percentage points for the "P" stats). */
   perRank: number;
+  /** What it costs, per rank — every talent is a trade, so choosing a path is a real decision. */
+  downStat: TalentStat;
+  downPerRank: number;
 }
 
+/*
+ * Every talent trades: an upside in its branch for a smaller downside
+ * elsewhere (Path of Exile style). Measured with the pacing bot: a tree of
+ * plain bonuses made the whole Season ~15% faster even at tiny values —
+ * tower damage moves boss fights a lot — so the trades are what keep the
+ * Season's pace where it was designed while still letting each player
+ * build a different castle.
+ */
 export const TALENTS: readonly TalentDefinition[] = [
-  { id: "W_BLADES", branch: "WAR", tier: 0, maxRank: 3, stat: "damagePct", perRank: 2 },
-  { id: "W_HASTE", branch: "WAR", tier: 1, maxRank: 3, stat: "attackSpeedPct", perRank: 2 },
-  { id: "W_HUNTER", branch: "WAR", tier: 2, maxRank: 3, stat: "bossDamagePct", perRank: 5 },
-  { id: "W_CRIT", branch: "WAR", tier: 3, maxRank: 2, stat: "critChancePct", perRank: 2 },
-  { id: "W_CARNAGE", branch: "WAR", tier: 4, maxRank: 1, stat: "damagePct", perRank: 6 },
-  { id: "G_LOOT", branch: "GOLD", tier: 0, maxRank: 3, stat: "killGoldPct", perRank: 2 },
-  { id: "G_TITHE", branch: "GOLD", tier: 1, maxRank: 2, stat: "cityShareP", perRank: 1 },
-  { id: "G_ELITE", branch: "GOLD", tier: 2, maxRank: 2, stat: "eliteShardP", perRank: 2 },
-  { id: "G_RIFT", branch: "GOLD", tier: 3, maxRank: 2, stat: "riftRewardPct", perRank: 15 },
-  { id: "G_KING", branch: "GOLD", tier: 4, maxRank: 1, stat: "killGoldPct", perRank: 5 },
-  { id: "M_STONE", branch: "WALL", tier: 0, maxRank: 3, stat: "castleDamageReductionPct", perRank: 4 },
-  { id: "M_REPAIR", branch: "WALL", tier: 1, maxRank: 3, stat: "castleRepairPct", perRank: 2 },
-  { id: "M_MOAT", branch: "WALL", tier: 2, maxRank: 2, stat: "enemySlowPct", perRank: 3 },
-  { id: "M_WATCH", branch: "WALL", tier: 3, maxRank: 2, stat: "rangePct", perRank: 3 },
-  { id: "M_LASTSTAND", branch: "WALL", tier: 4, maxRank: 1, stat: "lastStandDamagePct", perRank: 15 },
+  { id: "W_BLADES", branch: "WAR", tier: 0, maxRank: 3, stat: "damagePct", perRank: 3, downStat: "killGoldPct", downPerRank: -3 },
+  { id: "W_HASTE", branch: "WAR", tier: 1, maxRank: 3, stat: "attackSpeedPct", perRank: 3, downStat: "killGoldPct", downPerRank: -3 },
+  { id: "W_HUNTER", branch: "WAR", tier: 2, maxRank: 3, stat: "bossDamagePct", perRank: 6, downStat: "castleDamageReductionPct", downPerRank: -4 },
+  { id: "W_CRIT", branch: "WAR", tier: 3, maxRank: 2, stat: "critChancePct", perRank: 2, downStat: "rangePct", downPerRank: -3 },
+  { id: "W_CARNAGE", branch: "WAR", tier: 4, maxRank: 1, stat: "damagePct", perRank: 6, downStat: "killGoldPct", downPerRank: -6 },
+  { id: "G_LOOT", branch: "GOLD", tier: 0, maxRank: 3, stat: "killGoldPct", perRank: 3, downStat: "damagePct", downPerRank: -2 },
+  { id: "G_TITHE", branch: "GOLD", tier: 1, maxRank: 2, stat: "cityShareP", perRank: 1, downStat: "attackSpeedPct", downPerRank: -2 },
+  { id: "G_ELITE", branch: "GOLD", tier: 2, maxRank: 2, stat: "eliteShardP", perRank: 2, downStat: "enemySlowPct", downPerRank: -2 },
+  { id: "G_RIFT", branch: "GOLD", tier: 3, maxRank: 2, stat: "riftRewardPct", perRank: 15, downStat: "damagePct", downPerRank: -1.5 },
+  { id: "G_KING", branch: "GOLD", tier: 4, maxRank: 1, stat: "killGoldPct", perRank: 6, downStat: "castleDamageReductionPct", downPerRank: -6 },
+  { id: "M_STONE", branch: "WALL", tier: 0, maxRank: 3, stat: "castleDamageReductionPct", perRank: 5, downStat: "damagePct", downPerRank: -1.5 },
+  { id: "M_REPAIR", branch: "WALL", tier: 1, maxRank: 3, stat: "castleRepairPct", perRank: 2, downStat: "killGoldPct", downPerRank: -1.5 },
+  { id: "M_MOAT", branch: "WALL", tier: 2, maxRank: 2, stat: "enemySlowPct", perRank: 3, downStat: "killGoldPct", downPerRank: -2 },
+  { id: "M_WATCH", branch: "WALL", tier: 3, maxRank: 2, stat: "rangePct", perRank: 4, downStat: "attackSpeedPct", downPerRank: -2 },
+  { id: "M_LASTSTAND", branch: "WALL", tier: 4, maxRank: 1, stat: "lastStandDamagePct", perRank: 15, downStat: "killGoldPct", downPerRank: -3 },
 ];
 
 export const TALENT_BRANCHES: readonly TalentBranch[] = ["WAR", "GOLD", "WALL"];
@@ -120,7 +131,11 @@ export type TalentBonus = Record<TalentStat, number>;
 
 export function talentBonus(ranks: TalentRanks): TalentBonus {
   const bonus = Object.fromEntries(TALENTS.map((t) => [t.stat, 0])) as TalentBonus;
-  for (const t of TALENTS) bonus[t.stat] += (ranks[t.id] ?? 0) * t.perRank;
+  for (const t of TALENTS) {
+    const r = ranks[t.id] ?? 0;
+    bonus[t.stat] += r * t.perRank;
+    bonus[t.downStat] += r * t.downPerRank;
+  }
   return bonus;
 }
 

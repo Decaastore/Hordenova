@@ -25,11 +25,11 @@ interface BestiaryPanelProps {
 }
 
 const STAR_COLORS = ["#c08a4a", "#cfd6e0", "#ffcf5e"];
-const fmt = (n: number) => n.toLocaleString();
 
 /** BESTIÁRIO E CONQUISTAS — your defeats per creature (with stars) and your account's achievements and titles. Never reset by the Season. */
 export function BestiaryPanel({ kills, stats, unlocked, title, onEquipTitle, onClose }: BestiaryPanelProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
   const [tab, setTab] = useState<"bestiary" | "achievements">("bestiary");
   const b = bestiaryStats(kills);
 

@@ -64,6 +64,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           <PhaseWaveProgress onda={onda} />
           <div className="hh-wave-place">
             {t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)} · {t("hud.globalWaveSublabel", { wave: hud.wave })}
+            {hud.seasonBestWave > 0 && (
+              <span className="hh-record" title={t("hud.recordTooltip")}>
+                {" · "}
+                {t("hud.record", { wave: hud.seasonBestWave })}
+              </span>
+            )}
           </div>
         </div>
 
@@ -128,14 +134,6 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <span className="hh-sep" aria-hidden="true" />
               <span className="hh-threat" style={{ color: threat.color }}>
                 {threat.text}
-              </span>
-            </>
-          )}
-          {hud.seasonBestWave > 0 && (
-            <>
-              <span className="hh-sep hh-hide-sm" aria-hidden="true" />
-              <span className="hh-record hh-hide-sm" title={t("hud.recordTooltip")}>
-                {t("hud.record", { wave: hud.seasonBestWave })}
               </span>
             </>
           )}
@@ -459,7 +457,7 @@ div.hh-brand { cursor: default; }
 .hh-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .hh-status-text { font-weight: 700; color: ${PALETTE.uiText}; white-space: nowrap; }
 .hh-threat { font-weight: 600; white-space: nowrap; }
-.hh-record { color: ${PALETTE.uiTextDim}; white-space: nowrap; cursor: help; }
+.hh-record { white-space: nowrap; cursor: help; }
 .hh-sep { width: 1px; height: 12px; background: rgba(255,214,140,0.22); }
 
 .hh-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; }

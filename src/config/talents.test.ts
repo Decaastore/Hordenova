@@ -8,6 +8,14 @@ describe("talents", () => {
     expect(talentPointsEarned(305)).toBe(30);
   });
 
+  it("every talent is a trade: an upside and a smaller downside", () => {
+    for (const t of TALENTS) {
+      expect(t.perRank).toBeGreaterThan(0);
+      expect(t.downPerRank).toBeLessThan(0);
+      expect(t.downStat).not.toBe(t.stat);
+    }
+  });
+
   it("there are more ranks than a deep Season gives points", () => {
     const totalRanks = TALENTS.reduce((s, t) => s + t.maxRank, 0);
     expect(totalRanks).toBeGreaterThan(talentPointsEarned(300));
@@ -23,8 +31,8 @@ describe("talents", () => {
 
   it("adds up the bonus per rank", () => {
     const b = talentBonus({ W_BLADES: 3, W_HASTE: 1, W_HUNTER: 1, W_CRIT: 1, W_CARNAGE: 1, G_LOOT: 2 });
-    expect(b.damagePct).toBe(12);
-    expect(b.killGoldPct).toBe(4);
+    expect(b.damagePct).toBeCloseTo(3 * 3 + 6 - 2 * 2);
+    expect(b.killGoldPct).toBeCloseTo(2 * 3 - 3 * 3 - 3 - 6);
   });
 
   it("sanitizes broken saves: limits, broken paths and too many points", () => {

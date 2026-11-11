@@ -70,6 +70,161 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v98",
+    dateIso: "2026-11-11",
+    category: "SYSTEMS",
+    title: {
+      en: "Bestiary and Achievements with Titles",
+      ptBR: "Bestiário e Conquistas com Títulos",
+    },
+    description: {
+      en: "A new Bestiary keeps count of every creature you defeat, and Achievements mark the big milestones of your account. Each achievement unlocks a title you can wear next to your name on the Ranking.",
+      ptBR: "Um Bestiário novo conta cada criatura que você derrota, e as Conquistas marcam os grandes marcos da sua conta. Cada conquista libera um título que você pode usar ao lado do seu nome no Ranking.",
+    },
+    highlights: [
+      {
+        en: "Every creature has a card with its family and how many you have defeated, earning bronze, silver and gold stars at 10, 100 and 1,000 defeats.",
+        ptBR: "Cada criatura tem uma ficha com a família dela e quantas você já derrotou, ganhando estrela de bronze, prata e ouro com 10, 100 e 1.000 derrotas.",
+      },
+      {
+        en: "13 achievements: creatures defeated, waves reached, bosses and mini-bosses defeated, Rifts cleared, rare items found and the bestiary itself.",
+        ptBR: "13 conquistas: criaturas derrotadas, ondas alcançadas, chefes e mini-chefes vencidos, Fendas vencidas, itens raros encontrados e o próprio bestiário.",
+      },
+      {
+        en: "Wear any title you have unlocked; it shows next to your name on the Ranking.",
+        ptBR: "Use qualquer título que você liberou; ele aparece ao lado do seu nome no Ranking.",
+      },
+      {
+        en: "Prestige only, and never reset by the Season. Open it from the new BESTIARY button in the battle's top bar.",
+        ptBR: "É só prestígio e nunca zera com a temporada. Abra pelo novo botão BESTIÁRIO na barra de cima da partida.",
+      },
+    ],
+  },
+  {
+    id: "v97",
+    dateIso: "2026-11-11",
+    category: "SYSTEMS",
+    title: {
+      en: "Castle Talent Tree",
+      ptBR: "Árvore de Talentos do Castelo",
+    },
+    description: {
+      en: "Every 10 waves of your Season record give you a talent point to spend in three paths: War, Gold and Wall. Every talent is a trade — an upside with a smaller price — so each Season you choose what kind of castle to build.",
+      ptBR: "A cada 10 ondas do seu recorde na temporada você ganha um ponto de talento para gastar em três caminhos: Guerra, Ouro e Muralha. Cada talento é uma troca, uma vantagem com um preço menor, então a cada temporada você escolhe que tipo de castelo montar.",
+    },
+    highlights: [
+      {
+        en: "15 talents in three paths; each opens once the one before it has a point. There are more talents than points in a Season.",
+        ptBR: "15 talentos em três caminhos; cada um abre quando o anterior tem um ponto. Há mais talentos do que pontos numa temporada.",
+      },
+      {
+        en: "War: more damage, attack speed, boss damage and critical hits, paid with gold, castle resistance or range.",
+        ptBR: "Guerra: mais dano, velocidade de ataque, dano em chefes e críticos, pagos com ouro, resistência do castelo ou alcance.",
+      },
+      {
+        en: "Gold: more gold per enemy, city income, elite shards and Rift rewards, paid with damage, speed or castle resistance.",
+        ptBR: "Ouro: mais ouro por inimigo, renda da cidade, fragmentos de elites e prêmio das Fendas, pagos com dano, velocidade ou resistência do castelo.",
+      },
+      {
+        en: "Wall: a tougher castle that repairs itself each wave, slower enemies, more range and a last stand below 30% life.",
+        ptBR: "Muralha: um castelo mais resistente que se repara a cada onda, inimigos mais lentos, mais alcance e um último bastião abaixo de 30% de vida.",
+      },
+      {
+        en: "Reset your points any time for free. The tree goes back to zero with each new Season. Tested so the Season's pace stays the same.",
+        ptBR: "Refaça os pontos quando quiser, de graça. A árvore volta a zero a cada temporada nova. Testado para o ritmo da temporada continuar o mesmo.",
+      },
+    ],
+  },
+  {
+    id: "v96",
+    dateIso: "2026-11-11",
+    category: "CONTENT",
+    title: {
+      en: "Rifts: Harder Waves You Choose, for Better Loot",
+      ptBR: "Fendas: Ondas Mais Difíceis, Escolhidas por Você, por Loot Melhor",
+    },
+    description: {
+      en: "Rifts are optional cursed waves. You earn a Rift charge every 10 waves cleared; open one and pick its curses, and your next regular wave becomes a Rift. Clear it and it pays Gem Shards, bonus gold and item rolls, dropped in front of the castle.",
+      ptBR: "As Fendas são ondas amaldiçoadas opcionais. Você ganha uma carga de Fenda a cada 10 ondas vencidas; abra uma, escolha as maldições, e a sua próxima onda comum vira uma Fenda. Vencendo, ela paga Fragmentos de Gema, ouro extra e sorteios de item, que caem na frente do castelo.",
+    },
+    highlights: [
+      {
+        en: "Four curses to combine: Haste (+25% enemy speed), Carapace (+50% life), Horde (+50% enemies) and Cracked Wall (double castle damage).",
+        ptBR: "Quatro maldições para combinar: Pressa (+25% de velocidade dos inimigos), Couraça (+50% de vida), Horda (+50% de inimigos) e Muralha Rachada (o dobro de dano no castelo).",
+      },
+      {
+        en: "Each curse adds to the reward: more shards, more bonus gold and up to 3 item rolls on the table shown in the panel, with its real chances.",
+        ptBR: "Cada maldição aumenta o prêmio: mais fragmentos, mais ouro extra e até 3 sorteios de item na tabela mostrada no painel, com as chances reais.",
+      },
+      {
+        en: "A Rift never lands on a boss or mini-boss wave, and you can back out before it starts. If the castle falls during it, the Rift is lost.",
+        ptBR: "A Fenda nunca cai em onda de chefe ou mini-chefe, e você pode desistir antes de ela começar. Se o castelo cair durante a Fenda, ela é perdida.",
+      },
+      {
+        en: "Up to 3 charges stored. Open the panel from the new RIFT button in the top bar.",
+        ptBR: "Até 3 cargas guardadas. Abra o painel pelo novo botão FENDA na barra de cima.",
+      },
+    ],
+  },
+  {
+    id: "v95",
+    dateIso: "2026-11-11",
+    category: "ITEMS",
+    title: {
+      en: "Loot Falls on the Map",
+      ptBR: "Os Itens Agora Caem no Mapa",
+    },
+    description: {
+      en: "When a boss or mini-boss drops loot, you now see it fall: a beam of light in the rarity's colour, the item's name over it, and its own sound, before it flies to your bag. Elites can now drop Gem Shards too.",
+      ptBR: "Quando um chefe ou mini-chefe deixa loot, agora você vê cair: um feixe de luz na cor da raridade, o nome do item por cima e um som próprio, antes de ele voar para a sua mochila. Elites agora também podem deixar Fragmentos de Gema.",
+    },
+    highlights: [
+      {
+        en: "The rarer the item, the taller and brighter its beam; it glows at night too.",
+        ptBR: "Quanto mais raro o item, mais alto e forte o feixe; ele brilha também à noite.",
+      },
+      {
+        en: "Three drop sounds: a clink for common finds, a chime for rare ones and a deep bell for Epic and above.",
+        ptBR: "Três sons de drop: um tilintar para achados comuns, um sino agudo para os raros e um sino grave para Épico ou melhor.",
+      },
+      {
+        en: "Elites have a flat 5% chance to drop 1 Gem Shard when they die.",
+        ptBR: "Elites têm 5% de chance fixa de deixar 1 Fragmento de Gema ao morrer.",
+      },
+    ],
+  },
+  {
+    id: "v94",
+    dateIso: "2026-11-11",
+    category: "ITEMS",
+    title: {
+      en: "Items Now Have Their Own Rolls — and They Work",
+      ptBR: "Itens Agora Têm Valores Próprios, e Funcionam de Verdade",
+    },
+    description: {
+      en: "Items equipped in a tower now really give their bonus in combat. Every new copy rolls its own values inside a range the item shows, so two copies of the same item can differ — and you can re-roll a copy's values with Gem Shards.",
+      ptBR: "Os itens equipados numa torre agora dão o bônus de verdade em combate. Cada cópia nova sorteia seus próprios valores dentro de uma faixa que o item mostra, então duas cópias do mesmo item podem ser diferentes, e você pode refazer os valores de uma cópia com Fragmentos de Gema.",
+    },
+    highlights: [
+      {
+        en: "Tower damage, attack speed, boss damage and critical chance from items now apply to the tower they are equipped in.",
+        ptBR: "Dano de torre, velocidade de ataque, dano em chefes e chance de crítico dos itens agora valem na torre onde estão equipados.",
+      },
+      {
+        en: "Each item shows its range (60% to 140% of its listed value) and a quality bar for this exact copy.",
+        ptBR: "Cada item mostra a faixa possível (de 60% a 140% do valor listado) e uma barra de qualidade desta cópia.",
+      },
+      {
+        en: "Re-roll values in the item's details: from 4 shards (Uncommon) to 60 (Mythic). It can come out better or worse.",
+        ptBR: "Refaça os valores nos detalhes do item: de 4 fragmentos (Incomum) a 60 (Mítico). Pode sair melhor ou pior.",
+      },
+      {
+        en: "Items you already had keep exactly the value they listed before.",
+        ptBR: "Os itens que você já tinha continuam exatamente com o valor que mostravam antes.",
+      },
+    ],
+  },
+  {
     id: "v93",
     dateIso: "2026-11-11",
     category: "INTERFACE",
