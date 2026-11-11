@@ -1,4 +1,5 @@
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
+import { ENEMY_VOICE_FAMILY } from "@/config/enemyVoice";
 import { waveGoldFactor, waveHpFactor } from "@/config/waveBudget";
 import { deviceId, recordBalanceEvent, type DefenceSnapshot } from "@/telemetry/balanceTelemetry";
 import {
@@ -2273,7 +2274,7 @@ export class GameEngine {
         recordKill(this.battleStats, enemy);
         const tier = this.classifyEnemyTier(enemy);
         const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
-        this.emitAudio({ type: "enemy_death", tier, flavor });
+        this.emitAudio({ type: "enemy_death", tier, flavor, family: ENEMY_VOICE_FAMILY[enemy.type] });
         if (tier === "boss") this.emitAudio({ type: "boss_death" });
         if (enemy.id === this.activeBossId) {
           bossDefeatedThisTick = true;

@@ -492,15 +492,7 @@ export function drawWeather(ctx: CanvasRenderingContext2D, biome: BiomeDefinitio
       ctx.stroke();
     }
     ctx.restore();
-    // distant lightning: a double flicker every so often while the rain is heavy
-    if (k < 0.6) return 0;
-    const PERIOD = 23000;
-    const cycle = Math.floor(timeMs / PERIOD);
-    const at = n01(cycle * 5.3) * (PERIOD - 900);
-    const dt = timeMs - cycle * PERIOD - at;
-    if (dt < 0 || dt > 520) return 0;
-    const flash = dt < 90 ? 1 - dt / 90 : dt > 180 && dt < 300 ? 0.7 * (1 - (dt - 180) / 120) : 0;
-    return flash;
+    return lightningFlash(timeMs);
   }
   // ash: slow grey flakes with a few still-glowing ones; snow: soft white flakes
   const snow = kind === "snow";
@@ -527,6 +519,34 @@ export function drawWeather(ctx: CanvasRenderingContext2D, biome: BiomeDefinitio
   }
   ctx.restore();
   return 0;
+}
+
+const LIGHTNING_PERIOD_MS = 23000;
+
+/** Does this map get rain (and with it lightning and thunder)? */
+export function hasRain(biomeId: string): boolean {
+  return WEATHER[biomeId] === "rain";
+}
+
+/**
+ * When the next/current lightning strike of this cycle lands (ms on the same
+ * clock as the renderer), or null when the rain isn't heavy enough for
+ * lightning right now. One strike per 23 s cycle at most — shared by the
+ * on-screen flash and the thunder that follows it.
+ */
+export function lightningStrikeAt(timeMs: number): { cycle: number; atMs: number } | null {
+  if (weatherIntensity(timeMs) < 0.6) return null;
+  const cycle = Math.floor(timeMs / LIGHTNING_PERIOD_MS);
+  return { cycle, atMs: cycle * LIGHTNING_PERIOD_MS + n01(cycle * 5.3) * (LIGHTNING_PERIOD_MS - 900) };
+}
+
+/** Lightning flash strength right now (0..1): a double flicker at each strike. */
+export function lightningFlash(timeMs: number): number {
+  const strike = lightningStrikeAt(timeMs);
+  if (!strike) return 0;
+  const dt = timeMs - strike.atMs;
+  if (dt < 0 || dt > 520) return 0;
+  return dt < 90 ? 1 - dt / 90 : dt > 180 && dt < 300 ? 0.7 * (1 - (dt - 180) / 120) : 0;
 }
 
 /** A sheet of lightning over the whole frame (strength 0..1). */

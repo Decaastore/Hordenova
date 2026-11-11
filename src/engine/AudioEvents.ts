@@ -1,4 +1,5 @@
 import type { TowerType } from "@/config/towerStats";
+import type { EnemyVoiceFamily } from "@/config/enemyVoice";
 
 /**
  * Audio spec sections 1/2 — pure data describing something that REALLY
@@ -16,7 +17,7 @@ export type GameAudioEvent =
   /** towerType picks the impact's identity (spec section 4 — "os impactos precisam respeitar o tipo de ataque"); tier adjusts weight (a boss/mini-boss/elite hit reads heavier than a regular one). */
   | { type: "enemy_hit"; towerType: TowerType; tier: EnemyAudioTier }
   /** `flavor` reflects the enemy's REAL status at the moment of death (still burning / still frozen) — spec section 3's "morte por fogo" / "morte congelada" — never a guess at which tower landed the killing blow. */
-  | { type: "enemy_death"; tier: EnemyAudioTier; flavor?: "fire" | "ice" }
+  | { type: "enemy_death"; tier: EnemyAudioTier; flavor?: "fire" | "ice"; family?: EnemyVoiceFamily }
   | { type: "frostborn_freeze" }
   | { type: "stormcaller_chain" }
   | { type: "boss_intro" }

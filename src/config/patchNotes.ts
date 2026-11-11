@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v92",
+    dateIso: "2026-11-11",
+    category: "CONTENT",
+    title: {
+      en: "A Darker Soundscape: Creature Voices, Living Maps and Heavier Hits",
+      ptBR: "Som Mais Sombrio: Voz dos Bichos, Mapas Vivos e Golpes Mais Pesados",
+    },
+    description: {
+      en: "The battlefield now sounds like a dark fantasy world. Every creature dies with a voice that fits its kind, each map has its own ambient sound under the fight, rain follows the rain you see, and thunder rolls in after each lightning flash. Tower shots and hits have more weight.",
+      ptBR: "O campo de batalha agora soa como um mundo de fantasia sombria. Cada criatura morre com uma voz própria do seu tipo, cada mapa tem o seu som de ambiente por baixo da luta, a chuva que você ouve acompanha a chuva da tela e um trovão chega logo depois de cada relâmpago. Os tiros e golpes das torres ganharam mais peso.",
+    },
+    highlights: [
+      {
+        en: "Five creature voices: beasts snarl and fall, crawlers chitter and crunch, armoured brutes groan and clatter down, the undead wail and crumble to dust, flyers screech and drop. Two versions each, so kills don't repeat.",
+        ptBR: "Cinco vozes de criaturas: feras rosnam e tombam, rastejantes chiam e estalam, brutamontes de armadura gemem e caem com a armadura batendo, mortos-vivos uivam e viram pó, voadores guincham e despencam. Duas versões de cada, para as mortes não se repetirem.",
+      },
+      {
+        en: "Ambient sound per map: night forest with crickets and an owl, howling wind over ruins, desert and tundra, lava and rumbling earth, a cave's drone and dripping water, waves breaking on the coast.",
+        ptBR: "Som de ambiente por mapa: floresta à noite com grilos e coruja, vento uivando em ruínas, deserto e tundra, lava e terra roncando, o eco e as gotas de uma caverna, ondas quebrando na costa.",
+      },
+      {
+        en: "Rain you can hear, rising and fading with the rain on screen, and thunder a moment after each lightning flash.",
+        ptBR: "Chuva que você ouve, aumentando e sumindo junto com a chuva da tela, e trovão um instante depois de cada relâmpago.",
+      },
+      {
+        en: "Tower shots and impacts have a deeper, heavier body, at the same volume as before.",
+        ptBR: "Tiros e impactos das torres com um som mais grave e pesado, no mesmo volume de antes.",
+      },
+      {
+        en: "Ambient sound follows the effects volume and mute, and goes quiet when the game's tab is in the background.",
+        ptBR: "O ambiente segue o volume e o mudo dos efeitos e fica em silêncio quando a aba do jogo está em segundo plano.",
+      },
+    ],
+  },
+  {
     id: "v91",
     dateIso: "2026-11-10",
     category: "INTERFACE",

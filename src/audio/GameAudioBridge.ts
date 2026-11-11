@@ -2,6 +2,7 @@ import type { TowerType } from "@/config/towerStats";
 import type { EnemyAudioTier, GameAudioEvent } from "@/engine/AudioEvents";
 import { audioManager } from "./AudioManager";
 import type { SfxId } from "./sfxCatalog";
+import type { EnemyVoiceFamily } from "@/config/enemyVoice";
 
 /**
  * Audio spec sections 1/3/4/9 — the ONLY place that turns a semantic
@@ -24,6 +25,13 @@ const TOWER_IMPACT_SFX: Record<TowerType, SfxId> = {
   STORMCALLER: "stormcaller_impact",
 };
 
+let voiceTake = 0;
+/** Alternates the family's two takes so consecutive kills never sound identical. */
+function deathVoice(family: EnemyVoiceFamily): SfxId {
+  voiceTake = 1 - voiceTake;
+  return `death_${family}_${voiceTake + 1}` as SfxId;
+}
+
 /** A boss/mini-boss/elite hit or death reads heavier than a regular enemy's — pitch down, volume up — without needing a separate asset file per tier (spec section 5's "pequenas variações"). */
 const TIER_WEIGHT: Record<EnemyAudioTier, { pitch: number; volume: number }> = {
   regular: { pitch: 1, volume: 1 },
@@ -44,12 +52,16 @@ export function playGameAudioEvent(event: GameAudioEvent): void {
     }
     case "enemy_death": {
       const weight = TIER_WEIGHT[event.tier];
-      if (event.flavor === "fire") {
-        audioManager.play("inferno_impact", { pitch: weight.pitch * 0.85, volume: weight.volume });
-      } else if (event.flavor === "ice") {
-        audioManager.play("frostborn_freeze", { pitch: weight.pitch, volume: weight.volume * 0.9 });
-      } else {
+      // the creature's own voice first (its family's death cry), then the element that killed it underneath
+      if (event.family) {
+        audioManager.play(deathVoice(event.family), weight);
+      } else if (!event.flavor) {
         audioManager.play("enemy_death", weight);
+      }
+      if (event.flavor === "fire") {
+        audioManager.play("inferno_impact", { pitch: weight.pitch * 0.85, volume: weight.volume * (event.family ? 0.55 : 1) });
+      } else if (event.flavor === "ice") {
+        audioManager.play("frostborn_freeze", { pitch: weight.pitch, volume: weight.volume * (event.family ? 0.5 : 0.9) });
       }
       return;
     }

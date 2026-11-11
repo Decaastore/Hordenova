@@ -35,7 +35,20 @@ export type SfxId =
   | "defeat"
   | "victory"
   | "tower_upgrade"
-  | "level_unlock";
+  | "level_unlock"
+  | "death_beast_1"
+  | "death_beast_2"
+  | "death_insect_1"
+  | "death_insect_2"
+  | "death_brute_1"
+  | "death_brute_2"
+  | "death_undead_1"
+  | "death_undead_2"
+  | "death_winged_1"
+  | "death_winged_2"
+  | "thunder_1"
+  | "thunder_2"
+  | "thunder_3";
 
 export interface SfxAssetConfig {
   url: string;
@@ -105,4 +118,23 @@ export const SFX_ASSETS: Record<SfxId, SfxAssetConfig> = {
 
   tower_upgrade: asset("tower_upgrade", { priority: "MEDIUM", cooldownMs: 100, maxSimultaneous: 2, pitchVariance: 0 }),
   level_unlock: asset("level_unlock", { priority: "MEDIUM", cooldownMs: 100, maxSimultaneous: 1, baseVolume: 0.95, pitchVariance: 0 }),
+
+  // Creature death voices — one family per anatomy (config/enemyVoice.ts),
+  // two takes each so a stream of kills alternates. A short cooldown and at
+  // most two overlapping copies per take keep a swarm from turning into a wall.
+  death_beast_1: asset("death_beast_1", { priority: "MEDIUM", cooldownMs: 110, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  death_beast_2: asset("death_beast_2", { priority: "MEDIUM", cooldownMs: 110, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  death_insect_1: asset("death_insect_1", { priority: "MEDIUM", cooldownMs: 90, maxSimultaneous: 2, baseVolume: 0.55, pitchVariance: 0.1 }),
+  death_insect_2: asset("death_insect_2", { priority: "MEDIUM", cooldownMs: 90, maxSimultaneous: 2, baseVolume: 0.55, pitchVariance: 0.1 }),
+  death_brute_1: asset("death_brute_1", { priority: "MEDIUM", cooldownMs: 160, maxSimultaneous: 2, baseVolume: 0.65, pitchVariance: 0.06 }),
+  death_brute_2: asset("death_brute_2", { priority: "MEDIUM", cooldownMs: 160, maxSimultaneous: 2, baseVolume: 0.65, pitchVariance: 0.06 }),
+  death_undead_1: asset("death_undead_1", { priority: "MEDIUM", cooldownMs: 140, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  death_undead_2: asset("death_undead_2", { priority: "MEDIUM", cooldownMs: 140, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  death_winged_1: asset("death_winged_1", { priority: "MEDIUM", cooldownMs: 110, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+  death_winged_2: asset("death_winged_2", { priority: "MEDIUM", cooldownMs: 110, maxSimultaneous: 2, baseVolume: 0.6, pitchVariance: 0.08 }),
+
+  // Thunder that follows the lightning seen on rainy maps (audio/ambience.ts).
+  thunder_1: asset("thunder_1", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
+  thunder_2: asset("thunder_2", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
+  thunder_3: asset("thunder_3", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
 };
