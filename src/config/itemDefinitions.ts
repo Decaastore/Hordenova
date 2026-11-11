@@ -91,6 +91,12 @@ export type ItemId = (typeof ITEM_TYPES)[number];
  * real numbers these items drop at (spec section 12: if the UI shows a
  * chance, the chance IS the logic).
  */
+/*
+ * ITENS DE TOPO COM PESO — the rarer the item, the bigger the bonus, and the
+ * top rarities carry more than one effect: Uncommon/Rare give a small single
+ * stat, Epic and Legendary two, the Mythic three. Their chance of dropping is
+ * what keeps them rare (dropTables.ts), never a hidden rule.
+ */
 export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
   // A common trophy of having faced the Warden and lived — soulbound on
   // purpose (spec section 17 asks for at least one real example): a
@@ -116,7 +122,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     i18nKey: "mosswood_charm",
     rarity: "UNCOMMON",
     category: "AMULET",
-    effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 2 }],
+    effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 4 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
     visualAssetId: "mosswood_charm",
@@ -126,7 +132,7 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     i18nKey: "ancient_core",
     rarity: "RARE",
     category: "RUNE",
-    effects: [{ kind: "TOWER_ATTACK_SPEED_PERCENT", value: 3 }],
+    effects: [{ kind: "TOWER_ATTACK_SPEED_PERCENT", value: 7 }],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
     visualAssetId: "ancient_core",
@@ -138,7 +144,10 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     i18nKey: "hollow_sigil",
     rarity: "EPIC",
     category: "AMULET",
-    effects: [{ kind: "BOSS_DAMAGE_PERCENT", value: 5 }],
+    effects: [
+      { kind: "BOSS_DAMAGE_PERCENT", value: 20 },
+      { kind: "TOWER_DAMAGE_PERCENT", value: 5 },
+    ],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
     visualAssetId: "hollow_sigil",
@@ -150,7 +159,10 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     i18nKey: "wardens_eye",
     rarity: "LEGENDARY",
     category: "AMULET",
-    effects: [{ kind: "CRIT_CHANCE_PERCENT", value: 4 }],
+    effects: [
+      { kind: "CRIT_CHANCE_PERCENT", value: 15 },
+      { kind: "TOWER_ATTACK_SPEED_PERCENT", value: 10 },
+    ],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
     visualAssetId: "wardens_eye",
@@ -164,7 +176,11 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     i18nKey: "crown_of_the_hollow_king",
     rarity: "MYTHIC",
     category: "ARTIFACT",
-    effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 8 }],
+    effects: [
+      { kind: "TOWER_DAMAGE_PERCENT", value: 30 },
+      { kind: "BOSS_DAMAGE_PERCENT", value: 15 },
+      { kind: "TOWER_ATTACK_SPEED_PERCENT", value: 10 },
+    ],
     source: { type: "BOSS_DROP", refId: "hollow-warden" },
     tradable: true,
     visualAssetId: "crown_of_the_hollow_king",

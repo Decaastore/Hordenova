@@ -251,7 +251,7 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
     const items = [makeItem("hollow_sigil")];
     const { container } = renderPanel({ inventory: items });
 
-    expect(container.textContent).not.toContain("+3–7% Boss Damage");
+    expect(container.textContent).not.toContain("+12–28% Boss Damage");
 
     // React listens for native "mouseover"/"mouseout" (not "mouseenter"/"mouseleave",
     // which don't bubble) to simulate onMouseEnter/onMouseLeave, so the event must
@@ -262,14 +262,14 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
 
     expect(container.textContent).toContain("Hollow Sigil");
     expect(container.textContent).toContain("Amulet");
-    expect(container.textContent).toContain("+3–7% Boss Damage");
+    expect(container.textContent).toContain("+12–28% Boss Damage");
 
     act(() => tile.dispatchEvent(new MouseEvent("mouseout", { bubbles: true })));
-    expect(container.textContent).not.toContain("+3–7% Boss Damage");
+    expect(container.textContent).not.toContain("+12–28% Boss Damage");
   });
 
   it("clicking an amulet tile opens ItemDetailsModal with its real data (large icon, name, category, effect)", () => {
-    const items = [{ ...makeItem("wardens_eye"), rolls: [4] }];
+    const items = [{ ...makeItem("wardens_eye"), rolls: [15, 10] }];
     const { container } = renderPanel({ inventory: items });
 
     // The tile's clickable content button wraps the icon, name, AND rarity
@@ -279,7 +279,7 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
     act(() => nameButton!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
     expect(container.textContent).toContain("Amulet");
-    expect(container.textContent).toContain("+4% Crit Chance");
-    expect(container.textContent).toContain("range 2.4–5.6");
+    expect(container.textContent).toContain("+15% Crit Chance");
+    expect(container.textContent).toContain("range 9–21");
   });
 });

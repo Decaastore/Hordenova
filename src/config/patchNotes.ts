@@ -198,8 +198,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
     dateIso: "2026-11-11",
     category: "ITEMS",
     title: {
-      en: "Items Now Have Their Own Rolls — and They Work",
-      ptBR: "Itens Agora Têm Valores Próprios, e Funcionam de Verdade",
+      en: "Items Now Work, Roll Their Own Values, and Top Items Hit Hard",
+      ptBR: "Itens Agora Funcionam, Têm Valores Próprios, e os de Topo Pesam",
     },
     description: {
       en: "Items equipped in a tower now really give their bonus in combat. Every new copy rolls its own values inside a range the item shows, so two copies of the same item can differ — and you can re-roll a copy's values with Gem Shards.",
@@ -211,6 +211,10 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Dano de torre, velocidade de ataque, dano em chefes e chance de crítico dos itens agora valem na torre onde estão equipados.",
       },
       {
+        en: "Top items hit hard: the Epic Hollow Sigil gives +20% boss damage and +5% damage, the Legendary Warden's Eye +15% critical chance and +10% attack speed, and the Mythic Crown of the Hollow King +30% damage, +15% boss damage and +10% attack speed.",
+        ptBR: "Os itens de topo pesam: o Sigilo Oco (Épico) dá +20% de dano em chefes e +5% de dano, o Olho do Guardião (Lendário) +15% de chance de crítico e +10% de velocidade de ataque, e a Coroa do Rei Oco (Mítica) +30% de dano, +15% de dano em chefes e +10% de velocidade de ataque.",
+      },
+      {
         en: "Each item shows its range (60% to 140% of its listed value) and a quality bar for this exact copy.",
         ptBR: "Cada item mostra a faixa possível (de 60% a 140% do valor listado) e uma barra de qualidade desta cópia.",
       },
@@ -219,8 +223,8 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
         ptBR: "Refaça os valores nos detalhes do item: de 4 fragmentos (Incomum) a 60 (Mítico). Pode sair melhor ou pior.",
       },
       {
-        en: "Items you already had keep exactly the value they listed before.",
-        ptBR: "Os itens que você já tinha continuam exatamente com o valor que mostravam antes.",
+        en: "Items you already had get the new listed values.",
+        ptBR: "Os itens que você já tinha passam a ter os valores novos.",
       },
     ],
   },

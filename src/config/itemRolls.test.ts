@@ -17,6 +17,13 @@ describe("item rolls", () => {
     }
   });
 
+  it("rarer items give much more, and the top ones carry several effects", () => {
+    const total = (id: keyof typeof ITEM_DEFINITIONS) => ITEM_DEFINITIONS[id].effects.reduce((s, e) => s + e.value, 0);
+    expect(total("crown_of_the_hollow_king")).toBeGreaterThan(total("wardens_eye"));
+    expect(total("wardens_eye")).toBeGreaterThan(total("ancient_core"));
+    expect(ITEM_DEFINITIONS.crown_of_the_hollow_king.effects.length).toBe(3);
+  });
+
   it("a new copy carries its own rolls; an old copy without rolls uses the listed value", () => {
     const item = createItemInstance("mosswood_charm", "p1", { type: "BOSS_DROP", refId: "hollow-warden" });
     expect(item.rolls).toHaveLength(1);
@@ -32,12 +39,12 @@ describe("item rolls", () => {
 
   it("equipped items add up into the tower's bonus", () => {
     const bonus = itemBonusFrom([
-      { itemDefinitionId: "mosswood_charm", rolls: [2.5] },
-      { itemDefinitionId: "crown_of_the_hollow_king", rolls: [9] },
-      { itemDefinitionId: "hollow_sigil", rolls: [6] },
+      { itemDefinitionId: "mosswood_charm", rolls: [3] },
+      { itemDefinitionId: "crown_of_the_hollow_king", rolls: [30, 15, 10] },
+      { itemDefinitionId: "hollow_sigil", rolls: [20, 5] },
     ]);
-    expect(bonus.damagePct).toBeCloseTo(11.5);
-    expect(bonus.bossDamagePct).toBe(6);
-    expect(bonus.attackSpeedPct).toBe(0);
+    expect(bonus.damagePct).toBeCloseTo(3 + 30 + 5);
+    expect(bonus.bossDamagePct).toBe(15 + 20);
+    expect(bonus.attackSpeedPct).toBe(10);
   });
 });

@@ -20,25 +20,31 @@ describe("itemDefinitions — AMULET category", () => {
     expect(amuletIds).toEqual([...AMULET_IDS].sort());
   });
 
-  it("each amulet keeps its pre-existing rarity/effects/source/tradable — only category changed", () => {
+  it("each amulet keeps its rarity/source/tradable as an AMULET, with the stronger top-item effects", () => {
     expect(getItemDefinition("mosswood_charm")).toMatchObject({
       rarity: "UNCOMMON",
       category: "AMULET",
-      effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 2 }],
+      effects: [{ kind: "TOWER_DAMAGE_PERCENT", value: 4 }],
       source: { type: "BOSS_DROP", refId: "hollow-warden" },
       tradable: true,
     });
     expect(getItemDefinition("hollow_sigil")).toMatchObject({
       rarity: "EPIC",
       category: "AMULET",
-      effects: [{ kind: "BOSS_DAMAGE_PERCENT", value: 5 }],
+      effects: [
+        { kind: "BOSS_DAMAGE_PERCENT", value: 20 },
+        { kind: "TOWER_DAMAGE_PERCENT", value: 5 },
+      ],
       source: { type: "BOSS_DROP", refId: "hollow-warden" },
       tradable: true,
     });
     expect(getItemDefinition("wardens_eye")).toMatchObject({
       rarity: "LEGENDARY",
       category: "AMULET",
-      effects: [{ kind: "CRIT_CHANCE_PERCENT", value: 4 }],
+      effects: [
+        { kind: "CRIT_CHANCE_PERCENT", value: 15 },
+        { kind: "TOWER_ATTACK_SPEED_PERCENT", value: 10 },
+      ],
       source: { type: "BOSS_DROP", refId: "hollow-warden" },
       tradable: true,
     });
