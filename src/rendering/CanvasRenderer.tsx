@@ -1,3 +1,4 @@
+import { LootFx } from "./lootFx";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { CombatFx, preloadCombatFxArt } from "./combatFx";
 import { drawGrimGrade, drawGroundMist, drawLightningFlash, drawWeather, drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
@@ -226,6 +227,7 @@ export function CanvasRenderer({
     const vfx = new VfxManager();
     // REALISTIC COMBAT EFFECTS (rendering/combatFx.ts) — each landed shot gets its own tower's impact.
     const combatFx = new CombatFx();
+    const lootFx = new LootFx();
     preloadCombatFxArt();
     combatFx.onShake = (m, ms) => vfx.triggerShake(m, ms);
     let flyingProjectiles = new Map<string, ProjectileInstance>();
@@ -296,6 +298,7 @@ export function CanvasRenderer({
       const gateHomePosition = roadPath[roadPath.length - 1]!;
       const portalAnchor = getPortalAnchor(roadPath);
       latestSnapshotRef.current = snapshot;
+      lootFx.sync(snapshot.lootDrops, timestamp);
 
       const castleHpPercent = hud.maxBaseHp > 0 ? hud.baseHp / hud.maxBaseHp : 1;
       const biome = getBiome(snapshot.biomeId);
@@ -647,6 +650,7 @@ export function CanvasRenderer({
           else if (e.elite) lights.push({ x: e.position.x, y: e.position.y, r: 40, rgb: [255, 220, 160], intensity: 0.35 });
         }
         lights.push(...combatFx.lights());
+        lights.push(...lootFx.lights(timestamp));
         drawLighting(ctx, biome, visibleBounds, tod, lights);
         if (groundBake && tod.night > 0.02) drawGroundEmissive(ctx, groundBake, biome, timestamp, tod.night * 0.85);
         drawLightningFlash(ctx, visibleBounds, drawWeather(ctx, biome, visibleBounds, timestamp));
@@ -667,6 +671,8 @@ export function CanvasRenderer({
         drawAmbientParticles(ctx, biome, timestamp);
       }
       drawVignette(ctx, biome, visibleBounds);
+      // loot beams and names sit on top of everything, like Diablo's item labels
+      lootFx.draw(ctx, timestamp, visibleBounds.y0 + 8);
 
       rafId = requestAnimationFrame(draw);
     };

@@ -48,7 +48,10 @@ export type SfxId =
   | "death_winged_2"
   | "thunder_1"
   | "thunder_2"
-  | "thunder_3";
+  | "thunder_3"
+  | "loot_common"
+  | "loot_rare"
+  | "loot_legendary";
 
 export interface SfxAssetConfig {
   url: string;
@@ -137,4 +140,9 @@ export const SFX_ASSETS: Record<SfxId, SfxAssetConfig> = {
   thunder_1: asset("thunder_1", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
   thunder_2: asset("thunder_2", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
   thunder_3: asset("thunder_3", { priority: "MEDIUM", cooldownMs: 4000, maxSimultaneous: 1, baseVolume: 0.7, pitchVariance: 0.05 }),
+
+  // Loot falling on the map (config/loot.ts): clink, chime, bell by rarity.
+  loot_common: asset("loot_common", { priority: "MEDIUM", cooldownMs: 120, maxSimultaneous: 2, baseVolume: 0.8, pitchVariance: 0.05 }),
+  loot_rare: asset("loot_rare", { priority: "HIGH", cooldownMs: 200, maxSimultaneous: 1, baseVolume: 0.85, pitchVariance: 0.02 }),
+  loot_legendary: asset("loot_legendary", { priority: "HIGH", cooldownMs: 600, maxSimultaneous: 1, baseVolume: 0.9, pitchVariance: 0 }),
 };

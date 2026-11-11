@@ -19,6 +19,11 @@ export const en = {
     playMusic: "Play music",
     musicLabel: "Music",
   },
+  loot: {
+    shardsOne: "1 Gem Shard",
+    shards: "{n} Gem Shards",
+    unknown: "Item",
+  },
   mapBrightness: {
     label: "Map",
     title: "Map brightness",

@@ -50,6 +50,11 @@ export function playGameAudioEvent(event: GameAudioEvent): void {
       audioManager.play(TOWER_IMPACT_SFX[event.towerType], weight);
       return;
     }
+    case "loot_drop": {
+      const order = ["COMMON", "UNCOMMON", "RARE", "EPIC", "LEGENDARY", "MYTHIC"].indexOf(event.rarity);
+      audioManager.play(order >= 3 ? "loot_legendary" : order >= 2 ? "loot_rare" : "loot_common");
+      return;
+    }
     case "enemy_death": {
       const weight = TIER_WEIGHT[event.tier];
       // the creature's own voice first (its family's death cry), then the element that killed it underneath

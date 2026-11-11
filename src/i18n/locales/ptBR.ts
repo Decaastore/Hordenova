@@ -20,6 +20,11 @@ export const ptBR: TranslationSchema = {
     playMusic: "Tocar música",
     musicLabel: "Música",
   },
+  loot: {
+    shardsOne: "1 Fragmento de Gema",
+    shards: "{n} Fragmentos de Gema",
+    unknown: "Item",
+  },
   mapBrightness: {
     label: "Mapa",
     title: "Brilho do mapa",

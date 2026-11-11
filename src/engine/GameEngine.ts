@@ -1,3 +1,4 @@
+import { ELITE_SHARD_DROP_AMOUNT, ELITE_SHARD_DROP_CHANCE, MAX_RECENT_LOOT, shardPileRarity, type LootDrop } from "@/config/loot";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import { ENEMY_VOICE_FAMILY } from "@/config/enemyVoice";
@@ -311,6 +312,8 @@ export interface RenderSnapshot {
   biomeId: string;
   /** The map being played — draw its road and sites (never derive them from biomeId alone). */
   mapLayoutId: string;
+  /** Recent loot that fell on the map (config/loot.ts), newest last. */
+  lootDrops: readonly LootDrop[];
 }
 
 function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
@@ -2095,6 +2098,16 @@ export class GameEngine {
     return claimed;
   }
 
+  private lootDrops: LootDrop[] = [];
+  private lootSeq = 0;
+
+  /** Puts a drop on the map for the renderer (beam + name) and plays its sound. */
+  private dropLoot(drop: Omit<LootDrop, "seq">): void {
+    this.lootSeq += 1;
+    this.lootDrops = [...this.lootDrops, { ...drop, seq: this.lootSeq }].slice(-MAX_RECENT_LOOT);
+    this.emitAudio({ type: "loot_drop", rarity: drop.rarity });
+  }
+
   private itemBonusTicks = 0;
   private itemBonusDirty = true;
 
@@ -2331,7 +2344,11 @@ export class GameEngine {
           bossDefeatedThisTick = true;
           this.lastBossReward = enemy.goldReward;
         }
-        if (enemy.boss) this.grantBossDrop(enemy.boss);
+        if (enemy.boss) this.grantBossDrop(enemy.boss, enemy.position);
+        else if (tier === "elite" && Math.random() < ELITE_SHARD_DROP_CHANCE) {
+          this.addGemShards(ELITE_SHARD_DROP_AMOUNT, "elite_drop");
+          this.dropLoot({ kind: "shards", rarity: shardPileRarity(ELITE_SHARD_DROP_AMOUNT), amount: ELITE_SHARD_DROP_AMOUNT, x: enemy.position.x, y: enemy.position.y });
+        }
         continue; // removed, killed by towers/burn
       }
       survivors.push(enemy);
@@ -2633,7 +2650,7 @@ export class GameEngine {
    * Forest, for now) simply grants nothing — no placeholder loot, per spec
    * section 25's "não criar dezenas de itens agora".
    */
-  private grantBossDrop(boss: BossState): void {
+  private grantBossDrop(boss: BossState, at?: { x: number; y: number }): void {
     if (boss.isMainBoss) this.bossesDefeatedTotal += 1;
     else this.miniBossesDefeatedTotal += 1;
 
@@ -2656,7 +2673,9 @@ export class GameEngine {
     // the other (one-time, per-wave-milestone) half of Prestige's income.
     const baseShards = 2;
     const shards = Math.round(baseShards * getPrestigeBonuses(this.prestigeLevel).gemShardMultiplier);
-    this.addGemShards(this.withSkinShardBonus(shards), boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
+    const granted = this.withSkinShardBonus(shards);
+    this.addGemShards(granted, boss.isMainBoss ? "main_boss_kill" : "mini_boss_kill");
+    if (at) this.dropLoot({ kind: "shards", rarity: shardPileRarity(granted), amount: granted, x: at.x - 22, y: at.y + 6 });
 
     const def = getBossDefinitionById(boss.bossId);
     if (!def || !def.dropTableId) return;
@@ -2675,6 +2694,8 @@ export class GameEngine {
     this.inventory = result.inventory;
     this.overflowInventory = result.overflow;
     this.pendingItemRewards.push(item);
+    const itemDef = getItemDefinition(item.itemDefinitionId);
+    if (at && itemDef) this.dropLoot({ kind: "item", rarity: itemDef.rarity, itemDefinitionId: item.itemDefinitionId, amount: 1, x: at.x + 18, y: at.y - 4 });
 
     const ledgerBase = {
       itemInstanceId: item.instanceId,
@@ -2989,6 +3010,7 @@ export class GameEngine {
       selectedTowerId: this.selectedTowerId,
       biomeId: getPhaseForWave(this.wave.currentWave).biomeId,
       mapLayoutId: this.layout.id,
+      lootDrops: this.lootDrops,
     };
   }
 }
