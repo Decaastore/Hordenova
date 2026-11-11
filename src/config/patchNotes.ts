@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v91",
+    dateIso: "2026-11-10",
+    category: "INTERFACE",
+    title: {
+      en: "New Option: Map Brightness",
+      ptBR: "Nova Opção: Brilho do Mapa",
+    },
+    description: {
+      en: "Prefer a lighter battlefield? A new button in the game's top bar switches the map between Dark, Normal and Bright. Your choice is remembered on this device.",
+      ptBR: "Prefere o campo de batalha mais claro? Um novo botão na barra de cima do jogo alterna o mapa entre Sombrio, Normal e Claro. A escolha fica salva neste aparelho.",
+    },
+    highlights: [
+      {
+        en: "Dark: the full grim look, with cold colours, deep nights and thick mist.",
+        ptBR: "Sombrio: o visual sombrio completo, com cores frias, noites fundas e névoa densa.",
+      },
+      {
+        en: "Normal (the new default): a softer, lighter version, with clearer nights and less mist.",
+        ptBR: "Normal (o novo padrão): uma versão mais suave e clara, com noites mais claras e menos névoa.",
+      },
+      {
+        en: "Bright: the map's original colours and much lighter nights; rain, snow and ash still pass through.",
+        ptBR: "Claro: as cores originais do mapa e noites bem mais claras; chuva, neve e cinzas continuam aparecendo.",
+      },
+      {
+        en: "Visual only: it changes nothing in combat.",
+        ptBR: "É só visual: não muda nada no combate.",
+      },
+    ],
+  },
+  {
     id: "v90",
     dateIso: "2026-11-10",
     category: "CONTENT",

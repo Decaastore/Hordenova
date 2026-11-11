@@ -7,6 +7,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
 import { BrandLogo } from "./BrandLogo";
+import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
 import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
 
 interface HUDProps {
@@ -152,6 +153,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           <BagIcon size={13} />
           {t("inventory.button")}
         </button>
+        <MapBrightnessControl />
         <SfxControl />
       </div>
     </div>
@@ -171,6 +173,23 @@ function widestStateLabel(labels: readonly string[]): number {
   } catch {
     return 0;
   }
+}
+
+/** Map brightness: Sombrio / Normal / Claro, a per-device display choice (rendering/mapBrightness.ts). */
+function MapBrightnessControl() {
+  const [level, setLevel] = useState(getMapBrightness);
+  const { t } = useLanguage();
+  return (
+    <button
+      onClick={() => setLevel(cycleMapBrightness())}
+      title={t("mapBrightness.title")}
+      aria-label={`${t("mapBrightness.title")}: ${t(`mapBrightness.${level}`)}`}
+      style={{ ...inventoryButtonStyle }}
+      data-testid="map-brightness"
+    >
+      {t("mapBrightness.label")}: {t(`mapBrightness.${level}`)}
+    </button>
+  );
 }
 
 /** Audio spec section 13 — SFX Volume (0/25/50/75/100%) + a separate Mute toggle, persisted via audio/audioSettings.ts. No music control — none exists yet. */

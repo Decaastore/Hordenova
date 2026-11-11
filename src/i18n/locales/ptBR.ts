@@ -20,6 +20,13 @@ export const ptBR: TranslationSchema = {
     playMusic: "Tocar música",
     musicLabel: "Música",
   },
+  mapBrightness: {
+    label: "Mapa",
+    title: "Brilho do mapa",
+    DARK: "Sombrio",
+    NORMAL: "Normal",
+    BRIGHT: "Claro",
+  },
   nav: {
     home: "Início",
     play: "Jogar",

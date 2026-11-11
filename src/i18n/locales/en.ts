@@ -19,6 +19,13 @@ export const en = {
     playMusic: "Play music",
     musicLabel: "Music",
   },
+  mapBrightness: {
+    label: "Map",
+    title: "Map brightness",
+    DARK: "Dark",
+    NORMAL: "Normal",
+    BRIGHT: "Bright",
+  },
   nav: {
     home: "Home",
     play: "Play",

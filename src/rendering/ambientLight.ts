@@ -1,3 +1,4 @@
+import { brightnessFactors } from "./mapBrightness";
 import type { BiomeDefinition } from "./biomes";
 import type { VisibleBounds } from "./MapRenderer";
 import { n01 } from "./fireFx";
@@ -113,7 +114,7 @@ export function drawLighting(
   lights: readonly LightSource[],
 ): void {
   const sky = skyFor(biome.id);
-  const alpha = sky.dayAlpha + (sky.nightAlpha - sky.dayAlpha) * tod.night;
+  const alpha = (sky.dayAlpha + (sky.nightAlpha - sky.dayAlpha) * tod.night) * brightnessFactors().night;
   const w = bounds.x1 - bounds.x0;
   const h = bounds.y1 - bounds.y0;
 
@@ -365,28 +366,32 @@ function gradeTone(biomeId: string): readonly [number, number, number] {
  * the world and its units are drawn, before lights and effects.
  */
 export function drawGrimGrade(ctx: CanvasRenderingContext2D, biome: BiomeDefinition, bounds: VisibleBounds): void {
+  const k = brightnessFactors().grade;
+  if (k <= 0) return;
   const w = bounds.x1 - bounds.x0;
   const h = bounds.y1 - bounds.y0;
   const [r, g, b] = gradeTone(biome.id);
+  const toWhite = (c: number) => Math.round(255 + (c - 255) * k);
+  const shade = (c: number) => Math.round(255 + (c - 255) * k);
   ctx.save();
   // 1. less color
   ctx.globalCompositeOperation = "saturation";
-  ctx.fillStyle = "rgba(128,128,128,0.34)";
+  ctx.fillStyle = `rgba(128,128,128,${0.34 * k})`;
   ctx.fillRect(bounds.x0, bounds.y0, w, h);
   // 2. colder and darker
   ctx.globalCompositeOperation = "multiply";
-  ctx.fillStyle = `rgb(${r},${g},${b})`;
+  ctx.fillStyle = `rgb(${toWhite(r)},${toWhite(g)},${toWhite(b)})`;
   ctx.fillRect(bounds.x0, bounds.y0, w, h);
   // 3. harder contrast: shadows sink, highlights hold
   ctx.globalCompositeOperation = "soft-light";
-  ctx.fillStyle = "rgba(20,22,30,0.38)";
+  ctx.fillStyle = `rgba(20,22,30,${0.38 * k})`;
   ctx.fillRect(bounds.x0, bounds.y0, w, h);
   // 4. heavy vignette
   ctx.globalCompositeOperation = "multiply";
   const v = ctx.createRadialGradient(500, 300, 240, 500, 300, 820);
   v.addColorStop(0, "rgba(255,255,255,1)");
-  v.addColorStop(0.6, "rgba(150,150,160,1)");
-  v.addColorStop(1, "rgba(40,40,52,1)");
+  v.addColorStop(0.6, `rgb(${shade(150)},${shade(150)},${shade(160)})`);
+  v.addColorStop(1, `rgb(${shade(40)},${shade(40)},${shade(52)})`);
   ctx.fillStyle = v;
   ctx.fillRect(bounds.x0, bounds.y0, w, h);
   ctx.restore();
@@ -417,6 +422,8 @@ function getMistSprite(): HTMLCanvasElement {
 
 /** Low mist drifting slowly over the ground, thicker at night. */
 export function drawGroundMist(ctx: CanvasRenderingContext2D, bounds: VisibleBounds, tod: TimeOfDay, timeMs: number): void {
+  const mist = brightnessFactors().mist;
+  if (mist <= 0) return;
   const sprite = getMistSprite();
   const span = bounds.x1 - bounds.x0 + 500;
   ctx.save();
@@ -425,7 +432,7 @@ export function drawGroundMist(ctx: CanvasRenderingContext2D, bounds: VisibleBou
     const x = bounds.x0 - 250 + ((n01(i * 7.1) * span + (timeMs / 1000) * speed) % span);
     const y = 60 + n01(i * 11.7) * 520 + Math.sin(timeMs / 9000 + i) * 10;
     const size = 220 + n01(i * 5.9) * 260;
-    ctx.globalAlpha = (0.1 + 0.1 * tod.night) * (0.6 + 0.4 * Math.sin(timeMs / 13000 + i * 1.7));
+    ctx.globalAlpha = mist * (0.1 + 0.1 * tod.night) * (0.6 + 0.4 * Math.sin(timeMs / 13000 + i * 1.7));
     ctx.drawImage(sprite, x - size / 2, y - size * 0.22, size, size * 0.44);
   }
   ctx.restore();
