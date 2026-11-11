@@ -26,9 +26,11 @@ interface HUDProps {
   onToggleCity?: () => void;
   /** FENDAS — opens the Rift panel. */
   onToggleRift?: () => void;
+  /** ÁRVORE DE TALENTOS — opens the talent panel. */
+  onToggleTalents?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -151,6 +153,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <ScrollIcon size={13} />
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
+            </button>
+          )}
+          {onToggleTalents && (
+            <button onClick={onToggleTalents} className="hh-btn" data-testid="talents-button" title={t("talents.tooltip")}>
+              <span aria-hidden="true" className="hh-talent-glyph">✦</span>
+              <span className="hh-btn-txt">{t("talents.button")}</span>
+              {hud.talents.free > 0 && <span className="hh-badge">{hud.talents.free}</span>}
             </button>
           )}
           {onToggleRift && (
@@ -464,6 +473,7 @@ div.hh-brand { cursor: default; }
   background: ${PALETTE.gold}; color: #2b1906; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
 .hh-badge.is-fire { background: ${PALETTE.danger}; color: #fff; }
 .hh-badge.is-rift { background: #b47cff; color: #1a0f24; }
+.hh-talent-glyph { color: ${PALETTE.uiAccentBright}; font-size: 12px; line-height: 1; }
 .hh-rift-glyph { color: #c99cff; font-size: 12px; line-height: 1; }
 .hh-rift.is-ready { border-color: #8a5cc8; box-shadow: 0 0 10px rgba(180,124,255,0.35); }
 .hh button:focus-visible { outline: 2px solid ${PALETTE.uiAccentBright}; outline-offset: 2px; }

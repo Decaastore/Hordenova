@@ -87,7 +87,7 @@ export interface TowerInstance {
    * retryPhase() (equipping is a build decision, not battle state).
    */
   equippedItemInstanceIds: (string | null)[];
-  /** Combined bonus of the items in this tower's slots — derived, kept up to date by the engine (GameEngine.refreshItemBonuses), never saved. */
+  /** Combined bonus of the items in this tower's slots plus the castle talents (config/talents.ts) — derived, kept up to date by the engine (GameEngine.refreshItemBonusesIfDue), never saved. */
   itemBonus?: ItemBonus;
 
   /**
@@ -273,6 +273,7 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
   if (tower.itemBonus) {
     damage *= 1 + tower.itemBonus.damagePct / 100;
     attackSpeed *= 1 + tower.itemBonus.attackSpeedPct / 100;
+    range *= 1 + tower.itemBonus.rangePct / 100;
   }
 
   const skinEffect = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;

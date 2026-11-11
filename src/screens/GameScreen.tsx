@@ -1,3 +1,4 @@
+import { TalentPanel } from "@/ui/TalentPanel";
 import { RiftPanel } from "@/ui/RiftPanel";
 import { CityPanel } from "@/ui/CityPanel";
 import { HordeAdaptationBadge } from "@/ui/HordeAdaptationBadge";
@@ -107,6 +108,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const [missionsOpen, setMissionsOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
   const [riftOpen, setRiftOpen] = useState(false);
+  const [talentsOpen, setTalentsOpen] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
   // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
@@ -409,7 +411,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -655,6 +657,16 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           />
         )}
 
+        {talentsOpen && (
+          <TalentPanel
+            ranks={hud.talents.ranks}
+            free={hud.talents.free}
+            seasonBestWave={hud.seasonBestWave}
+            onRaise={(id) => engine.raiseTalent(id)}
+            onReset={() => engine.resetTalents()}
+            onClose={() => setTalentsOpen(false)}
+          />
+        )}
         {riftOpen && (
           <RiftPanel
             charges={hud.rift.charges}

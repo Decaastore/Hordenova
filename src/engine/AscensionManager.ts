@@ -273,6 +273,7 @@ export function syncSeasonIfNeeded(): void {
     hordeAdaptation: createHordeAdaptation(),
     city: createCityState(),
     rift: createRiftState(),
+    talents: {},
   });
 }
 
@@ -344,5 +345,6 @@ export function resetSeasonProgressionForTesting(): void {
     hordeAdaptation: createHordeAdaptation(),
     city: createCityState(),
     rift: createRiftState(),
+    talents: {},
   });
 }

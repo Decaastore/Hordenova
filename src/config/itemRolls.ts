@@ -77,9 +77,11 @@ export interface ItemBonus {
   attackSpeedPct: number;
   bossDamagePct: number;
   critChancePct: number;
+  /** Range bonus (talents only — no item has range today). */
+  rangePct: number;
 }
 
-export const NO_ITEM_BONUS: ItemBonus = { damagePct: 0, attackSpeedPct: 0, bossDamagePct: 0, critChancePct: 0 };
+export const NO_ITEM_BONUS: ItemBonus = { damagePct: 0, attackSpeedPct: 0, bossDamagePct: 0, critChancePct: 0, rangePct: 0 };
 
 export function itemBonusFrom(items: readonly Pick<ItemInstance, "itemDefinitionId" | "rolls">[]): ItemBonus {
   const bonus = { ...NO_ITEM_BONUS };

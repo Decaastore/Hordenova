@@ -1,3 +1,4 @@
+import { sanitizeTalentRanks, type TalentRanks } from "@/config/talents";
 import { createRiftState, sanitizeRiftState, type RiftState } from "@/config/rifts";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { effectRange } from "@/config/itemRolls";
@@ -257,6 +258,8 @@ export interface SaveData {
   city: CityState;
   /** FENDAS — Rift charges and the Rift opened/being fought (config/rifts.ts). Season-scoped. */
   rift: RiftState;
+  /** ÁRVORE DE TALENTOS — ranks per talent (config/talents.ts). Season-scoped. */
+  talents: TalentRanks;
 
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
@@ -355,6 +358,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   hordeAdaptation: createHordeAdaptation(),
   city: createCityState(),
   rift: createRiftState(),
+  talents: {},
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -896,6 +900,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       hordeAdaptation: sanitizeHordeAdaptation(parsed.hordeAdaptation),
       city: sanitizeCityState(parsed.city),
       rift: sanitizeRiftState(parsed.rift),
+      talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has
