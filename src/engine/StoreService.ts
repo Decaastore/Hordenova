@@ -38,7 +38,8 @@ export function getSkinStatus(skinId: string, save: SaveData = loadSave()): Skin
   if (!def) return null;
   if (save.ownedTowerSkinIds.includes(skinId)) return { kind: "OWNED", equipped: save.equippedTowerSkinByType[def.towerType] === skinId };
   const have = highestLevelOfType(save, def.towerType);
-  if (have < def.unlockLevel) return { kind: "LOCKED", needLevel: def.unlockLevel, haveLevel: have };
+  // Paid skins are buyable from level 1 — even before building that tower (it wears the skin once placed).
+  if (def.unlockLevel > 1 && have < def.unlockLevel) return { kind: "LOCKED", needLevel: def.unlockLevel, haveLevel: have };
   return { kind: "AVAILABLE" };
 }
 

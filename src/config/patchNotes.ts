@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v99",
+    dateIso: "2026-11-11",
+    category: "INTERFACE",
+    title: {
+      en: "Paid Tower Skins Available From Level 1",
+      ptBR: "Skins Pagas de Torre Liberadas Desde o Nível 1",
+    },
+    description: {
+      en: "You no longer need a tower at level 15 to buy its paid skins. Every paid skin can be bought from the start — even before you build that tower — and the tower wears it as soon as it's placed.",
+      ptBR: "Não é mais preciso ter a torre no nível 15 para comprar as skins pagas dela. Toda skin paga pode ser comprada desde o começo, até antes de construir a torre, e ela já aparece com a skin assim que for colocada.",
+    },
+    highlights: [
+      {
+        en: "All 20 paid tower skins are buyable at level 1, in the Store and in the tower's panel.",
+        ptBR: "As 20 skins pagas de torre podem ser compradas no nível 1, na Loja e no painel da torre.",
+      },
+      {
+        en: "Prestige skins still come only from Prestige, as before.",
+        ptBR: "As skins de Prestígio continuam vindo só do Prestígio, como antes.",
+      },
+    ],
+  },
+  {
     id: "v98",
     dateIso: "2026-11-11",
     category: "SYSTEMS",

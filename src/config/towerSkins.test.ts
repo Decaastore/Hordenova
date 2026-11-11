@@ -30,11 +30,12 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
     expect(tower.equippedSkinId).toBeNull();
   });
 
-  it("a skin cannot be purchased below its unlockLevel", () => {
+  it("every paid skin can be bought from tower level 1", () => {
     const tower = createTowerInstance("slot-1", "IRONWOOD", { x: 0, y: 0 }, 1);
-    const skin = getSkinsForTower("IRONWOOD")[0]!;
-    expect(skin.unlockLevel).toBeGreaterThan(1);
-    expect(canPurchaseSkin(tower, skin.id, OWNED([]))).toBe(false);
+    for (const skin of getSkinsForTower("IRONWOOD")) {
+      expect(skin.unlockLevel).toBe(1);
+      expect(canPurchaseSkin(tower, skin.id, OWNED([]))).toBe(true);
+    }
   });
 
   it("a skin cannot be purchased twice (already owned)", () => {

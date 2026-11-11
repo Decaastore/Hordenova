@@ -21,12 +21,11 @@ describe("Store", () => {
     }
   });
 
-  it("a skin is locked until a tower of its type reaches the unlock level, then buyable with either currency", () => {
-    updateSave({ towerLoadout: [entry(skin.unlockLevel - 1)] as never, freeGems: 10_000, purchasedGems: 0 });
-    expect(getSkinStatus(skin.id)!.kind).toBe("LOCKED");
-    expect(buyTowerSkin(skin.id, "FREE")).toEqual({ ok: false, reason: "LOCKED" });
+  it("a paid skin is buyable from the start, even before that tower is built, with either currency", () => {
+    updateSave({ towerLoadout: [] as never, freeGems: 10_000, purchasedGems: 0 });
+    expect(getSkinStatus(skin.id)!.kind).toBe("AVAILABLE");
 
-    updateSave({ towerLoadout: [entry(skin.unlockLevel)] as never });
+    updateSave({ towerLoadout: [entry(1)] as never });
     expect(getSkinStatus(skin.id)!.kind).toBe("AVAILABLE");
     expect(buyTowerSkin(skin.id, "PURCHASED")).toEqual({ ok: false, reason: "INSUFFICIENT_GEMS" });
     const result = buyTowerSkin(skin.id, "FREE");

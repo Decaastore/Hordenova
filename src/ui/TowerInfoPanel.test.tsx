@@ -89,6 +89,12 @@ function findButtonByText(container: HTMLDivElement, text: string): HTMLButtonEl
   return Array.from(container.querySelectorAll("button")).find((b) => b.textContent?.includes(text)) ?? null;
 }
 
+/** The slot-unlock confirmation's own currency button — skins are buyable from level 1 too, so their buy buttons (same 🔒/💎 marks) also sit in the panel. */
+function findConfirmButton(container: HTMLDivElement, text: string): HTMLButtonElement | null {
+  const confirm = Array.from(container.querySelectorAll("div")).filter((d) => d.textContent?.includes("Unlock Slot") && d.querySelector("button")).pop();
+  return Array.from((confirm ?? container).querySelectorAll("button")).find((b) => b.textContent?.includes(text)) ?? null;
+}
+
 /**
  * HORDENOVA "Trocar Especialização" UI fix — the action was already fully
  * implemented at the engine level (GameEngine.switchTowerSpecialization),
@@ -385,8 +391,8 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     expect(unlockButton.disabled).toBe(false);
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
 
-    const freeButton = findButtonByText(container, "🔒")!;
-    const purchasedButton = findButtonByText(container, "💎")!;
+    const freeButton = findConfirmButton(container, "🔒")!;
+    const purchasedButton = findConfirmButton(container, "💎")!;
     expect(freeButton.disabled).toBe(true);
     expect(freeButton.title).toContain(`100 / ${SLOT_2_PRICE.free}`);
     expect(purchasedButton.disabled).toBe(false);
@@ -405,8 +411,8 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).not.toHaveBeenCalled();
     expect(container.textContent).toContain("Unlock Slot 2?");
-    expect(findButtonByText(container, "🔒")).not.toBeNull();
-    expect(findButtonByText(container, "💎")).not.toBeNull();
+    expect(findConfirmButton(container, "🔒")).not.toBeNull();
+    expect(findConfirmButton(container, "💎")).not.toBeNull();
   });
 
   it("confirming the unlock by paying with PURCHASED Gems calls onUnlockSlot exactly once with the right slot index and currency", () => {
@@ -420,7 +426,7 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     }));
     const unlockButton = findExactButton("UNLOCK")!;
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    const purchasedButton = findButtonByText(container, "💎")!;
+    const purchasedButton = findConfirmButton(container, "💎")!;
     act(() => purchasedButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).toHaveBeenCalledTimes(1);
     expect(onUnlockSlot).toHaveBeenCalledWith(1, "PURCHASED");
@@ -437,7 +443,7 @@ describe("TowerInfoPanel — Equipment slot unlock UI (SISTEMA DE SLOTS DE EQUIP
     }));
     const unlockButton = findExactButton("UNLOCK")!;
     act(() => unlockButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    const freeButton = findButtonByText(container, "🔒")!;
+    const freeButton = findConfirmButton(container, "🔒")!;
     act(() => freeButton.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     expect(onUnlockSlot).toHaveBeenCalledTimes(1);
     expect(onUnlockSlot).toHaveBeenCalledWith(1, "FREE");
