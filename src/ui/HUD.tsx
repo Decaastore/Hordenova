@@ -7,6 +7,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
 import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config/phaseConfig";
+import { riftRewardPct } from "@/config/rifts";
 import { BrandLogo } from "./BrandLogo";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
 import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
@@ -23,9 +24,11 @@ interface HUDProps {
   onToggleMissions?: () => void;
   /** Opens/closes the city panel (config/city.ts). */
   onToggleCity?: () => void;
+  /** FENDAS — opens the Rift panel. */
+  onToggleRift?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -150,6 +153,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
             </button>
           )}
+          {onToggleRift && (
+            <button onClick={onToggleRift} className={`hh-btn hh-rift${hud.rift.charges > 0 && !hud.rift.armed && !hud.rift.active ? " is-ready" : ""}`} data-testid="rift-button" title={t("rift.tooltip")}>
+              <span aria-hidden="true" className="hh-rift-glyph">◈</span>
+              <span className="hh-btn-txt">{t("rift.button")}</span>
+              {hud.rift.charges > 0 && <span className="hh-badge is-rift">{hud.rift.charges}</span>}
+            </button>
+          )}
           {onToggleCity && (
             <button onClick={onToggleCity} className="hh-btn" data-testid="city-button" title={t("hud.cityTooltip")}>
               <CastleIcon size={13} />
@@ -199,6 +209,10 @@ function statusLine(hud: HudSnapshot, t: Translate): { text: string; color: stri
 
 /** What is coming: the mini-boss or the region's boss, with how many waves are left. */
 function threatLine(hud: HudSnapshot, t: Translate): { text: string; color: string } | null {
+  if (hud.rift.active && hud.rift.active.wave === hud.wave) {
+    return { text: t("rift.threat", { pct: riftRewardPct(hud.rift.active.mods) }), color: "#d5b3ff" };
+  }
+  if (hud.rift.armed) return { text: t("rift.threatArmed"), color: "#d5b3ff" };
   if (hud.bossSiege && hud.bossSiege.wavesUntilBoss > 0) {
     return { text: t("hud.threat.bossReturns", { wave: hud.bossSiege.wave, n: hud.bossSiege.wavesUntilBoss }), color: "#ff8a7a" };
   }
@@ -449,6 +463,9 @@ div.hh-brand { cursor: default; }
 .hh-badge { position: absolute; top: -7px; right: -7px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
   background: ${PALETTE.gold}; color: #2b1906; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
 .hh-badge.is-fire { background: ${PALETTE.danger}; color: #fff; }
+.hh-badge.is-rift { background: #b47cff; color: #1a0f24; }
+.hh-rift-glyph { color: #c99cff; font-size: 12px; line-height: 1; }
+.hh-rift.is-ready { border-color: #8a5cc8; box-shadow: 0 0 10px rgba(180,124,255,0.35); }
 .hh button:focus-visible { outline: 2px solid ${PALETTE.uiAccentBright}; outline-offset: 2px; }
 
 @media (max-width: 1100px) {

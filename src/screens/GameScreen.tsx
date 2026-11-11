@@ -1,3 +1,4 @@
+import { RiftPanel } from "@/ui/RiftPanel";
 import { CityPanel } from "@/ui/CityPanel";
 import { HordeAdaptationBadge } from "@/ui/HordeAdaptationBadge";
 import { VictoryClipCard } from "@/ui/clip/VictoryClipCard";
@@ -105,6 +106,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [missionsOpen, setMissionsOpen] = useState(false);
   const [cityOpen, setCityOpen] = useState(false);
+  const [riftOpen, setRiftOpen] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
   // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
@@ -203,6 +205,21 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityEvent?.seq]);
+  // FENDAS — a short notice when a Rift is won or lost.
+  const riftResult = hud.rift.lastResult;
+  const lastRiftSeqRef = useRef<number>(riftResult?.seq ?? 0);
+  useEffect(() => {
+    if (!riftResult || riftResult.seq === lastRiftSeqRef.current) return;
+    lastRiftSeqRef.current = riftResult.seq;
+    setCityNotice(
+      riftResult.won && riftResult.reward
+        ? t("rift.won", { shards: riftResult.reward.shards, gold: riftResult.reward.gold, items: riftResult.reward.itemRolls })
+        : t("rift.lost"),
+    );
+    const timer = window.setTimeout(() => setCityNotice(null), 5200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [riftResult?.seq]);
   const deploying = hud.phase === "DEPLOY";
   const benchSelectedId = deploying
     ? (hud.deployBench.find((b) => b.id === deployPick)?.id ?? [...hud.deployBench].sort((a, b) => b.level - a.level)[0]?.id ?? null)
@@ -392,7 +409,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -638,6 +655,16 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           />
         )}
 
+        {riftOpen && (
+          <RiftPanel
+            charges={hud.rift.charges}
+            armed={hud.rift.armed}
+            active={hud.rift.active}
+            onOpen={(mods) => engine.openRift(mods)}
+            onCancel={() => engine.cancelRift()}
+            onClose={() => setRiftOpen(false)}
+          />
+        )}
         {cityOpen && (
           <CityPanel seasonBestWave={hud.seasonBestWave} burning={hud.city.burning} goldShare={hud.city.goldShare} onClose={() => setCityOpen(false)} />
         )}

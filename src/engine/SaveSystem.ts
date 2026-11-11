@@ -1,3 +1,4 @@
+import { createRiftState, sanitizeRiftState, type RiftState } from "@/config/rifts";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { effectRange } from "@/config/itemRolls";
 import { createHordeAdaptation, sanitizeHordeAdaptation, type HordeAdaptation } from "@/config/hordeAdaptation";
@@ -254,6 +255,8 @@ export interface SaveData {
   hordeAdaptation: HordeAdaptation;
   /** O CASTELO VIRA CIDADE — which buildings are burning (config/city.ts); the buildings themselves derive from seasonBestWave. Season-scoped. */
   city: CityState;
+  /** FENDAS — Rift charges and the Rift opened/being fought (config/rifts.ts). Season-scoped. */
+  rift: RiftState;
 
   /**
    * MARKETPLACE / LEILÃO — every auction this account has ever created, as
@@ -351,6 +354,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   bossRecords: null,
   hordeAdaptation: createHordeAdaptation(),
   city: createCityState(),
+  rift: createRiftState(),
   auctionListings: [],
   tradeUnlocked: false,
   activeTradeSession: null,
@@ -891,6 +895,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       bossRecords: parseBossRecords(parsed.bossRecords),
       hordeAdaptation: sanitizeHordeAdaptation(parsed.hordeAdaptation),
       city: sanitizeCityState(parsed.city),
+      rift: sanitizeRiftState(parsed.rift),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
       // every other additive migration in this function: no auction has

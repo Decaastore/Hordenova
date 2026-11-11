@@ -1,3 +1,4 @@
+import { createRiftState } from "@/config/rifts";
 import { createHordeAdaptation } from "@/config/hordeAdaptation";
 import { createCityState } from "@/config/city";
 import { loadSave, updateSave } from "./SaveSystem";
@@ -271,6 +272,7 @@ export function syncSeasonIfNeeded(): void {
     castleHpBonus: 0,
     hordeAdaptation: createHordeAdaptation(),
     city: createCityState(),
+    rift: createRiftState(),
   });
 }
 
@@ -341,5 +343,6 @@ export function resetSeasonProgressionForTesting(): void {
     castleHpBonus: 0,
     hordeAdaptation: createHordeAdaptation(),
     city: createCityState(),
+    rift: createRiftState(),
   });
 }

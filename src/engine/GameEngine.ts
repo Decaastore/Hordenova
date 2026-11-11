@@ -1,3 +1,4 @@
+import { chargeAfterWave, createRiftState, riftReward, RIFT_DROP_TABLE_ID, RIFT_FRAGILE_BREACH, RIFT_HASTE_SPEED, RIFT_TOUGH_HP, withHordeExtra, type RiftModId, type RiftReward, type RiftState } from "@/config/rifts";
 import { ELITE_SHARD_DROP_AMOUNT, ELITE_SHARD_DROP_CHANCE, MAX_RECENT_LOOT, shardPileRarity, type LootDrop } from "@/config/loot";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
@@ -237,6 +238,13 @@ export interface HudSnapshot {
     goldShare: number;
     lastEvent: { seq: number; kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME"; ids: readonly CityBuildingId[]; amount: number } | null;
   };
+  /** FENDAS — charges, the curses armed for the next eligible wave, the Rift being fought, and the latest result (seq bumps). */
+  rift: {
+    charges: number;
+    armed: readonly RiftModId[] | null;
+    active: { wave: number; mods: readonly RiftModId[] } | null;
+    lastResult: { seq: number; won: boolean; reward: RiftReward | null } | null;
+  };
 }
 
 /** The Welcome Back summary: the offline simulation plus everything it was turned into. */
@@ -363,6 +371,10 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.horde.changeSeq === b.horde.changeSeq &&
     TOWER_TYPES.every((type) => a.horde.multipliers[type] === b.horde.multipliers[type]) &&
     a.city.lastEvent?.seq === b.city.lastEvent?.seq &&
+    a.rift.charges === b.rift.charges &&
+    JSON.stringify(a.rift.armed) === JSON.stringify(b.rift.armed) &&
+    a.rift.active?.wave === b.rift.active?.wave &&
+    a.rift.lastResult?.seq === b.rift.lastResult?.seq &&
     a.city.goldShare === b.city.goldShare &&
     JSON.stringify(a.city.burning) === JSON.stringify(b.city.burning) &&
     a.deployBench.length === b.deployBench.length &&
@@ -516,6 +528,8 @@ export class GameEngine {
   private hordeChangeSeq = 0;
   /** O CASTELO VIRA CIDADE — see config/city.ts. */
   private city: CityState = createCityState();
+  private rift: RiftState = createRiftState();
+  private lastRiftResult: { seq: number; won: boolean; reward: RiftReward | null } | null = null;
   /** Gold from kills in the wave in progress — the city pays a share of it when the wave is cleared. */
   private waveKillGold = 0;
   /** True once any creature reached the castle during the wave in progress. */
@@ -626,6 +640,7 @@ export class GameEngine {
     this.towerManaLevels = { ...save.towerManaLevels };
     this.hordeAdaptation = { memory: { ...save.hordeAdaptation.memory }, multipliers: { ...save.hordeAdaptation.multipliers } };
     this.city = { burning: { ...save.city.burning }, firesStarted: save.city.firesStarted };
+    this.rift = { charges: save.rift.charges, armed: save.rift.armed ? [...save.rift.armed] : null, active: save.rift.active ? { wave: save.rift.active.wave, mods: [...save.rift.active.mods] } : null };
     this.cityBuiltCount = builtBuildings(save.seasonBestWave).length;
     this.masteryUnlocked = { ...save.masteryUnlocked };
     // Deep-copy each per-type array for the same reason as
@@ -2098,6 +2113,78 @@ export class GameEngine {
     return claimed;
   }
 
+  /** FENDAS — opens a Rift with these curses for the next eligible wave, spending a charge when that wave starts. */
+  openRift(mods: readonly RiftModId[]): boolean {
+    if (this.rift.charges <= 0 || this.rift.armed || this.rift.active) return false;
+    this.rift = { ...this.rift, armed: [...new Set(mods)] };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Takes back an opened Rift before its wave starts (the charge was never spent). */
+  cancelRift(): boolean {
+    if (!this.rift.armed) return false;
+    this.rift = { ...this.rift, armed: null };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** A Rift only takes a regular wave — never a main boss or mini-boss wave. */
+  private static riftEligible(wave: number): boolean {
+    return !isBossMilestone(wave) && !isMiniBossWave(wave);
+  }
+
+  private onWaveStarted(wave: number): void {
+    if (!this.rift.armed || !GameEngine.riftEligible(wave)) return;
+    const mods = this.rift.armed;
+    this.rift = { charges: this.rift.charges - 1, armed: null, active: { wave, mods } };
+    if (mods.includes("HORDE")) this.wave.spawnQueue = withHordeExtra(this.wave.spawnQueue);
+    this.emitAudio({ type: "boss_enrage" });
+    this.persist();
+  }
+
+  private applyRiftToSpawn(enemy: EnemyInstance): void {
+    const active = this.rift.active;
+    if (!active || active.wave !== this.wave.currentWave) return;
+    if (active.mods.includes("TOUGH")) {
+      enemy.maxHp = Math.round(enemy.maxHp * RIFT_TOUGH_HP);
+      enemy.hp = Math.round(enemy.hp * RIFT_TOUGH_HP);
+    }
+    if (active.mods.includes("HASTE")) enemy.baseSpeed *= RIFT_HASTE_SPEED;
+  }
+
+  /** Pays a cleared Rift: Shards, bonus Gold and item rolls, dropped in front of the castle. */
+  private completeRift(): void {
+    const active = this.rift.active!;
+    const reward = riftReward(active.mods, this.waveKillGold);
+    this.rift = { ...this.rift, active: null };
+    const gate = this.layout.path[this.layout.path.length - 1] ?? { x: 900, y: 450 };
+    const at = (i: number) => ({ x: gate.x - 90 + i * 34, y: gate.y - 70 + (i % 2) * 14 });
+    let slot = 0;
+    this.addGemShards(reward.shards, "rift_reward");
+    this.dropLoot({ kind: "shards", rarity: shardPileRarity(reward.shards), amount: reward.shards, ...at(slot++) });
+    this.gold += reward.gold;
+    const table = getDropTable(RIFT_DROP_TABLE_ID);
+    for (let i = 0; table && i < reward.itemRolls; i++) {
+      const item = createItemInstance(rollDropTable(table), this.playerId, { type: "MINI_BOSS_DROP", refId: "rift" });
+      const result = addItemWithCapacity(this.inventory, this.overflowInventory, item, this.inventoryCapacity);
+      this.inventory = result.inventory;
+      this.overflowInventory = result.overflow;
+      appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "rift", eventType: "ITEM_CREATED", fromOwner: null, toOwner: this.playerId });
+      appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "rift", eventType: "ITEM_ACQUIRED", fromOwner: null, toOwner: this.playerId });
+      const def = getItemDefinition(item.itemDefinitionId);
+      if (def) this.dropLoot({ kind: "item", rarity: def.rarity, itemDefinitionId: item.itemDefinitionId, amount: 1, ...at(slot++) });
+    }
+    this.itemBonusDirty = true;
+    this.lastRiftResult = { seq: (this.lastRiftResult?.seq ?? 0) + 1, won: true, reward };
+    this.trackRiftCleared?.();
+  }
+
+  /** Hook for achievements (set by the achievement system). */
+  private trackRiftCleared?: () => void;
+
   private lootDrops: LootDrop[] = [];
   private lootSeq = 0;
 
@@ -2169,6 +2256,7 @@ export class GameEngine {
       if (this.victoryRemainingMs <= 0) {
         this.activeBossId = null;
         activateNextWave(this.wave);
+        this.onWaveStarted(this.wave.currentWave);
         this.phase = "RUNNING";
         this.emitAudio({ type: "wave_start" });
         this.syncMapLayout();
@@ -2194,10 +2282,13 @@ export class GameEngine {
         return;
       }
 
+      const waveBefore = this.wave.currentWave;
       const { enemyTypeToSpawn } = tickWaveManager(this.wave, scaledDt, this.enemies.length);
+      if (this.wave.currentWave !== waveBefore) this.onWaveStarted(this.wave.currentWave);
       if (enemyTypeToSpawn) {
         const spawned = createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave, waveHpFactor(this.wave.currentWave));
         spawned.goldReward = Math.round(spawned.goldReward * waveGoldFactor(this.wave.currentWave));
+        this.applyRiftToSpawn(spawned);
         this.enemies.push(spawned);
         this.maybeDiscover(enemyTypeToSpawn);
       }
@@ -2314,7 +2405,8 @@ export class GameEngine {
         // HP (never a flat per-archetype constant, never cached on the
         // enemy, never applied more than this one time per enemy).
         const category: CastleDamageCategory = enemy.boss?.isMainBoss ? "BOSS" : enemy.boss ? "MINI_BOSS" : "NORMAL";
-        const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp);
+        const fragile = this.rift.active?.wave === this.wave.currentWave && this.rift.active.mods.includes("FRAGILE");
+        const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp) * (fragile ? RIFT_FRAGILE_BREACH : 1);
         this.baseHp = Math.max(0, this.baseHp - castleDamage);
         recordBaseHit(this.battleStats, enemy, castleDamage);
         continue; // removed, no gold — it breached the base
@@ -2473,6 +2565,9 @@ export class GameEngine {
   private finishWave(wave: number): void {
     if (this.lastFinishedWave === wave) return;
     this.lastFinishedWave = wave;
+
+    if (this.rift.active && this.rift.active.wave === wave) this.completeRift();
+    this.rift = chargeAfterWave(this.rift, wave);
 
     const before = strongestResistance(this.hordeAdaptation);
     this.hordeAdaptation = adaptAfterWave(this.hordeAdaptation, this.waveDamageByType, wave);
@@ -2754,6 +2849,10 @@ export class GameEngine {
       return;
     }
     this.phase = "PROGRESSION_STOPPED";
+    if (this.rift.active) {
+      this.rift = { ...this.rift, active: null };
+      this.lastRiftResult = { seq: (this.lastRiftResult?.seq ?? 0) + 1, won: false, reward: null };
+    }
     const failedWave = this.wave.currentWave;
     const finalized = finalizeBattleStats(this.battleStats, failedWave);
     this.lastFailureReport = generateFailureReport(finalized, this.towers);
@@ -2933,6 +3032,7 @@ export class GameEngine {
         bossRecords: this.bossRecords,
         hordeAdaptation: this.hordeAdaptation,
         city: this.city,
+        rift: this.rift,
       },
       this.storageKey,
     );
@@ -2992,6 +3092,7 @@ export class GameEngine {
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
       horde: { multipliers: this.hordeAdaptation.multipliers, changeSeq: this.hordeChangeSeq },
       city: { burning: { ...this.city.burning }, goldShare: cityGoldShare(this.seasonBestWave, this.city), lastEvent: this.lastCityEvent },
+      rift: { charges: this.rift.charges, armed: this.rift.armed, active: this.rift.active, lastResult: this.lastRiftResult },
     };
 
     const prev = this.cachedHud;
