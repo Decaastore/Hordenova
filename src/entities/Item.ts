@@ -1,3 +1,4 @@
+import { rollItemEffects } from "@/config/itemRolls";
 import { generateId } from "@/utils/id";
 import { getItemDefinition } from "@/config/itemDefinitions";
 
@@ -35,6 +36,8 @@ export interface ItemInstance {
   /** MARKETPLACE / LEILÃO spec section 17 — true while this exact copy is listed in an ACTIVE auction. Mirrors pendingTrade's guard exactly (blocks equip via entities/Tower.ts's canEquipItem and Item Fusion via engine/ItemFusion.ts's checkFusionEligibility) so a listed item is genuinely unusable elsewhere, never just visually greyed out. Cleared the moment the auction settles or is cancelled — see engine/AuctionManager.ts. */
   pendingAuction: boolean;
   history: ItemHistoryEntry[];
+  /** This copy's own rolled value for each of its definition's effects (config/itemRolls.ts). Absent on copies made before rolls existed — they use the listed value. */
+  rolls?: number[];
 }
 
 export function createItemInstance(itemDefinitionId: string, ownerId: string, source: ItemAcquiredFrom, now = Date.now()): ItemInstance {
@@ -49,5 +52,6 @@ export function createItemInstance(itemDefinitionId: string, ownerId: string, so
     pendingTrade: false,
     pendingAuction: false,
     history: [{ timestamp: now, event: "ACQUIRED", fromOwner: null, toOwner: ownerId }],
+    ...(def && def.effects.length > 0 ? { rolls: rollItemEffects(def) } : {}),
   };
 }

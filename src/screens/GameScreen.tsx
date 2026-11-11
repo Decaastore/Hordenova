@@ -663,6 +663,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
             onUpgradePrestige={(currency) => engine.upgradePrestige(currency)}
             getFusionEligibility={(ids) => engine.getFusionEligibility(ids)}
             onAttemptFusion={(ids) => engine.attemptFusion(ids)}
+            onRerollItem={(id) => engine.rerollItem(id)}
           />
         )}
       </div>

@@ -9,16 +9,23 @@ import type { ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
 import { DropTableView } from "./DropTableView";
 import { ItemGlyph } from "./ItemGlyph";
+import { effectRange, itemEffectsOf, itemRollQuality, rerollCost } from "@/config/itemRolls";
 
 interface ItemDetailsModalProps {
   item: ItemInstance;
   onClose: () => void;
+  /** Current Gem Shards, for the re-roll button (omit both to hide re-rolling, e.g. outside a run). */
+  gemShards?: number;
+  onReroll?: (instanceId: string) => number[] | null;
 }
 
 /** Item Details — Item System spec sections 8/13/22: rarity, category, lore, effects (declarative, see itemDefinitions.ts header), source, tradable/soulbound, and full trade history for this exact instance. */
-export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
+export function ItemDetailsModal({ item, onClose, gemShards, onReroll }: ItemDetailsModalProps) {
   const { t } = useLanguage();
   const [showDropTable, setShowDropTable] = useState(false);
+  // the copy's own rolls, updated in place right after a re-roll
+  const [rolls, setRolls] = useState(item.rolls);
+  const [justRolled, setJustRolled] = useState(false);
   const def = getItemDefinition(item.itemDefinitionId);
   if (!def) return null;
 
@@ -34,6 +41,7 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
+        <style>{".hn-roll-flash{animation:hnRoll 700ms ease-out}@keyframes hnRoll{0%{color:#fff;text-shadow:0 0 12px #a860f0}100%{text-shadow:none}}@media (prefers-reduced-motion: reduce){.hn-roll-flash{animation:none}}"}</style>
         <button onClick={onClose} style={closeButtonStyle}>
           ×
         </button>
@@ -53,11 +61,38 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
           {def.effects.length === 0 ? (
             <div style={mutedLineStyle}>{t("inventory.noEffects")}</div>
           ) : (
-            def.effects.map((effect, i) => (
-              <div key={i} style={effectLineStyle}>
-                {t(`itemEffect.${effect.kind}` as TranslationKey, { value: effect.value })}
-              </div>
-            ))
+            <>
+              {itemEffectsOf({ itemDefinitionId: item.itemDefinitionId, rolls }).map((effect, i) => {
+                const range = effectRange(def.effects[i]!);
+                return (
+                  <div key={i} style={effectLineStyle} className={justRolled ? "hn-roll-flash" : undefined}>
+                    {t(`itemEffect.${effect.kind}` as TranslationKey, { value: effect.value })}
+                    <span style={rangeStyle}> {t("inventory.rollRange", { min: range.min, max: range.max })}</span>
+                  </div>
+                );
+              })}
+              <QualityBar quality={itemRollQuality({ itemDefinitionId: item.itemDefinitionId, rolls }) ?? 0} label={t("inventory.rollQuality")} />
+              {onReroll && rerollCost(item) !== null && (
+                <div style={rerollRowStyle}>
+                  <button
+                    style={{ ...rerollButtonStyle, opacity: (gemShards ?? 0) >= (rerollCost(item) ?? 0) && !item.pendingTrade && !item.pendingAuction ? 1 : 0.5 }}
+                    disabled={(gemShards ?? 0) < (rerollCost(item) ?? 0) || item.pendingTrade || item.pendingAuction}
+                    onClick={() => {
+                      const next = onReroll(item.instanceId);
+                      if (next) {
+                        setRolls(next);
+                        setJustRolled(false);
+                        window.requestAnimationFrame(() => setJustRolled(true));
+                      }
+                    }}
+                    data-testid="item-reroll"
+                  >
+                    {t("inventory.reroll", { cost: rerollCost(item) ?? 0 })}
+                  </button>
+                  <div style={mutedLineStyle}>{t("inventory.rerollHint")}</div>
+                </div>
+              )}
+            </>
           )}
         </Section>
 
@@ -93,6 +128,23 @@ export function ItemDetailsModal({ item, onClose }: ItemDetailsModalProps) {
             <DropTableView table={sourceTable} />
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/** How good this copy's roll is inside its range (0 = worst possible, 1 = best possible). */
+function QualityBar({ quality, label }: { quality: number; label: string }) {
+  const pct = Math.round(quality * 100);
+  const color = quality >= 0.8 ? "#ffcf5e" : quality >= 0.5 ? "#6fe06f" : "#c9c9c9";
+  return (
+    <div style={{ marginTop: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: PALETTE.uiTextDim }}>
+        <span>{label}</span>
+        <span style={{ color, fontWeight: 700 }}>{pct}%</span>
+      </div>
+      <div style={{ height: 5, borderRadius: 3, background: "rgba(255,255,255,0.1)", overflow: "hidden", marginTop: 3 }}>
+        <div style={{ width: `${pct}%`, height: "100%", background: color, transition: "width 300ms ease" }} />
       </div>
     </div>
   );
@@ -213,4 +265,18 @@ const linkButtonStyle: CSSProperties = {
   fontSize: 11.5,
   letterSpacing: 0.6,
   cursor: "pointer",
+};
+
+const rangeStyle: CSSProperties = { color: PALETTE.uiTextDim, fontWeight: 400, fontSize: 11 };
+const rerollRowStyle: CSSProperties = { marginTop: 10, display: "grid", gap: 4 };
+const rerollButtonStyle: CSSProperties = {
+  padding: "7px 12px",
+  borderRadius: 7,
+  border: `1px solid ${PALETTE.gem}`,
+  background: "rgba(168,96,240,0.16)",
+  color: PALETTE.uiText,
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: "pointer",
+  justifySelf: "start",
 };

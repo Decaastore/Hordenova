@@ -1,3 +1,4 @@
+import type { ItemBonus } from "@/config/itemRolls";
 import { HIGH_GROUND_RANGE_MULT, RUNE_ALTAR_DAMAGE_MULT, type SiteTrait } from "@/data/mapLayouts";
 import {
   getTowerLevelStats,
@@ -86,6 +87,8 @@ export interface TowerInstance {
    * retryPhase() (equipping is a build decision, not battle state).
    */
   equippedItemInstanceIds: (string | null)[];
+  /** Combined bonus of the items in this tower's slots — derived, kept up to date by the engine (GameEngine.refreshItemBonuses), never saved. */
+  itemBonus?: ItemBonus;
 
   /**
    * SISTEMA DE SLOTS DE EQUIPAMENTO — permanent, per-TOWER-TYPE slot
@@ -265,6 +268,12 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
 
   if (tower.siteTrait === "HIGH_GROUND") range *= HIGH_GROUND_RANGE_MULT;
   else if (tower.siteTrait === "RUNE_ALTAR") damage *= RUNE_ALTAR_DAMAGE_MULT;
+
+  // Items equipped in the tower's slots (config/itemRolls.ts) — small percentages.
+  if (tower.itemBonus) {
+    damage *= 1 + tower.itemBonus.damagePct / 100;
+    attackSpeed *= 1 + tower.itemBonus.attackSpeedPct / 100;
+  }
 
   const skinEffect = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;
   if (skinEffect) {

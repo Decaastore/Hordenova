@@ -1,3 +1,4 @@
+import { getItemDefinition } from "@/config/itemDefinitions";
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
 import { ENEMY_VOICE_FAMILY } from "@/config/enemyVoice";
 import { waveGoldFactor, waveHpFactor } from "@/config/waveBudget";
@@ -36,6 +37,7 @@ import {
 } from "@/config/prestige";
 import { getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
+import { itemBonusFrom, rerollCost, rollItemEffects } from "@/config/itemRolls";
 import { createItemInstance, type ItemInstance } from "@/entities/Item";
 import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY, findItem } from "./InventoryManager";
 import { appendLedgerEvent } from "./EconomyLedger";
@@ -1488,6 +1490,7 @@ export class GameEngine {
     const currentSlot = tower.equippedItemInstanceIds.indexOf(instanceId);
     if (currentSlot !== -1) unequipItemEntity(tower, currentSlot);
     equipItemEntity(tower, slotIndex, instanceId);
+    this.itemBonusDirty = true;
     this.persist();
     this.notify();
     return true;
@@ -1499,6 +1502,7 @@ export class GameEngine {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);
     if (!tower) return false;
     unequipItemEntity(tower, slotIndex);
+    this.itemBonusDirty = true;
     this.persist();
     this.notify();
     return true;
@@ -1932,6 +1936,30 @@ export class GameEngine {
     return gemShards >= GameEngine.GEM_SHARD_TO_GEM_RATE;
   }
 
+  /**
+   * REFAZER ATRIBUTOS — pays this item's re-roll price in Gem Shards
+   * (config/itemRolls.ts) and rolls new values for every effect, uniform
+   * inside the ranges the item shows. Refused for items without effects,
+   * items listed in a trade or auction, or not enough Shards. Returns the
+   * new values, or null when refused.
+   */
+  rerollItem(instanceId: string): number[] | null {
+    const index = this.inventory.findIndex((item) => item.instanceId === instanceId);
+    if (index === -1) return null;
+    const item = this.inventory[index]!;
+    if (item.pendingTrade || item.pendingAuction) return null;
+    const def = getItemDefinition(item.itemDefinitionId);
+    const cost = rerollCost(item);
+    if (!def || cost === null || this.gemShards < cost) return null;
+    this.gemShards -= cost;
+    const rolls = rollItemEffects(def);
+    this.inventory = this.inventory.map((it, i) => (i === index ? { ...it, rolls } : it));
+    this.itemBonusDirty = true;
+    this.persist();
+    this.notify();
+    return rolls;
+  }
+
   convertGemShards(): boolean {
     if (!GameEngine.canConvertGemShards(this.gemShards)) return false;
     const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
@@ -2067,7 +2095,24 @@ export class GameEngine {
     return claimed;
   }
 
+  private itemBonusTicks = 0;
+  private itemBonusDirty = true;
+
+  /** Recomputes each tower's bonus from the items in its slots (config/itemRolls.ts) when something changed, and about once a second as a safety net. */
+  private refreshItemBonusesIfDue(): void {
+    this.itemBonusTicks += 1;
+    if (!this.itemBonusDirty && this.itemBonusTicks < 60) return;
+    this.itemBonusTicks = 0;
+    this.itemBonusDirty = false;
+    const byId = new Map(this.inventory.map((item) => [item.instanceId, item]));
+    for (const tower of this.towers) {
+      const items = tower.equippedItemInstanceIds.map((id) => (id ? byId.get(id) : undefined)).filter((x): x is ItemInstance => !!x);
+      tower.itemBonus = items.length > 0 ? itemBonusFrom(items) : undefined;
+    }
+  }
+
   update(dtMs: number): void {
+    this.refreshItemBonusesIfDue();
     if (this.tutorialHold) return;
     if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return;
     if (this.syncMapLayout() && (this.phase as RunPhase) === "DEPLOY") {

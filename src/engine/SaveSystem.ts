@@ -1,3 +1,5 @@
+import { getItemDefinition } from "@/config/itemDefinitions";
+import { effectRange } from "@/config/itemRolls";
 import { createHordeAdaptation, sanitizeHordeAdaptation, type HordeAdaptation } from "@/config/hordeAdaptation";
 import { createCityState, sanitizeCityState, type CityState } from "@/config/city";
 import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
@@ -448,7 +450,7 @@ function isValidItemInstance(raw: unknown): raw is ItemInstance {
 /** MARKETPLACE / LEILÃO (save v18 -> v19) — `pendingAuction` is a brand new field; a save written before it existed never had an item locked in an auction, so `false` is the only correct default (self-healing, same pattern as every other additive field in this file). */
 function parseInventory(raw: unknown): ItemInstance[] {
   if (!Array.isArray(raw)) return [];
-  return raw.filter(isValidItemInstance).map((item) => ({ ...item, pendingAuction: item.pendingAuction === true }));
+  return raw.filter(isValidItemInstance).map((item) => sanitizeItemRolls({ ...item, pendingAuction: item.pendingAuction === true }));
 }
 
 function parseLocalFirstDiscoveries(raw: unknown): LocalFirstDiscoveries {
@@ -937,4 +939,21 @@ export function recordRunResult(waveReached: number, storageKey: string = SAVE_S
     },
     storageKey,
   );
+}
+
+/** Rolled item values (config/itemRolls.ts) are kept only when they fit the item's shown range; anything else falls back to the listed value. */
+function sanitizeItemRolls<T extends { itemDefinitionId: string; rolls?: unknown }>(item: T): T {
+  const def = getItemDefinition(item.itemDefinitionId);
+  const raw = item.rolls;
+  if (!def || !Array.isArray(raw)) {
+    const { rolls: _drop, ...rest } = item;
+    void _drop;
+    return rest as T;
+  }
+  const rolls = def.effects.map((effect, i) => {
+    const v = raw[i];
+    const { min, max } = effectRange(effect);
+    return typeof v === "number" && Number.isFinite(v) && v >= min - 1e-9 && v <= max + 1e-9 ? v : effect.value;
+  });
+  return { ...item, rolls };
 }

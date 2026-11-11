@@ -1,3 +1,4 @@
+import { effectRange } from "@/config/itemRolls";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -63,11 +64,14 @@ export function ItemTooltip({ itemDefinitionId }: { itemDefinitionId: string }) 
       {def.effects.length > 0 && (
         <div style={sectionStyle}>
           <div style={sectionLabelStyle}>{t("inventory.effects")}</div>
-          {def.effects.map((effect, i) => (
-            <div key={i} style={effectLineStyle}>
-              {t(`itemEffect.${effect.kind}` as TranslationKey, { value: effect.value })}
-            </div>
-          ))}
+          {def.effects.map((effect, i) => {
+            const range = effectRange(effect);
+            return (
+              <div key={i} style={effectLineStyle}>
+                {t(`itemEffect.${effect.kind}` as TranslationKey, { value: `${range.min}–${range.max}` })}
+              </div>
+            );
+          })}
         </div>
       )}
       {boss && (

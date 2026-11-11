@@ -76,6 +76,8 @@ interface InventoryPanelProps {
   getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
   /** Pays out the atomic fusion attempt — consumes the 3 selected items and, on success only, creates 1 superior item. See engine/GameEngine.ts's attemptFusion for the exact 8-step guarantee. */
   onAttemptFusion: (selectedInstanceIds: string[]) => FusionOutcome;
+  /** Re-rolls an item's values for Gem Shards (config/itemRolls.ts). */
+  onRerollItem?: (instanceId: string) => number[] | null;
 }
 
 type Tab = "items" | "trade" | "stats";
@@ -110,6 +112,7 @@ export function InventoryPanel({
   onUpgradePrestige,
   getFusionEligibility,
   onAttemptFusion,
+  onRerollItem,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>("items");
@@ -321,7 +324,7 @@ export function InventoryPanel({
         )}
       </div>
 
-      {selectedItem && <ItemDetailsModal item={selectedItem} onClose={() => setSelectedInstanceId(null)} />}
+      {selectedItem && <ItemDetailsModal item={selectedItem} onClose={() => setSelectedInstanceId(null)} gemShards={gemShards} onReroll={onRerollItem} />}
     </div>
   );
 }

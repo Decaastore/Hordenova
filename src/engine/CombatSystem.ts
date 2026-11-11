@@ -1,3 +1,4 @@
+import { ITEM_CRIT_MULTIPLIER } from "@/config/itemRolls";
 import {
   disableTower,
   getEquippedSkinGameplayEffect,
@@ -180,6 +181,15 @@ export function tickCombat(
       effectiveDamage *= WEAKNESS_DAMAGE_MULTIPLIER;
       if (enemy.boss.shieldUntilMs !== null && enemy.damageReduction > enemy.boss.baseDamageReduction) {
         armorPenetration = Math.max(armorPenetration, 1 - enemy.boss.baseDamageReduction / enemy.damageReduction);
+      }
+    }
+    // Items in the tower's slots: bonus damage against bosses and mini-bosses, and a chance to crit for any tower.
+    const items = tower.itemBonus;
+    if (items) {
+      if (enemy.boss && items.bossDamagePct > 0) effectiveDamage *= 1 + items.bossDamagePct / 100;
+      if (!isCrit && items.critChancePct > 0 && Math.random() < items.critChancePct / 100) {
+        effectiveDamage *= ITEM_CRIT_MULTIPLIER;
+        isCrit = true;
       }
     }
     const wasAlive = !isEnemyDead(enemy);

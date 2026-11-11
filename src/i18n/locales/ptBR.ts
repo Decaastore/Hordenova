@@ -735,6 +735,10 @@ export const ptBR: TranslationSchema = {
     tapToView: "Toque para ver",
   },
   inventory: {
+    rollRange: "(faixa {min}–{max})",
+    rollQuality: "Qualidade desta cópia",
+    reroll: "Refazer valores · {cost} fragmentos",
+    rerollHint: "Sorteia de novo os valores dentro da faixa mostrada. Pode sair melhor ou pior.",
     button: "INVENTÁRIO",
     title: "INVENTÁRIO",
     empty: "Nenhum item ainda. Derrote chefes para encontrar itens.",

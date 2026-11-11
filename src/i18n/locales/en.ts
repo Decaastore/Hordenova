@@ -734,6 +734,10 @@ export const en = {
     tapToView: "Tap to view",
   },
   inventory: {
+    rollRange: "(range {min}–{max})",
+    rollQuality: "This copy's quality",
+    reroll: "Re-roll values · {cost} shards",
+    rerollHint: "Rolls the values again inside the range shown. It can come out better or worse.",
     button: "INVENTORY",
     title: "INVENTORY",
     empty: "No items yet. Defeat bosses to find loot.",
