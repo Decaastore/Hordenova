@@ -4,6 +4,7 @@ import { loadSave } from "@/engine/SaveSystem";
 import { claimAllFreePassLevels, claimFreePassLevel, getPassView } from "@/engine/SeasonPassService";
 import { freeRewardForLevel, PASS_LEVELS, PASS_XP, PREMIUM_PASS_PRICE_BRL, premiumRewardForLevel, type PassReward } from "@/config/seasonPass";
 import { REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
+import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { seasonClock } from "@/engine/SeasonClock";
 import { RewardPartsLabel, REWARD_CSS } from "./RewardPartsLabel";
 
@@ -94,6 +95,7 @@ export function SeasonPassSection({ showTitle = true }: { showTitle?: boolean } 
       </div>
       <p className="pg-note">{t("pass.boundNote")}</p>
       <p className="pg-note">{REAL_MONEY_PAYMENTS_ENABLED ? t("pass.premiumOn", { price: brl }) : t("pass.premiumSoon", { price: brl })}</p>
+      <p className="pg-note">{t("pass.adultOnly", { age: PURCHASE_MIN_AGE })}</p>
     </section>
   );
 }

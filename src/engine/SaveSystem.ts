@@ -1,3 +1,4 @@
+import { createAgeVerification, sanitizeAgeVerification, type AgeVerification } from "@/config/ageGate";
 import { isAchievementId, sanitizeBestiaryKills, type AchievementId, type BestiaryKills } from "@/config/achievements";
 import { sanitizeTalentRanks, type TalentRanks } from "@/config/talents";
 import { createRiftState, sanitizeRiftState, type RiftState } from "@/config/rifts";
@@ -261,6 +262,8 @@ export interface SaveData {
   rift: RiftState;
   /** ÁRVORE DE TALENTOS — ranks per talent (config/talents.ts). Season-scoped. */
   talents: TalentRanks;
+  /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
+  ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
   bestiaryKills: BestiaryKills;
   /** CONQUISTAS — achievements unlocked, the title worn, and the counters they need. Permanent. */
@@ -368,6 +371,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   city: createCityState(),
   rift: createRiftState(),
   talents: {},
+  ageVerification: createAgeVerification(),
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -919,6 +923,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       equippedTitle: isAchievementId(parsed.equippedTitle) && Array.isArray(parsed.achievements) && parsed.achievements.includes(parsed.equippedTitle) ? parsed.equippedTitle : null,
       riftsCleared: typeof parsed.riftsCleared === "number" && Number.isFinite(parsed.riftsCleared) ? Math.max(0, Math.floor(parsed.riftsCleared)) : 0,
       bestRarityFound: typeof parsed.bestRarityFound === "number" && Number.isFinite(parsed.bestRarityFound) ? Math.max(-1, Math.min(5, Math.floor(parsed.bestRarityFound))) : -1,
+      ageVerification: sanitizeAgeVerification(parsed.ageVerification),
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as

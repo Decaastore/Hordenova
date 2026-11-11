@@ -6,6 +6,7 @@ import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { loadSave, type SaveData } from "@/engine/SaveSystem";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
+import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
@@ -50,7 +51,9 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 
   const onBuyPack = (packId: string) => {
     const result = requestGemPackPurchase(packId);
-    if (!result.ok) setNotice(t("store.packsSoon"));
+    if (result.reason === "UNDER_AGE") setNotice(t("store.underAge", { age: PURCHASE_MIN_AGE }));
+    else if (result.reason === "AGE_VERIFICATION_REQUIRED") setNotice(t("store.verifyAtFirstPurchase", { age: PURCHASE_MIN_AGE }));
+    else setNotice(t("store.packsSoon"));
   };
 
   const onBuySkin = (skin: TowerSkinDefinition, currency: GemCurrency) => {
@@ -117,6 +120,10 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
               <h2 className="pg-h2">{t("store.gemsTitle")}</h2>
             </div>
             <p className="pg-sub">{REAL_MONEY_PAYMENTS_ENABLED ? t("store.gemsSub") : t("store.gemsSubSoon")}</p>
+            <p className="st-adult" data-testid="adult-only">
+              <span className="st-adult-badge">{PURCHASE_MIN_AGE}+</span>
+              {t("store.adultOnly", { age: PURCHASE_MIN_AGE })}
+            </p>
             <article className="st-starter" data-testid="starter-pack">
               <div>
                 <h3>{t("store.starterTitle")}</h3>
@@ -229,6 +236,9 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 }
 
 const STORE_CSS = `
+.st-adult { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0,0,0,0.25); font-size: 13px; color: var(--ash); max-width: 720px; line-height: 1.45; }
+.st-adult-badge { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 26px; padding: 0 6px; border-radius: 6px; border: 1.5px solid #e0644b; color: #ff9a85; font-weight: 800; font-size: 13px; }
+
 .st-balance { display: flex; gap: 32px; margin: 0; }
 .st-balance dt { font-size: 13px; color: var(--ash); }
 .st-balance dd { margin: 4px 0 0; font-family: var(--display); font-weight: 700; font-size: clamp(32px, 4vw, 48px); line-height: 1; color: var(--bone); font-variant-numeric: lining-nums tabular-nums; }

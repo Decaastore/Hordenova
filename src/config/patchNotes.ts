@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v100",
+    dateIso: "2026-11-11",
+    category: "SYSTEMS",
+    title: {
+      en: "Real-Money Purchases Are for Adults Only",
+      ptBR: "Compras com Dinheiro Só para Maiores de 18",
+    },
+    description: {
+      en: "The game stays open to everyone, but buying with real money — Gems, the starter pack and the Premium pass — will be for people aged 18 or over. When purchases open, your age is confirmed once, at the first purchase, by the payment itself.",
+      ptBR: "O jogo continua aberto para todos, mas comprar com dinheiro (Gemas, pacote inicial e passe Premium) vai ser só para maiores de 18 anos. Quando as compras abrirem, a idade é confirmada uma vez, na primeira compra, pelo próprio pagamento.",
+    },
+    highlights: [
+      {
+        en: "The Store and the Season pass now show the 18+ rule next to every real-money purchase.",
+        ptBR: "A Loja e o passe da Season agora mostram a regra 18+ junto de toda compra com dinheiro.",
+      },
+      {
+        en: "Your age is never taken from a typed birth date: it is confirmed through the card or account holder's ID when you pay.",
+        ptBR: "A idade nunca é aceita só por uma data digitada: ela é confirmada pelo CPF do titular do cartão ou da conta na hora de pagar.",
+      },
+      {
+        en: "Playing, earning Gems by playing and spending the Gems you have are not affected.",
+        ptBR: "Jogar, ganhar Gemas jogando e gastar as Gemas que você já tem continuam iguais.",
+      },
+    ],
+  },
+  {
     id: "v99",
     dateIso: "2026-11-11",
     category: "INTERFACE",

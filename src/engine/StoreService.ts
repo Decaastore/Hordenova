@@ -4,6 +4,7 @@ import { getCurrentDayIndex } from "./DailyClock";
 import { getTowerSkinDefinition, getTowerSkinDualPrice, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
+import { canPayWithRealMoney } from "@/config/ageGate";
 import type { TowerType } from "@/config/towerStats";
 
 /**
@@ -93,9 +94,16 @@ export function claimDailyGift(nowMs: number = Date.now()): SaveData | null {
  * Where a real-money checkout will start once a payment provider is
  * connected. Until then it refuses — it never grants Gems on its own.
  */
-export function requestGemPackPurchase(packId: string): { ok: false; reason: "PAYMENTS_NOT_ENABLED" | "UNKNOWN_PACK" } {
+export function requestGemPackPurchase(
+  packId: string,
+  save: SaveData = loadSave(),
+): { ok: false; reason: "PAYMENTS_NOT_ENABLED" | "UNKNOWN_PACK" | "AGE_VERIFICATION_REQUIRED" | "UNDER_AGE" } {
   if (packId !== STARTER_PACK.id && !GEM_PACKS.some((p) => p.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
   if (!REAL_MONEY_PAYMENTS_ENABLED) return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
+  // COMPRAS SÓ PARA MAIORES (config/ageGate.ts): a denied account never pays; an unverified one is
+  // verified first, by the payment provider, as part of this same checkout.
+  if (save.ageVerification.status === "DENIED") return { ok: false, reason: "UNDER_AGE" };
+  if (!canPayWithRealMoney(save.ageVerification)) return { ok: false, reason: "AGE_VERIFICATION_REQUIRED" };
   // The checkout integration goes here (see config/store.ts's header).
   return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
 }
