@@ -28,9 +28,11 @@ interface HUDProps {
   onToggleRift?: () => void;
   /** ÁRVORE DE TALENTOS — opens the talent panel. */
   onToggleTalents?: () => void;
+  /** BESTIÁRIO E CONQUISTAS — opens the bestiary panel. */
+  onToggleBestiary?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -174,6 +176,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <CastleIcon size={13} />
               <span className="hh-btn-txt">{t("city.button")}</span>
               {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
+            </button>
+          )}
+          {onToggleBestiary && (
+            <button onClick={onToggleBestiary} className="hh-btn" data-testid="bestiary-button" title={t("bestiary.tooltip")}>
+              <span aria-hidden="true" className="hh-talent-glyph">♛</span>
+              <span className="hh-btn-txt">{t("bestiary.button")}</span>
             </button>
           )}
           <button onClick={onOpenInventory} className="hh-btn" title={t("hud.inventoryTooltip")}>

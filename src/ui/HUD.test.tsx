@@ -30,6 +30,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     enemiesLeft: 0,
     rift: { charges: 0, armed: null, active: null, lastResult: null },
     talents: { ranks: {}, free: 0 },
+    achievement: { last: null, title: null, count: 0 },
     nextWaveInS: null,
     selectedTowerId: null,
     bossNameKey: null,

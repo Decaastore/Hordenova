@@ -1,3 +1,4 @@
+import { BestiaryPanel } from "@/ui/BestiaryPanel";
 import { TalentPanel } from "@/ui/TalentPanel";
 import { RiftPanel } from "@/ui/RiftPanel";
 import { CityPanel } from "@/ui/CityPanel";
@@ -109,6 +110,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
   const [cityOpen, setCityOpen] = useState(false);
   const [riftOpen, setRiftOpen] = useState(false);
   const [talentsOpen, setTalentsOpen] = useState(false);
+  const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
   // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
@@ -207,6 +209,23 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityEvent?.seq]);
+  // CONQUISTAS — a short notice when an achievement unlocks.
+  const lastAch = hud.achievement.last;
+  const lastAchSeqRef = useRef<number>(lastAch?.seq ?? 0);
+  useEffect(() => {
+    if (!lastAch || lastAch.seq === lastAchSeqRef.current) return;
+    lastAchSeqRef.current = lastAch.seq;
+    setCityNotice(
+      t("achievements.unlocked", {
+        name: t(`achievements.list.${lastAch.id}.name` as TranslationKey),
+        title: t(`achievements.list.${lastAch.id}.title` as TranslationKey),
+      }),
+    );
+    const timer = window.setTimeout(() => setCityNotice(null), 5200);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lastAch?.seq]);
+
   // FENDAS — a short notice when a Rift is won or lost.
   const riftResult = hud.rift.lastResult;
   const lastRiftSeqRef = useRef<number>(riftResult?.seq ?? 0);
@@ -411,7 +430,7 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -657,6 +676,16 @@ export function GameScreen({ onExitToMenu, onOpenStore }: GameScreenProps) {
           />
         )}
 
+        {bestiaryOpen && (
+          <BestiaryPanel
+            kills={engine.getBestiaryKills()}
+            stats={engine.getAchievementStats()}
+            unlocked={engine.getUnlockedAchievements()}
+            title={hud.achievement.title}
+            onEquipTitle={(id) => engine.equipTitle(id)}
+            onClose={() => setBestiaryOpen(false)}
+          />
+        )}
         {talentsOpen && (
           <TalentPanel
             ranks={hud.talents.ranks}

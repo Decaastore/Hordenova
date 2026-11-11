@@ -1,3 +1,5 @@
+import { bestiaryStats, reachedAchievements, type AchievementId, type AchievementStats, type BestiaryKills } from "@/config/achievements";
+import { RARITY_DEFINITIONS } from "@/config/rarity";
 import { canRaiseTalent, LAST_STAND_HP_FRACTION, sanitizeTalentRanks, talentBonus, talentPointsFree, type TalentId, type TalentRanks } from "@/config/talents";
 import { chargeAfterWave, createRiftState, riftReward, RIFT_DROP_TABLE_ID, RIFT_FRAGILE_BREACH, RIFT_HASTE_SPEED, RIFT_TOUGH_HP, withHordeExtra, type RiftModId, type RiftReward, type RiftState } from "@/config/rifts";
 import { ELITE_SHARD_DROP_AMOUNT, ELITE_SHARD_DROP_CHANCE, MAX_RECENT_LOOT, shardPileRarity, type LootDrop } from "@/config/loot";
@@ -239,6 +241,8 @@ export interface HudSnapshot {
     goldShare: number;
     lastEvent: { seq: number; kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME"; ids: readonly CityBuildingId[]; amount: number } | null;
   };
+  /** CONQUISTAS — the latest achievement unlocked (seq bumps) and the title worn. */
+  achievement: { last: { seq: number; id: AchievementId } | null; title: AchievementId | null; count: number };
   /** ÁRVORE DE TALENTOS — ranks and points still free. */
   talents: { ranks: Readonly<TalentRanks>; free: number };
   /** FENDAS — charges, the curses armed for the next eligible wave, the Rift being fought, and the latest result (seq bumps). */
@@ -377,6 +381,9 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.rift.charges === b.rift.charges &&
     a.talents.ranks === b.talents.ranks &&
     a.talents.free === b.talents.free &&
+    a.achievement.last?.seq === b.achievement.last?.seq &&
+    a.achievement.title === b.achievement.title &&
+    a.achievement.count === b.achievement.count &&
     JSON.stringify(a.rift.armed) === JSON.stringify(b.rift.armed) &&
     a.rift.active?.wave === b.rift.active?.wave &&
     a.rift.lastResult?.seq === b.rift.lastResult?.seq &&
@@ -535,6 +542,12 @@ export class GameEngine {
   private city: CityState = createCityState();
   private rift: RiftState = createRiftState();
   private talents: TalentRanks = {};
+  private bestiaryKills: BestiaryKills = {};
+  private achievements: AchievementId[] = [];
+  private equippedTitle: AchievementId | null = null;
+  private riftsCleared = 0;
+  private bestRarityFound = -1;
+  private lastAchievement: { seq: number; id: AchievementId } | null = null;
   private lastRiftResult: { seq: number; won: boolean; reward: RiftReward | null } | null = null;
   /** Gold from kills in the wave in progress — the city pays a share of it when the wave is cleared. */
   private waveKillGold = 0;
@@ -647,6 +660,11 @@ export class GameEngine {
     this.hordeAdaptation = { memory: { ...save.hordeAdaptation.memory }, multipliers: { ...save.hordeAdaptation.multipliers } };
     this.city = { burning: { ...save.city.burning }, firesStarted: save.city.firesStarted };
     this.talents = sanitizeTalentRanks(save.talents, save.seasonBestWave);
+    this.bestiaryKills = { ...save.bestiaryKills };
+    this.achievements = [...save.achievements];
+    this.equippedTitle = save.equippedTitle;
+    this.riftsCleared = save.riftsCleared;
+    this.bestRarityFound = save.bestRarityFound;
     this.rift = { charges: save.rift.charges, armed: save.rift.armed ? [...save.rift.armed] : null, active: save.rift.active ? { wave: save.rift.active.wave, mods: [...save.rift.active.mods] } : null };
     this.cityBuiltCount = builtBuildings(save.seasonBestWave).length;
     this.masteryUnlocked = { ...save.masteryUnlocked };
@@ -2120,6 +2138,58 @@ export class GameEngine {
     return claimed;
   }
 
+  /** CONQUISTAS — unlocks every achievement whose target is now reached and announces the newest one. */
+  private checkAchievements(): void {
+    const b = bestiaryStats(this.bestiaryKills);
+    const reached = reachedAchievements({
+      totalKills: b.total,
+      bossesDefeated: this.bossesDefeatedTotal,
+      miniBossesDefeated: this.miniBossesDefeatedTotal,
+      riftsCleared: this.riftsCleared,
+      bestWave: this.bestWave,
+      bestRarityFound: this.bestRarityFound,
+      goldStarCreatures: b.goldStars,
+      creaturesMet: b.met,
+    });
+    const fresh = reached.filter((id) => !this.achievements.includes(id));
+    if (fresh.length === 0) return;
+    this.achievements = [...this.achievements, ...fresh];
+    this.lastAchievement = { seq: (this.lastAchievement?.seq ?? 0) + 1, id: fresh[fresh.length - 1]! };
+    this.emitAudio({ type: "loot_drop", rarity: "LEGENDARY" });
+    this.persist();
+  }
+
+  /** Wears an unlocked achievement's title (null takes it off). */
+  equipTitle(id: AchievementId | null): boolean {
+    if (id !== null && !this.achievements.includes(id)) return false;
+    this.equippedTitle = id;
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  getBestiaryKills(): Readonly<BestiaryKills> {
+    return this.bestiaryKills;
+  }
+
+  getAchievementStats(): AchievementStats {
+    const b = bestiaryStats(this.bestiaryKills);
+    return {
+      totalKills: b.total,
+      bossesDefeated: this.bossesDefeatedTotal,
+      miniBossesDefeated: this.miniBossesDefeatedTotal,
+      riftsCleared: this.riftsCleared,
+      bestWave: this.bestWave,
+      bestRarityFound: this.bestRarityFound,
+      goldStarCreatures: b.goldStars,
+      creaturesMet: b.met,
+    };
+  }
+
+  getUnlockedAchievements(): readonly AchievementId[] {
+    return this.achievements;
+  }
+
   /** ÁRVORE DE TALENTOS — spends one free point on `id` (refused if locked, maxed or no point free). */
   raiseTalent(id: TalentId): boolean {
     if (!canRaiseTalent(this.talents, id, this.seasonBestWave)) return false;
@@ -2213,11 +2283,9 @@ export class GameEngine {
     }
     this.itemBonusDirty = true;
     this.lastRiftResult = { seq: (this.lastRiftResult?.seq ?? 0) + 1, won: true, reward };
-    this.trackRiftCleared?.();
+    this.riftsCleared += 1;
+    this.checkAchievements();
   }
-
-  /** Hook for achievements (set by the achievement system). */
-  private trackRiftCleared?: () => void;
 
   private lootDrops: LootDrop[] = [];
   private lootSeq = 0;
@@ -2226,6 +2294,13 @@ export class GameEngine {
   private dropLoot(drop: Omit<LootDrop, "seq">): void {
     this.lootSeq += 1;
     this.lootDrops = [...this.lootDrops, { ...drop, seq: this.lootSeq }].slice(-MAX_RECENT_LOOT);
+    if (drop.kind === "item") {
+      const order = RARITY_DEFINITIONS[drop.rarity].order;
+      if (order > this.bestRarityFound) {
+        this.bestRarityFound = order;
+        this.checkAchievements();
+      }
+    }
     this.emitAudio({ type: "loot_drop", rarity: drop.rarity });
   }
 
@@ -2476,6 +2551,7 @@ export class GameEngine {
         }
         if (enemy.boss?.isMainBoss) this.addPassXp("MAIN_BOSS");
         recordKill(this.battleStats, enemy);
+        this.bestiaryKills[enemy.type] = (this.bestiaryKills[enemy.type] ?? 0) + 1;
         const tier = this.classifyEnemyTier(enemy);
         const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
         this.emitAudio({ type: "enemy_death", tier, flavor, family: ENEMY_VOICE_FAMILY[enemy.type] });
@@ -2615,6 +2691,7 @@ export class GameEngine {
     this.lastFinishedWave = wave;
 
     if (this.rift.active && this.rift.active.wave === wave) this.completeRift();
+    this.checkAchievements();
     const repair = talentBonus(this.talents).castleRepairPct;
     if (repair > 0 && this.baseHp > 0) this.baseHp = Math.min(this.maxBaseHp, this.baseHp + (this.maxBaseHp * repair) / 100);
     this.rift = chargeAfterWave(this.rift, wave);
@@ -3084,6 +3161,11 @@ export class GameEngine {
         city: this.city,
         rift: this.rift,
         talents: this.talents,
+        bestiaryKills: this.bestiaryKills,
+        achievements: this.achievements,
+        equippedTitle: this.equippedTitle,
+        riftsCleared: this.riftsCleared,
+        bestRarityFound: this.bestRarityFound,
       },
       this.storageKey,
     );
@@ -3145,6 +3227,7 @@ export class GameEngine {
       city: { burning: { ...this.city.burning }, goldShare: this.cityShare(), lastEvent: this.lastCityEvent },
       rift: { charges: this.rift.charges, armed: this.rift.armed, active: this.rift.active, lastResult: this.lastRiftResult },
       talents: { ranks: this.talents, free: talentPointsFree(this.talents, this.seasonBestWave) },
+      achievement: { last: this.lastAchievement, title: this.equippedTitle, count: this.achievements.length },
     };
 
     const prev = this.cachedHud;

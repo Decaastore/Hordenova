@@ -112,6 +112,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
                                 {row.displayName}
                               </button>
                               {isMe && <span className="rk-you">{t("ranking.you")}</span>}
+                              {isMe && save.equippedTitle && <span className="rk-title">{t(`achievements.list.${save.equippedTitle}.title` as TranslationKey)}</span>}
                             </td>
                             <td>
                               <span style={{ color: tier.color }}>{tier.name}</span> <span className="rk-dim">{row.prestigeLevel}</span>
@@ -169,6 +170,7 @@ const RANKING_CSS = `
 .rk-name { padding: 0; background: none; border: none; cursor: pointer; font-weight: 600; font-size: 15px; color: var(--bone); text-align: left; }
 .rk-name:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offset: 3px; }
 .rk-you { margin-left: 10px; font-size: 12px; font-weight: 700; color: var(--gold); }
+.rk-title { margin-left: 8px; font-size: 11.5px; font-style: italic; color: var(--gold); opacity: 0.85; }
 .rk-dim { color: var(--ash-2); font-size: 13px; }
 .rk-rewards { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line-soft); }
 .rk-rewards li { display: grid; grid-template-columns: 40px 1fr auto; align-items: baseline; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
