@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v93",
+    dateIso: "2026-11-11",
+    category: "INTERFACE",
+    title: {
+      en: "A Clearer, Better-Looking Top Bar in Battle",
+      ptBR: "Barra de Cima da Partida Mais Bonita e Mais Clara",
+    },
+    description: {
+      en: "The bar at the top of the battle was redone. The main information is bigger and tidier, and a new strip below it says in plain words what is happening and what is coming next.",
+      ptBR: "A barra no topo da partida foi refeita. As informações principais ficaram maiores e mais organizadas, e uma faixa nova logo abaixo diz em palavras simples o que está acontecendo e o que vem a seguir.",
+    },
+    highlights: [
+      {
+        en: "Phase and wave read as \"Phase 2 · Wave 4 of 10\", with a progress bar and the region's name.",
+        ptBR: "Fase e onda aparecem como \"Fase 2 · Onda 4 de 10\", com barra de progresso e o nome da região.",
+      },
+      {
+        en: "The castle's life is now a bar that changes colour as it drops.",
+        ptBR: "A vida do castelo virou uma barra que muda de cor conforme cai.",
+      },
+      {
+        en: "New status line: how many enemies are left, the countdown to the next wave, when the mini-boss and the region's boss arrive, and your season record.",
+        ptBR: "Nova linha de situação: quantos inimigos faltam, a contagem para a próxima onda, quando chegam o mini-chefe e o chefe da região, e o seu recorde na temporada.",
+      },
+      {
+        en: "Hover any part of the bar for a short explanation of what it is.",
+        ptBR: "Passe o mouse em qualquer parte da barra para ver uma explicação curta do que ela é.",
+      },
+      {
+        en: "Speed, missions, city, inventory, map brightness and sound are grouped on the right; on phones the buttons scroll sideways instead of stacking.",
+        ptBR: "Velocidade, missões, cidade, inventário, brilho do mapa e som ficam juntos à direita; no celular os botões deslizam para o lado em vez de empilhar.",
+      },
+    ],
+  },
+  {
     id: "v92",
     dateIso: "2026-11-11",
     category: "CONTENT",

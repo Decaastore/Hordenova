@@ -175,6 +175,10 @@ export interface HudSnapshot {
   /** This Season's own high-water mark — see SaveData.seasonBestWave's doc comment. */
   seasonBestWave: number;
   enemiesDefeated: number;
+  /** Enemies still to come this wave: alive on the map plus not yet spawned. */
+  enemiesLeft: number;
+  /** Whole seconds until the next wave starts while between waves, else null. */
+  nextWaveInS: number | null;
   selectedTowerId: string | null;
   /** i18n key (bosses.<bossNameKey>.name) — NOT a display string. */
   bossNameKey: string | null;
@@ -322,6 +326,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.bestWave === b.bestWave &&
     a.seasonBestWave === b.seasonBestWave &&
     a.enemiesDefeated === b.enemiesDefeated &&
+    a.enemiesLeft === b.enemiesLeft &&
+    a.nextWaveInS === b.nextWaveInS &&
     a.selectedTowerId === b.selectedTowerId &&
     a.bossNameKey === b.bossNameKey &&
     a.bossHp === b.bossHp &&
@@ -2890,6 +2896,8 @@ export class GameEngine {
       bestWave: this.bestWave,
       seasonBestWave: this.seasonBestWave,
       enemiesDefeated: this.enemiesDefeated,
+      enemiesLeft: this.wave.spawnQueue.length + this.enemies.filter((e) => e.hp > 0).length,
+      nextWaveInS: this.wave.phase === "TRANSITIONING" ? Math.max(0, Math.ceil(this.wave.transitionTimerMs / 1000)) : null,
       selectedTowerId: this.selectedTowerId,
       bossNameKey: boss?.boss?.nameKey ?? this.bossIntroNameKey,
       bossHp: boss ? boss.hp : null,

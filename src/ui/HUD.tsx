@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
@@ -6,9 +6,10 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
+import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config/phaseConfig";
 import { BrandLogo } from "./BrandLogo";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
-import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon, WaveIcon } from "./icons";
+import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -25,154 +26,191 @@ interface HUDProps {
 }
 
 export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity }: HUDProps) {
-  const { t, language } = useLanguage();
-  const stateWidth = useMemo(() => widestStateLabel(STATE_PHASES.map((p) => t(`hud.phase.${p}`))), [language, t]);
-  const hpRatio = hud.baseHp / hud.maxBaseHp;
+  const { t } = useLanguage();
+  const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
+  const onda = waveInPhase(hud.wave);
+  const status = statusLine(hud, t);
+  const threat = threatLine(hud, t);
 
   return (
-    <div style={barStyle}>
-      {onExitToHome ? (
-        <button type="button" onClick={onExitToHome} style={brandButtonStyle} title={t("hud.backToHome")} aria-label={t("hud.backToHome")} data-testid="hud-home">
-          <BrandLogo height={20} decorative />
-        </button>
-      ) : (
-        <div style={brandStyle}>
-          <BrandLogo height={20} />
-        </div>
-      )}
+    <div className="hh" data-testid="hud">
+      <style>{HUD_CSS}</style>
 
-      <div style={groupStyle}>
-        <div>
-          <Stat
-            icon={<WaveIcon color={PALETTE.uiAccent} />}
-            label={t("hud.wave")}
-            // "FASE X — ONDA Y" (Y always 1..WAVES_PER_PHASE) is the primary
-            // gameplay identity — spec: "não mostrar somente a onda global
-            // como identificação principal". The real global wave (every
-            // progression formula's actual input, never replaced) stays
-            // visible as secondary info in the sublabel below, alongside the
-            // biome/phase name.
-            value={t("hud.phaseWaveValue", { phase: phaseNumberFromWave(hud.wave), onda: waveInPhase(hud.wave) })}
-            sublabel={`${t("hud.globalWaveSublabel", { wave: hud.wave })} · ${t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)}`}
-            title={t("hud.phaseWaveTooltip", { onda: waveInPhase(hud.wave), total: WAVES_PER_PHASE })}
-          />
-          <PhaseWaveProgress onda={waveInPhase(hud.wave)} />
-        </div>
-        <Stat
-          icon={<ShieldIcon color={hpColor} />}
-          label={t("hud.baseHp")}
-          value={`${Math.ceil(hud.baseHp)} / ${hud.maxBaseHp}`}
-          valueColor={hpColor}
-        />
-        <div style={{ position: "relative" }}>
-          <Stat
-            icon={<CoinIcon color={PALETTE.gold} />}
-            label={t("hud.gold")}
-            value={String(hud.gold)}
-            valueColor={PALETTE.gold}
-          />
-          <GoldGainIndicator gold={hud.gold} />
-        </div>
-        {/*
-         * P2 UX fix — Gems and Gem Shards used to share ONE stat (`${gems}
-         * (+${shards})`), so a "+5" that was actually 5 Gem Shards (see
-         * config/gemSinks.ts's GEM_SHARDS_PER_GEM = 10) read as if 5 more
-         * Gems had just been granted. Two separate stats, two separate
-         * icons/labels, and a tooltip stating the real conversion rate make
-         * the two currencies impossible to conflate at a glance.
-         */}
-        <GemsLink onOpenStore={onOpenStore} title={t("hud.openStore")}>
-          <Stat
-            icon={<GemIcon color={PALETTE.gem} />}
-            label={t("hud.freeGems")}
-            value={String(hud.freeGems)}
-            valueColor={PALETTE.gem}
-            title={onOpenStore ? undefined : t("gems.freeExplainer")}
-          />
-          <Stat
-            icon={<GemIcon color={PALETTE.gem} />}
-            label={t("hud.purchasedGems")}
-            value={String(hud.purchasedGems)}
-            valueColor={PALETTE.gem}
-            title={onOpenStore ? undefined : t("gems.purchasedExplainer")}
-          />
-        </GemsLink>
-        {hud.gemShards > 0 && (
-          <Stat
-            icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
-            label={t("hud.gemShards")}
-            value={`+${hud.gemShards}`}
-            valueColor={PALETTE.uiTextDim}
-            title={t("hud.gemShardsTooltip")}
-          />
+      {/* ── row 1: where you are and what you have ── */}
+      <div className="hh-main">
+        {onExitToHome ? (
+          <button type="button" onClick={onExitToHome} className="hh-brand" title={t("hud.backToHome")} aria-label={t("hud.backToHome")} data-testid="hud-home">
+            <BrandLogo height={22} decorative />
+          </button>
+        ) : (
+          <div className="hh-brand">
+            <BrandLogo height={22} />
+          </div>
         )}
-        {/* As wide as the longest state label, so a state change (every wave) never reflows the bar and resizes the map. */}
-        <div style={{ textAlign: "center", minWidth: Math.max(100, stateWidth), whiteSpace: "nowrap" }}>
-          <div style={labelStyle}>{t("hud.state")}</div>
-          <div style={{ ...valueStyle, fontSize: 13 }}>{t(`hud.phase.${hud.phase}`)}</div>
+
+        <div className="hh-wave" title={t("hud.checkpointTooltip", { onda, total: WAVES_PER_PHASE })}>
+          <div className="hh-wave-top">
+            <span className="hh-wave-phase">{t("hud.phaseLabel", { phase: phaseNumberFromWave(hud.wave) })}</span>
+            <span className="hh-wave-onda">{t("hud.waveOfPhase", { onda, total: WAVES_PER_PHASE })}</span>
+          </div>
+          <PhaseWaveProgress onda={onda} />
+          <div className="hh-wave-place">
+            {t(`phases.${hud.phaseI18nKey}.name` as TranslationKey)} · {t("hud.globalWaveSublabel", { wave: hud.wave })}
+          </div>
+        </div>
+
+        <div className="hh-castle" title={t("hud.castleTooltip")}>
+          <div className="hh-castle-head">
+            <ShieldIcon color={hpColor} size={14} />
+            <span className="hh-lbl">{t("hud.baseHp")}</span>
+            <span className="hh-castle-num" style={{ color: hpColor }}>
+              {Math.ceil(hud.baseHp)} / {hud.maxBaseHp}
+            </span>
+          </div>
+          <div className="hh-castle-bar" role="meter" aria-valuemin={0} aria-valuemax={hud.maxBaseHp} aria-valuenow={Math.ceil(hud.baseHp)} aria-label={t("hud.baseHp")}>
+            <div className="hh-castle-fill" style={{ width: `${hpRatio * 100}%`, background: `linear-gradient(180deg, ${hpColor}, ${hpColor}aa)` }} />
+          </div>
+        </div>
+
+        <div className="hh-wallet">
+          <div style={{ position: "relative" }} title={t("hud.goldTooltip")}>
+            <Stat icon={<CoinIcon color={PALETTE.gold} />} label={t("hud.gold")} value={String(hud.gold)} valueColor={PALETTE.gold} />
+            <GoldGainIndicator gold={hud.gold} />
+          </div>
+          {/*
+           * P2 UX fix — Gems and Gem Shards are always separate stats with
+           * separate labels (never "<gems> (+<shards>)"), so a Shards gain can
+           * never read as Gems. See config/gemSinks.ts for the conversion.
+           */}
+          <GemsLink onOpenStore={onOpenStore} title={t("hud.openStore")}>
+            <Stat
+              icon={<GemIcon color={PALETTE.gem} />}
+              label={t("hud.freeGems")}
+              value={String(hud.freeGems)}
+              valueColor={PALETTE.gem}
+              title={onOpenStore ? undefined : t("gems.freeExplainer")}
+            />
+            <Stat
+              icon={<GemIcon color={PALETTE.gem} />}
+              label={t("hud.purchasedGems")}
+              value={String(hud.purchasedGems)}
+              valueColor={PALETTE.gem}
+              title={onOpenStore ? undefined : t("gems.purchasedExplainer")}
+            />
+          </GemsLink>
+          {hud.gemShards > 0 && (
+            <Stat
+              icon={<GemShardIcon color={PALETTE.gem} style={{ opacity: 0.8 }} />}
+              label={t("hud.gemShards")}
+              value={`+${hud.gemShards}`}
+              valueColor={PALETTE.uiTextDim}
+              title={t("hud.gemShardsTooltip")}
+            />
+          )}
         </div>
       </div>
 
-      <div style={groupStyle}>
-        <BoltIcon color={PALETTE.uiTextDim} size={13} />
-        {GAME_SPEEDS.map((speed) => {
-          const active = hud.speed === speed;
-          return (
-            <button
-              key={speed}
-              data-tutorial={`speed-${speed}`}
-              onClick={() => onSetSpeed(speed)}
-              style={{
-                ...speedButtonStyle,
-                borderColor: active ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
-                color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-                background: active ? "rgba(255,210,87,0.18)" : "#3a2a18",
-                boxShadow: active ? `0 0 10px ${PALETTE.uiAccent}66` : "none",
-              }}
-            >
-              {speed}x
+      {/* ── row 2: what is happening now, and the controls ── */}
+      <div className="hh-sub">
+        <div className="hh-status" aria-live="polite">
+          <span className="hh-dot" style={{ background: status.color, boxShadow: `0 0 8px ${status.color}` }} />
+          <span className="hh-status-text">{status.text}</span>
+          {threat && (
+            <>
+              <span className="hh-sep" aria-hidden="true" />
+              <span className="hh-threat" style={{ color: threat.color }}>
+                {threat.text}
+              </span>
+            </>
+          )}
+          {hud.seasonBestWave > 0 && (
+            <>
+              <span className="hh-sep hh-hide-sm" aria-hidden="true" />
+              <span className="hh-record hh-hide-sm" title={t("hud.recordTooltip")}>
+                {t("hud.record", { wave: hud.seasonBestWave })}
+              </span>
+            </>
+          )}
+        </div>
+
+        <div className="hh-controls">
+          <div className="hh-speed" role="group" aria-label={t("hud.speedLabel")} title={t("hud.speedTooltip")}>
+            <BoltIcon color={PALETTE.uiTextDim} size={12} />
+            {GAME_SPEEDS.map((speed) => (
+              <button key={speed} data-tutorial={`speed-${speed}`} onClick={() => onSetSpeed(speed)} className={`hh-speed-btn${hud.speed === speed ? " is-on" : ""}`} aria-pressed={hud.speed === speed}>
+                {speed}x
+              </button>
+            ))}
+          </div>
+          {onToggleMissions && (
+            <button onClick={onToggleMissions} className="hh-btn" data-testid="missions-button" title={t("hud.missionsTooltip")}>
+              <ScrollIcon size={13} />
+              <span className="hh-btn-txt">{t("missions.button")}</span>
+              {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
             </button>
-          );
-        })}
-        {onToggleMissions && (
-          <button onClick={onToggleMissions} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="missions-button">
-            <ScrollIcon size={13} />
-            {t("missions.button")}
-            {hud.missionsClaimable > 0 && <span style={badgeStyle}>{hud.missionsClaimable}</span>}
+          )}
+          {onToggleCity && (
+            <button onClick={onToggleCity} className="hh-btn" data-testid="city-button" title={t("hud.cityTooltip")}>
+              <CastleIcon size={13} />
+              <span className="hh-btn-txt">{t("city.button")}</span>
+              {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
+            </button>
+          )}
+          <button onClick={onOpenInventory} className="hh-btn" title={t("hud.inventoryTooltip")}>
+            <BagIcon size={13} />
+            <span className="hh-btn-txt">{t("inventory.button")}</span>
           </button>
-        )}
-        {onToggleCity && (
-          <button onClick={onToggleCity} style={{ ...inventoryButtonStyle, position: "relative" }} data-testid="city-button">
-            <CastleIcon size={13} />
-            {t("city.button")}
-            {Object.keys(hud.city.burning).length > 0 && <span style={{ ...badgeStyle, background: PALETTE.danger }}>{Object.keys(hud.city.burning).length}</span>}
-          </button>
-        )}
-        <button onClick={onOpenInventory} style={inventoryButtonStyle}>
-          <BagIcon size={13} />
-          {t("inventory.button")}
-        </button>
-        <MapBrightnessControl />
-        <SfxControl />
+          <span className="hh-divider" aria-hidden="true" />
+          <MapBrightnessControl />
+          <SfxControl />
+        </div>
       </div>
     </div>
   );
 }
 
-const STATE_PHASES = ["PRE_RUN", "OFFLINE_RETURN", "RUNNING", "WAVE_TRANSITION", "BOSS_INTRO", "BOSS_BATTLE", "VICTORY", "PROGRESSION_STOPPED", "DEPLOY"] as const satisfies readonly HudSnapshot["phase"][];
+type Translate = ReturnType<typeof useLanguage>["t"];
 
-/** Width in px of the widest state label at the state value's font (13px bold), measured once per language. */
-function widestStateLabel(labels: readonly string[]): number {
-  try {
-    const ctx = document.createElement("canvas").getContext("2d");
-    if (!ctx) return 0;
-    const family = getComputedStyle(document.body).fontFamily || "sans-serif";
-    ctx.font = `700 13px ${family}`;
-    return Math.ceil(Math.max(...labels.map((l) => ctx.measureText(l).width)) + 4);
-  } catch {
-    return 0;
+/** The plain-language line that says what is happening right now. */
+function statusLine(hud: HudSnapshot, t: Translate): { text: string; color: string } {
+  switch (hud.phase) {
+    case "RUNNING":
+      return {
+        text: hud.enemiesLeft === 1 ? t("hud.status.runningOne") : t("hud.status.running", { n: hud.enemiesLeft }),
+        color: PALETTE.success,
+      };
+    case "WAVE_TRANSITION":
+      return { text: hud.nextWaveInS !== null ? t("hud.status.transition", { s: Math.max(1, hud.nextWaveInS) }) : t("hud.phase.WAVE_TRANSITION"), color: PALETTE.gold };
+    case "BOSS_INTRO":
+      return { text: t("hud.status.bossIntro"), color: PALETTE.danger };
+    case "BOSS_BATTLE":
+      return { text: t("hud.status.bossBattle"), color: PALETTE.danger };
+    case "VICTORY":
+      return { text: t("hud.status.victory"), color: PALETTE.gold };
+    case "PROGRESSION_STOPPED":
+      return { text: t("hud.status.stopped"), color: PALETTE.danger };
+    case "DEPLOY":
+      return { text: t("hud.status.deploy"), color: "#7fb6ff" };
+    default:
+      return { text: t(`hud.phase.${hud.phase}`), color: PALETTE.uiTextDim };
   }
+}
+
+/** What is coming: the mini-boss or the region's boss, with how many waves are left. */
+function threatLine(hud: HudSnapshot, t: Translate): { text: string; color: string } | null {
+  if (hud.bossSiege && hud.bossSiege.wavesUntilBoss > 0) {
+    return { text: t("hud.threat.bossReturns", { wave: hud.bossSiege.wave, n: hud.bossSiege.wavesUntilBoss }), color: "#ff8a7a" };
+  }
+  const phase = getPhaseForWave(hud.wave);
+  if (isMainBossWave(hud.wave)) return { text: t("hud.threat.bossNow"), color: "#ff8a7a" };
+  if (isMiniBossWaveInPhase(hud.wave)) return { text: t("hud.threat.miniNow"), color: "#ffb36b" };
+  const nextMini = phase.miniBossWaves.find((w) => w > hud.wave);
+  const bossIn = phase.endWave - hud.wave;
+  if (nextMini !== undefined && nextMini - hud.wave <= 3) {
+    return { text: t("hud.threat.miniIn", { wave: nextMini, n: nextMini - hud.wave }), color: "#ffb36b" };
+  }
+  return { text: bossIn === 1 ? t("hud.threat.bossNext") : t("hud.threat.bossIn", { wave: phase.endWave, n: bossIn }), color: PALETTE.uiAccent };
 }
 
 /** Map brightness: Sombrio / Normal / Claro, a per-device display choice (rendering/mapBrightness.ts). */
@@ -184,10 +222,10 @@ function MapBrightnessControl() {
       onClick={() => setLevel(cycleMapBrightness())}
       title={t("mapBrightness.title")}
       aria-label={`${t("mapBrightness.title")}: ${t(`mapBrightness.${level}`)}`}
-      style={{ ...inventoryButtonStyle }}
+      className="hh-btn"
       data-testid="map-brightness"
     >
-      {t("mapBrightness.label")}: {t(`mapBrightness.${level}`)}
+      <span className="hh-btn-txt">{t("mapBrightness.label")}:</span>{t(`mapBrightness.${level}`)}
     </button>
   );
 }
@@ -206,15 +244,11 @@ function SfxControl() {
   };
 
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-      <button
-        onClick={() => setMuted(toggleSfxMuted())}
-        title={t("audio.muteSfx")}
-        style={{ ...inventoryButtonStyle, marginLeft: 0, padding: "5px 8px" }}
-      >
+    <div className="hh-pair">
+      <button onClick={() => setMuted(toggleSfxMuted())} title={t("audio.muteSfx")} aria-label={t("audio.muteSfx")} className="hh-btn hh-btn-icon">
         <SpeakerIcon size={13} muted={muted} />
       </button>
-      <button onClick={cycleVolume} title={t("audio.sfxVolume")} style={{ ...inventoryButtonStyle, marginLeft: 0 }}>
+      <button onClick={cycleVolume} title={t("audio.sfxVolume")} className="hh-btn">
         {Math.round(volume * 100)}%
       </button>
     </div>
@@ -272,20 +306,10 @@ function GoldGainIndicator({ gold }: { gold: number }) {
  */
 function PhaseWaveProgress({ onda }: { onda: number }) {
   return (
-    <div style={phaseProgressRowStyle}>
+    <div className="hh-ticks" aria-hidden="true">
       {Array.from({ length: WAVES_PER_PHASE }, (_, i) => {
-        const stepOnda = i + 1;
-        const filled = stepOnda <= onda;
-        const isClosing = stepOnda === WAVES_PER_PHASE;
-        return (
-          <span
-            key={stepOnda}
-            style={{
-              ...phaseProgressTickStyle,
-              background: filled ? (isClosing ? PALETTE.danger : PALETTE.uiAccent) : "rgba(255,255,255,0.15)",
-            }}
-          />
-        );
+        const step = i + 1;
+        return <span key={step} className={`hh-tick${step < onda ? " is-done" : step === onda ? " is-now" : ""}`} />;
       })}
     </div>
   );
@@ -306,109 +330,30 @@ function Stat({
   label,
   value,
   valueColor,
-  sublabel,
   title,
 }: {
   icon: ReactNode;
   label: string;
   value: string;
   valueColor?: string;
-  /** Small caption under the value — used for the current phase/biome name under the wave counter. */
-  sublabel?: string;
   /** Native browser tooltip on hover — used to spell out the Gem Shard conversion rate without cluttering the stat itself. */
   title?: string;
 }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 92 }} title={title}>
-      <span style={{ opacity: 0.85, display: "flex" }}>{icon}</span>
+    <div className="hh-stat" title={title}>
+      <span className="hh-stat-icon">{icon}</span>
       <div>
-        <div style={labelStyle}>{label}</div>
-        <div style={{ ...valueStyle, color: valueColor ?? valueStyle.color }}>{value}</div>
-        {sublabel && <div style={sublabelStyle}>{sublabel}</div>}
+        <div className="hh-lbl">{label}</div>
+        <div className="hh-val" style={valueColor ? { color: valueColor } : undefined}>{value}</div>
       </div>
     </div>
   );
 }
 
-const barStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  padding: "9px 22px",
-  background: `linear-gradient(180deg, ${PALETTE.uiPanelBg}, rgba(28,18,10,0.97))`,
-  borderBottom: `1px solid ${PALETTE.uiPanelBorder}`,
-  boxShadow: "0 2px 14px rgba(0,0,0,0.5)",
-  gap: 18,
-  flexWrap: "wrap",
-  position: "relative",
-  zIndex: 2,
-};
-
-const brandStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 15,
-  fontWeight: 700,
-  letterSpacing: 3,
-  color: PALETTE.uiAccentBright,
-  textShadow: `0 0 12px ${PALETTE.uiAccent}88`,
-  whiteSpace: "nowrap",
-};
-
-const brandButtonStyle: CSSProperties = {
-  ...brandStyle,
-  background: "none",
-  border: "none",
-  padding: 0,
-  cursor: "pointer",
-};
-
-const groupStyle: CSSProperties = {
-  display: "flex",
-  gap: 20,
-  alignItems: "center",
-  flexWrap: "wrap",
-  rowGap: 6,
-};
-
-const labelStyle: CSSProperties = {
-  fontSize: 9,
-  letterSpacing: 1.4,
-  color: PALETTE.uiTextDim,
-  textTransform: "uppercase",
-};
-
-const sublabelStyle: CSSProperties = {
-  fontSize: 9.5,
-  color: PALETTE.uiAccent,
-  letterSpacing: 0.3,
-  marginTop: 1,
-  whiteSpace: "nowrap",
-};
-
-const valueStyle: CSSProperties = {
-  fontSize: 15,
-  fontWeight: 700,
-  color: PALETTE.uiText,
-  lineHeight: 1.3,
-};
-
-const phaseProgressRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 3,
-  marginTop: 3,
-};
-
-const phaseProgressTickStyle: CSSProperties = {
-  width: 8,
-  height: 4,
-  borderRadius: 2,
-  transition: "background 150ms ease",
-};
-
 const goldGainStyle: CSSProperties = {
   position: "absolute",
-  top: -4,
-  left: "calc(100% - 6px)",
+  top: -6,
+  left: "calc(100% - 4px)",
   padding: "1px 6px",
   borderRadius: 8,
   background: "rgba(232,193,90,0.16)",
@@ -422,7 +367,7 @@ const goldGainStyle: CSSProperties = {
 
 const gemsLinkStyle: CSSProperties = {
   display: "flex",
-  gap: 20,
+  gap: 18,
   alignItems: "center",
   padding: "2px 6px",
   margin: "-2px -6px",
@@ -435,43 +380,93 @@ const gemsLinkStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const badgeStyle: CSSProperties = {
-  position: "absolute",
-  top: -7,
-  right: -7,
-  minWidth: 16,
-  height: 16,
-  padding: "0 4px",
-  borderRadius: 8,
-  background: PALETTE.gold,
-  color: "#2b1906",
-  fontSize: 10,
-  fontWeight: 800,
-  lineHeight: "16px",
-  textAlign: "center",
-};
+/*
+ * The in-game top bar. Same family as the site's top bar (nav.tn): dark
+ * leather-brown ground, a gold hairline with a small diamond at its centre,
+ * gold for what you own, the castle's life as a filled bar, and a thinner
+ * second strip that says in words what is happening. Scoped under .hh.
+ */
+const HUD_CSS = `
+.hh { position: relative; z-index: 2; color: ${PALETTE.uiText};
+  background: linear-gradient(180deg, #2b1d11 0%, #1f150c 100%);
+  box-shadow: 0 3px 16px rgba(0,0,0,0.55); }
+.hh::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, ${PALETTE.uiAccent}99 18%, ${PALETTE.uiAccent} 50%, ${PALETTE.uiAccent}99 82%, transparent); }
+.hh::before { content: ""; position: absolute; left: 50%; bottom: -4px; width: 7px; height: 7px; margin-left: -3.5px;
+  transform: rotate(45deg); background: ${PALETTE.uiAccent}; box-shadow: 0 0 8px ${PALETTE.uiAccent}; z-index: 1; }
+.hh button { font-family: inherit; }
+.hh-main { display: flex; align-items: center; gap: 26px; padding: 9px 22px 8px; flex-wrap: wrap; row-gap: 8px; }
+.hh-brand { display: flex; align-items: center; background: none; border: none; padding: 0; cursor: pointer; }
+div.hh-brand { cursor: default; }
+.hh-lbl { font-size: 9.5px; letter-spacing: 1.2px; color: ${PALETTE.uiTextDim}; text-transform: uppercase; line-height: 1.2; }
+.hh-val { font-size: 16px; font-weight: 700; color: ${PALETTE.uiText}; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.hh-stat { display: flex; align-items: center; gap: 7px; min-width: 70px; }
+.hh-stat-icon { opacity: 0.9; display: flex; }
 
-const inventoryButtonStyle: CSSProperties = {
-  marginLeft: 6,
-  display: "flex",
-  alignItems: "center",
-  gap: 6,
-  padding: "5px 11px",
-  borderRadius: 6,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "#3a2a18",
-  color: PALETTE.uiTextDim,
-  fontWeight: 700,
-  fontSize: 10.5,
-  letterSpacing: 0.6,
-  cursor: "pointer",
-};
+.hh-wave { min-width: 190px; cursor: help; }
+.hh-wave-top { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.hh-wave-phase { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 700; color: ${PALETTE.uiAccentBright}; letter-spacing: 0.4px; }
+.hh-wave-onda { font-size: 13px; font-weight: 700; color: ${PALETTE.uiText}; }
+.hh-wave-place { font-size: 10px; color: ${PALETTE.uiTextDim}; margin-top: 3px; white-space: nowrap; }
+.hh-ticks { display: flex; gap: 3px; margin-top: 4px; }
+.hh-tick { width: 15px; height: 4px; border-radius: 1px; background: rgba(255,255,255,0.13); transition: background 150ms ease; }
+.hh-tick.is-done { background: ${PALETTE.uiAccent}; }
+.hh-tick.is-now { background: ${PALETTE.uiAccentBright}; box-shadow: 0 0 6px ${PALETTE.uiAccent}; }
 
-const speedButtonStyle: CSSProperties = {
-  padding: "5px 11px",
-  borderRadius: 6,
-  border: "1px solid",
-  fontWeight: 700,
-  fontSize: 12,
-  transition: "background 120ms ease, box-shadow 120ms ease",
-};
+.hh-castle { min-width: 190px; cursor: help; }
+.hh-castle-head { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.hh-castle-num { margin-left: auto; font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hh-castle-bar { margin-top: 5px; height: 8px; border-radius: 2px; background: rgba(0,0,0,0.45);
+  border: 1px solid rgba(255,214,140,0.22); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,0.6); }
+.hh-castle-fill { height: 100%; transition: width 250ms ease; box-shadow: inset 0 1px 0 rgba(255,255,255,0.25); }
+
+.hh-wallet { display: flex; align-items: center; gap: 18px; margin-left: auto; }
+
+.hh-sub { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 6px 22px 7px;
+  background: rgba(0,0,0,0.28); border-top: 1px solid rgba(255,214,140,0.08); flex-wrap: wrap; row-gap: 6px; }
+.hh-status { display: flex; align-items: center; gap: 9px; min-width: 0; font-size: 12.5px; flex-wrap: wrap; row-gap: 2px; }
+.hh-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.hh-status-text { font-weight: 700; color: ${PALETTE.uiText}; white-space: nowrap; }
+.hh-threat { font-weight: 600; white-space: nowrap; }
+.hh-record { color: ${PALETTE.uiTextDim}; white-space: nowrap; cursor: help; }
+.hh-sep { width: 1px; height: 12px; background: rgba(255,214,140,0.22); }
+
+.hh-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; row-gap: 6px; }
+.hh-speed { display: flex; align-items: center; gap: 2px; padding: 2px 3px 2px 7px; border-radius: 7px;
+  border: 1px solid ${PALETTE.uiPanelBorder}; background: rgba(0,0,0,0.3); margin-right: 4px; }
+.hh-speed-btn { padding: 3px 9px; border-radius: 5px; border: 1px solid transparent; background: none;
+  color: ${PALETTE.uiTextDim}; font-weight: 700; font-size: 11.5px; cursor: pointer; transition: background 120ms ease, color 120ms ease; }
+.hh-speed-btn:hover { color: ${PALETTE.uiText}; }
+.hh-speed-btn.is-on { background: rgba(255,210,87,0.18); border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; }
+.hh-btn { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px;
+  border: 1px solid ${PALETTE.uiPanelBorder}; background: linear-gradient(180deg, #3d2c1a, #2e2013);
+  color: ${PALETTE.uiText}; font-weight: 700; font-size: 10.5px; letter-spacing: 0.5px; cursor: pointer; white-space: nowrap;
+  transition: border-color 120ms ease, color 120ms ease; }
+.hh-btn:hover { border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; }
+.hh-btn-icon { padding: 5px 7px; }
+.hh-pair { display: flex; gap: 3px; }
+.hh-divider { width: 1px; height: 18px; background: rgba(255,214,140,0.18); margin: 0 4px; }
+.hh-badge { position: absolute; top: -7px; right: -7px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: ${PALETTE.gold}; color: #2b1906; font-size: 10px; font-weight: 800; line-height: 16px; text-align: center; }
+.hh-badge.is-fire { background: ${PALETTE.danger}; color: #fff; }
+.hh button:focus-visible { outline: 2px solid ${PALETTE.uiAccentBright}; outline-offset: 2px; }
+
+@media (max-width: 1100px) {
+  .hh-main { gap: 18px; }
+  .hh-wallet { margin-left: 0; }
+}
+@media (max-width: 720px) {
+  .hh-main { padding: 7px 12px 6px; gap: 10px 16px; }
+  .hh-brand { flex: 0 0 100%; justify-content: center; }
+  .hh-wave, .hh-castle { min-width: 0; flex: 1 1 140px; }
+  .hh-wallet { flex: 0 0 100%; gap: 12px; flex-wrap: wrap; }
+  .hh-sub { padding: 5px 12px 6px; }
+  .hh-status { font-size: 11.5px; }
+  .hh-controls { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding: 6px 2px 2px; scrollbar-width: none; }
+  .hh-controls::-webkit-scrollbar { display: none; }
+  .hh-hide-sm { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hh-castle-fill, .hh-tick, .hh-speed-btn, .hh-btn { transition: none; }
+}
+`;

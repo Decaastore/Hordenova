@@ -27,6 +27,8 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     bestWave: 14,
     seasonBestWave: 14,
     enemiesDefeated: 0,
+    enemiesLeft: 0,
+    nextWaveInS: null,
     selectedTowerId: null,
     bossNameKey: null,
     bossHp: null,
