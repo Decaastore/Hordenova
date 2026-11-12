@@ -308,7 +308,9 @@ export function missionStep(m: DuelMission, st: DuelMatchStats): number {
 }
 
 // ── Duel shop ───────────────────────────────────────────────────────────
-export type DuelCosmeticKind = "BANNER" | "FRAME";
+export type DuelCosmeticKind = "BANNER" | "FRAME" | "TOWER_SKIN" | "KILL_FX";
+/** Kill effects: what a creature leaves when it falls, in the Duel and the Eternal castle. */
+export type KillFxId = "EMBERS" | "FROST" | "SOULS" | "GOLD";
 export interface DuelShopItem {
   id: string;
   price: number;
@@ -316,7 +318,7 @@ export interface DuelShopItem {
   prize?: DuelPrize;
   /** At most once a week. */
   weekly?: boolean;
-  cosmetic?: { kind: DuelCosmeticKind; color: string; color2: string };
+  cosmetic?: { kind: DuelCosmeticKind; color: string; color2: string; skinId?: string; tower?: TowerType; fx?: KillFxId };
 }
 
 export const DUEL_SHOP: readonly DuelShopItem[] = [
@@ -330,6 +332,20 @@ export const DUEL_SHOP: readonly DuelShopItem[] = [
   { id: "FRAME_GOLD", price: 500, cosmetic: { kind: "FRAME", color: "#e8b04b", color2: "#7a5a1a" } },
   { id: "FRAME_FROST", price: 650, cosmetic: { kind: "FRAME", color: "#9ad8ff", color2: "#2a5a7a" } },
   { id: "FRAME_INFERNAL", price: 900, cosmetic: { kind: "FRAME", color: "#ff6a3a", color2: "#5a1a0a" } },
+  // tower skins — shown in the Duel and the Eternal castle only (never in the Season)
+  { id: "SKIN_IRONWOOD_GLADIATOR", price: 900, cosmetic: { kind: "TOWER_SKIN", color: "#d89a3a", color2: "#7a1414", skinId: "IRONWOOD_GLADIATOR", tower: "IRONWOOD" } },
+  { id: "SKIN_INFERNO_GLADIATOR", price: 900, cosmetic: { kind: "TOWER_SKIN", color: "#d89a3a", color2: "#7a1414", skinId: "INFERNO_GLADIATOR", tower: "INFERNO" } },
+  { id: "SKIN_FROSTBORN_GLADIATOR", price: 900, cosmetic: { kind: "TOWER_SKIN", color: "#d89a3a", color2: "#7a1414", skinId: "FROSTBORN_GLADIATOR", tower: "FROSTBORN" } },
+  { id: "SKIN_STORMCALLER_GLADIATOR", price: 900, cosmetic: { kind: "TOWER_SKIN", color: "#d89a3a", color2: "#7a1414", skinId: "STORMCALLER_GLADIATOR", tower: "STORMCALLER" } },
+  { id: "SKIN_IRONWOOD_CHAMPION", price: 1800, cosmetic: { kind: "TOWER_SKIN", color: "#ffd060", color2: "#1a1a22", skinId: "IRONWOOD_CHAMPION", tower: "IRONWOOD" } },
+  { id: "SKIN_INFERNO_CHAMPION", price: 1800, cosmetic: { kind: "TOWER_SKIN", color: "#ffd060", color2: "#1a1a22", skinId: "INFERNO_CHAMPION", tower: "INFERNO" } },
+  { id: "SKIN_FROSTBORN_CHAMPION", price: 1800, cosmetic: { kind: "TOWER_SKIN", color: "#ffd060", color2: "#1a1a22", skinId: "FROSTBORN_CHAMPION", tower: "FROSTBORN" } },
+  { id: "SKIN_STORMCALLER_CHAMPION", price: 1800, cosmetic: { kind: "TOWER_SKIN", color: "#ffd060", color2: "#1a1a22", skinId: "STORMCALLER_CHAMPION", tower: "STORMCALLER" } },
+  // kill effects
+  { id: "KILL_EMBERS", price: 700, cosmetic: { kind: "KILL_FX", color: "#ff7a2a", color2: "#5a1a0a", fx: "EMBERS" } },
+  { id: "KILL_FROST", price: 700, cosmetic: { kind: "KILL_FX", color: "#9ae0ff", color2: "#1a4a6a", fx: "FROST" } },
+  { id: "KILL_SOULS", price: 1000, cosmetic: { kind: "KILL_FX", color: "#c890ff", color2: "#2a0a4a", fx: "SOULS" } },
+  { id: "KILL_GOLD", price: 1200, cosmetic: { kind: "KILL_FX", color: "#ffd84a", color2: "#6a4a0a", fx: "GOLD" } },
 ];
 
 export function getShopItem(id: string): DuelShopItem | null {
@@ -356,6 +372,10 @@ export interface DuelProfile {
   owned: string[];
   banner: string | null;
   frame: string | null;
+  /** Duel tower skins worn per tower (shop item ids) — shown in the Duel and the Eternal castle. */
+  towerSkins: Partial<Record<TowerType, string>>;
+  /** Kill effect worn (shop item id). */
+  killFx: string | null;
   /** Week whose Weekly Challenge was beaten (-1 none). */
   weeklyWonWeek: number;
 }
@@ -377,6 +397,8 @@ export function createDuelProfile(): DuelProfile {
     owned: [],
     banner: null,
     frame: null,
+    towerSkins: {},
+    killFx: null,
     weeklyWonWeek: -1,
   };
 }
@@ -409,6 +431,12 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
     owned,
     banner: pickOwned(r.banner),
     frame: pickOwned(r.frame),
+    towerSkins: Object.fromEntries(
+      Object.entries((r.towerSkins && typeof r.towerSkins === "object" ? r.towerSkins : {}) as Record<string, unknown>).filter(
+        ([k, v]) => typeof v === "string" && owned.includes(v) && getShopItem(v)?.cosmetic?.tower === k,
+      ),
+    ) as Partial<Record<TowerType, string>>,
+    killFx: pickOwned(r.killFx),
     weeklyWonWeek: intOr(r.weeklyWonWeek, -1),
   };
 }
@@ -499,6 +527,8 @@ export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { pr
     owned: item.cosmetic ? [...p.owned, id] : p.owned,
     banner: item.cosmetic?.kind === "BANNER" ? id : p.banner,
     frame: item.cosmetic?.kind === "FRAME" ? id : p.frame,
+    towerSkins: item.cosmetic?.kind === "TOWER_SKIN" && item.cosmetic.tower ? { ...p.towerSkins, [item.cosmetic.tower]: id } : p.towerSkins,
+    killFx: item.cosmetic?.kind === "KILL_FX" ? id : p.killFx,
   };
   return { profile, prize: item.prize ?? NO_PRIZE };
 }
@@ -538,4 +568,38 @@ export function weeklyChallenge(week: number): WeeklyChallenge {
     return out;
   };
   return { week, seed: week * 7919 + 13, myDeck: [...pick(towers, 3, 1), ...pick(sends, 5, 2)], foeDeck: [...pick(towers, 4, 3), ...pick(sends, 4, 4)] };
+}
+
+/** Wears or takes off an owned Duel cosmetic. */
+export function toggleDuelCosmetic(p: DuelProfile, id: string): DuelProfile | null {
+  const c = getShopItem(id)?.cosmetic;
+  if (!c || !p.owned.includes(id)) return null;
+  switch (c.kind) {
+    case "BANNER":
+      return { ...p, banner: p.banner === id ? null : id };
+    case "FRAME":
+      return { ...p, frame: p.frame === id ? null : id };
+    case "KILL_FX":
+      return { ...p, killFx: p.killFx === id ? null : id };
+    case "TOWER_SKIN": {
+      const next = { ...p.towerSkins };
+      if (next[c.tower!] === id) delete next[c.tower!];
+      else next[c.tower!] = id;
+      return { ...p, towerSkins: next };
+    }
+  }
+}
+
+/** The tower skin ids (not shop ids) worn in the Duel / Eternal castle, per tower. */
+export function duelSkinLooks(p: DuelProfile): Partial<Record<TowerType, string>> {
+  const out: Partial<Record<TowerType, string>> = {};
+  for (const [t, id] of Object.entries(p.towerSkins)) {
+    const skinId = getShopItem(id ?? "")?.cosmetic?.skinId;
+    if (skinId) out[t as TowerType] = skinId;
+  }
+  return out;
+}
+
+export function duelKillFx(p: DuelProfile): KillFxId | null {
+  return p.killFx ? getShopItem(p.killFx)?.cosmetic?.fx ?? null : null;
 }

@@ -29,6 +29,11 @@ import {
   WEEKLY_CHALLENGE_AI,
   WEEKLY_CHALLENGE_SHARDS,
   weeklyChallenge,
+  duelKillFx,
+  duelSkinLooks,
+  toggleDuelCosmetic,
+  type DuelShopItem,
+  type KillFxId,
   type DuelCardId,
   type DuelOutcome,
   type DuelPrize,
@@ -43,6 +48,7 @@ import type { EnemyType } from "@/config/enemyStats";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { MaterialIcon, type MaterialKind } from "@/ui/MaterialIcon";
+import { drawKillFx, setDuelLooks } from "@/rendering/duelLooks";
 
 const W = DUEL_W;
 const H = DUEL_H;
@@ -99,6 +105,37 @@ function EnemyPortrait({ type, size }: { type: EnemyType; size: number }) {
     return () => window.clearInterval(id);
   }, [inst, size, type]);
   return <canvas ref={ref} style={{ width: size, height: size }} aria-hidden="true" />;
+}
+
+/** A looping preview of a kill effect. */
+function KillFxPreview({ fx }: { fx: KillFxId }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    let raf = 0;
+    const loop = (now: number) => {
+      const cv = ref.current;
+      const ctx = cv?.getContext("2d");
+      if (cv && ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        if (cv.width !== 80 * dpr) {
+          cv.width = 80 * dpr;
+          cv.height = 64 * dpr;
+        }
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        ctx.clearRect(0, 0, 80, 64);
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.beginPath();
+        ctx.ellipse(40, 50, 18, 5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        const t = (now % 1300) / 1300;
+        drawKillFx(ctx, fx, 40, 50, t, Math.floor(now / 1300) % 997, true);
+      }
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [fx]);
+  return <canvas ref={ref} className="du-fxprev" style={{ width: 80, height: 64 }} aria-hidden="true" />;
 }
 
 interface DuelScreenProps {
@@ -238,6 +275,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setResult(null);
     setChallenge(false);
     setMatchNo((n) => n + 1);
+    setDuelLooks(duelSkinLooks(next.duel), duelKillFx(next.duel));
     setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], duelAiSkill(next.duel.trophies), next.equippedTowerSkinByType));
   };
 
@@ -245,6 +283,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setResult(null);
     setChallenge(true);
     setMatchNo((n) => n + 1);
+    setDuelLooks(duelSkinLooks(save.duel), duelKillFx(save.duel));
     setMatch(new DuelEngine(weekly.seed, [weekly.myDeck, weekly.foeDeck], WEEKLY_CHALLENGE_AI, save.equippedTowerSkinByType));
   };
 
@@ -282,11 +321,10 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   const wear = (id: string) => {
     const cur = loadSave();
-    const item = getShopItem(id);
-    if (!item?.cosmetic || !cur.duel.owned.includes(id)) return;
-    const k = item.cosmetic.kind === "BANNER" ? "banner" : "frame";
-    setSave(updateSave({ duel: { ...cur.duel, [k]: cur.duel[k] === id ? null : id } }));
+    const p = toggleDuelCosmetic(cur.duel, id);
+    if (p) setSave(updateSave({ duel: p }));
   };
+
 
   if (match)
     return (
@@ -434,42 +472,63 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               </span>
             </div>
             <p className="pg-sub">{t("duel.shopLead")}</p>
-            <div className="du-shop">
-              {DUEL_SHOP.map((item) => {
-                const owned = duel.owned.includes(item.id);
-                const worn = duel.banner === item.id || duel.frame === item.id;
-                const weeklyLocked = item.weekly && duel.shopWeek === week;
-                return (
-                  <div key={item.id} className="du-item">
-                    {item.cosmetic ? (
-                      <span className={`du-swatch is-${item.cosmetic.kind}`} style={{ background: `linear-gradient(160deg, ${item.cosmetic.color}, ${item.cosmetic.color2})` }} aria-hidden="true" />
-                    ) : (
-                      <span className="du-swatch is-mat" aria-hidden="true">
-                        <MaterialIcon kind={item.id === "EPIC" ? "EPIC" : item.id === "RARE" ? "RARE" : "SPLINTERS"} size={40} />
-                      </span>
-                    )}
-                    <strong>{t(`duel.shop.${item.id}` as TranslationKey)}</strong>
-                    {item.prize && <PrizeLine prize={item.prize} />}
-                    {item.weekly && <small>{t("duel.shopWeekly")}</small>}
-                    {owned ? (
-                      <button className="pg-btn-ghost" onClick={() => wear(item.id)}>
-                        {worn ? t("duel.wearing") : t("duel.wear")}
-                      </button>
-                    ) : (
-                      <button className="pg-btn" disabled={duel.coins < item.price || !!weeklyLocked} onClick={() => buy(item.id)}>
-                        {weeklyLocked ? (
-                          t("duel.shopWeeklyDone")
+            {(
+              [
+                ["mats", (i: DuelShopItem) => !i.cosmetic],
+                ["skins", (i: DuelShopItem) => i.cosmetic?.kind === "TOWER_SKIN"],
+                ["kills", (i: DuelShopItem) => i.cosmetic?.kind === "KILL_FX"],
+                ["looks", (i: DuelShopItem) => i.cosmetic?.kind === "BANNER" || i.cosmetic?.kind === "FRAME"],
+              ] as const
+            ).map(([group, pick]) => (
+              <div key={group} className="du-shop-group">
+                <h3 className="du-shop-h">{t(`duel.shopGroup.${group}` as TranslationKey)}</h3>
+                {(group === "skins" || group === "kills") && <p className="pg-sub">{t("duel.shopWhereShown")}</p>}
+                <div className="du-shop">
+                  {DUEL_SHOP.filter(pick).map((item) => {
+                    const owned = duel.owned.includes(item.id);
+                    const c = item.cosmetic;
+                    const worn = duel.banner === item.id || duel.frame === item.id || duel.killFx === item.id || (c?.tower ? duel.towerSkins[c.tower] === item.id : false);
+                    const weeklyLocked = item.weekly && duel.shopWeek === week;
+                    return (
+                      <div key={item.id} className={`du-item${c?.kind === "TOWER_SKIN" ? " is-skin" : ""}`}>
+                        {c?.kind === "TOWER_SKIN" && c.skinId && c.tower ? (
+                          <span className="du-skinart">
+                            <TowerPortrait type={c.tower} level={41} skinId={c.skinId} width={110} height={110} zoom={1.8} baseY={0.74} />
+                          </span>
+                        ) : c?.kind === "KILL_FX" && c.fx ? (
+                          <KillFxPreview fx={c.fx} />
+                        ) : c ? (
+                          <span className={`du-swatch is-${c.kind}`} style={{ background: `linear-gradient(160deg, ${c.color}, ${c.color2})` }} aria-hidden="true" />
                         ) : (
-                          <>
-                            <MaterialIcon kind="DUEL_COINS" size={16} /> {fmt(item.price)}
-                          </>
+                          <span className="du-swatch is-mat" aria-hidden="true">
+                            <MaterialIcon kind={item.id === "EPIC" ? "EPIC" : item.id === "RARE" ? "RARE" : "SPLINTERS"} size={40} />
+                          </span>
                         )}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                        <strong>{t(`duel.shop.${item.id}` as TranslationKey)}</strong>
+                        {c?.tower && <small className="du-item-tower">{t(`towers.${c.tower}.name` as TranslationKey)}</small>}
+                        {item.prize && <PrizeLine prize={item.prize} />}
+                        {item.weekly && <small>{t("duel.shopWeekly")}</small>}
+                        {owned ? (
+                          <button className="pg-btn-ghost" onClick={() => wear(item.id)}>
+                            {worn ? t("duel.wearing") : t("duel.wear")}
+                          </button>
+                        ) : (
+                          <button className="pg-btn" disabled={duel.coins < item.price || !!weeklyLocked} onClick={() => buy(item.id)}>
+                            {weeklyLocked ? (
+                              t("duel.shopWeeklyDone")
+                            ) : (
+                              <>
+                                <MaterialIcon kind="DUEL_COINS" size={16} /> {fmt(item.price)}
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
           </section>
 
           <section className="du-deck">
@@ -755,6 +814,13 @@ const LOBBY_CSS = `
 .du-item { display: grid; justify-items: start; gap: 6px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); font-size: 13px; }
 .du-item strong { font-size: 15px; color: var(--bone); }
 .du-item small { color: #d8a8ff; }
+.du-item small.du-item-tower { color: var(--ash); }
+.du-item.is-skin { border-color: rgba(232,176,75,0.4); }
+.du-skinart { width: 110px; height: 110px; border-radius: 10px; background: radial-gradient(circle at 50% 60%, rgba(255,214,140,0.12), rgba(0,0,0,0.35)); display: grid; place-items: center; }
+.du-fxprev { border-radius: 10px; background: radial-gradient(circle at 50% 70%, rgba(255,255,255,0.06), rgba(0,0,0,0.4)); }
+.du-shop-group { margin-top: 18px; }
+.du-shop-h { margin: 0; font-family: var(--display); font-size: 20px; color: var(--bone); }
+.du-shop-group .pg-sub { margin: 2px 0 0; }
 .du-item button { margin-top: auto; }
 .du-swatch { width: 54px; height: 54px; border-radius: 10px; display: grid; place-items: center; border: 2px solid rgba(255,255,255,0.25); }
 .du-swatch.is-BANNER { clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); }

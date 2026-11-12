@@ -1,3 +1,4 @@
+import { activeKillFx, drawKillFx } from "./duelLooks";
 import { CASTLE_AT, LANE_H, LANE_SLOTS, LANE_W, lanePath, slotPos, type DuelSnapshot, type Pt, type Side } from "@/engine/DuelEngine";
 import { MAX_DUEL_TOWER_LEVEL } from "@/config/duel";
 import { drawEnemy, drawEnemyHpBar, drawTower } from "./EntityRenderer";
@@ -387,8 +388,10 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: DuelSnapshot): void {
 
 function drawDeaths(ctx: CanvasRenderingContext2D, snap: DuelSnapshot): void {
   ctx.save();
+  const fx = activeKillFx();
   for (const d of snap.deaths) {
     const k = (snap.timeMs - d.at) / 900;
+    if (fx) drawKillFx(ctx, fx, d.x, d.y, k, d.at % 997, d.big);
     const r = (d.big ? 26 : 14) * (0.6 + k);
     ctx.fillStyle = `rgba(30,24,20,${0.55 * (1 - k)})`;
     ctx.beginPath();

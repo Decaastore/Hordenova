@@ -139,3 +139,42 @@ describe("weekly challenge and season rule", () => {
     expect(getSeasonRule(1 + SEASON_RULES.length).id).toBe(SEASON_RULES[0]!.id);
   });
 });
+
+describe("Duel cosmetics", () => {
+  it("Duel skins and kill effects are bought with coins, worn per tower, and only shown in the Duel and the Eternal castle", async () => {
+    const { buyDuelShopItem: buy, createDuelProfile: fresh, duelSkinLooks, duelKillFx, toggleDuelCosmetic } = await import("@/config/duel");
+    const { DUEL_TOWER_SKINS, getSkinsForTower } = await import("@/config/towerSkins");
+    const { TOWER_SPRITES } = await import("@/rendering/towerSpriteMeta");
+    for (const s of DUEL_TOWER_SKINS) {
+      expect(Object.keys(TOWER_SPRITES[s.towerType]?.[s.id] ?? {})).toHaveLength(6);
+      expect(getSkinsForTower(s.towerType).some((x) => x.id === s.id)).toBe(false); // never in the Gem store / tower panel
+      expect(s.gameplayEffect).toEqual({});
+    }
+    let p = { ...fresh(), coins: 5000 };
+    p = buy(p, "SKIN_INFERNO_GLADIATOR", 0)!.profile;
+    p = buy(p, "KILL_SOULS", 0)!.profile;
+    expect(duelSkinLooks(p)).toEqual({ INFERNO: "INFERNO_GLADIATOR" });
+    expect(duelKillFx(p)).toBe("SOULS");
+    p = toggleDuelCosmetic(p, "SKIN_INFERNO_GLADIATOR")!;
+    expect(duelSkinLooks(p)).toEqual({});
+    expect(toggleDuelCosmetic(p, "SKIN_IRONWOOD_CHAMPION")).toBeNull(); // not owned
+  });
+
+  it("the Season castle never shows Duel looks; the Eternal castle does", async () => {
+    window.localStorage.clear();
+    const { updateSave, loadSave, ETERNAL_STORAGE_KEY } = await import("./SaveSystem");
+    const { GameEngine } = await import("./GameEngine");
+    const { lookSkinId, activeKillFx } = await import("@/rendering/duelLooks");
+    const { buyDuelShopItem: buy } = await import("@/config/duel");
+    let duel = { ...loadSave().duel, coins: 5000 };
+    duel = buy(duel, "SKIN_INFERNO_GLADIATOR", 0)!.profile;
+    duel = buy(duel, "KILL_GOLD", 0)!.profile;
+    updateSave({ duel });
+    new GameEngine(ETERNAL_STORAGE_KEY).startRun();
+    expect(lookSkinId("INFERNO", null)).toBe("INFERNO_GLADIATOR");
+    expect(activeKillFx()).toBe("GOLD");
+    new GameEngine().startRun();
+    expect(lookSkinId("INFERNO", "INFERNO_BLUE_FLAME")).toBe("INFERNO_BLUE_FLAME");
+    expect(activeKillFx()).toBeNull();
+  });
+});

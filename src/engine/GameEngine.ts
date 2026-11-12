@@ -147,6 +147,8 @@ import { adaptAfterWave, createHordeAdaptation, emptyShares, strongestResistance
 import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FIRES_PER_BOSS_BREACH, CITY_FIRES_PER_LEAKED_WAVE, igniteBuildings, type CityBuildingId, type CityState } from "@/config/city";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
+import { setDuelLooks } from "@/rendering/duelLooks";
+import { duelKillFx, duelSkinLooks } from "@/config/duel";
 import { getSeasonRule, type SeasonRule } from "@/config/seasonRules";
 import {
   addEssences,
@@ -721,6 +723,8 @@ export class GameEngine {
     this.momentOffers = save.momentOffers;
     this.vip = save.vip;
     setEvolvedSkins(save.evolvedSkinIds);
+    // DUELO cosmetics show in the Eternal castle only — the Season castle keeps its own looks
+    setDuelLooks(this.isEternal ? duelSkinLooks(save.duel) : null, this.isEternal ? duelKillFx(save.duel) : null);
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;

@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v110",
+    dateIso: "2026-11-12",
+    category: "CONTENT",
+    title: {
+      en: "Duel Skins and Kill Effects",
+      ptBR: "Skins e Efeitos de Abate do Duelo",
+    },
+    description: {
+      en: "The Duel Shop now sells tower skins and kill effects for Duel Coins. They show in the Duel and in the Eternal castle; the Season castle keeps its own skins, so nothing from the Duel changes the Season.",
+      ptBR: "A Loja do Duelo agora vende skins de torre e efeitos de abate por Moedas de Duelo. Eles aparecem no Duelo e no castelo Eterno; o castelo da Season continua com as skins dela, então nada do Duelo muda a Season.",
+    },
+    highlights: [
+      {
+        en: "8 Duel tower skins, two per tower: Gladiator (hammered bronze and crimson, 900 coins) and Champion (white marble, gold and black, 1,800 coins).",
+        ptBR: "8 skins de torre do Duelo, duas por torre: Gladiador (bronze batido e carmesim, 900 moedas) e Campeão (mármore branco, ouro e preto, 1.800 moedas).",
+      },
+      {
+        en: "4 kill effects, what a creature leaves when it falls: Embers, Frost Shatter, Freed Souls and Gold Rain.",
+        ptBR: "4 efeitos de abate, o que a criatura deixa quando cai: Brasas, Estilhaço de Gelo, Almas Libertas e Chuva de Ouro.",
+      },
+      {
+        en: "Purely visual: a Duel skin swaps the tower's look only and never changes its own skin's effects or bonuses. Wear and take them off any time in the Duel Shop.",
+        ptBR: "Só visual: a skin do Duelo troca apenas a aparência da torre e nunca muda os efeitos nem os bônus da skin dela. Dá para usar e tirar a qualquer hora na Loja do Duelo.",
+      },
+    ],
+  },
+  {
     id: "v109",
     dateIso: "2026-11-12",
     category: "INTERFACE",

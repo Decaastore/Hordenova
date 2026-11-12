@@ -152,7 +152,7 @@ export const NO_GAMEPLAY_EFFECT: SkinGameplayEffect = {};
  * price points (see TOWER_SKIN_TIER_PRICES). Purely a pricing classification
  * — never read by combat code, never affects catalog/ownership/equip logic.
  */
-export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE";
+export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE" | "DUEL";
 
 /**
  * The three approved commercial price points, in Gems, plus PRESTIGE (0 —
@@ -165,6 +165,8 @@ export const TOWER_SKIN_TIER_PRICES: Record<TowerSkinTier, number> = {
   INTERMEDIATE: 350,
   PREMIUM: 800,
   PRESTIGE: 0,
+  /** Bought with Duel Coins only (config/duel.ts DUEL_SHOP), never with Gems. */
+  DUEL: 0,
 };
 
 /**
@@ -957,7 +959,145 @@ export const PRESTIGE_TOWER_SKINS: readonly TowerSkinDefinition[] = [
   },
 ];
 
-const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS].map((s) => [s.id, s]));
+
+/**
+ * DUELO — tower skins bought with Duel Coins in the Duel Shop. They show in
+ * the Duel and in the Eternal castle only; the Season castle keeps its own
+ * skins (the Gem ones), so the Season isn't touched by the Duel. Purely
+ * visual: a Duel skin replaces only the look, never any effect or bonus.
+ */
+export const DUEL_TOWER_SKINS: readonly TowerSkinDefinition[] = [
+  {
+    id: "IRONWOOD_GLADIATOR",
+    towerType: "IRONWOOD",
+    i18nKey: "IRONWOOD_GLADIATOR",
+    paletteOverride: { primary: "#6a3a1e", secondary: "#22100a", accent: "#ff4a2a", glow: "rgba(255,74,42,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "molten",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ff4a2a", behavior: "embers" },
+    projectileStyle: "magma-orb",
+    cosmeticAttribute: { i18nKey: "IRONWOOD_GLADIATOR" },
+    gameplayEffect: {},
+  },
+  {
+    id: "IRONWOOD_CHAMPION",
+    towerType: "IRONWOOD",
+    i18nKey: "IRONWOOD_CHAMPION",
+    paletteOverride: { primary: "#e8e0cc", secondary: "#1e1c1e", accent: "#ffd84a", glow: "rgba(255,216,74,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "radiant",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ffd84a", behavior: "solar-flares" },
+    projectileStyle: "divine-bolt",
+    cosmeticAttribute: { i18nKey: "IRONWOOD_CHAMPION" },
+    gameplayEffect: {},
+  },
+  {
+    id: "INFERNO_GLADIATOR",
+    towerType: "INFERNO",
+    i18nKey: "INFERNO_GLADIATOR",
+    paletteOverride: { primary: "#7a2a1e", secondary: "#1e120a", accent: "#ff4a1a", glow: "rgba(255,74,26,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "molten",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ff4a1a", behavior: "embers" },
+    projectileStyle: "magma-orb",
+    cosmeticAttribute: { i18nKey: "INFERNO_GLADIATOR" },
+    gameplayEffect: {},
+  },
+  {
+    id: "INFERNO_CHAMPION",
+    towerType: "INFERNO",
+    i18nKey: "INFERNO_CHAMPION",
+    paletteOverride: { primary: "#e8e0cc", secondary: "#1e1c22", accent: "#ffd84a", glow: "rgba(255,216,74,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "radiant",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ffd84a", behavior: "solar-flares" },
+    projectileStyle: "divine-bolt",
+    cosmeticAttribute: { i18nKey: "INFERNO_CHAMPION" },
+    gameplayEffect: {},
+  },
+  {
+    id: "FROSTBORN_GLADIATOR",
+    towerType: "FROSTBORN",
+    i18nKey: "FROSTBORN_GLADIATOR",
+    paletteOverride: { primary: "#8a5232", secondary: "#22120a", accent: "#ff6a3a", glow: "rgba(255,106,58,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "molten",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ff6a3a", behavior: "embers" },
+    projectileStyle: "magma-orb",
+    cosmeticAttribute: { i18nKey: "FROSTBORN_GLADIATOR" },
+    gameplayEffect: {},
+  },
+  {
+    id: "FROSTBORN_CHAMPION",
+    towerType: "FROSTBORN",
+    i18nKey: "FROSTBORN_CHAMPION",
+    paletteOverride: { primary: "#f0e8d4", secondary: "#1a1a22", accent: "#ffe08a", glow: "rgba(255,224,138,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "radiant",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ffe08a", behavior: "solar-flares" },
+    projectileStyle: "divine-bolt",
+    cosmeticAttribute: { i18nKey: "FROSTBORN_CHAMPION" },
+    gameplayEffect: {},
+  },
+  {
+    id: "STORMCALLER_GLADIATOR",
+    towerType: "STORMCALLER",
+    i18nKey: "STORMCALLER_GLADIATOR",
+    paletteOverride: { primary: "#7a4428", secondary: "#1c0e08", accent: "#ff5a2a", glow: "rgba(255,90,42,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "molten",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ff5a2a", behavior: "embers" },
+    projectileStyle: "magma-orb",
+    cosmeticAttribute: { i18nKey: "STORMCALLER_GLADIATOR" },
+    gameplayEffect: {},
+  },
+  {
+    id: "STORMCALLER_CHAMPION",
+    towerType: "STORMCALLER",
+    i18nKey: "STORMCALLER_CHAMPION",
+    paletteOverride: { primary: "#f0e8d4", secondary: "#1a1a22", accent: "#ffe06a", glow: "rgba(255,224,106,0.5)" },
+    unlockLevel: 1,
+    tier: "DUEL",
+    gemCost: 0,
+    material: "radiant",
+    coreShape: "",
+    weaponDetail: "",
+    particleStyle: { color: "#ffe06a", behavior: "solar-flares" },
+    projectileStyle: "divine-bolt",
+    cosmeticAttribute: { i18nKey: "STORMCALLER_CHAMPION" },
+    gameplayEffect: {},
+  },
+];
+
+const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS].map((s) => [s.id, s]));
 
 export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
   return SKINS_BY_ID.get(id) ?? null;

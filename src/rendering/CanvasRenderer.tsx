@@ -1,3 +1,4 @@
+import { activeKillFx, drawKillFx } from "./duelLooks";
 import { LootFx } from "./lootFx";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { CombatFx, preloadCombatFxArt } from "./combatFx";
@@ -609,6 +610,8 @@ export function CanvasRenderer({
         ctx.translate(-anim.enemy.position.x, -anim.enemy.position.y);
         drawEnemy(ctx, anim.enemy, anim.freezeTimeMs, Infinity, anim.scale, anim.bossColor);
         ctx.restore();
+        const fx = activeKillFx();
+        if (fx) drawKillFx(ctx, fx, anim.enemy.position.x, anim.enemy.position.y, progress, anim.startTimestamp % 997, !!anim.enemy.boss);
       }
 
       // LUZ E CICLO DO DIA (rendering/ambientLight.ts) — dusk dims the map a

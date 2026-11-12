@@ -1,3 +1,4 @@
+import { lookSkinId } from "./duelLooks";
 import { MANA_MAX, MANA_OVERCHARGE_MAX } from "@/config/towerMana";
 import type { TowerInstance } from "@/entities/Tower";
 import type { EnemyInstance } from "@/entities/Enemy";
@@ -294,7 +295,8 @@ export function drawTower(
   // or reads a skin, so equipping one is structurally incapable of
   // touching gameplay. See config/towerSkins.ts.
   const baseTheme = TOWER_THEME[tower.type];
-  const skin = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId) : null;
+  const lookId = lookSkinId(tower.type, tower.equippedSkinId);
+  const skin = lookId ? getTowerSkinDefinition(lookId) : null;
   const theme = skin ? { ...baseTheme, ...skin.paletteOverride } : baseTheme;
   const visualStage = getTowerVisualStage(stats.level);
   // TOWER REDESIGN MASTER PASS v2 — fixed at every level (see
@@ -310,7 +312,7 @@ export function drawTower(
 
   // Pre-rendered 3D body when one exists for this type/skin/stage (see
   // towerSprites.ts); otherwise the original vector tower below.
-  const sprite = getTowerSprite(tower.type, tower.equippedSkinId, visualStage);
+  const sprite = getTowerSprite(tower.type, lookId, visualStage);
   if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
     drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
