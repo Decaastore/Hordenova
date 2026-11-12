@@ -61,7 +61,7 @@ describe("Duel profile", () => {
     const up = applyDuelResult(p, stats("WIN"), day);
     expect(up.rankAfter.league).toBe("SILVER");
     expect(up.newRanks).toEqual([3]);
-    expect(up.prize.shards).toBeGreaterThan(0);
+    expect(up.prize.coins).toBeGreaterThan(0);
     p = up.profile;
     // drop back: never below Silver's start, and climbing again doesn't pay twice
     p = applyDuelResult(p, stats("LOSS"), day).profile;
@@ -82,17 +82,18 @@ describe("Duel profile", () => {
     expect(applyDuelResult(p, stats("LOSS"), day).profile.streak).toBe(0);
   });
 
-  it("Epic essences stay hard: only league promotions, a 10-win streak and one a week in the shop; Legendary only at Legend", () => {
-    for (let i = 0; i < RANK_STEPS.length; i++) {
-      const pr = rankPrize(i);
-      if (pr.epic) expect(RANK_STEPS[i]!.division).toBe(1);
-      if (pr.legendary) expect(RANK_STEPS[i]!.league).toBe("LEGEND");
+  it("the Duel only pays Duel Coins — no Gems, Shards or Forge materials reach the Season", async () => {
+    const { DUEL_SHOP, STREAK_PRIZES: streaks } = await import("@/config/duel");
+    const onlyCoins = (pr: { shards: number; splinters: number; rare: number; epic: number; legendary: number }) => pr.shards + pr.splinters + pr.rare + pr.epic + pr.legendary === 0;
+    for (let i = 0; i < RANK_STEPS.length; i++) expect(onlyCoins(rankPrize(i))).toBe(true);
+    for (const s2 of streaks) expect(onlyCoins(s2.prize)).toBe(true);
+    expect(onlyCoins(FIRST_WIN_PRIZE)).toBe(true);
+    for (const item of DUEL_SHOP) {
+      expect(item.cosmetic).toBeTruthy();
+      expect(item.prize).toBeUndefined();
     }
     let p = { ...createDuelProfile(), coins: 5000 };
-    const r1 = buyDuelShopItem(p, "EPIC", day)!;
-    expect(r1.prize.epic).toBe(1);
-    expect(buyDuelShopItem(r1.profile, "EPIC", day)).toBeNull();
-    expect(buyDuelShopItem(r1.profile, "EPIC", day + 7 * 86_400_000)).not.toBeNull();
+    expect(buyDuelShopItem(p, "EPIC", day)).toBeNull();
     p = buyDuelShopItem(p, "BANNER_VOID", day)!.profile;
     expect(p.banner).toBe("BANNER_VOID");
     expect(buyDuelShopItem(p, "BANNER_VOID", day)).toBeNull();

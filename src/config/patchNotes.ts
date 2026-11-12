@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v114",
+    dateIso: "2026-11-12",
+    category: "BALANCE",
+    title: {
+      en: "The Duel now only gives Duel Coins",
+      ptBR: "O Duelo agora só dá Moedas de Duelo",
+    },
+    description: {
+      en: "So the Season stays with only its own skins and items, nothing from the Duel reaches it anymore. The Duel Shop no longer sells Splinters or Essences, and every Duel prize is now paid in Duel Coins, which buy the Duel's own looks.",
+      ptBR: "Para a Season ficar só com as skins e itens dela, nada do Duelo chega mais nela. A Loja do Duelo não vende mais Estilhaços nem Essências, e todo prêmio do Duelo agora é pago em Moedas de Duelo, que compram os visuais do próprio Duelo.",
+    },
+    highlights: [
+      {
+        en: "League prizes: Silver 250, Gold 400, Platinum 600, Diamond 900, Master 1,500 and Legend 3,000 Duel Coins; every new division II and III gives 80.",
+        ptBR: "Prêmios de liga: Prata 250, Ouro 400, Platina 600, Diamante 900, Mestre 1.500 e Lenda 3.000 Moedas de Duelo; cada divisão nova II e III dá 80.",
+      },
+      {
+        en: "First win of the day: 40 coins. Win streaks of 3, 5 and 10: 30, 60 and 150 coins. Weekly Challenge: 150 coins.",
+        ptBR: "Primeira vitória do dia: 40 moedas. Sequências de 3, 5 e 10 vitórias: 30, 60 e 150 moedas. Desafio da Semana: 150 moedas.",
+      },
+      {
+        en: "Epic, Legendary and Mythic Essences now come only from expeditions, so the top items stay rare.",
+        ptBR: "Essências Épicas, Lendárias e Míticas agora só vêm das expedições, então os itens de topo continuam raros.",
+      },
+    ],
+  },
+  {
     id: "v113",
     dateIso: "2026-11-12",
     category: "INTERFACE",

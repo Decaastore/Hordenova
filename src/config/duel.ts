@@ -196,10 +196,9 @@ export const TROPHIES_LOSS = 20;
 
 // ── rewards ─────────────────────────────────────────────────────────────
 /**
- * What the Duel pays. Duel Coins are its own currency (Duel shop). Gem
- * Shards, Forge Splinters and Essences go to the account. Epic Essences are
- * rare on purpose: league promotions, a 10-win streak and one a week in the
- * shop; one Legendary Essence only at Legend. Mythic never comes from the Duel.
+ * What the Duel pays: Duel Coins only, its own currency, spent in the Duel
+ * Shop on looks. Nothing from the Duel reaches the Season — no Gems, no Gem
+ * Shards, no Forge materials (so no items).
  */
 export interface DuelPrize {
   coins: number;
@@ -217,34 +216,20 @@ export function addPrize(a: DuelPrize, b: DuelPrize): DuelPrize {
 }
 
 export const MATCH_COINS: Record<DuelOutcome, number> = { WIN: 12, LOSS: 4, DRAW: 6 };
-export const FIRST_WIN_PRIZE = P({ coins: 30, shards: 2, splinters: 15 });
+export const FIRST_WIN_PRIZE = P({ coins: 40 });
 export const STREAK_PRIZES: readonly { at: number; prize: DuelPrize }[] = [
-  { at: 3, prize: P({ coins: 25 }) },
-  { at: 5, prize: P({ coins: 50, rare: 2 }) },
-  { at: 10, prize: P({ coins: 120, epic: 1 }) },
+  { at: 3, prize: P({ coins: 30 }) },
+  { at: 5, prize: P({ coins: 60 }) },
+  { at: 10, prize: P({ coins: 150 }) },
 ];
 
-/** Paid once, the first time a rank step is reached (by best trophies). */
+/** Paid once, the first time a rank step is reached (by best trophies) — Duel Coins only. */
 export function rankPrize(index: number): DuelPrize {
   const step = RANK_STEPS[index];
   if (!step || index === 0) return NO_PRIZE;
-  if (step.division !== 1) return P({ coins: 60, splinters: 15, rare: 2 });
-  switch (step.league) {
-    case "SILVER":
-      return P({ coins: 150, splinters: 40, rare: 6, shards: 3 });
-    case "GOLD":
-      return P({ coins: 250, splinters: 60, rare: 10, epic: 1 });
-    case "PLATINUM":
-      return P({ coins: 350, splinters: 80, rare: 15, epic: 2, shards: 5 });
-    case "DIAMOND":
-      return P({ coins: 500, splinters: 100, epic: 3, shards: 8 });
-    case "MASTER":
-      return P({ coins: 800, splinters: 150, epic: 5, shards: 12 });
-    case "LEGEND":
-      return P({ coins: 1500, splinters: 250, epic: 8, legendary: 1, shards: 20 });
-    default:
-      return NO_PRIZE;
-  }
+  if (step.division !== 1) return P({ coins: 80 });
+  const byLeague: Record<LeagueId, number> = { BRONZE: 0, SILVER: 250, GOLD: 400, PLATINUM: 600, DIAMOND: 900, MASTER: 1500, LEGEND: 3000 };
+  return P({ coins: byLeague[step.league] });
 }
 
 // ── daily missions ─────────────────────────────────────────────────────
@@ -322,9 +307,6 @@ export interface DuelShopItem {
 }
 
 export const DUEL_SHOP: readonly DuelShopItem[] = [
-  { id: "SPLINTERS", price: 80, prize: P({ splinters: 30 }) },
-  { id: "RARE", price: 100, prize: P({ rare: 3 }) },
-  { id: "EPIC", price: 600, prize: P({ epic: 1 }), weekly: true },
   { id: "BANNER_CRIMSON", price: 300, cosmetic: { kind: "BANNER", color: "#b0302a", color2: "#f0c060" } },
   { id: "BANNER_AZURE", price: 300, cosmetic: { kind: "BANNER", color: "#2a5ab0", color2: "#e8e8f0" } },
   { id: "BANNER_EMERALD", price: 450, cosmetic: { kind: "BANNER", color: "#1f7a4a", color2: "#f0d080" } },
@@ -539,7 +521,8 @@ export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { pr
  * seed, your deck and the opponent's deck are set, and the opponent plays at
  * full skill. Beat it once in the week for its reward. Trophies don't move.
  */
-export const WEEKLY_CHALLENGE_SHARDS = 3;
+/** Duel Coins for beating the Weekly Challenge (once a week). */
+export const WEEKLY_CHALLENGE_COINS = 150;
 export const WEEKLY_CHALLENGE_AI = 0.95;
 
 export interface WeeklyChallenge {

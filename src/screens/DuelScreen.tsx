@@ -27,7 +27,7 @@ import {
   rankPrize,
   STREAK_PRIZES,
   WEEKLY_CHALLENGE_AI,
-  WEEKLY_CHALLENGE_SHARDS,
+  WEEKLY_CHALLENGE_COINS,
   weeklyChallenge,
   duelKillFx,
   duelSkinLooks,
@@ -292,8 +292,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const cur = loadSave();
     if (challenge) {
       const paid = outcome === "WIN" && cur.duel.weeklyWonWeek !== week;
-      const prize = paid ? { ...NO_PRIZE, shards: WEEKLY_CHALLENGE_SHARDS } : NO_PRIZE;
-      const next = updateSave({ ...grantPrize(cur, prize, "duel_weekly"), duel: { ...cur.duel, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
+      const prize = paid ? { ...NO_PRIZE, coins: WEEKLY_CHALLENGE_COINS } : NO_PRIZE;
+      const next = updateSave({ duel: { ...cur.duel, coins: cur.duel.coins + prize.coins, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
       setSave(next);
       setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null });
       return;
@@ -380,7 +380,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               <p className="pg-sub">
                 {duel.firstWinDay === day ? t("duel.firstWinDone") : t("duel.firstWinOpen")} <PrizeLine prize={FIRST_WIN_PRIZE} />
               </p>
-              <p className="pg-sub">{t("duel.coinsBalance", { n: fmt(duel.coins) })}</p>
+              <p className="pg-sub du-pz">
+                <MaterialIcon kind="DUEL_COINS" size={18} /> {t("duel.coinsBalance", { n: fmt(duel.coins) })}
+              </p>
             </div>
             <button className="pg-btn" disabled={!deckOk} onClick={start} data-testid="duel-start">
               {t("duel.playRanked")}
@@ -451,7 +453,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
           <section className="du-weekly" data-testid="duel-weekly">
             <div>
               <h2 className="pg-h2">{t("duel.weeklyTitle")}</h2>
-              <p className="pg-sub">{t("duel.weeklyLead", { shards: WEEKLY_CHALLENGE_SHARDS })}</p>
+              <p className="pg-sub">{t("duel.weeklyLead", { coins: WEEKLY_CHALLENGE_COINS })}</p>
               <div className="du-weekly-decks">
                 <span>{t("duel.weeklyYours")}</span>
                 {weekly.myDeck.map((id) => (
@@ -474,7 +476,6 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
             <p className="pg-sub">{t("duel.shopLead")}</p>
             {(
               [
-                ["mats", (i: DuelShopItem) => !i.cosmetic],
                 ["skins", (i: DuelShopItem) => i.cosmetic?.kind === "TOWER_SKIN"],
                 ["kills", (i: DuelShopItem) => i.cosmetic?.kind === "KILL_FX"],
                 ["looks", (i: DuelShopItem) => i.cosmetic?.kind === "BANNER" || i.cosmetic?.kind === "FRAME"],
