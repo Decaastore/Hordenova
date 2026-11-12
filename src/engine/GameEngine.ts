@@ -148,6 +148,7 @@ import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FI
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import { setDuelLooks } from "@/rendering/duelLooks";
+import { setEclipseAura } from "@/rendering/eclipseAura";
 import { duelKillFx, duelSkinLooks } from "@/config/duel";
 import { getSeasonRule, type SeasonRule } from "@/config/seasonRules";
 import {
@@ -725,6 +726,8 @@ export class GameEngine {
     setEvolvedSkins(save.evolvedSkinIds);
     // DUELO cosmetics show in the Eternal castle only — the Season castle keeps its own looks
     setDuelLooks(this.isEternal ? duelSkinLooks(save.duel) : null, this.isEternal ? duelKillFx(save.duel) : null);
+    // CHEFE GLOBAL — the Eclipse looks show in both castles
+    setEclipseAura(save.colossus.equipped);
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;

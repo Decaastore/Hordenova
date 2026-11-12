@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v119",
+    dateIso: "2026-11-12",
+    category: "BOSSES",
+    title: {
+      en: "Global Boss: the Serpent of the Eclipse (preview)",
+      ptBR: "Chefe Global: a Serpente do Eclipse (prévia)",
+    },
+    description: {
+      en: "A new weekly raid. A colossal winged serpent crawls a spiral across a floating island in the void, and its life is shared by everyone: rooms of 12 players, one tower each (your strongest), all chipping at the same bar. Until the game has an online server, the other players and rooms are simulated, and the game says so.",
+      ptBR: "Um novo raide semanal. Uma serpente alada colossal percorre uma espiral numa ilha flutuante no vazio, e a vida dela é uma só para todo mundo: salas de 12 jogadores, uma torre cada (a sua mais forte), todos batendo na mesma barra. Enquanto o jogo não tem servidor online, os outros jogadores e salas são simulados, e o jogo avisa isso.",
+    },
+    highlights: [
+      {
+        en: "Three phases in 2.5 minutes: Awakening, Starfall (move your tower off a marked slot or it gets stunned) and Eclipse (more damage, but scale shields: time your Star Strike).",
+        ptBR: "Três fases em 2,5 minutos: Despertar, Chuva de Estrelas (tire sua torre da vaga marcada ou ela fica atordoada) e Eclipse (mais dano, mas com escudos de escamas: acerte o tempo do Golpe Estelar).",
+      },
+      {
+        en: "3 attempts a day. Prizes by your place in the room: Splinters, Essences and Eclipse Marks. Free Gems stay small: 1 for the first attempt of the day and 3 if the community brings the Serpent down that week.",
+        ptBR: "3 tentativas por dia. Prêmios pela sua colocação na sala: Estilhaços, Essências e Marcas do Eclipse. As Gemas grátis são poucas: 1 na primeira tentativa do dia e 3 se a comunidade derrubar a Serpente na semana.",
+      },
+      {
+        en: "Weekly Marks unlock two permanent tower looks that show in the Season and the Eternal castle: the Eclipse Sigil (15 Marks) and the Eclipse Crown (40 Marks). 25 Marks also give 100 Splinters and a Legendary Essence every week.",
+        ptBR: "As Marcas da semana liberam dois visuais permanentes de torre que aparecem na Season e no Eterno: o Selo do Eclipse (15 Marcas) e a Coroa do Eclipse (40 Marcas). 25 Marcas também dão 100 Estilhaços e uma Essência Lendária toda semana.",
+      },
+      {
+        en: "Fair by design: tower power counts with diminishing returns, so slot choice, dodging and Strike timing matter as much as the account. Open it from the Season page.",
+        ptBR: "Justo por natureza: o poder da torre conta com retorno decrescente, então a vaga, os desvios e o tempo do Golpe pesam tanto quanto a conta. Abra pela página da Season.",
+      },
+    ],
+  },
+  {
     id: "v118",
     dateIso: "2026-11-12",
     category: "BALANCE",

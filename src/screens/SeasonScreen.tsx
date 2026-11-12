@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
@@ -25,6 +26,8 @@ interface SeasonScreenProps {
   onPlayEternal?: () => void;
   /** DUELO — opens the Duel lobby. */
   onPlayDuel?: () => void;
+  /** CHEFE GLOBAL — opens the Serpent of the Eclipse. */
+  onPlayColossus?: () => void;
 }
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
@@ -47,7 +50,7 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
  * the top five will earn. No backend yet, so nothing about other players
  * is ever invented (same stance as RankingScreen.tsx).
  */
-export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel }: SeasonScreenProps) {
+export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, onPlayColossus }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
@@ -209,6 +212,33 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel }: 
             </section>
           )}
 
+          {onPlayColossus && (
+            <section className="et-card co-card" data-testid="colossus-card">
+              <div className="et-text">
+                <p className="et-kicker co-kicker2">{t("colossus.kicker")}</p>
+                <h2 className="pg-h2">{t("colossus.title")}</h2>
+                <p className="pg-sub">{t("colossus.cardLead")}</p>
+                <dl className="et-figs">
+                  <div>
+                    <dt>{t("colossus.cardLife")}</dt>
+                    <dd>{(worldState(save.colossus, Date.now()).fraction * 100).toFixed(1)}%</dd>
+                  </div>
+                  <div>
+                    <dt>{t("colossus.cardAttempts")}</dt>
+                    <dd>
+                      {attemptsLeft(save.colossus, Date.now())}/{COLOSSUS_ATTEMPTS_PER_DAY}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="et-actions">
+                <button className="pg-btn" onClick={onPlayColossus} data-testid="play-colossus">
+                  {t("colossus.open")}
+                </button>
+              </div>
+            </section>
+          )}
+
           <SeasonPassSection />
 
           <div className="pg-cols">
@@ -335,5 +365,7 @@ const ETERNAL_CSS = `
 .sr-rule span { color: #d9cdb6; }
 .du-card { border-color: rgba(224,100,75,0.45); background: linear-gradient(110deg, rgba(224,100,75,0.13), rgba(24,18,12,0.6) 60%); }
 .du-kicker { color: #ff9a85 !important; }
+.co-card { border-color: rgba(176,106,255,0.5); background: linear-gradient(110deg, rgba(176,106,255,0.16), rgba(24,18,12,0.6) 60%); }
+.co-kicker2 { color: #c79bff !important; }
 @media (max-width: 720px) { .et-card { grid-template-columns: 1fr; } .et-actions { justify-items: stretch; max-width: none; } }
 `;

@@ -10,6 +10,7 @@ import { getTowerSkinDefinition, type SkinMaterialFinish, type SkinParticleStyle
 import { ENEMY_DISPLAY_SCALE, ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawSkinEvolution, isSkinEvolved } from "./skinEvolution";
 import { drawMasteryOver, drawMasteryUnder } from "./masteryFx";
+import { drawEclipseOver, drawEclipseUnder } from "./eclipseAura";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
@@ -317,7 +318,10 @@ export function drawTower(
   // Pre-rendered 3D body when one exists for this type/skin/stage (see
   // towerSprites.ts); otherwise the original vector tower below.
   const sprite = getTowerSprite(tower.type, lookId, visualStage);
-  if (!bodyOnly) drawMasteryUnder(ctx, tower.masteryLevel, theme.accent, timeMs);
+  if (!bodyOnly) {
+    drawEclipseUnder(ctx, timeMs);
+    drawMasteryUnder(ctx, tower.masteryLevel, theme.accent, timeMs);
+  }
   if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
     drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
@@ -339,7 +343,11 @@ export function drawTower(
       break;
   }
 
-  if (!bodyOnly) drawMasteryOver(ctx, tower.masteryLevel, theme.accent, timeMs, MASTERY_TOP_Y[tower.type]);
+  if (!bodyOnly) {
+    drawMasteryOver(ctx, tower.masteryLevel, theme.accent, timeMs, MASTERY_TOP_Y[tower.type]);
+    // the Eclipse sits above the Mastery halo/crown when both are on
+    drawEclipseOver(ctx, timeMs, MASTERY_TOP_Y[tower.type] - (tower.masteryLevel >= 60 ? 22 : 0));
+  }
 
   ctx.restore();
 
