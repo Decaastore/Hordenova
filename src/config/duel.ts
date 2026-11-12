@@ -118,8 +118,8 @@ export interface DuelArena {
 export const DUEL_ARENAS: readonly DuelArena[] = [
   { id: "ARENA_FOREST", minTrophies: 0, biome: "ANCIENT_FOREST", ai: 0.25 },
   { id: "ARENA_VOLCANO", minTrophies: 300, biome: "VOLCANIC_WASTES", ai: 0.45 },
-  { id: "ARENA_TUNDRA", minTrophies: 700, biome: "FROZEN_TUNDRA", ai: 0.65 },
-  { id: "ARENA_ABYSS", minTrophies: 1200, biome: "ABYSS", ai: 0.85 },
+  { id: "ARENA_TUNDRA", minTrophies: 900, biome: "FROZEN_TUNDRA", ai: 0.65 },
+  { id: "ARENA_ABYSS", minTrophies: 1500, biome: "ABYSS", ai: 0.85 },
 ];
 
 export function arenaFor(trophies: number): DuelArena {
@@ -128,71 +128,379 @@ export function arenaFor(trophies: number): DuelArena {
   return a;
 }
 
+// ── ranked: leagues and divisions ──────────────────────────────────────
+/**
+ * RANQUEADO — like Counter-Strike's ranks: five leagues of three divisions
+ * (100 trophies each), then Master and Legend. You can drop a division, but
+ * never below the start of the league you're in. The opponent gets
+ * stronger as you climb. Nothing here ever resets.
+ */
+export type LeagueId = "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" | "DIAMOND" | "MASTER" | "LEGEND";
+
+export const LEAGUES: readonly { id: LeagueId; min: number; divisions: number }[] = [
+  { id: "BRONZE", min: 0, divisions: 3 },
+  { id: "SILVER", min: 300, divisions: 3 },
+  { id: "GOLD", min: 600, divisions: 3 },
+  { id: "PLATINUM", min: 900, divisions: 3 },
+  { id: "DIAMOND", min: 1200, divisions: 3 },
+  { id: "MASTER", min: 1500, divisions: 1 },
+  { id: "LEGEND", min: 2000, divisions: 1 },
+];
+export const DIVISION_SIZE = 100;
+
+export interface DuelRank {
+  league: LeagueId;
+  /** 1..3 inside the league (1 for Master and Legend). */
+  division: number;
+  /** 0-based index over every rank step (Bronze I = 0 … Legend = 16). */
+  index: number;
+  /** Trophies where this rank starts, and where the next one starts (null at Legend). */
+  from: number;
+  next: number | null;
+}
+
+/** Every rank step in order, with the trophies where it starts. */
+export const RANK_STEPS: readonly { league: LeagueId; division: number; from: number }[] = LEAGUES.flatMap((l, i) => {
+  const end = LEAGUES[i + 1]?.min ?? Infinity;
+  if (l.divisions === 1) return [{ league: l.id, division: 1, from: l.min }];
+  return Array.from({ length: l.divisions }, (_, d) => ({ league: l.id, division: d + 1, from: Math.min(end, l.min + d * DIVISION_SIZE) }));
+});
+
+export function rankFor(trophies: number): DuelRank {
+  let index = 0;
+  RANK_STEPS.forEach((r, i) => {
+    if (trophies >= r.from) index = i;
+  });
+  const r = RANK_STEPS[index]!;
+  return { league: r.league, division: r.division, index, from: r.from, next: RANK_STEPS[index + 1]?.from ?? null };
+}
+
+/** The trophies you can never drop below: the start of your league. */
+export function leagueFloor(trophies: number): number {
+  let floor = 0;
+  for (const l of LEAGUES) if (trophies >= l.min) floor = l.min;
+  return floor;
+}
+
+/** AI skill grows with trophies — every win is earned against a stronger opponent. */
+export function duelAiSkill(trophies: number): number {
+  return Math.min(0.97, 0.2 + Math.max(0, trophies) / 2200);
+}
+
+export function trophyDelta(trophies: number, outcome: DuelOutcome): number {
+  const high = trophies >= 1500;
+  return outcome === "WIN" ? (high ? 20 : 30) : outcome === "LOSS" ? (high ? -25 : -20) : 0;
+}
 export const TROPHIES_WIN = 30;
 export const TROPHIES_LOSS = 20;
-export const TROPHIES_DRAW = 0;
-/** Gem Shards for a win — the only reward; nothing a Duel gives makes towers stronger. */
-export const DUEL_WIN_SHARDS = 1;
-/** At most this many rewarded wins per day. */
-export const DUEL_REWARDED_WINS_PER_DAY = 5;
 
+// ── rewards ─────────────────────────────────────────────────────────────
+/**
+ * What the Duel pays. Duel Coins are its own currency (Duel shop). Gem
+ * Shards, Forge Splinters and Essences go to the account. Epic Essences are
+ * rare on purpose: league promotions, a 10-win streak and one a week in the
+ * shop; one Legendary Essence only at Legend. Mythic never comes from the Duel.
+ */
+export interface DuelPrize {
+  coins: number;
+  shards: number;
+  splinters: number;
+  rare: number;
+  epic: number;
+  legendary: number;
+}
+export const NO_PRIZE: DuelPrize = { coins: 0, shards: 0, splinters: 0, rare: 0, epic: 0, legendary: 0 };
+const P = (p: Partial<DuelPrize>): DuelPrize => ({ ...NO_PRIZE, ...p });
+
+export function addPrize(a: DuelPrize, b: DuelPrize): DuelPrize {
+  return { coins: a.coins + b.coins, shards: a.shards + b.shards, splinters: a.splinters + b.splinters, rare: a.rare + b.rare, epic: a.epic + b.epic, legendary: a.legendary + b.legendary };
+}
+
+export const MATCH_COINS: Record<DuelOutcome, number> = { WIN: 12, LOSS: 4, DRAW: 6 };
+export const FIRST_WIN_PRIZE = P({ coins: 30, shards: 2, splinters: 15 });
+export const STREAK_PRIZES: readonly { at: number; prize: DuelPrize }[] = [
+  { at: 3, prize: P({ coins: 25 }) },
+  { at: 5, prize: P({ coins: 50, rare: 2 }) },
+  { at: 10, prize: P({ coins: 120, epic: 1 }) },
+];
+
+/** Paid once, the first time a rank step is reached (by best trophies). */
+export function rankPrize(index: number): DuelPrize {
+  const step = RANK_STEPS[index];
+  if (!step || index === 0) return NO_PRIZE;
+  if (step.division !== 1) return P({ coins: 60, splinters: 15, rare: 2 });
+  switch (step.league) {
+    case "SILVER":
+      return P({ coins: 150, splinters: 40, rare: 6, shards: 3 });
+    case "GOLD":
+      return P({ coins: 250, splinters: 60, rare: 10, epic: 1 });
+    case "PLATINUM":
+      return P({ coins: 350, splinters: 80, rare: 15, epic: 2, shards: 5 });
+    case "DIAMOND":
+      return P({ coins: 500, splinters: 100, epic: 3, shards: 8 });
+    case "MASTER":
+      return P({ coins: 800, splinters: 150, epic: 5, shards: 12 });
+    case "LEGEND":
+      return P({ coins: 1500, splinters: 250, epic: 8, legendary: 1, shards: 20 });
+    default:
+      return NO_PRIZE;
+  }
+}
+
+// ── daily missions ─────────────────────────────────────────────────────
+export type DuelMissionKind = "PLAY" | "WIN" | "WIN_WITH" | "KO_WIN" | "CLEAN_WIN" | "SENDS";
+
+export interface DuelMission {
+  id: string;
+  kind: DuelMissionKind;
+  target: number;
+  card?: DuelCardId;
+  coins: number;
+}
+
+export interface DuelMatchStats {
+  outcome: DuelOutcome;
+  myCastle: number;
+  foeCastle: number;
+  sends: number;
+  deck: readonly DuelCardId[];
+}
+
+/** Today's three missions — the same for everyone that day. */
+export function duelMissionsFor(day: number): DuelMission[] {
+  let s = (day * 2654435761 + 99) >>> 0 || 1;
+  const r = () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+  const towers = DUEL_CARDS.filter((c) => c.kind === "TOWER").map((c) => c.id);
+  const card = towers[Math.floor(r() * towers.length)]!;
+  const pool: DuelMission[] = [
+    { id: `m${day}-play`, kind: "PLAY", target: 3, coins: 30 },
+    { id: `m${day}-win`, kind: "WIN", target: 2, coins: 40 },
+    { id: `m${day}-with`, kind: "WIN_WITH", target: 1, card, coins: 35 },
+    { id: `m${day}-ko`, kind: "KO_WIN", target: 1, coins: 50 },
+    { id: `m${day}-clean`, kind: "CLEAN_WIN", target: 1, coins: 45 },
+    { id: `m${day}-sends`, kind: "SENDS", target: 15, coins: 30 },
+  ];
+  const out: DuelMission[] = [];
+  while (out.length < 3) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]!);
+  return out;
+}
+
+/** How much a match moves a mission forward. */
+export function missionStep(m: DuelMission, st: DuelMatchStats): number {
+  const win = st.outcome === "WIN";
+  switch (m.kind) {
+    case "PLAY":
+      return 1;
+    case "WIN":
+      return win ? 1 : 0;
+    case "WIN_WITH":
+      return win && m.card && st.deck.includes(m.card) ? 1 : 0;
+    case "KO_WIN":
+      return win && st.foeCastle <= 0 ? 1 : 0;
+    case "CLEAN_WIN":
+      return win && st.myCastle >= DUEL_CASTLE_HP - 5 ? 1 : 0;
+    case "SENDS":
+      return st.sends;
+  }
+}
+
+// ── Duel shop ───────────────────────────────────────────────────────────
+export type DuelCosmeticKind = "BANNER" | "FRAME";
+export interface DuelShopItem {
+  id: string;
+  price: number;
+  /** Materials it gives (repeatable buys). */
+  prize?: DuelPrize;
+  /** At most once a week. */
+  weekly?: boolean;
+  cosmetic?: { kind: DuelCosmeticKind; color: string; color2: string };
+}
+
+export const DUEL_SHOP: readonly DuelShopItem[] = [
+  { id: "SPLINTERS", price: 80, prize: P({ splinters: 30 }) },
+  { id: "RARE", price: 100, prize: P({ rare: 3 }) },
+  { id: "EPIC", price: 600, prize: P({ epic: 1 }), weekly: true },
+  { id: "BANNER_CRIMSON", price: 300, cosmetic: { kind: "BANNER", color: "#b0302a", color2: "#f0c060" } },
+  { id: "BANNER_AZURE", price: 300, cosmetic: { kind: "BANNER", color: "#2a5ab0", color2: "#e8e8f0" } },
+  { id: "BANNER_EMERALD", price: 450, cosmetic: { kind: "BANNER", color: "#1f7a4a", color2: "#f0d080" } },
+  { id: "BANNER_VOID", price: 700, cosmetic: { kind: "BANNER", color: "#3a1a5a", color2: "#d090ff" } },
+  { id: "FRAME_GOLD", price: 500, cosmetic: { kind: "FRAME", color: "#e8b04b", color2: "#7a5a1a" } },
+  { id: "FRAME_FROST", price: 650, cosmetic: { kind: "FRAME", color: "#9ad8ff", color2: "#2a5a7a" } },
+  { id: "FRAME_INFERNAL", price: 900, cosmetic: { kind: "FRAME", color: "#ff6a3a", color2: "#5a1a0a" } },
+];
+
+export function getShopItem(id: string): DuelShopItem | null {
+  return DUEL_SHOP.find((x) => x.id === id) ?? null;
+}
+
+// ── profile ─────────────────────────────────────────────────────────────
 export interface DuelProfile {
   trophies: number;
   bestTrophies: number;
   wins: number;
   losses: number;
   deck: DuelCardId[];
-  rewardDay: number;
-  rewardedToday: number;
+  coins: number;
+  streak: number;
+  bestStreak: number;
+  /** Last UTC day the first-win prize was paid. */
+  firstWinDay: number;
+  /** Highest rank step whose prize was paid. */
+  rankPaidUpTo: number;
+  missions: { day: number; progress: Record<string, number>; claimed: string[] };
+  /** Week the weekly shop item was last bought. */
+  shopWeek: number;
+  owned: string[];
+  banner: string | null;
+  frame: string | null;
   /** Week whose Weekly Challenge was beaten (-1 none). */
   weeklyWonWeek: number;
 }
 
 export function createDuelProfile(): DuelProfile {
-  return { trophies: 0, bestTrophies: 0, wins: 0, losses: 0, deck: [...DEFAULT_DECK], rewardDay: -1, rewardedToday: 0, weeklyWonWeek: -1 };
+  return {
+    trophies: 0,
+    bestTrophies: 0,
+    wins: 0,
+    losses: 0,
+    deck: [...DEFAULT_DECK],
+    coins: 0,
+    streak: 0,
+    bestStreak: 0,
+    firstWinDay: -1,
+    rankPaidUpTo: 0,
+    missions: { day: -1, progress: {}, claimed: [] },
+    shopWeek: -1,
+    owned: [],
+    banner: null,
+    frame: null,
+    weeklyWonWeek: -1,
+  };
 }
 
 const int = (v: unknown, d = 0) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : d);
+const intOr = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? Math.floor(v) : d);
 
 export function sanitizeDuelProfile(raw: unknown): DuelProfile {
   if (!raw || typeof raw !== "object") return createDuelProfile();
   const r = raw as Record<string, unknown>;
   const trophies = int(r.trophies);
+  const m = (r.missions && typeof r.missions === "object" ? r.missions : {}) as Record<string, unknown>;
+  const progress: Record<string, number> = {};
+  if (m.progress && typeof m.progress === "object") for (const [k, v] of Object.entries(m.progress as Record<string, unknown>)) if (typeof v === "number" && v > 0) progress[k] = Math.floor(v);
+  const owned = Array.isArray(r.owned) ? (r.owned as unknown[]).filter((x): x is string => typeof x === "string" && !!getShopItem(x)?.cosmetic) : [];
+  const pickOwned = (v: unknown) => (typeof v === "string" && owned.includes(v) ? v : null);
   return {
     trophies,
     bestTrophies: Math.max(trophies, int(r.bestTrophies)),
     wins: int(r.wins),
     losses: int(r.losses),
     deck: sanitizeDeck(r.deck),
-    rewardDay: typeof r.rewardDay === "number" ? Math.floor(r.rewardDay) : -1,
-    rewardedToday: int(r.rewardedToday),
-    weeklyWonWeek: typeof r.weeklyWonWeek === "number" ? Math.floor(r.weeklyWonWeek) : -1,
+    coins: int(r.coins),
+    streak: int(r.streak),
+    bestStreak: int(r.bestStreak),
+    firstWinDay: intOr(r.firstWinDay, -1),
+    rankPaidUpTo: Math.max(int(r.rankPaidUpTo), 0),
+    missions: { day: intOr(m.day, -1), progress, claimed: Array.isArray(m.claimed) ? (m.claimed as unknown[]).filter((x): x is string => typeof x === "string") : [] },
+    shopWeek: intOr(r.shopWeek, -1),
+    owned,
+    banner: pickOwned(r.banner),
+    frame: pickOwned(r.frame),
+    weeklyWonWeek: intOr(r.weeklyWonWeek, -1),
   };
 }
 
 export type DuelOutcome = "WIN" | "LOSS" | "DRAW";
 
-/** The profile after a match, and the Shards it paid. */
-export function applyDuelResult(p: DuelProfile, outcome: DuelOutcome, nowMs: number): { profile: DuelProfile; shards: number } {
+export interface DuelResult {
+  profile: DuelProfile;
+  /** Everything this match paid, all together. */
+  prize: DuelPrize;
+  trophyChange: number;
+  /** Rank before and after (for the promotion / demotion banner). */
+  rankBefore: DuelRank;
+  rankAfter: DuelRank;
+  firstWin: boolean;
+  streakBonus: number | null;
+  /** Rank steps reached for the first time this match. */
+  newRanks: number[];
+}
+
+/** Applies a ranked match: trophies (with the league floor), coins, first win of the day, streak and first-time rank prizes, and mission progress. */
+export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: number): DuelResult {
   const day = Math.floor(nowMs / 86_400_000);
-  const rewardedToday = p.rewardDay === day ? p.rewardedToday : 0;
-  const delta = outcome === "WIN" ? TROPHIES_WIN : outcome === "LOSS" ? -TROPHIES_LOSS : TROPHIES_DRAW;
-  // never drop below the floor of the arena you're in
-  const floor = arenaFor(p.trophies).minTrophies;
-  const trophies = Math.max(floor, p.trophies + delta);
-  const paid = outcome === "WIN" && rewardedToday < DUEL_REWARDED_WINS_PER_DAY;
+  const rankBefore = rankFor(p.trophies);
+  const floor = leagueFloor(p.trophies);
+  const trophies = Math.max(floor, p.trophies + trophyDelta(p.trophies, st.outcome));
+  const win = st.outcome === "WIN";
+  let prize = P({ coins: MATCH_COINS[st.outcome] });
+  const firstWin = win && p.firstWinDay !== day;
+  if (firstWin) prize = addPrize(prize, FIRST_WIN_PRIZE);
+  const streak = win ? p.streak + 1 : st.outcome === "LOSS" ? 0 : p.streak;
+  const streakHit = win ? STREAK_PRIZES.find((s) => s.at === streak) : undefined;
+  if (streakHit) prize = addPrize(prize, streakHit.prize);
+  const bestTrophies = Math.max(p.bestTrophies, trophies);
+  const reached = rankFor(bestTrophies).index;
+  const newRanks: number[] = [];
+  for (let i = p.rankPaidUpTo + 1; i <= reached; i++) {
+    newRanks.push(i);
+    prize = addPrize(prize, rankPrize(i));
+  }
+  // missions (progress only; claimed from the lobby)
+  const missions = p.missions.day === day ? p.missions : { day, progress: {}, claimed: [] };
+  const progress = { ...missions.progress };
+  for (const m of duelMissionsFor(day)) progress[m.id] = Math.min(m.target, (progress[m.id] ?? 0) + missionStep(m, st));
   return {
     profile: {
       ...p,
       trophies,
-      bestTrophies: Math.max(p.bestTrophies, trophies),
-      wins: p.wins + (outcome === "WIN" ? 1 : 0),
-      losses: p.losses + (outcome === "LOSS" ? 1 : 0),
-      rewardDay: day,
-      rewardedToday: rewardedToday + (paid ? 1 : 0),
+      bestTrophies,
+      wins: p.wins + (win ? 1 : 0),
+      losses: p.losses + (st.outcome === "LOSS" ? 1 : 0),
+      coins: p.coins + prize.coins,
+      streak,
+      bestStreak: Math.max(p.bestStreak, streak),
+      firstWinDay: firstWin ? day : p.firstWinDay,
+      rankPaidUpTo: Math.max(p.rankPaidUpTo, reached),
+      missions: { ...missions, progress },
     },
-    shards: paid ? DUEL_WIN_SHARDS : 0,
+    prize,
+    trophyChange: trophies - p.trophies,
+    rankBefore,
+    rankAfter: rankFor(trophies),
+    firstWin,
+    streakBonus: streakHit ? streakHit.at : null,
+    newRanks,
   };
+}
+
+/** Claims a finished mission's coins. */
+export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): DuelProfile | null {
+  const day = Math.floor(nowMs / 86_400_000);
+  const m = duelMissionsFor(day).find((x) => x.id === id);
+  if (!m || p.missions.day !== day || p.missions.claimed.includes(id) || (p.missions.progress[id] ?? 0) < m.target) return null;
+  return { ...p, coins: p.coins + m.coins, missions: { ...p.missions, claimed: [...p.missions.claimed, id] } };
+}
+
+/** Buys from the Duel shop. Materials come back as a prize for the account; cosmetics are owned (and worn) at once. */
+export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { profile: DuelProfile; prize: DuelPrize } | null {
+  const item = getShopItem(id);
+  if (!item || p.coins < item.price) return null;
+  const week = duelWeek(nowMs);
+  if (item.weekly && p.shopWeek === week) return null;
+  if (item.cosmetic && p.owned.includes(id)) return null;
+  const profile: DuelProfile = {
+    ...p,
+    coins: p.coins - item.price,
+    shopWeek: item.weekly ? week : p.shopWeek,
+    owned: item.cosmetic ? [...p.owned, id] : p.owned,
+    banner: item.cosmetic?.kind === "BANNER" ? id : p.banner,
+    frame: item.cosmetic?.kind === "FRAME" ? id : p.frame,
+  };
+  return { profile, prize: item.prize ?? NO_PRIZE };
 }
 
 // ── weekly challenge ────────────────────────────────────────────────────

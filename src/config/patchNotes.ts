@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v108",
+    dateIso: "2026-11-12",
+    category: "CONTENT",
+    title: {
+      en: "Ranked Duel: Bronze to Legend",
+      ptBR: "Duelo Ranqueado: de Bronze a Lenda",
+    },
+    description: {
+      en: "The Duel is now a ranked mode that never resets, like the ranks in competitive shooters: five leagues with three divisions each, then Master and Legend. The AI gets stronger as you climb, and the Duel has its own coins, daily missions, league prizes, win streaks and shop.",
+      ptBR: "O Duelo agora é um ranqueado que nunca zera, como as patentes dos jogos de tiro competitivos: cinco ligas com três divisões cada, depois Mestre e Lenda. A IA fica mais forte conforme você sobe, e o Duelo ganhou moedas próprias, missões diárias, prêmios de liga, sequência de vitórias e uma loja.",
+    },
+    highlights: [
+      {
+        en: "Leagues: Bronze, Silver, Gold, Platinum and Diamond (I, II and III), then Master (1,500 trophies) and Legend (2,000). You can drop a division, but never below the start of your league.",
+        ptBR: "Ligas: Bronze, Prata, Ouro, Platina e Diamante (I, II e III), depois Mestre (1.500 troféus) e Lenda (2.000). Dá para cair de divisão, mas nunca abaixo do começo da sua liga.",
+      },
+      {
+        en: "Each new rank pays once, the first time you reach it. Epic Essences come only from new leagues (from Gold up), a 10-win streak and one a week in the Duel Shop; a Legendary Essence only at Legend.",
+        ptBR: "Cada patente nova paga uma vez, na primeira vez que você chega nela. Essências Épicas só vêm de liga nova (a partir de Ouro), de 10 vitórias seguidas e de uma por semana na Loja do Duelo; Essência Lendária, só na Lenda.",
+      },
+      {
+        en: "Every match gives Duel Coins (12 for a win, 6 for a draw, 4 for a loss). The first win of the day adds Gem Shards and Splinters, and 3, 5 and 10 wins in a row pay a bonus.",
+        ptBR: "Toda partida dá Moedas de Duelo (12 na vitória, 6 no empate, 4 na derrota). A primeira vitória do dia soma fragmentos de gema e Estilhaços, e 3, 5 e 10 vitórias seguidas pagam bônus.",
+      },
+      {
+        en: "Three daily missions, the same for everyone. The Duel Shop sells Forge materials and looks that only exist there: banners over your castle and card frames.",
+        ptBR: "Três missões por dia, iguais para todos. A Loja do Duelo vende materiais da Forja e visuais que só existem lá: estandartes no seu castelo e molduras de carta.",
+      },
+      {
+        en: "Your rank shows on the Duel card on the Season page.",
+        ptBR: "A sua patente aparece no cartão do Duelo na página da Season.",
+      },
+    ],
+  },
+  {
     id: "v107",
     dateIso: "2026-11-12",
     category: "FIXES",

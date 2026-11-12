@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DuelEngine } from "./DuelEngine";
-import { applyDuelResult, arenaFor, createDuelProfile, DEFAULT_DECK, DUEL_REWARDED_WINS_PER_DAY, isValidDeck, sanitizeDeck, TROPHIES_LOSS, TROPHIES_WIN } from "@/config/duel";
+import { applyDuelResult, buyDuelShopItem, claimDuelMission, createDuelProfile, DEFAULT_DECK, duelMissionsFor, FIRST_WIN_PRIZE, isValidDeck, MATCH_COINS, RANK_STEPS, rankFor, rankPrize, sanitizeDeck } from "@/config/duel";
 
 const decks = [DEFAULT_DECK, DEFAULT_DECK] as const;
 
@@ -48,21 +48,67 @@ describe("Duel match", () => {
 });
 
 describe("Duel profile", () => {
-  it("trophies move by result, never below the arena floor, and wins pay a few Shards a day", () => {
-    let p = createDuelProfile();
-    const now = 1_000 * 86_400_000;
-    let shards = 0;
-    for (let i = 0; i < DUEL_REWARDED_WINS_PER_DAY + 2; i++) {
-      const r = applyDuelResult(p, "WIN", now);
-      p = r.profile;
-      shards += r.shards;
-    }
-    expect(p.trophies).toBe((DUEL_REWARDED_WINS_PER_DAY + 2) * TROPHIES_WIN);
-    expect(shards).toBe(DUEL_REWARDED_WINS_PER_DAY);
-    p = { ...p, trophies: arenaFor(300).minTrophies + 5 };
-    p = applyDuelResult(p, "LOSS", now).profile;
+  const stats = (outcome: "WIN" | "LOSS" | "DRAW") => ({ outcome, myCastle: 20, foeCastle: 0, sends: 5, deck: [...DEFAULT_DECK] });
+  const day = 1_000 * 86_400_000;
+
+  it("ranks: leagues of three divisions, a league floor, and prizes paid once per rank", () => {
+    expect(rankFor(0)).toMatchObject({ league: "BRONZE", division: 1 });
+    expect(rankFor(250)).toMatchObject({ league: "BRONZE", division: 3 });
+    expect(rankFor(300)).toMatchObject({ league: "SILVER", division: 1 });
+    expect(rankFor(1500)).toMatchObject({ league: "MASTER" });
+    expect(rankFor(2400)).toMatchObject({ league: "LEGEND", next: null });
+    let p = { ...createDuelProfile(), trophies: 290, bestTrophies: 290, rankPaidUpTo: 2 };
+    const up = applyDuelResult(p, stats("WIN"), day);
+    expect(up.rankAfter.league).toBe("SILVER");
+    expect(up.newRanks).toEqual([3]);
+    expect(up.prize.shards).toBeGreaterThan(0);
+    p = up.profile;
+    // drop back: never below Silver's start, and climbing again doesn't pay twice
+    p = applyDuelResult(p, stats("LOSS"), day).profile;
     expect(p.trophies).toBe(300);
-    expect(TROPHIES_LOSS).toBeLessThan(TROPHIES_WIN);
+    expect(applyDuelResult({ ...p, trophies: 290 }, stats("WIN"), day).newRanks).toEqual([]);
+  });
+
+  it("first win of the day and streaks pay extra; losses still give a few coins", () => {
+    let p = createDuelProfile();
+    const w1 = applyDuelResult(p, stats("WIN"), day);
+    expect(w1.firstWin).toBe(true);
+    expect(w1.prize.coins).toBe(MATCH_COINS.WIN + FIRST_WIN_PRIZE.coins);
+    p = w1.profile;
+    expect(applyDuelResult(p, stats("WIN"), day).firstWin).toBe(false);
+    p = applyDuelResult(applyDuelResult(p, stats("WIN"), day).profile, stats("WIN"), day).profile;
+    expect(p.streak).toBe(3);
+    expect(applyDuelResult(p, stats("LOSS"), day).prize.coins).toBe(MATCH_COINS.LOSS);
+    expect(applyDuelResult(p, stats("LOSS"), day).profile.streak).toBe(0);
+  });
+
+  it("Epic essences stay hard: only league promotions, a 10-win streak and one a week in the shop; Legendary only at Legend", () => {
+    for (let i = 0; i < RANK_STEPS.length; i++) {
+      const pr = rankPrize(i);
+      if (pr.epic) expect(RANK_STEPS[i]!.division).toBe(1);
+      if (pr.legendary) expect(RANK_STEPS[i]!.league).toBe("LEGEND");
+    }
+    let p = { ...createDuelProfile(), coins: 5000 };
+    const r1 = buyDuelShopItem(p, "EPIC", day)!;
+    expect(r1.prize.epic).toBe(1);
+    expect(buyDuelShopItem(r1.profile, "EPIC", day)).toBeNull();
+    expect(buyDuelShopItem(r1.profile, "EPIC", day + 7 * 86_400_000)).not.toBeNull();
+    p = buyDuelShopItem(p, "BANNER_VOID", day)!.profile;
+    expect(p.banner).toBe("BANNER_VOID");
+    expect(buyDuelShopItem(p, "BANNER_VOID", day)).toBeNull();
+  });
+
+  it("missions move with matches and are claimed once", () => {
+    let p = createDuelProfile();
+    const ms = duelMissionsFor(1000);
+    expect(ms).toHaveLength(3);
+    for (let i = 0; i < 20; i++) p = applyDuelResult(p, { outcome: "WIN", myCastle: 20, foeCastle: 0, sends: 5, deck: ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "S_SHIELDS"] }, day).profile;
+    for (const m of ms) {
+      const c = claimDuelMission(p, m.id, day)!;
+      expect(c.coins).toBe(p.coins + m.coins);
+      p = c;
+      expect(claimDuelMission(p, m.id, day)).toBeNull();
+    }
   });
 
   it("validates decks", () => {

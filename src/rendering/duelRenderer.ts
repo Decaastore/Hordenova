@@ -444,8 +444,55 @@ function drawCastle(ctx: CanvasRenderingContext2D, side: Side, biome: string, sn
   }
 }
 
+function drawBanner(ctx: CanvasRenderingContext2D, b: { color: string; color2: string }, timeMs: number): void {
+  for (const dx of [-62, 62]) {
+    const x = CASTLE_AT.x + dx;
+    const top = CASTLE_AT.y - 150;
+    ctx.fillStyle = "#3a2a1a";
+    ctx.fillRect(x - 1.5, top, 3, 70);
+    ctx.fillStyle = "#e8c06a";
+    ctx.beginPath();
+    ctx.arc(x, top, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+    const w = 26;
+    const h = 40;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x + 1.5, top + 4);
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      ctx.lineTo(x + 1.5 + t * w, top + 4 + Math.sin(timeMs / 260 + t * 4 + dx) * 2.5 * t);
+    }
+    for (let i = 8; i >= 0; i--) {
+      const t = i / 8;
+      const notch = t > 0.85 ? -6 * ((t - 0.85) / 0.15) : 0;
+      ctx.lineTo(x + 1.5 + t * w, top + 4 + h + notch + Math.sin(timeMs / 260 + t * 4 + dx) * 2.5 * t);
+    }
+    ctx.closePath();
+    const g = ctx.createLinearGradient(x, top, x + w, top + h);
+    g.addColorStop(0, b.color);
+    g.addColorStop(1, b.color2);
+    ctx.fillStyle = g;
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.5)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 /** Draws one frame of the Duel. */
-export function drawDuelFrame(ctx: CanvasRenderingContext2D, snap: DuelSnapshot, arenaId: string, biome: string, timeMs: number, pickingSlot: boolean, hoverSlot: number | null): void {
+export function drawDuelFrame(
+  ctx: CanvasRenderingContext2D,
+  snap: DuelSnapshot,
+  arenaId: string,
+  biome: string,
+  timeMs: number,
+  pickingSlot: boolean,
+  hoverSlot: number | null,
+  /** The player's Duel banner (Duel shop cosmetic), flown over their castle. */
+  banner: { color: string; color2: string } | null = null,
+): void {
   const look = LOOK[arenaId] ?? LOOK.ARENA_FOREST!;
   const b = board(arenaId, biome);
   if (b) ctx.drawImage(b, 0, 0);
@@ -465,7 +512,14 @@ export function drawDuelFrame(ctx: CanvasRenderingContext2D, snap: DuelSnapshot,
 
   // depth-sorted towers, units and castles
   const items: { y: number; draw: () => void }[] = [];
-  for (const side of [0, 1] as Side[]) items.push({ y: CASTLE_AT.y, draw: () => drawCastle(ctx, side, biome, snap, timeMs) });
+  for (const side of [0, 1] as Side[])
+    items.push({
+      y: CASTLE_AT.y,
+      draw: () => {
+        drawCastle(ctx, side, biome, snap, timeMs);
+        if (side === 0 && banner) drawBanner(ctx, banner, timeMs);
+      },
+    });
   for (const t of snap.towers) {
     items.push({
       y: t.inst.position.y,

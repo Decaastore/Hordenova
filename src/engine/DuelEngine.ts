@@ -139,13 +139,14 @@ interface Player {
   queue: DuelCardId[];
   next: DuelCardId;
   plays: number;
+  sends: number;
 }
 
 export interface DuelSnapshot {
   timeMs: number;
   over: boolean;
   outcome: DuelOutcome | null;
-  players: readonly { mana: number; castle: number; hand: readonly DuelCardId[]; next: DuelCardId }[];
+  players: readonly { mana: number; castle: number; hand: readonly DuelCardId[]; next: DuelCardId; sends: number }[];
   units: readonly Unit[];
   towers: readonly DTower[];
   shots: readonly Shot[];
@@ -186,7 +187,7 @@ export class DuelEngine {
       const j = Math.floor(this.r() * (i + 1));
       [cards[i], cards[j]] = [cards[j]!, cards[i]!];
     }
-    return { mana: DUEL_START_MANA, manaAcc: 0, castle: DUEL_CASTLE_HP, hand: cards.slice(0, HAND_SIZE), queue: cards.slice(HAND_SIZE + 1), next: cards[HAND_SIZE]!, plays: 0 };
+    return { mana: DUEL_START_MANA, manaAcc: 0, castle: DUEL_CASTLE_HP, hand: cards.slice(0, HAND_SIZE), queue: cards.slice(HAND_SIZE + 1), next: cards[HAND_SIZE]!, plays: 0, sends: 0 };
   }
 
   get timeMs(): number {
@@ -219,7 +220,10 @@ export class DuelEngine {
     p.queue.push(cardId);
     p.next = p.queue.shift()!;
     if (card.kind === "TOWER") this.buildTower(side, card, slot!);
-    else this.send((1 - side) as Side, card);
+    else {
+      p.sends += 1;
+      this.send((1 - side) as Side, card);
+    }
     return true;
   }
 
@@ -393,7 +397,7 @@ export class DuelEngine {
       timeMs: this.t,
       over: this.over,
       outcome: this.outcome,
-      players: this.players.map((p) => ({ mana: p.mana, castle: p.castle, hand: [...p.hand], next: p.next })),
+      players: this.players.map((p) => ({ mana: p.mana, castle: p.castle, hand: [...p.hand], next: p.next, sends: p.sends })),
       units: this.units,
       towers: this.towers,
       shots: this.shots,

@@ -3,7 +3,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
 import { depthOfWave, romanDepth } from "@/config/eternal";
-import { arenaFor } from "@/config/duel";
+import { rankFor } from "@/config/duel";
 import { getSeasonRule } from "@/config/seasonRules";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
@@ -186,8 +186,11 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel }: 
                     <dd>{save.duel.trophies.toLocaleString(locale)}</dd>
                   </div>
                   <div>
-                    <dt>{t("duel.arena")}</dt>
-                    <dd>{t(`duel.arenas.${arenaFor(save.duel.trophies).id}` as TranslationKey)}</dd>
+                    <dt>{t("duel.rankLabel")}</dt>
+                    <dd>
+                      {t(`duel.league.${rankFor(save.duel.trophies).league}` as TranslationKey)}
+                      {rankFor(save.duel.trophies).league === "MASTER" || rankFor(save.duel.trophies).league === "LEGEND" ? "" : ` ${["", "I", "II", "III"][rankFor(save.duel.trophies).division]}`}
+                    </dd>
                   </div>
                   <div>
                     <dt>{t("duel.record")}</dt>

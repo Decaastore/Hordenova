@@ -7,23 +7,33 @@ import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot } from "@/engine/Due
 import {
   applyDuelResult,
   arenaFor,
+  buyDuelShopItem,
+  claimDuelMission,
   DECK_SIZE,
-  DUEL_ARENAS,
   DUEL_CARDS,
   DUEL_LENGTH_MS,
   DUEL_MAX_MANA,
-  DUEL_REWARDED_WINS_PER_DAY,
-  DUEL_WIN_SHARDS,
-  getDuelCard,
-  isValidDeck,
-  TROPHIES_LOSS,
-  TROPHIES_WIN,
+  DUEL_SHOP,
+  duelAiSkill,
+  duelMissionsFor,
   duelWeek,
+  FIRST_WIN_PRIZE,
+  getDuelCard,
+  getShopItem,
+  isValidDeck,
+  NO_PRIZE,
+  RANK_STEPS,
+  rankFor,
+  rankPrize,
+  STREAK_PRIZES,
   WEEKLY_CHALLENGE_AI,
   WEEKLY_CHALLENGE_SHARDS,
   weeklyChallenge,
   type DuelCardId,
   type DuelOutcome,
+  type DuelPrize,
+  type DuelRank,
+  type LeagueId,
 } from "@/config/duel";
 import { drawEnemy } from "@/rendering/EntityRenderer";
 import { drawDuelFrame, DUEL_H, DUEL_W } from "@/rendering/duelRenderer";
@@ -95,6 +105,87 @@ interface DuelScreenProps {
 }
 
 /** DUELO — lobby (trophies, arena, deck) and the match against the AI. */
+type MatchResult = {
+  outcome: DuelOutcome;
+  weekly: boolean;
+  trophyChange: number;
+  prize: DuelPrize;
+  rankBefore: DuelRank | null;
+  rankAfter: DuelRank | null;
+  firstWin: boolean;
+  streakBonus: number | null;
+};
+
+const LEAGUE_COLOR: Record<LeagueId, [string, string]> = {
+  BRONZE: ["#d08a52", "#5a3418"],
+  SILVER: ["#d8dee6", "#5a6470"],
+  GOLD: ["#ffd56a", "#8a5a10"],
+  PLATINUM: ["#8ae8e0", "#1f6a70"],
+  DIAMOND: ["#9ac8ff", "#2a3aa8"],
+  MASTER: ["#e0a0ff", "#5a1a8a"],
+  LEGEND: ["#ff8a6a", "#8a1a1a"],
+};
+const ROMAN = ["", "I", "II", "III"];
+
+/** The rank emblem — a shield in the league's colours with its division. */
+export function RankBadge({ trophies, size = 64 }: { trophies: number; size?: number }) {
+  const { t } = useLanguage();
+  const r = rankFor(trophies);
+  const [c1, c2] = LEAGUE_COLOR[r.league];
+  const label = `${t(`duel.league.${r.league}` as TranslationKey)}${r.league === "MASTER" || r.league === "LEGEND" ? "" : " " + ROMAN[r.division]}`;
+  return (
+    <span className="rk-badge" title={label} style={{ width: size, height: size * 1.12 }}>
+      <svg viewBox="0 0 64 72" width={size} height={size * 1.12} aria-hidden="true">
+        <defs>
+          <linearGradient id={`rk-${r.league}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={c1} />
+            <stop offset="1" stopColor={c2} />
+          </linearGradient>
+        </defs>
+        <path d="M32 2 L60 12 L56 44 Q52 60 32 70 Q12 60 8 44 L4 12 Z" fill={`url(#rk-${r.league})`} stroke="#1a120a" strokeWidth="3" />
+        <path d="M32 9 L53 17 L50 42 Q47 55 32 63 Q17 55 14 42 L11 17 Z" fill="none" stroke="rgba(255,255,255,0.45)" strokeWidth="1.5" />
+        {r.league === "LEGEND" || r.league === "MASTER" ? (
+          <text x="32" y="44" textAnchor="middle" fontSize="24" fill="#fff" stroke="#1a120a" strokeWidth="1">{r.league === "LEGEND" ? "♛" : "★"}</text>
+        ) : (
+          Array.from({ length: r.division }, (_, i) => <path key={i} d={`M${20 + i * 12 - (r.division - 1) * 6 + 6} ${30} l6 6 l-6 6 l-6 -6 Z`} fill="#fff" stroke="#1a120a" strokeWidth="1" />)
+        )}
+      </svg>
+    </span>
+  );
+}
+
+function PrizeLine({ prize }: { prize: DuelPrize }) {
+  const { t } = useLanguage();
+  const parts = [
+    prize.coins ? t("duel.prize.coins", { n: prize.coins }) : null,
+    prize.shards ? t("duel.prize.shards", { n: prize.shards }) : null,
+    prize.splinters ? t("duel.prize.splinters", { n: prize.splinters }) : null,
+    prize.rare ? t("duel.prize.rare", { n: prize.rare }) : null,
+    prize.epic ? t("duel.prize.epic", { n: prize.epic }) : null,
+    prize.legendary ? t("duel.prize.legendary", { n: prize.legendary }) : null,
+  ].filter(Boolean);
+  return <span className="du-prize">{parts.join(" · ")}</span>;
+}
+
+/** Puts a Duel prize on the account: Gem Shards and Forge materials (coins live in the Duel profile). */
+function grantPrize(cur: SaveData, prize: DuelPrize, source: string): Partial<SaveData> {
+  if (prize.shards > 0) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source, amount: prize.shards });
+  const e = cur.expeditions;
+  return {
+    gemShards: cur.gemShards + prize.shards,
+    expeditions: {
+      ...e,
+      splinters: e.splinters + prize.splinters,
+      essences: { ...e.essences, RARE: e.essences.RARE + prize.rare, EPIC: e.essences.EPIC + prize.epic, LEGENDARY: e.essences.LEGENDARY + prize.legendary },
+    },
+  };
+}
+
+interface DuelScreenProps {
+  onExit: () => void;
+}
+
+/** DUELO — ranked lobby (league, missions, prizes, shop, deck) and the match against the AI. */
 export function DuelScreen({ onExit }: DuelScreenProps) {
   const { t, language } = useLanguage();
   const [save, setSave] = useState<SaveData>(() => loadSave());
@@ -102,15 +193,24 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const [match, setMatch] = useState<DuelEngine | null>(null);
   /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
   const [matchNo, setMatchNo] = useState(0);
-  const [result, setResult] = useState<{ outcome: DuelOutcome; trophies: number; shards: number } | null>(null);
+  const [result, setResult] = useState<MatchResult | null>(null);
   const [challenge, setChallenge] = useState(false);
-  const week = duelWeek(Date.now());
+  const [notice, setNotice] = useState<string | null>(null);
+  const now = Date.now();
+  const day = Math.floor(now / 86_400_000);
+  const week = duelWeek(now);
   const weekly = useMemo(() => weeklyChallenge(week), [week]);
   const weeklyDone = save.duel.weeklyWonWeek === week;
-  const arena = arenaFor(save.duel.trophies);
-  const nextArena = DUEL_ARENAS.find((a) => a.minTrophies > save.duel.trophies);
+  const duel = save.duel;
+  const arena = arenaFor(duel.trophies);
+  const rank = rankFor(duel.trophies);
   const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
   const deckOk = isValidDeck(deck);
+  const missions = duelMissionsFor(day);
+  const mState = duel.missions.day === day ? duel.missions : { day, progress: {} as Record<string, number>, claimed: [] as string[] };
+  const rankName = (r: DuelRank) => `${t(`duel.league.${r.league}` as TranslationKey)}${r.league === "MASTER" || r.league === "LEGEND" ? "" : " " + ROMAN[r.division]}`;
+  const banner = duel.banner ? getShopItem(duel.banner)?.cosmetic ?? null : null;
+  const frame = duel.frame ? getShopItem(duel.frame)?.cosmetic ?? null : null;
 
   const toggleCard = (id: DuelCardId) => {
     setDeck((d) => (d.includes(id) ? d.filter((x) => x !== id) : d.length < DECK_SIZE ? [...d, id] : d));
@@ -118,12 +218,12 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   const start = () => {
     if (!deckOk) return;
-    const next = updateSave({ duel: { ...save.duel, deck } });
+    const next = updateSave({ duel: { ...loadSave().duel, deck } });
     setSave(next);
     setResult(null);
     setChallenge(false);
     setMatchNo((n) => n + 1);
-    setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], arena.ai, next.equippedTowerSkinByType));
+    setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], duelAiSkill(next.duel.trophies), next.equippedTowerSkinByType));
   };
 
   const startWeekly = () => {
@@ -133,21 +233,44 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setMatch(new DuelEngine(weekly.seed, [weekly.myDeck, weekly.foeDeck], WEEKLY_CHALLENGE_AI, save.equippedTowerSkinByType));
   };
 
-  const finish = (outcome: DuelOutcome) => {
+  const finish = (snap: DuelSnapshot) => {
+    const outcome = snap.outcome!;
     const cur = loadSave();
     if (challenge) {
       const paid = outcome === "WIN" && cur.duel.weeklyWonWeek !== week;
-      if (paid) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source: "duel_weekly", amount: WEEKLY_CHALLENGE_SHARDS });
-      const next = updateSave({ duel: { ...cur.duel, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek }, gemShards: cur.gemShards + (paid ? WEEKLY_CHALLENGE_SHARDS : 0) });
+      const prize = paid ? { ...NO_PRIZE, shards: WEEKLY_CHALLENGE_SHARDS } : NO_PRIZE;
+      const next = updateSave({ ...grantPrize(cur, prize, "duel_weekly"), duel: { ...cur.duel, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
       setSave(next);
-      setResult({ outcome, trophies: 0, shards: paid ? WEEKLY_CHALLENGE_SHARDS : 0 });
+      setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null });
       return;
     }
-    const { profile, shards } = applyDuelResult(cur.duel, outcome, Date.now());
-    if (shards > 0) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source: "duel_win", amount: shards });
-    const next = updateSave({ duel: profile, gemShards: cur.gemShards + shards });
+    const r = applyDuelResult(cur.duel, { outcome, myCastle: snap.players[0]!.castle, foeCastle: snap.players[1]!.castle, sends: snap.players[0]!.sends, deck: cur.duel.deck }, Date.now());
+    const next = updateSave({ ...grantPrize(cur, r.prize, "duel_match"), duel: r.profile });
     setSave(next);
-    setResult({ outcome, trophies: profile.trophies - cur.duel.trophies, shards });
+    setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus });
+  };
+
+  const claimMission = (id: string) => {
+    const cur = loadSave();
+    const p = claimDuelMission(cur.duel, id, Date.now());
+    if (!p) return;
+    setSave(updateSave({ duel: p }));
+  };
+
+  const buy = (id: string) => {
+    const cur = loadSave();
+    const r = buyDuelShopItem(cur.duel, id, Date.now());
+    if (!r) return;
+    setSave(updateSave({ ...grantPrize(cur, r.prize, "duel_shop"), duel: r.profile }));
+    setNotice(t("duel.shopBought"));
+  };
+
+  const wear = (id: string) => {
+    const cur = loadSave();
+    const item = getShopItem(id);
+    if (!item?.cosmetic || !cur.duel.owned.includes(id)) return;
+    const k = item.cosmetic.kind === "BANNER" ? "banner" : "frame";
+    setSave(updateSave({ duel: { ...cur.duel, [k]: cur.duel[k] === id ? null : id } }));
   };
 
   if (match)
@@ -157,12 +280,18 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
         engine={match}
         arenaId={challenge ? "ARENA_ABYSS" : arena.id}
         biome={challenge ? "ABYSS" : arena.biome}
+        banner={banner}
+        frame={frame}
         result={result}
+        rankName={rankName}
         onFinish={finish}
         onAgain={challenge ? startWeekly : start}
         onLobby={() => setMatch(null)}
       />
     );
+
+  const pct = rank.next ? Math.max(0, Math.min(1, (duel.trophies - rank.from) / (rank.next - rank.from))) : 1;
+  const leagueSteps = RANK_STEPS.map((r, i) => ({ ...r, i })).filter((r) => r.division === 1 && r.i > 0);
 
   return (
     <div className="pg-root">
@@ -175,31 +304,97 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                 ← {t("duel.back")}
               </button>
               <h1 className="pg-h1">{t("duel.lobbyTitle")}</h1>
-              <p className="pg-lead">{t("duel.lead")}</p>
+              <p className="pg-lead">{t("duel.rankedLead")}</p>
             </div>
-            <dl className="du-figs">
+            <div className="du-rank" data-testid="duel-rank">
+              <RankBadge trophies={duel.trophies} size={92} />
               <div>
-                <dt>{t("duel.trophies")}</dt>
-                <dd>🏆 {fmt(save.duel.trophies)}</dd>
+                <p className="du-rank-name">{rankName(rank)}</p>
+                <p className="du-rank-tr">🏆 {fmt(duel.trophies)}</p>
+                <div className="du-rank-bar">
+                  <div style={{ width: `${pct * 100}%` }} />
+                </div>
+                <p className="du-rank-next">{rank.next !== null ? t("duel.toNext", { n: rank.next - duel.trophies, name: rankName(rankFor(rank.next)) }) : t("duel.topRank")}</p>
+                {duel.streak >= 2 && <p className="du-streak">{t("duel.streak", { n: duel.streak })}</p>}
               </div>
-              <div>
-                <dt>{t("duel.arena")}</dt>
-                <dd className="is-arena">{t(`duel.arenas.${arena.id}` as TranslationKey)}</dd>
-              </div>
-            </dl>
+            </div>
           </div>
         </header>
         <div className="pg-wrap">
           <section className="du-play">
             <div>
-              <p className="pg-sub">{nextArena ? t("duel.nextArena", { name: t(`duel.arenas.${nextArena.id}` as TranslationKey), n: nextArena.minTrophies }) : t("duel.maxArena")}</p>
-              <p className="pg-sub">{t("duel.rewards", { win: TROPHIES_WIN, loss: TROPHIES_LOSS, shards: DUEL_WIN_SHARDS, max: DUEL_REWARDED_WINS_PER_DAY })}</p>
-              <p className="pg-sub">{t("duel.rules")}</p>
+              <p className="pg-sub">{t("duel.rankedRules")}</p>
+              <p className="pg-sub">
+                {duel.firstWinDay === day ? t("duel.firstWinDone") : t("duel.firstWinOpen")} <PrizeLine prize={FIRST_WIN_PRIZE} />
+              </p>
+              <p className="pg-sub">{t("duel.coinsBalance", { n: fmt(duel.coins) })}</p>
             </div>
             <button className="pg-btn" disabled={!deckOk} onClick={start} data-testid="duel-start">
-              {t("duel.play")}
+              {t("duel.playRanked")}
             </button>
           </section>
+          {notice && <p className="du-notice">{notice}</p>}
+
+          <section className="du-block" data-testid="duel-missions">
+            <h2 className="pg-h2">{t("duel.missionsTitle")}</h2>
+            <p className="pg-sub">{t("duel.missionsLead")}</p>
+            <div className="du-missions">
+              {missions.map((m) => {
+                const prog = mState.progress[m.id] ?? 0;
+                const done = prog >= m.target;
+                const claimed = mState.claimed.includes(m.id);
+                return (
+                  <div key={m.id} className="du-mission">
+                    <div>
+                      <strong>{t(`duel.mission.${m.kind}` as TranslationKey, { n: m.target, card: m.card ? t(`duel.card.${m.card}.name` as TranslationKey) : "" })}</strong>
+                      <div className="du-mbar">
+                        <div style={{ width: `${(prog / m.target) * 100}%` }} />
+                      </div>
+                      <small>
+                        {prog} / {m.target} · {t("duel.prize.coins", { n: m.coins })}
+                      </small>
+                    </div>
+                    <button className={claimed ? "pg-btn-ghost" : "pg-btn"} disabled={!done || claimed} onClick={() => claimMission(m.id)}>
+                      {claimed ? t("duel.claimed") : t("duel.claim")}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="du-block" data-testid="duel-ladder">
+            <h2 className="pg-h2">{t("duel.ladderTitle")}</h2>
+            <p className="pg-sub">{t("duel.ladderLead")}</p>
+            <div className="du-ladder">
+              {leagueSteps.map((r) => {
+                const reached = duel.rankPaidUpTo >= r.i;
+                return (
+                  <div key={r.i} className={`du-step${reached ? " is-done" : ""}`}>
+                    <RankBadge trophies={r.from} size={44} />
+                    <div>
+                      <strong>{rankName(rankFor(r.from))}</strong>
+                      <small>🏆 {fmt(r.from)}</small>
+                      <PrizeLine prize={rankPrize(r.i)} />
+                    </div>
+                    <span className="du-step-tag">{reached ? "✓" : ""}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="pg-sub">{t("duel.ladderDivisions")}</p>
+            <p className="pg-sub">
+              {t("duel.streakRules")}
+            </p>
+            <ul className="du-streaks">
+              {STREAK_PRIZES.map((s) => (
+                <li key={s.at}>
+                  🔥 {s.at} — <PrizeLine prize={s.prize} />
+                </li>
+              ))}
+            </ul>
+          </section>
+
           <section className="du-weekly" data-testid="duel-weekly">
             <div>
               <h2 className="pg-h2">{t("duel.weeklyTitle")}</h2>
@@ -215,6 +410,45 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               {weeklyDone ? t("duel.weeklyDone") : t("duel.weeklyPlay")}
             </button>
           </section>
+
+          <section className="du-block" data-testid="duel-shop">
+            <div className="pg-head">
+              <h2 className="pg-h2">{t("duel.shopTitle")}</h2>
+              <span className="du-coins">◈ {fmt(duel.coins)}</span>
+            </div>
+            <p className="pg-sub">{t("duel.shopLead")}</p>
+            <div className="du-shop">
+              {DUEL_SHOP.map((item) => {
+                const owned = duel.owned.includes(item.id);
+                const worn = duel.banner === item.id || duel.frame === item.id;
+                const weeklyLocked = item.weekly && duel.shopWeek === week;
+                return (
+                  <div key={item.id} className="du-item">
+                    {item.cosmetic ? (
+                      <span className={`du-swatch is-${item.cosmetic.kind}`} style={{ background: `linear-gradient(160deg, ${item.cosmetic.color}, ${item.cosmetic.color2})` }} aria-hidden="true" />
+                    ) : (
+                      <span className="du-swatch is-mat" aria-hidden="true">
+                        {item.id === "EPIC" ? "◆" : item.id === "RARE" ? "◆" : "✦"}
+                      </span>
+                    )}
+                    <strong>{t(`duel.shop.${item.id}` as TranslationKey)}</strong>
+                    {item.prize && <PrizeLine prize={item.prize} />}
+                    {item.weekly && <small>{t("duel.shopWeekly")}</small>}
+                    {owned ? (
+                      <button className="pg-btn-ghost" onClick={() => wear(item.id)}>
+                        {worn ? t("duel.wearing") : t("duel.wear")}
+                      </button>
+                    ) : (
+                      <button className="pg-btn" disabled={duel.coins < item.price || !!weeklyLocked} onClick={() => buy(item.id)}>
+                        {weeklyLocked ? t("duel.shopWeeklyDone") : `◈ ${fmt(item.price)}`}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="du-deck">
             <div className="pg-head">
               <h2 className="pg-h2">{t("duel.deck")}</h2>
@@ -250,13 +484,16 @@ interface DuelMatchProps {
   engine: DuelEngine;
   arenaId: string;
   biome: string;
-  result: { outcome: DuelOutcome; trophies: number; shards: number } | null;
-  onFinish: (o: DuelOutcome) => void;
+  banner: { color: string; color2: string } | null;
+  frame: { color: string; color2: string } | null;
+  result: MatchResult | null;
+  rankName: (r: DuelRank) => string;
+  onFinish: (s: DuelSnapshot) => void;
   onAgain: () => void;
   onLobby: () => void;
 }
 
-function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby }: DuelMatchProps) {
+function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, onFinish, onAgain, onLobby }: DuelMatchProps) {
   const { t } = useLanguage();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [snap, setSnap] = useState<DuelSnapshot>(() => engine.snapshot());
@@ -294,12 +531,12 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
           cv.height = Math.round(h * dpr);
         }
         ctx.setTransform((cv.width / W), 0, 0, cv.height / H, 0, 0);
-        drawDuelFrame(ctx, s, arenaId, biome, now, !!pickedRef.current && getDuelCard(pickedRef.current)?.kind === "TOWER", hoverRef.current);
+        drawDuelFrame(ctx, s, arenaId, biome, now, !!pickedRef.current && getDuelCard(pickedRef.current)?.kind === "TOWER", hoverRef.current, banner);
       }
       setSnap(s);
       if (s.over && !finishedRef.current) {
         finishedRef.current = true;
-        onFinish(s.outcome!);
+        onFinish(s);
       }
       if (!s.over) raf = requestAnimationFrame(loop);
     };
@@ -346,7 +583,7 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
   };
 
   return (
-    <div style={matchRoot}>
+    <div style={{ ...matchRoot, ...(frame ? { ["--fr1" as string]: frame.color, ["--fr2" as string]: frame.color2 } : null) }} className={frame ? "has-frame" : undefined}>
       <style>{MATCH_CSS}</style>
       <div className="dm-top">
         <div className="dm-side">
@@ -383,8 +620,20 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
         {result && (
           <div className="dm-result" role="dialog" data-testid="duel-result">
             <h2 className={`is-${result.outcome}`}>{t(result.outcome === "WIN" ? "duel.win" : result.outcome === "LOSS" ? "duel.loss" : "duel.draw")}</h2>
-            <p>{t("duel.trophiesDelta", { n: (result.trophies > 0 ? "+" : "") + result.trophies })}</p>
-            {result.shards > 0 && <p>{t("duel.shardsWon", { n: result.shards })}</p>}
+            {!result.weekly && <p className="dm-tr">{t("duel.trophiesDelta", { n: (result.trophyChange > 0 ? "+" : "") + result.trophyChange })}</p>}
+            {result.rankBefore && result.rankAfter && result.rankAfter.index !== result.rankBefore.index && (
+              <div className={`dm-rankchange ${result.rankAfter.index > result.rankBefore.index ? "is-up" : "is-down"}`}>
+                <RankBadge trophies={result.rankAfter.from} size={70} />
+                <span>{t(result.rankAfter.index > result.rankBefore.index ? "duel.promoted" : "duel.demoted", { name: rankName(result.rankAfter) })}</span>
+              </div>
+            )}
+            {result.firstWin && <p className="dm-tag">{t("duel.firstWinTag")}</p>}
+            {result.streakBonus && <p className="dm-tag">{t("duel.streakTag", { n: result.streakBonus })}</p>}
+            {(result.prize.coins || result.prize.shards) > 0 && (
+              <p>
+                <PrizeLine prize={result.prize} />
+              </p>
+            )}
             <div className="dm-result-actions">
               <button className="dm-btn" onClick={onAgain}>
                 {t("duel.again")}
@@ -447,6 +696,45 @@ function CastleBar({ hp, foe }: { hp: number; foe?: boolean }) {
 const matchRoot: CSSProperties = { position: "fixed", inset: 0, display: "grid", gridTemplateRows: "auto 1fr auto", background: "#0d0a07", color: "#efe4cf" };
 
 const LOBBY_CSS = `
+.rk-badge { display: inline-grid; place-items: center; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); flex: none; }
+.du-rank { display: flex; align-items: center; gap: 18px; }
+.du-rank p { margin: 0; }
+.du-rank-name { font-family: var(--display); font-weight: 700; font-size: clamp(26px, 3vw, 38px); color: var(--gold-hi); line-height: 1.05; }
+.du-rank-tr { font-size: 16px; color: var(--bone); margin-top: 4px !important; }
+.du-rank-bar { width: 220px; height: 8px; border-radius: 4px; background: rgba(255,255,255,0.1); margin-top: 8px; overflow: hidden; }
+.du-rank-bar div { height: 100%; background: linear-gradient(90deg, #a8761e, #ffd56a); }
+.du-rank-next { font-size: 12.5px; color: var(--ash); margin-top: 5px !important; }
+.du-streak { font-size: 13px; font-weight: 700; color: #ff9a5a; margin-top: 4px !important; }
+.du-notice { margin: 12px 0 0; color: #9be37a; font-weight: 700; }
+.du-block { padding: 30px 0 6px; }
+.du-block .pg-sub { margin: 4px 0 0; }
+.du-prize { color: var(--bone); font-weight: 600; }
+.du-missions { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
+.du-mission { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); }
+.du-mission > div { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.du-mission strong { font-size: 14.5px; color: var(--bone); }
+.du-mission button:disabled, .du-item button:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+.du-mission small { font-size: 12px; color: var(--ash); }
+.du-mbar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.du-mbar div { height: 100%; background: linear-gradient(90deg, #a8761e, #ffd56a); }
+.du-ladder { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; margin: 14px 0 10px; }
+.du-step { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.5); }
+.du-step > div { flex: 1; display: grid; gap: 2px; font-size: 13px; }
+.du-step strong { font-family: var(--display); font-size: 18px; color: var(--bone); }
+.du-step small { color: var(--ash); }
+.du-step.is-done { border-color: rgba(155,227,122,0.45); }
+.du-step-tag { font-size: 20px; color: #9be37a; font-weight: 800; }
+.du-streaks { margin: 6px 0 0; padding-left: 18px; color: var(--ash); font-size: 14px; display: grid; gap: 4px; }
+.du-coins { font-size: 18px; font-weight: 800; color: #8ae0d0; }
+.du-shop { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-top: 14px; }
+.du-item { display: grid; justify-items: start; gap: 6px; padding: 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); font-size: 13px; }
+.du-item strong { font-size: 15px; color: var(--bone); }
+.du-item small { color: #d8a8ff; }
+.du-item button { margin-top: auto; }
+.du-swatch { width: 54px; height: 54px; border-radius: 10px; display: grid; place-items: center; border: 2px solid rgba(255,255,255,0.25); }
+.du-swatch.is-BANNER { clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 80%, 0 100%); }
+.du-swatch.is-FRAME { background-clip: padding-box; box-shadow: inset 0 0 0 10px rgba(20,14,8,0.9); }
+.du-swatch.is-mat { background: rgba(0,0,0,0.3); font-size: 28px; color: #b47cff; }
 .du-figs { display: flex; gap: 32px; margin: 0; }
 .du-figs dt { font-size: 13px; color: var(--ash); }
 .du-figs dd { margin: 4px 0 0; font-family: var(--display); font-weight: 700; font-size: clamp(28px, 3.4vw, 42px); line-height: 1; color: var(--gold-hi); }
@@ -468,6 +756,12 @@ const LOBBY_CSS = `
 `;
 
 const MATCH_CSS = `
+.has-frame .dc-face { border-color: var(--fr1) !important; box-shadow: 0 0 0 1px var(--fr2), 0 0 14px color-mix(in srgb, var(--fr1) 45%, transparent), inset 0 1px 0 rgba(255,230,180,0.15) !important; }
+.dm-tr { font-size: 20px !important; font-weight: 700; }
+.dm-rankchange { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-radius: 12px; background: rgba(0,0,0,0.45); font-family: Georgia, serif; font-size: 22px; font-weight: 700; animation: dmIn 0.6s ease-out; }
+.dm-rankchange.is-up { color: #ffd56a; box-shadow: 0 0 30px rgba(255,213,106,0.35); }
+.dm-rankchange.is-down { color: #e0a090; }
+.dm-tag { font-size: 14px !important; font-weight: 800; color: #ff9a5a; }
 .dm-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 22px; background: linear-gradient(180deg, #2a1f14, #140e09); border-bottom: 2px solid #5a4226; box-shadow: 0 2px 0 rgba(255,214,140,0.12) inset, 0 6px 18px rgba(0,0,0,0.5); }
 .dm-side { display: flex; align-items: center; gap: 12px; font-size: 15px; }
 .dm-side strong { font-family: Georgia, serif; font-size: 17px; color: #f4e2bb; letter-spacing: 0.02em; }
