@@ -15,6 +15,7 @@ import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCO
 import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
 import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
+import { MaterialIcon } from "@/ui/MaterialIcon";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { GemIcon } from "@/ui/icons";
@@ -193,7 +194,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                       </div>
                     ) : (
                       <div className={`st-day-art is-mat is-${offer.kind}`} aria-hidden="true">
-                        {offer.kind === "SPLINTERS" ? "✦" : "◆"}
+                        <MaterialIcon kind={offer.kind === "SPLINTERS" ? "SPLINTERS" : offer.kind === "EPIC_ESSENCE" ? "EPIC" : "RARE"} size={64} />
                       </div>
                     )}
                     <p className="st-type">{t(`store.dailyKind.${offer.kind}` as TranslationKey)}</p>

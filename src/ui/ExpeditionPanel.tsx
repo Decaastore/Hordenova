@@ -4,6 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { ITEM_DEFINITIONS } from "@/config/itemDefinitions";
+import { MaterialIcon, type MaterialKind } from "./MaterialIcon";
 import {
   ESSENCE_RARITIES,
   EXPEDITION_HOURS,
@@ -68,12 +69,23 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
   const regionName = (i: number) => t(`phases.${expeditionRegions()[i]!.i18nKey}.name` as TranslationKey);
   const rarityName = (r: string) => t(`expeditions.essenceShort.${r}` as TranslationKey);
 
-  const prizeLines = (pr: ExpeditionPrize) => [
-    t("expeditions.gold", { n: fmt(pr.gold) }),
-    ...(pr.shards > 0 ? [t("expeditions.shards", { n: pr.shards })] : []),
-    t("expeditions.splinters", { n: pr.splinters }),
-    ...ESSENCE_RARITIES.filter((r) => pr.essences[r] > 0).map((r) => t("expeditions.essence", { n: pr.essences[r], r: t(`expeditions.essenceName.${r}` as TranslationKey) })),
-  ];
+  /** A row of icon + amount chips. */
+  const chips = (list: [MaterialKind, number | string, string][]) => (
+    <span style={chipsRow}>
+      {list.map(([k, n, label]) => (
+        <span key={k} style={chipStyleI} title={label}>
+          <MaterialIcon kind={k} size={15} title={label} /> {n}
+        </span>
+      ))}
+    </span>
+  );
+  const prizeChips = (pr: ExpeditionPrize) =>
+    chips([
+      ["GOLD", fmt(pr.gold), t("expeditions.gold", { n: fmt(pr.gold) })],
+      ...(pr.shards > 0 ? ([["SHARDS", pr.shards, t("expeditions.shards", { n: pr.shards })]] as [MaterialKind, number, string][]) : []),
+      ["SPLINTERS", pr.splinters, t("expeditions.splinters", { n: pr.splinters })],
+      ...ESSENCE_RARITIES.filter((r) => pr.essences[r] > 0).map((r) => [r, pr.essences[r], t(`expeditions.essenceName.${r}` as TranslationKey)] as [MaterialKind, number, string]),
+    ]);
 
   const rushButtons = (msLeft: number, onRush: (c: GemCurrency) => void) => {
     const price = rushPrice(msLeft);
@@ -116,7 +128,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
                       <div style={{ ...barFill, width: `${Math.min(100, ((now - e.startedAt) / (e.endsAt - e.startedAt)) * 100)}%` }} />
                     </div>
                     <div style={{ fontSize: 10.5, color: done ? "#9be37a" : PALETTE.uiTextDim, marginTop: 2 }}>{done ? t("expeditions.ready") : t("expeditions.timeLeft", { t: fmtLeft(left) })}</div>
-                    <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{prizeLines(pr).join(" · ")}</div>
+                    <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 3 }}>{prizeChips(pr)}</div>
                   </div>
                   {done ? (
                     <button style={btnStyle} onClick={() => p.onCollect(i)}>
@@ -155,7 +167,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
               {region && (
                 <div style={{ marginTop: 8, fontSize: 11.5 }}>
                   <span style={{ color: GOLD, fontWeight: 700 }}>{t("expeditions.prize")}: </span>
-                  {prizeLines(expeditionPrize(region.tier, hours)).join(" · ")}
+                  {prizeChips(expeditionPrize(region.tier, hours))}
                 </div>
               )}
               <button
@@ -188,12 +200,12 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
           <div style={subStyle}>{t("expeditions.forgeLead")}</div>
           <div style={{ ...rowStyle, marginTop: 8, flexWrap: "wrap", gap: 8, fontSize: 11.5 }}>
             <strong style={{ width: "100%", fontSize: 11 }}>{t("expeditions.materials")}</strong>
-            <span>
-              {t("expeditions.splintersLabel")}: <b>{fmt(s.splinters)}</b>
+            <span style={matStyle} title={t("expeditions.splintersLabel")}>
+              <MaterialIcon kind="SPLINTERS" size={24} /> <b>{fmt(s.splinters)}</b>
             </span>
             {ESSENCE_RARITIES.map((r) => (
-              <span key={r} style={{ color: RARITY_COLOR[r] }}>
-                {rarityName(r)}: <b>{s.essences[r]}</b>
+              <span key={r} style={{ ...matStyle, color: RARITY_COLOR[r] }} title={t(`expeditions.essenceName.${r}` as TranslationKey)}>
+                <MaterialIcon kind={r} size={24} /> <b>{s.essences[r]}</b>
               </span>
             ))}
           </div>
@@ -228,12 +240,12 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
                 <div key={r.itemId} style={{ ...rowStyle, borderColor: `${RARITY_COLOR[rarity]}66` }} data-testid={`recipe-${r.itemId}`}>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: RARITY_COLOR[rarity] }}>{t(`items.${ITEM_DEFINITIONS[r.itemId].i18nKey}.name` as TranslationKey)}</div>
-                    <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>
-                      {[
-                        `${r.splinters} ${t("expeditions.splintersLabel")}`,
-                        ...ESSENCE_RARITIES.filter((k) => r.essences[k] > 0).map((k) => `${r.essences[k]} ${rarityName(k)}`),
-                        t("expeditions.hours", { n: r.hours }),
-                      ].join(" · ")}
+                    <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+                      {chips([
+                        ["SPLINTERS", r.splinters, t("expeditions.splintersLabel")],
+                        ...ESSENCE_RARITIES.filter((k) => r.essences[k] > 0).map((k) => [k, r.essences[k], t(`expeditions.essenceName.${k}` as TranslationKey)] as [MaterialKind, number, string]),
+                      ])}
+                      <span>⏱ {t("expeditions.hours", { n: r.hours })}</span>
                     </div>
                     {missing.length > 0 && <div style={{ fontSize: 10.5, color: "#e58a7a" }}>{t("expeditions.missing", { list: missing.join(", ") })}</div>}
                   </div>
@@ -276,5 +288,8 @@ const chipStyle: CSSProperties = { flex: 1, padding: "5px 0", borderRadius: 6, b
 const chipOnStyle: CSSProperties = { borderColor: GOLD, color: "#f1dcae", background: "rgba(232,192,106,0.15)" };
 const labelStyle: CSSProperties = { display: "block", fontSize: 11, color: PALETTE.uiTextDim, fontWeight: 700 };
 const selectStyle: CSSProperties = { display: "block", width: "100%", marginTop: 4, padding: "5px 6px", borderRadius: 6, background: "#1c140c", color: PALETTE.uiText, border: "1px solid rgba(232,192,106,0.4)", fontSize: 12 };
+const chipsRow: CSSProperties = { display: "inline-flex", flexWrap: "wrap", gap: 6, alignItems: "center" };
+const chipStyleI: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 3, padding: "1px 6px 1px 3px", borderRadius: 10, background: "rgba(0,0,0,0.3)", color: PALETTE.uiText, fontWeight: 700 };
+const matStyle: CSSProperties = { display: "inline-flex", alignItems: "center", gap: 4, fontSize: 13 };
 const barTrack: CSSProperties = { height: 4, borderRadius: 2, background: "rgba(255,255,255,0.1)", marginTop: 5, overflow: "hidden" };
 const barFill: CSSProperties = { height: "100%", background: GOLD };

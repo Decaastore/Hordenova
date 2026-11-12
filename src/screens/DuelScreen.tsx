@@ -42,6 +42,7 @@ import { createEnemyInstance } from "@/entities/Enemy";
 import type { EnemyType } from "@/config/enemyStats";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { PAGE_CSS } from "@/ui/pageChrome";
+import { MaterialIcon, type MaterialKind } from "@/ui/MaterialIcon";
 
 const W = DUEL_W;
 const H = DUEL_H;
@@ -156,15 +157,29 @@ export function RankBadge({ trophies, size = 64 }: { trophies: number; size?: nu
 
 function PrizeLine({ prize }: { prize: DuelPrize }) {
   const { t } = useLanguage();
-  const parts = [
-    prize.coins ? t("duel.prize.coins", { n: prize.coins }) : null,
-    prize.shards ? t("duel.prize.shards", { n: prize.shards }) : null,
-    prize.splinters ? t("duel.prize.splinters", { n: prize.splinters }) : null,
-    prize.rare ? t("duel.prize.rare", { n: prize.rare }) : null,
-    prize.epic ? t("duel.prize.epic", { n: prize.epic }) : null,
-    prize.legendary ? t("duel.prize.legendary", { n: prize.legendary }) : null,
-  ].filter(Boolean);
-  return <span className="du-prize">{parts.join(" · ")}</span>;
+  const parts: [MaterialKind, number, string][] = (
+    [
+      ["DUEL_COINS", prize.coins, "coins"],
+      ["SHARDS", prize.shards, "shards"],
+      ["SPLINTERS", prize.splinters, "splinters"],
+      ["RARE", prize.rare, "rare"],
+      ["EPIC", prize.epic, "epic"],
+      ["LEGENDARY", prize.legendary, "legendary"],
+    ] as [MaterialKind, number, string][]
+  ).filter(([, n]) => n > 0);
+  return (
+    <span className="du-prize">
+      {parts.map(([k, n, key]) => {
+        const label = t(`duel.prize.${key}` as TranslationKey, { n });
+        return (
+          <span key={k} className="du-pz" title={label}>
+            <MaterialIcon kind={k} size={18} title={label} />
+            {label}
+          </span>
+        );
+      })}
+    </span>
+  );
 }
 
 /** Puts a Duel prize on the account: Gem Shards and Forge materials (coins live in the Duel profile). */
@@ -414,7 +429,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
           <section className="du-block" data-testid="duel-shop">
             <div className="pg-head">
               <h2 className="pg-h2">{t("duel.shopTitle")}</h2>
-              <span className="du-coins">◈ {fmt(duel.coins)}</span>
+              <span className="du-coins">
+                <MaterialIcon kind="DUEL_COINS" size={22} /> {fmt(duel.coins)}
+              </span>
             </div>
             <p className="pg-sub">{t("duel.shopLead")}</p>
             <div className="du-shop">
@@ -428,7 +445,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                       <span className={`du-swatch is-${item.cosmetic.kind}`} style={{ background: `linear-gradient(160deg, ${item.cosmetic.color}, ${item.cosmetic.color2})` }} aria-hidden="true" />
                     ) : (
                       <span className="du-swatch is-mat" aria-hidden="true">
-                        {item.id === "EPIC" ? "◆" : item.id === "RARE" ? "◆" : "✦"}
+                        <MaterialIcon kind={item.id === "EPIC" ? "EPIC" : item.id === "RARE" ? "RARE" : "SPLINTERS"} size={40} />
                       </span>
                     )}
                     <strong>{t(`duel.shop.${item.id}` as TranslationKey)}</strong>
@@ -440,7 +457,13 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                       </button>
                     ) : (
                       <button className="pg-btn" disabled={duel.coins < item.price || !!weeklyLocked} onClick={() => buy(item.id)}>
-                        {weeklyLocked ? t("duel.shopWeeklyDone") : `◈ ${fmt(item.price)}`}
+                        {weeklyLocked ? (
+                          t("duel.shopWeeklyDone")
+                        ) : (
+                          <>
+                            <MaterialIcon kind="DUEL_COINS" size={16} /> {fmt(item.price)}
+                          </>
+                        )}
                       </button>
                     )}
                   </div>
@@ -708,7 +731,9 @@ const LOBBY_CSS = `
 .du-notice { margin: 12px 0 0; color: #9be37a; font-weight: 700; }
 .du-block { padding: 30px 0 6px; }
 .du-block .pg-sub { margin: 4px 0 0; }
-.du-prize { color: var(--bone); font-weight: 600; }
+.du-prize { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; color: var(--bone); font-weight: 600; vertical-align: middle; }
+.du-pz { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.du-coins { display: inline-flex; align-items: center; gap: 6px; }
 .du-missions { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin-top: 14px; }
 .du-mission { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); }
 .du-mission > div { flex: 1; min-width: 0; display: grid; gap: 5px; }

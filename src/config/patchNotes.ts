@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v109",
+    dateIso: "2026-11-12",
+    category: "INTERFACE",
+    title: {
+      en: "Pictures for the new materials",
+      ptBR: "Imagens para os materiais novos",
+    },
+    description: {
+      en: "Splinters, the four Essences, Duel Coins, Gem Shards and Eternal Marks now have their own pictures, shown wherever they appear instead of plain text.",
+      ptBR: "Estilhaços, as quatro Essências, Moedas de Duelo, fragmentos de gema e Marcas Eternas agora têm imagem própria, mostrada em todo lugar onde aparecem, no lugar de só texto.",
+    },
+    highlights: [
+      {
+        en: "Expeditions and the Forge show every prize, cost and material with its picture and amount.",
+        ptBR: "Expedições e Forja mostram cada prêmio, custo e material com a imagem e a quantidade.",
+      },
+      {
+        en: "Also in the Duel (prizes, missions and Duel Shop), the Store's daily offers and the Eternal panel.",
+        ptBR: "Também no Duelo (prêmios, missões e Loja do Duelo), nas ofertas de hoje da Loja e no painel do Eterno.",
+      },
+    ],
+  },
+  {
     id: "v108",
     dateIso: "2026-11-12",
     category: "CONTENT",

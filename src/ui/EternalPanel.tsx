@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { MaterialIcon } from "./MaterialIcon";
 import type { TranslationKey } from "@/i18n/translate";
 import {
   DEPTH_EVERY,
@@ -46,7 +47,9 @@ export function EternalPanel({ marks, record, currentWave, contracts, milestones
         ×
       </button>
       <div style={titleStyle}>{t("eternal.panelTitle")}</div>
-      <div style={{ fontSize: 13, fontWeight: 700, color: VIOLET, marginTop: 4 }}>◆ {t("eternal.marksBalance", { n: fmt(marks) })}</div>
+      <div style={{ fontSize: 13, fontWeight: 700, color: VIOLET, marginTop: 4, display: "flex", alignItems: "center", gap: 6 }}>
+        <MaterialIcon kind="MARKS" size={20} /> {t("eternal.marksBalance", { n: fmt(marks) })}
+      </div>
       <div role="tablist" style={tabsStyle}>
         {(["contracts", "milestones", "merchant"] as const).map((id) => (
           <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{ ...tabStyle, ...(tab === id ? tabOnStyle : null) }}>
