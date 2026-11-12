@@ -1,3 +1,4 @@
+import { createExpeditionState, sanitizeExpeditionState, type ExpeditionState } from "@/config/expeditions";
 import { createEternalState, sanitizeEternalState, type EternalState } from "@/config/eternal";
 import { createAgeVerification, sanitizeAgeVerification, type AgeVerification } from "@/config/ageGate";
 import { isAchievementId, sanitizeBestiaryKills, type AchievementId, type BestiaryKills } from "@/config/achievements";
@@ -265,6 +266,8 @@ export interface SaveData {
   talents: TalentRanks;
   /** MODO ETERNO — marks, depth/milestone rewards paid, this week's contracts (config/eternal.ts). Account-level, permanent. */
   eternal: EternalState;
+  /** EXPEDIÇÕES E FORJA — scout groups, trips under way, Forge materials and the item being forged (config/expeditions.ts). Account-level. */
+  expeditions: ExpeditionState;
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -376,6 +379,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   talents: {},
   ageVerification: createAgeVerification(),
   eternal: createEternalState(0),
+  expeditions: createExpeditionState(),
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -920,6 +924,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       bestRarityFound: typeof parsed.bestRarityFound === "number" && Number.isFinite(parsed.bestRarityFound) ? Math.max(-1, Math.min(5, Math.floor(parsed.bestRarityFound))) : -1,
       ageVerification: sanitizeAgeVerification(parsed.ageVerification),
       eternal: sanitizeEternalState(parsed.eternal),
+      expeditions: sanitizeExpeditionState(parsed.expeditions),
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as

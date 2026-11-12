@@ -33,9 +33,11 @@ interface HUDProps {
   onToggleBestiary?: () => void;
   /** MODO ETERNO — opens the Eternal panel (only shown in the Eternal castle). */
   onToggleEternal?: () => void;
+  /** EXPEDIÇÕES E FORJA — opens the Expeditions and Forge panel. */
+  onToggleExpeditions?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal, onToggleExpeditions }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -162,6 +164,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <ScrollIcon size={13} />
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
+            </button>
+          )}
+          {onToggleExpeditions && (
+            <button onClick={onToggleExpeditions} className="hh-btn" data-testid="expeditions-button" title={t("expeditions.tooltip")}>
+              <span aria-hidden="true" className="hh-talent-glyph">⚑</span>
+              <span className="hh-btn-txt">{t("expeditions.button")}</span>
+              {hud.expeditions.ready > 0 && <span className="hh-badge">{hud.expeditions.ready}</span>}
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (

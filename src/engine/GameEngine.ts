@@ -146,6 +146,25 @@ import { getMilestoneUnlockForLevel } from "@/config/towerStats";
 import { adaptAfterWave, createHordeAdaptation, emptyShares, strongestResistance, ADAPTATION_ANNOUNCE_STEP, type DamageShares, type HordeAdaptation } from "@/config/hordeAdaptation";
 import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FIRES_PER_BOSS_BREACH, CITY_FIRES_PER_LEAKED_WAVE, igniteBuildings, type CityBuildingId, type CityState } from "@/config/city";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
+import {
+  addEssences,
+  BOSS_SPLINTERS,
+  canAffordRecipe,
+  createExpeditionState,
+  EXTRA_GROUP_PRICE,
+  expeditionPrize,
+  expeditionRegions,
+  getRecipe,
+  MAX_SCOUT_GROUPS,
+  MINI_BOSS_SPLINTERS,
+  NO_ESSENCES,
+  RIFT_SPLINTERS,
+  rushPrice,
+  unlockedRegions,
+  type ExpeditionHours,
+  type ExpeditionPrize,
+  type ExpeditionState,
+} from "@/config/expeditions";
 
 /** Elite spec (section 5): real stat multipliers plus a passive-regen "special ability", not just a bigger HP number. */
 const ELITE_MODIFIER: EliteModifier = {
@@ -251,6 +270,8 @@ export interface HudSnapshot {
     lastEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null;
     contractsReady: number;
   };
+  /** EXPEDIÇÕES E FORJA — trips and forge ready to collect, and trips under way. */
+  expeditions: { ready: number; away: number; forging: boolean; splinters: number };
   /** CONQUISTAS — the latest achievement unlocked (seq bumps) and the title worn. */
   achievement: { last: { seq: number; id: AchievementId } | null; title: AchievementId | null; count: number };
   /** ÁRVORE DE TALENTOS — ranks and points still free. */
@@ -352,6 +373,10 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.freeGems === b.freeGems &&
     a.purchasedGems === b.purchasedGems &&
     a.gemShards === b.gemShards &&
+    a.expeditions.ready === b.expeditions.ready &&
+    a.expeditions.away === b.expeditions.away &&
+    a.expeditions.forging === b.expeditions.forging &&
+    a.expeditions.splinters === b.expeditions.splinters &&
     a.baseHp === b.baseHp &&
     a.maxBaseHp === b.maxBaseHp &&
     a.speed === b.speed &&
@@ -559,6 +584,7 @@ export class GameEngine {
   private rift: RiftState = createRiftState();
   private talents: TalentRanks = {};
   private eternal: EternalState = createEternalState();
+  private expeditions: ExpeditionState = createExpeditionState();
   private lastEternalEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null = null;
   private bestiaryKills: BestiaryKills = {};
   private achievements: AchievementId[] = [];
@@ -679,6 +705,7 @@ export class GameEngine {
     this.city = { burning: { ...save.city.burning }, firesStarted: save.city.firesStarted };
     this.talents = sanitizeTalentRanks(save.talents, save.seasonBestWave);
     this.eternal = rollWeek(save.eternal, Date.now());
+    this.expeditions = save.expeditions;
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
@@ -2288,6 +2315,7 @@ export class GameEngine {
     let slot = 0;
     this.addGemShards(reward.shards, "rift_reward");
     this.dropLoot({ kind: "shards", rarity: shardPileRarity(reward.shards), amount: reward.shards, ...at(slot++) });
+    this.addForgeMaterials(RIFT_SPLINTERS, { ...NO_ESSENCES, RARE: active.mods.length });
     this.gold += reward.gold;
     const table = getDropTable(RIFT_DROP_TABLE_ID);
     for (let i = 0; table && i < reward.itemRolls; i++) {
@@ -2371,6 +2399,136 @@ export class GameEngine {
     this.persist();
     this.notify();
     return true;
+  }
+
+  // ── EXPEDIÇÕES E FORJA (config/expeditions.ts) ─────────────────────────
+  private addForgeMaterials(splinters: number, essences: typeof NO_ESSENCES): void {
+    this.expeditions = { ...this.expeditions, splinters: this.expeditions.splinters + splinters, essences: addEssences(this.expeditions.essences, essences) };
+  }
+
+  /** Highest wave this account has reached — what opens expedition regions. */
+  private expeditionRecord(): number {
+    return Math.max(this.bestWave, this.seasonBestWave);
+  }
+
+  getExpeditionState(): Readonly<ExpeditionState> {
+    return this.expeditions;
+  }
+
+  getExpeditionRecord(): number {
+    return this.expeditionRecord();
+  }
+
+  /** Sends a free scout group to a region the record has passed. */
+  startExpedition(regionIndex: number, hours: ExpeditionHours, nowMs: number = Date.now()): boolean {
+    const e = this.expeditions;
+    if (e.active.length >= e.groups) return false;
+    if (!unlockedRegions(this.expeditionRecord()).some((r) => r.index === regionIndex)) return false;
+    this.expeditions = { ...e, active: [...e.active, { regionIndex, hours, startedAt: nowMs, endsAt: nowMs + hours * 3_600_000 }] };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  private payExpedition(i: number): ExpeditionPrize | null {
+    const exp = this.expeditions.active[i];
+    const region = exp ? expeditionRegions()[exp.regionIndex] : undefined;
+    if (!exp || !region) return null;
+    const prize = expeditionPrize(region.tier, exp.hours);
+    this.gold += prize.gold;
+    this.addGemShards(prize.shards, "expedition");
+    this.expeditions = { ...this.expeditions, active: this.expeditions.active.filter((_, k) => k !== i) };
+    this.addForgeMaterials(prize.splinters, prize.essences);
+    return prize;
+  }
+
+  /** Collects a finished trip. */
+  collectExpedition(i: number, nowMs: number = Date.now()): ExpeditionPrize | null {
+    const exp = this.expeditions.active[i];
+    if (!exp || nowMs < exp.endsAt) return null;
+    const prize = this.payExpedition(i);
+    this.emitAudio({ type: "loot_drop", rarity: "RARE" });
+    this.persist();
+    this.notify();
+    return prize;
+  }
+
+  /** Finishes a trip now for Gems (price by the time left). */
+  rushExpedition(i: number, currency: GemCurrency, nowMs: number = Date.now()): ExpeditionPrize | null {
+    const exp = this.expeditions.active[i];
+    if (!exp) return null;
+    const cost = gemPriceForCurrency(rushPrice(exp.endsAt - nowMs), currency);
+    if (nowMs < exp.endsAt) {
+      if (!this.canAffordGemsInCurrency(cost, currency)) return null;
+      if (!this.spendGems(cost, "expedition_rush", currency)) return null;
+    }
+    const prize = this.payExpedition(i);
+    this.persist();
+    this.notify();
+    return prize;
+  }
+
+  /** Buys the 3rd or 4th scout group (permanent). */
+  buyScoutGroup(currency: GemCurrency): boolean {
+    if (this.expeditions.groups >= MAX_SCOUT_GROUPS) return false;
+    const cost = gemPriceForCurrency(EXTRA_GROUP_PRICE, currency);
+    if (!this.canAffordGemsInCurrency(cost, currency)) return false;
+    if (!this.spendGems(cost, "scout_group", currency)) return false;
+    this.expeditions = { ...this.expeditions, groups: this.expeditions.groups + 1 };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Starts forging the chosen item (one at a time). */
+  startForge(itemId: string, nowMs: number = Date.now()): boolean {
+    const r = getRecipe(itemId);
+    const e = this.expeditions;
+    if (!r || e.forging || !canAffordRecipe(e, r)) return false;
+    this.expeditions = { ...e, splinters: e.splinters - r.splinters, essences: addEssences(e.essences, r.essences, -1), forging: { itemId: r.itemId, endsAt: nowMs + r.hours * 3_600_000 } };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  private finishForge(): ItemInstance | null {
+    const f = this.expeditions.forging;
+    if (!f) return null;
+    const item = createItemInstance(f.itemId, this.playerId, { type: "FUSION", refId: "forge" });
+    const result = addItemWithCapacity(this.inventory, this.overflowInventory, item, this.inventoryCapacity);
+    this.inventory = result.inventory;
+    this.overflowInventory = result.overflow;
+    this.pendingItemRewards.push(item);
+    appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "forge", eventType: "ITEM_CREATED", fromOwner: null, toOwner: this.playerId });
+    appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "forge", eventType: "ITEM_ACQUIRED", fromOwner: null, toOwner: this.playerId });
+    this.expeditions = { ...this.expeditions, forging: null };
+    this.persist();
+    this.notify();
+    return item;
+  }
+
+  /** Takes the forged item once its time is up. */
+  collectForge(nowMs: number = Date.now()): ItemInstance | null {
+    const f = this.expeditions.forging;
+    if (!f || nowMs < f.endsAt) return null;
+    return this.finishForge();
+  }
+
+  /** Finishes the forge now for Gems (price by the time left). */
+  rushForge(currency: GemCurrency, nowMs: number = Date.now()): ItemInstance | null {
+    const f = this.expeditions.forging;
+    if (!f) return null;
+    if (nowMs < f.endsAt) {
+      const cost = gemPriceForCurrency(rushPrice(f.endsAt - nowMs), currency);
+      if (!this.canAffordGemsInCurrency(cost, currency)) return null;
+      if (!this.spendGems(cost, "forge_rush", currency)) return null;
+    }
+    return this.finishForge();
+  }
+
+  /** Trips and forge that are ready to collect (HUD badge). */
+  private expeditionsReady(nowMs: number): number {
+    return this.expeditions.active.filter((e) => nowMs >= e.endsAt).length + (this.expeditions.forging && nowMs >= this.expeditions.forging.endsAt ? 1 : 0);
   }
 
   /** Depth and wave-milestone rewards of the Eternal record — paid automatically when reached. */
@@ -2984,6 +3142,7 @@ export class GameEngine {
   private grantBossDrop(boss: BossState, at?: { x: number; y: number }): void {
     if (boss.isMainBoss) this.bossesDefeatedTotal += 1;
     else this.miniBossesDefeatedTotal += 1;
+    this.addForgeMaterials(boss.isMainBoss ? BOSS_SPLINTERS : MINI_BOSS_SPLINTERS, NO_ESSENCES);
 
     // Gem Shards (spec section 34: "obtidos via... bosses"): every boss
     // kill grants a small amount regardless of whether it also has a
@@ -3271,6 +3430,7 @@ export class GameEngine {
         rift: this.rift,
         talents: this.talents,
         eternal: this.eternal,
+        expeditions: this.expeditions,
         bestiaryKills: this.bestiaryKills,
         achievements: this.achievements,
         equippedTitle: this.equippedTitle,
@@ -3345,6 +3505,7 @@ export class GameEngine {
         lastEvent: this.lastEternalEvent,
         contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
       },
+      expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters },
     };
 
     const prev = this.cachedHud;

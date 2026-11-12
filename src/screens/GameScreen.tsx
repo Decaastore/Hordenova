@@ -1,3 +1,4 @@
+import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
 import { EternalPanel } from "@/ui/EternalPanel";
 import { romanDepth } from "@/config/eternal";
 import { ETERNAL_STORAGE_KEY } from "@/engine/SaveSystem";
@@ -119,6 +120,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
   const [talentsOpen, setTalentsOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [eternalOpen, setEternalOpen] = useState(false);
+  const [expeditionsOpen, setExpeditionsOpen] = useState(false);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
   // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
@@ -454,7 +456,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => !open)} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -700,6 +702,22 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
           />
         )}
 
+        {expeditionsOpen && (
+          <ExpeditionPanel
+            state={engine.getExpeditionState()}
+            record={engine.getExpeditionRecord()}
+            freeGems={hud.freeGems}
+            purchasedGems={hud.purchasedGems}
+            onSend={(r, h) => engine.startExpedition(r, h)}
+            onCollect={(i) => engine.collectExpedition(i)}
+            onRush={(i, c) => engine.rushExpedition(i, c)}
+            onBuyGroup={(c) => engine.buyScoutGroup(c)}
+            onForge={(id) => engine.startForge(id)}
+            onCollectForge={() => engine.collectForge()}
+            onRushForge={(c) => engine.rushForge(c)}
+            onClose={() => setExpeditionsOpen(false)}
+          />
+        )}
         {eternalOpen && hud.eternal.active && (
           <EternalPanel
             marks={hud.eternal.marks}

@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v102",
+    dateIso: "2026-11-11",
+    category: "ITEMS",
+    title: {
+      en: "Expeditions and the Forge",
+      ptBR: "Expedições e Forja",
+    },
+    description: {
+      en: "A new EXPEDITIONS button in the game. Send scout groups to regions you've already beaten and they come back with a prize you see before they leave. Bosses, Rifts and expeditions now give Forge materials, and in the Forge you choose which item to make. No chests and no luck you pay for.",
+      ptBR: "Novo botão EXPEDIÇÕES no jogo. Mande grupos de batedores a regiões que você já venceu: eles voltam com um prêmio que você vê antes de sair. Chefes, Fendas e expedições agora dão materiais da Forja, e na Forja você escolhe qual item quer fazer. Sem baú e sem pagar por sorte.",
+    },
+    highlights: [
+      {
+        en: "Trips of 1h, 4h, 8h or 24h; deeper regions and longer trips pay more gold, Gem Shards, Splinters and Essences.",
+        ptBR: "Expedições de 1h, 4h, 8h ou 24h; regiões mais fundas e viagens mais longas pagam mais ouro, fragmentos, Estilhaços e Essências.",
+      },
+      {
+        en: "Everyone starts with 2 scout groups; a 3rd and 4th can be bought with Gems, and any trip or forge can be finished early for 5 to 60 Gems.",
+        ptBR: "Todo mundo começa com 2 grupos de batedores; o 3º e o 4º podem ser comprados com Gemas, e qualquer expedição ou forja pode terminar na hora por 5 a 60 Gemas.",
+      },
+      {
+        en: "The Forge makes all five items, from the Mosswood Charm to the Crown of the Hollow King, one at a time. Legendary and Mythic Essences only come from the deepest 24-hour trips, so the top items stay rare.",
+        ptBR: "A Forja faz os cinco itens, do Amuleto de Musgolenho à Coroa do Rei Oco, um por vez. Essências Lendárias e Míticas só vêm das expedições de 24h nas regiões mais fundas, então os itens de topo continuam raros.",
+      },
+      {
+        en: "Region bosses leave 5 Splinters, mini-bosses 1, and a cleared Rift 4 Splinters plus one Rare Essence per curse.",
+        ptBR: "Chefes de região deixam 5 Estilhaços, mini-chefes 1, e uma Fenda vencida 4 Estilhaços mais uma Essência Rara por maldição.",
+      },
+    ],
+  },
+  {
     id: "v101",
     dateIso: "2026-11-11",
     category: "CONTENT",
