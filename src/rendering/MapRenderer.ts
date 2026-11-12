@@ -140,52 +140,57 @@ export function drawDecorations(
 ): void {
   for (const deco of getMapDecorations(biome)) {
     if (skipKinds?.has(deco.kind)) continue;
-    ctx.save();
-    ctx.translate(deco.position.x, deco.position.y);
-    if (deco.kind !== "WATER") {
-      // VISUAL POLISH (fase 260 feedback) — torches were spun to a random
-      // angle like every other prop, so a pole+brazier+flame lying sideways
-      // read as an arrow flying across the map. Torches now always stand
-      // upright and crystals only lean a little.
-      if (deco.kind === "CRYSTAL") ctx.rotate((deco.rotation / Math.PI - 1) * 0.35);
-      else if (deco.kind !== "TORCH") ctx.rotate(deco.rotation);
-      ctx.scale(deco.scale, deco.scale);
-    }
-
-    switch (deco.kind) {
-      case "TREE":
-        drawTree(ctx, deco, biome);
-        break;
-      case "ROCK":
-        drawRock(ctx, deco, biome);
-        break;
-      case "ROOT":
-        drawRoot(ctx, biome);
-        break;
-      case "RUIN":
-        drawRuinDecor(ctx, biome);
-        break;
-      case "CRYSTAL":
-        drawCrystalCluster(ctx, deco, timeMs, biome);
-        break;
-      case "GRASS":
-        drawGrassTuft(ctx, biome);
-        break;
-      case "FLOWER":
-        drawFlower(ctx, deco.variant);
-        break;
-      case "WATER":
-        drawWaterPond(ctx, deco, timeMs, biome);
-        break;
-      case "TORCH":
-        drawBrazierTorch(ctx, deco, timeMs, biome);
-        break;
-      case "FISSURE":
-        drawFissure(ctx, deco, timeMs, biome);
-        break;
-    }
-    ctx.restore();
+    drawDecoration(ctx, deco, biome, timeMs);
   }
+}
+
+/** Draws one decoration (tree, rock, torch…) at its position — also used by the Duel board. */
+export function drawDecoration(ctx: CanvasRenderingContext2D, deco: Decoration, biome: BiomeDefinition, timeMs: number): void {
+  ctx.save();
+  ctx.translate(deco.position.x, deco.position.y);
+  if (deco.kind !== "WATER") {
+    // VISUAL POLISH (fase 260 feedback) — torches were spun to a random
+    // angle like every other prop, so a pole+brazier+flame lying sideways
+    // read as an arrow flying across the map. Torches now always stand
+    // upright and crystals only lean a little.
+    if (deco.kind === "CRYSTAL") ctx.rotate((deco.rotation / Math.PI - 1) * 0.35);
+    else if (deco.kind !== "TORCH") ctx.rotate(deco.rotation);
+    ctx.scale(deco.scale, deco.scale);
+  }
+
+  switch (deco.kind) {
+    case "TREE":
+      drawTree(ctx, deco, biome);
+      break;
+    case "ROCK":
+      drawRock(ctx, deco, biome);
+      break;
+    case "ROOT":
+      drawRoot(ctx, biome);
+      break;
+    case "RUIN":
+      drawRuinDecor(ctx, biome);
+      break;
+    case "CRYSTAL":
+      drawCrystalCluster(ctx, deco, timeMs, biome);
+      break;
+    case "GRASS":
+      drawGrassTuft(ctx, biome);
+      break;
+    case "FLOWER":
+      drawFlower(ctx, deco.variant);
+      break;
+    case "WATER":
+      drawWaterPond(ctx, deco, timeMs, biome);
+      break;
+    case "TORCH":
+      drawBrazierTorch(ctx, deco, timeMs, biome);
+      break;
+    case "FISSURE":
+      drawFissure(ctx, deco, timeMs, biome);
+      break;
+  }
+  ctx.restore();
 }
 
 /**

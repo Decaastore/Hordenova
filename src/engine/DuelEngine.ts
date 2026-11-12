@@ -38,7 +38,7 @@ export interface Pt {
 export const LANE_W = 640;
 export const LANE_H = 660;
 const LANE_PATH: readonly Pt[] = [
-  { x: 320, y: -30 },
+  { x: 320, y: 40 },
   { x: 320, y: 105 },
   { x: 110, y: 105 },
   { x: 110, y: 255 },
@@ -109,6 +109,7 @@ interface Unit {
   slowUntil: number;
   inst: EnemyInstance;
   angle: number;
+  turnRate: number;
 }
 
 interface DTower {
@@ -246,7 +247,7 @@ export class DuelEngine {
       inst.id = `du${this.uid}`;
       inst.maxHp = hp;
       inst.hp = hp;
-      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, slowUntil: 0, inst, angle: Math.PI / 2 });
+      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, slowUntil: 0, inst, angle: Math.PI / 2, turnRate: 0 });
     }
   }
 
@@ -275,7 +276,18 @@ export class DuelEngine {
       u.dist += (u.card.speed * slow * dt) / 1000;
       const { p, angle } = pointAt(u.side, u.dist);
       u.inst.position = p;
-      u.angle = angle;
+      // turn smoothly at corners instead of snapping (the body banks into the turn)
+      let diff = angle - u.angle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      const maxTurn = (7 * dt) / 1000;
+      const turn = Math.max(-maxTurn, Math.min(maxTurn, diff));
+      u.angle += turn;
+      u.turnRate = turn / dt;
+      u.inst.direction = { x: Math.cos(angle), y: Math.sin(angle) };
+      // the creature's own gait is driven by the distance it has walked
+      u.inst.distanceTraveled = Math.max(0, u.dist);
+      u.inst.baseSpeed = u.card.speed;
       u.inst.hp = u.hp;
     }
     // breach

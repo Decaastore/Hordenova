@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v111",
+    dateIso: "2026-11-12",
+    category: "INTERFACE",
+    title: {
+      en: "Duel: the board now looks like the main game",
+      ptBR: "Duelo: o tabuleiro agora tem a cara do jogo principal",
+    },
+    description: {
+      en: "The Duel board is now drawn with the main game's own map pieces, and creatures walk with their real animation instead of sliding.",
+      ptBR: "O tabuleiro do Duelo agora é desenhado com as mesmas peças do mapa do jogo principal, e as criaturas andam com a animação de verdade em vez de deslizar.",
+    },
+    highlights: [
+      {
+        en: "Creatures walk, turn smoothly at corners and climb out of the same rift portal as in the main game.",
+        ptBR: "As criaturas andam, viram suavemente nas curvas e saem do mesmo portal de fenda do jogo principal.",
+      },
+      {
+        en: "The arena's own ground, winding road, tower platforms and scenery: trees, rocks, grass and flowers in the Forest; rocks and lava cracks in the Volcano; crystals in the Tundra and the Abyss.",
+        ptBR: "Chão, estrada sinuosa, plataformas de torre e cenário da própria arena: árvores, pedras, grama e flores na Floresta; pedras e rachaduras de lava no Vulcão; cristais na Tundra e no Abismo.",
+      },
+    ],
+  },
+  {
     id: "v110",
     dateIso: "2026-11-12",
     category: "CONTENT",

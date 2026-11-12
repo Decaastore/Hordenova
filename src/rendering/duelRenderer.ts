@@ -1,4 +1,9 @@
 import { activeKillFx, drawKillFx } from "./duelLooks";
+import { drawBackground, drawDecoration, drawPath, drawSlot } from "./MapRenderer";
+import { drawRiftPortal } from "./riftPortal";
+import { getBiome } from "./biomes";
+import type { Decoration, DecorationKind } from "./mapDecorations";
+import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
 import { CASTLE_AT, LANE_H, LANE_SLOTS, LANE_W, lanePath, slotPos, type DuelSnapshot, type Pt, type Side } from "@/engine/DuelEngine";
 import { MAX_DUEL_TOWER_LEVEL } from "@/config/duel";
 import { drawEnemy, drawEnemyHpBar, drawTower } from "./EntityRenderer";
@@ -50,45 +55,101 @@ function groundImage(biome: string): HTMLImageElement | null {
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
-/** The static part of the board (ground, road, wall), drawn once per arena into an offscreen canvas. */
+/**
+ * The static part of the board, drawn once per arena into an offscreen
+ * canvas with the main game's own map pieces: the biome's ground, its
+ * organic road, and scenery (trees, rocks, grass…) kept clear of the roads,
+ * the tower spots and the castles.
+ */
 const boardCache = new Map<string, HTMLCanvasElement>();
-function board(arenaId: string, biome: string): HTMLCanvasElement | null {
-  const key = `${arenaId}:${biome}`;
+function board(arenaId: string, biomeId: string): HTMLCanvasElement | null {
+  const key = `${arenaId}:${biomeId}`;
   const hit = boardCache.get(key);
   if (hit) return hit;
-  const ground = groundImage(biome);
-  if (!ground) return null;
-  const look = LOOK[arenaId] ?? LOOK.ARENA_FOREST!;
+  const biome = getBiome(biomeId);
   const cv = document.createElement("canvas");
   cv.width = DUEL_W;
   cv.height = DUEL_H;
   const ctx = cv.getContext("2d")!;
-  for (const side of [0, 1] as Side[]) {
-    const x0 = side * LANE_W;
+  drawBackground(ctx, biome, { x0: 0, y0: 0, x1: DUEL_W, y1: DUEL_H });
+  const ground = groundImage(biomeId);
+  if (ground) {
+    // a light wash of the biome's painted ground for texture
     ctx.save();
-    ctx.beginPath();
-    ctx.rect(x0, 0, LANE_W, DUEL_H);
-    ctx.clip();
-    // ground: the biome texture, toned down so the road and units read
-    ctx.fillStyle = look.ground[0];
-    ctx.fillRect(x0, 0, LANE_W, DUEL_H);
-    ctx.globalAlpha = 0.85;
-    ctx.drawImage(ground, 260 + side * 520, 420, 900, 900 * (DUEL_H / LANE_W), x0, 0, LANE_W, DUEL_H);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = "rgba(6,4,2,0.38)";
-    ctx.fillRect(x0, 0, LANE_W, DUEL_H);
-    // vignette
-    const v = ctx.createRadialGradient(x0 + LANE_W / 2, DUEL_H * 0.55, 120, x0 + LANE_W / 2, DUEL_H * 0.55, 520);
-    v.addColorStop(0, "rgba(0,0,0,0)");
-    v.addColorStop(1, "rgba(0,0,0,0.6)");
-    ctx.fillStyle = v;
-    ctx.fillRect(x0, 0, LANE_W, DUEL_H);
-    drawRoad(ctx, lanePath(side), look, side);
+    ctx.globalAlpha = 0.28;
+    ctx.globalCompositeOperation = "overlay";
+    ctx.drawImage(ground, 0, 0, ground.naturalWidth, ground.naturalWidth * (DUEL_H / DUEL_W), 0, 0, DUEL_W, DUEL_H);
     ctx.restore();
   }
+  for (const side of [0, 1] as Side[]) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(side * LANE_W, 0, LANE_W, DUEL_H);
+    ctx.clip();
+    drawPath(ctx, lanePath(side), biome);
+    ctx.restore();
+  }
+  for (const d of duelDecorations(biomeId)) drawDecoration(ctx, d, biome, 0);
+  // soft vignette per lane
+  for (const side of [0, 1] as Side[]) {
+    const x0 = side * LANE_W;
+    const v = ctx.createRadialGradient(x0 + LANE_W / 2, DUEL_H * 0.55, 160, x0 + LANE_W / 2, DUEL_H * 0.55, 560);
+    v.addColorStop(0, "rgba(0,0,0,0)");
+    v.addColorStop(1, "rgba(0,0,0,0.5)");
+    ctx.fillStyle = v;
+    ctx.fillRect(x0, 0, LANE_W, DUEL_H);
+  }
   drawWall(ctx);
-  boardCache.set(key, cv);
+  if (ground) boardCache.set(key, cv);
   return cv;
+}
+
+function distToPath(p: Pt, path: readonly Pt[]): number {
+  let best = Infinity;
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i]!;
+    const b = path[i + 1]!;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy)));
+    best = Math.min(best, Math.hypot(p.x - (a.x + dx * t), p.y - (a.y + dy * t)));
+  }
+  return best;
+}
+
+/** Scenery for the Duel board — the biome's own kinds of props, placed off the roads and tower spots. */
+function duelDecorations(biomeId: string): Decoration[] {
+  const r = seeded(biomeId.length * 31 + 7);
+  const kinds: DecorationKind[] =
+    biomeId === "VOLCANIC_WASTES"
+      ? ["ROCK", "ROCK", "FISSURE", "ROCK", "TORCH", "GRASS"]
+      : biomeId === "FROZEN_TUNDRA"
+        ? ["TREE", "ROCK", "CRYSTAL", "TREE", "GRASS", "ROCK"]
+        : biomeId === "ABYSS"
+          ? ["CRYSTAL", "ROCK", "RUIN", "CRYSTAL", "ROOT", "TORCH"]
+          : ["TREE", "TREE", "ROCK", "GRASS", "FLOWER", "TREE", "ROOT", "GRASS"];
+  const out: Decoration[] = [];
+  for (const side of [0, 1] as Side[]) {
+    const path = lanePath(side);
+    let tries = 0;
+    let placed = 0;
+    while (placed < 46 && tries < 2400) {
+      tries++;
+      const p = { x: side * LANE_W + 18 + r() * (LANE_W - 36), y: 56 + r() * (DUEL_H - 70) };
+      if (Math.abs(p.x - LANE_W) < 34) continue;
+      if (distToPath(p, path) < 46) continue;
+      if (LANE_SLOTS.some((_, i) => Math.hypot(slotPos(side, i).x - p.x, slotPos(side, i).y - p.y) < 50)) continue;
+      if (Math.hypot(CASTLE_AT.x + side * LANE_W - p.x, CASTLE_AT.y - p.y) < 120) continue;
+      if (out.some((d) => Math.hypot(d.position.x - p.x, d.position.y - p.y) < 24)) continue;
+      // big trees frame the outer edges; small props fill between the roads
+      const edge = Math.min(p.x - side * LANE_W, (side + 1) * LANE_W - p.x) < 90 || p.y < 90;
+      const kind = edge && kinds.includes("TREE") && r() < 0.7 ? "TREE" : kinds[Math.floor(r() * kinds.length)]!;
+      if (kind === "TREE" && distToPath(p, path) < 62) continue;
+      out.push({ kind, position: p, scale: kind === "TREE" ? 1.05 + r() * 0.65 : 0.9 + r() * 0.6, rotation: r() * Math.PI * 2, variant: Math.floor(r() * 4) });
+      placed++;
+    }
+  }
+  return out.sort((a, b) => a.position.y - b.position.y);
 }
 
 function seeded(seed: number): () => number {
@@ -99,78 +160,7 @@ function seeded(seed: number): () => number {
   };
 }
 
-function strokePath(ctx: CanvasRenderingContext2D, path: readonly Pt[], width: number, style: string | CanvasGradient): void {
-  ctx.strokeStyle = style;
-  ctx.lineWidth = width;
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-  ctx.beginPath();
-  path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-  ctx.stroke();
-}
 
-function drawRoad(ctx: CanvasRenderingContext2D, path: readonly Pt[], look: ArenaLook, side: Side): void {
-  // soft shadow, kerb, packed earth, worn centre
-  ctx.save();
-  ctx.filter = "blur(6px)";
-  strokePath(ctx, path, 70, "rgba(0,0,0,0.55)");
-  ctx.restore();
-  strokePath(ctx, path, 58, look.road[0]);
-  strokePath(ctx, path, 50, look.road[1]);
-  strokePath(ctx, path, 30, look.road[2]);
-  strokePath(ctx, path, 12, "rgba(255,240,210,0.05)");
-  // cobbles along the road
-  const r = seeded(17 + side);
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i]!;
-    const b = path[i + 1]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    const nx = -(b.y - a.y) / len;
-    const ny = (b.x - a.x) / len;
-    for (let d = 0; d < len; d += 9) {
-      for (let k = 0; k < 2; k++) {
-        const off = (r() - 0.5) * 46;
-        const t = d / len;
-        const x = a.x + (b.x - a.x) * t + nx * off;
-        const y = a.y + (b.y - a.y) * t + ny * off;
-        const s = 2 + r() * 3.2;
-        ctx.fillStyle = r() > 0.5 ? look.stone[0] : look.stone[1];
-        ctx.globalAlpha = 0.18 + r() * 0.3;
-        ctx.beginPath();
-        ctx.ellipse(x, y, s * 1.3, s, r() * Math.PI, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-  ctx.globalAlpha = 1;
-  // kerb stones on both edges
-  for (let i = 0; i < path.length - 1; i++) {
-    const a = path[i]!;
-    const b = path[i + 1]!;
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    const nx = -(b.y - a.y) / len;
-    const ny = (b.x - a.x) / len;
-    for (let d = 6; d < len; d += 16) {
-      for (const sgn of [-1, 1]) {
-        const t = d / len;
-        const x = a.x + (b.x - a.x) * t + nx * 27 * sgn;
-        const y = a.y + (b.y - a.y) * t + ny * 27 * sgn;
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
-        ctx.beginPath();
-        ctx.ellipse(x + 1, y + 2, 5.5, 3.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = look.stone[1];
-        ctx.beginPath();
-        ctx.ellipse(x, y, 5.5, 3.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "rgba(255,255,255,0.12)";
-        ctx.beginPath();
-        ctx.ellipse(x - 1, y - 1.2, 3, 1.6, 0, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-  }
-}
 
 function drawWall(ctx: CanvasRenderingContext2D): void {
   const x = LANE_W;
@@ -228,36 +218,6 @@ function drawTorches(ctx: CanvasRenderingContext2D, timeMs: number): void {
   }
 }
 
-function drawPortal(ctx: CanvasRenderingContext2D, side: Side, look: ArenaLook, timeMs: number): void {
-  const p = lanePath(side)[1]!;
-  const cx = p.x;
-  const cy = 30;
-  ctx.save();
-  // fog at the top of the lane
-  const fog = ctx.createLinearGradient(0, 0, 0, 120);
-  fog.addColorStop(0, "rgba(0,0,0,0.85)");
-  fog.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = fog;
-  ctx.fillRect(side * LANE_W, 0, LANE_W, 120);
-  ctx.globalCompositeOperation = "lighter";
-  const pulse = 0.7 + 0.3 * Math.sin(timeMs / 400);
-  const g = ctx.createRadialGradient(cx, cy, 4, cx, cy, 60);
-  g.addColorStop(0, `rgba(${look.portal},${0.55 * pulse})`);
-  g.addColorStop(1, `rgba(${look.portal},0)`);
-  ctx.fillStyle = g;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy, 60, 34, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = `rgba(${look.portal},0.8)`;
-  ctx.lineWidth = 2;
-  for (let k = 0; k < 3; k++) {
-    const a0 = timeMs / (700 + k * 260) + k * 2;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, 30 - k * 7, 15 - k * 3.5, 0, a0, a0 + Math.PI * 1.2);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
 
 function drawPlinth(ctx: CanvasRenderingContext2D, p: Pt, empty: boolean, highlight: number): void {
   ctx.fillStyle = "rgba(0,0,0,0.45)";
@@ -504,11 +464,14 @@ export function drawDuelFrame(
     ctx.fillRect(0, 0, DUEL_W, DUEL_H);
   }
   for (const side of [0, 1] as Side[]) {
-    drawPortal(ctx, side, look, timeMs);
+    const biomeDef = getBiome(biome);
+    const emerging = snap.units.filter((u) => u.side === side && u.dist >= 0 && u.dist < 6).map((u) => `${u.id}`);
+    drawRiftPortal(ctx, lanePath(side)[0]!, biomeDef, timeMs, emerging, false);
     LANE_SLOTS.forEach((_, i) => {
       const taken = snap.towers.some((t) => t.side === side && t.slot === i);
-      const hl = side === 0 && pickingSlot ? (hoverSlot === i ? 1 : 0.45 + 0.3 * Math.sin(timeMs / 220)) : 0;
-      drawPlinth(ctx, slotPos(side, i), !taken, hl);
+      const hl = side === 0 && pickingSlot && !taken;
+      drawSlot(ctx, { id: `d${side}-${i}`, position: slotPos(side, i) } as unknown as TowerSlotDefinition, i, taken, hl, biomeDef, timeMs);
+      if (side === 0 && pickingSlot && hoverSlot === i) drawPlinth(ctx, slotPos(side, i), false, 1);
     });
   }
   drawTorches(ctx, timeMs);
