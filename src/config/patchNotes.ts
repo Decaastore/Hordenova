@@ -70,6 +70,25 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v120",
+    dateIso: "2026-11-12",
+    category: "BOSSES",
+    title: {
+      en: "Global Boss: tower magic like the main game",
+      ptBR: "Chefe Global: magias das torres iguais ao jogo principal",
+    },
+    description: {
+      en: "In the Serpent of the Eclipse raid, the towers' shots now use the same magic as the main game instead of simple streaks: arrows, fireballs, ice bolts and chain lightning with their real impacts and trails.",
+      ptBR: "No raide da Serpente do Eclipse, os tiros das torres agora usam as mesmas magias do jogo principal em vez de riscos simples: flechas, bolas de fogo, rajadas de gelo e raios em cadeia, com os impactos e rastros de verdade.",
+    },
+    highlights: [
+      {
+        en: "The Star Strike now plays each tower's own special: Inferno's meteor firestorm, Frostborn's frost strike, Stormcaller's lightning and Ironwood's golden piercing lance, under a column of starlight.",
+        ptBR: "O Golpe Estelar agora toca o especial de cada torre: a tempestade de meteoro do Inferno, o golpe de gelo do Frostborn, o raio do Stormcaller e a lança dourada perfurante do Ironwood, sob uma coluna de luz estelar.",
+      },
+    ],
+  },
+  {
     id: "v119",
     dateIso: "2026-11-12",
     category: "BOSSES",

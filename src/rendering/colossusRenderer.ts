@@ -11,10 +11,16 @@
  * offscreen canvas and then only stamped, so a frame stays cheap. Purely
  * visual; reads only the snapshot.
  */
-import { drawTower } from "./EntityRenderer";
+import { drawProjectile, drawTower } from "./EntityRenderer";
+import { CombatFx, preloadCombatFxArt } from "./combatFx";
+import { SpecialVfxLayer } from "./specialVfx";
+import { VfxManager } from "./vfx";
+import { createProjectile, type ProjectileInstance } from "@/entities/Projectile";
+import { getTowerMuzzleOffset } from "@/entities/Tower";
 import { drawRiftPortal } from "./riftPortal";
 import { getBiome } from "./biomes";
 import type { TowerInstance } from "@/entities/Tower";
+import type { RaidShot } from "@/engine/ColossusEngine";
 import {
   ARENA_CENTER,
   BODY_SEGMENTS,
@@ -1005,7 +1011,6 @@ function paintTintedCached(head: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 // ── slots, stars, towers, shots ─────────────────────────────────────────
-const SHOT_RGB: Record<string, string> = { IRONWOOD: "255,226,160", INFERNO: "255,120,40", FROSTBORN: "150,225,255", STORMCALLER: "196,150,255" };
 
 function drawSlotMarks(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot | null, timeMs: number, opts: FrameOpts): void {
   const t = timeMs / 1000;
@@ -1187,68 +1192,18 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
   ctx.globalCompositeOperation = "lighter";
   for (const sh of snap.shots) {
     const age = snap.timeMs - sh.at;
-    const from = COLOSSUS_SLOTS[snap.players[sh.from]!.slot]!;
-    const fy = from.y - 34;
     const to = pathAt(Math.min(sh.s, PATH_LENGTH));
     const ty = to.y - HOVER;
-    const rgb = sh.shielded ? "150,230,255" : SHOT_RGB[sh.type]!;
     if (sh.strike) {
       const k = Math.min(1, age / 500);
-      // a column of starlight from the sky onto the target, plus the tower's beam
+      // the Star Strike: a column of starlight from the sky (the tower's own special plays on top)
       const bw = 26 * (1 - k) + 4;
       const bg = ctx.createLinearGradient(to.x, 0, to.x, ty);
       bg.addColorStop(0, "rgba(255,240,200,0)");
       bg.addColorStop(1, `rgba(255,240,200,${0.9 * (1 - k)})`);
       ctx.fillStyle = bg;
       ctx.fillRect(to.x - bw / 2, 0, bw, ty);
-      ctx.strokeStyle = `rgba(${rgb},${1 - k})`;
-      ctx.lineWidth = 6 * (1 - k) + 1;
-      ctx.beginPath();
-      ctx.moveTo(from.x, fy);
-      ctx.lineTo(to.x, ty);
-      ctx.stroke();
-      const rr = 20 + k * 90;
-      ctx.strokeStyle = `rgba(255,230,170,${1 - k})`;
-      ctx.lineWidth = 4 * (1 - k) + 0.5;
-      ctx.beginPath();
-      ctx.ellipse(to.x, ty, rr, rr * 0.6, 0, 0, Math.PI * 2);
-      ctx.stroke();
       continue;
-    }
-    const travel = 260;
-    if (age < travel) {
-      const k = age / travel;
-      const x = from.x + (to.x - from.x) * k;
-      const y = fy + (ty - fy) * k - Math.sin(k * Math.PI) * (sh.type === "INFERNO" ? 50 : 14);
-      if (sh.type === "STORMCALLER") {
-        ctx.strokeStyle = `rgba(${rgb},0.95)`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(from.x, fy);
-        const n = 6;
-        for (let i = 1; i <= n; i++) {
-          const f = i / n;
-          ctx.lineTo(from.x + (to.x - from.x) * f + (i < n ? (hash(sh.at + i) - 0.5) * 18 : 0), fy + (ty - fy) * f + (i < n ? (hash(sh.at + i * 3) - 0.5) * 18 : 0));
-        }
-        ctx.stroke();
-      } else {
-        const r = sh.type === "INFERNO" ? 7 : sh.crit ? 5 : 3.6;
-        const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.4);
-        g.addColorStop(0, "rgba(255,255,240,1)");
-        g.addColorStop(0.35, `rgba(${rgb},0.95)`);
-        g.addColorStop(1, `rgba(${rgb},0)`);
-        ctx.fillStyle = g;
-        ctx.beginPath();
-        ctx.arc(x, y, r * 2.4, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    } else {
-      const k = (age - travel) / 300;
-      if (k > 1) continue;
-      ctx.fillStyle = `rgba(${rgb},${0.8 * (1 - k)})`;
-      ctx.beginPath();
-      ctx.arc(to.x, ty, 6 + k * (sh.type === "INFERNO" ? 26 : 12), 0, Math.PI * 2);
-      ctx.fill();
     }
   }
   ctx.restore();
@@ -1258,8 +1213,8 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
   for (const sh of snap.shots) {
     if (!snap.players[sh.from]?.isYou) continue;
     const age = snap.timeMs - sh.at;
-    if (age < 200 || age > 700) continue;
-    const k = (age - 200) / 500;
+    if (age < 140 || age > 700) continue;
+    const k = (age - 140) / 560;
     const to = pathAt(Math.min(sh.s, PATH_LENGTH));
     ctx.globalAlpha = 1 - k;
     ctx.font = `800 ${sh.strike ? 22 : sh.crit ? 15 : 12}px system-ui, sans-serif`;
@@ -1281,11 +1236,103 @@ export function formatShort(n: number): string {
   return String(Math.round(n));
 }
 
+
+/**
+ * The towers' magic, exactly as in the main game: every raid shot becomes a
+ * real ProjectileInstance drawn by EntityRenderer.drawProjectile, with the
+ * main game's impact/trail particles (CombatFx), its special-attack sequences
+ * (SpecialVfxLayer — the Star Strike is each tower's special) and its hit
+ * sparks (VfxManager).
+ */
+export class ColossusFxLayer {
+  private combat = new CombatFx();
+  private special = new SpecialVfxLayer();
+  private vfx = new VfxManager();
+  private flying: { key: string; p: ProjectileInstance; strike: boolean }[] = [];
+  private seen = new Set<string>();
+
+  constructor() {
+    preloadCombatFxArt();
+    this.combat.onShake = (m, ms) => this.vfx.triggerShake(m, ms);
+  }
+
+  private static key(sh: RaidShot): string {
+    return `${sh.from}:${sh.at}:${sh.strike ? 1 : 0}`;
+  }
+
+  /** Turns the snapshot's new shots into projectiles and advances every effect by `dtMs`. */
+  sync(snap: ColossusSnapshot, towers: readonly TowerInstance[], dtMs: number): void {
+    const live = new Set<string>();
+    for (const sh of snap.shots) {
+      const key = ColossusFxLayer.key(sh);
+      live.add(key);
+      if (this.seen.has(key)) continue;
+      this.seen.add(key);
+      const tower = towers[sh.from];
+      const player = snap.players[sh.from];
+      if (!tower || !player) continue;
+      const slot = COLOSSUS_SLOTS[player.slot]!;
+      tower.position = { x: slot.x, y: slot.y };
+      const muzzle = getTowerMuzzleOffset(tower);
+      const hit = pathAt(Math.min(sh.s, PATH_LENGTH));
+      const to = { x: hit.x, y: hit.y - HOVER };
+      const chain: Pt[] = [];
+      if (sh.type === "STORMCALLER") {
+        for (const d of [-2, -4]) {
+          const c = pathAt(Math.max(0, Math.min(PATH_LENGTH, sh.s + d * SEGMENT_GAP)));
+          chain.push({ x: c.x, y: c.y - HOVER });
+        }
+      }
+      const proj = createProjectile(sh.type, muzzle, to, chain, sh.strike, undefined, player.isYou ? tower.equippedSkinId : null);
+      if (sh.strike) {
+        proj.power = 1.3;
+        if (sh.type === "INFERNO") this.combat.firestorm(to, 90, 1.3);
+        else if (sh.type === "FROSTBORN") this.combat.frostStrike(to, 80, 1.3);
+        this.special.spawn({ type: sh.type, towerPosition: slot, from: muzzle, to, chainTargets: chain, radius: sh.type === "FROSTBORN" ? 150 : 90, power: 1.3 });
+      }
+      this.flying.push({ key, p: proj, strike: sh.strike });
+    }
+    for (const k of this.seen) if (!live.has(k)) this.seen.delete(k);
+
+    let impacts = 0;
+    for (const f of this.flying) {
+      f.p.remainingMs -= dtMs;
+      const k = 1 - Math.max(0, f.p.remainingMs) / f.p.totalMs;
+      this.combat.trail(f.p.towerType, { x: f.p.from.x + (f.p.to.x - f.p.from.x) * k, y: f.p.from.y + (f.p.to.y - f.p.from.y) * k });
+      if (f.p.remainingMs <= 0 && impacts < 30) {
+        impacts++;
+        if (!(f.strike && (f.p.towerType === "INFERNO" || f.p.towerType === "FROSTBORN"))) this.combat.impact(f.p.towerType, f.p.from, f.p.to, f.p.chainTargets, f.strike);
+        const dir = { x: f.p.to.x - f.p.from.x, y: f.p.to.y - f.p.from.y };
+        this.vfx.spawnHitImpact(f.p.to, f.strike ? "#ffe6a8" : "#c79bff", dir);
+      }
+    }
+    this.flying = this.flying.filter((f) => f.p.remainingMs > 0);
+    this.combat.update(dtMs);
+    this.special.update(dtMs);
+    this.vfx.update(dtMs);
+  }
+
+  drawGround(ctx: CanvasRenderingContext2D, timeMs: number): void {
+    this.special.drawGround(ctx, timeMs);
+    this.combat.drawGround(ctx);
+  }
+
+  drawAir(ctx: CanvasRenderingContext2D, timeMs: number): void {
+    for (const f of this.flying) drawProjectile(ctx, f.p);
+    this.combat.drawSolid(ctx);
+    this.special.drawAir(ctx, timeMs);
+    this.combat.drawEmissive(ctx);
+    this.vfx.draw(ctx);
+  }
+}
+
 export interface FrameOpts {
   pickMode: boolean;
   hoverSlot: number | null;
   canMove: boolean;
   youLabel: string;
+  /** The towers' magic layer (projectiles + the main game's impact effects). */
+  fx?: ColossusFxLayer | null;
 }
 
 /** A full frame of the raid (snap = null before the attempt starts: slot picking over an idle Serpent). */
@@ -1307,6 +1354,7 @@ export function drawColossusFrame(ctx: CanvasRenderingContext2D, snap: ColossusS
   drawRiftPortal(ctx, RIFT_AT, getBiome("ABYSS"), timeMs, [], true);
   drawCore(ctx, timeMs, eclipse, snap ? Math.sin(snap.dive * Math.PI) : 0);
   drawSlotMarks(ctx, snap, timeMs, opts);
+  if (snap) opts.fx?.drawGround(ctx, timeMs);
   if (snap) {
     drawStars(ctx, snap);
     drawTowers(ctx, snap, towers, timeMs);
@@ -1315,12 +1363,13 @@ export function drawColossusFrame(ctx: CanvasRenderingContext2D, snap: ColossusS
   const headS = snap ? snap.headS : 40 + Math.sin(timeMs / 900) * 6;
   const shield = snap && st < snap.shieldUntil ? Math.min(1, (snap.shieldUntil - st) / 300, (st - (snap.shieldUntil - SHIELD_MS)) / 300) : 0;
   const shieldWarn = snap && snap.nextShieldAt !== null ? Math.max(0, 1 - (snap.nextShieldAt - st) / 2_000) : 0;
-  const flashS = snap ? snap.shots.filter((s) => st - s.at > 240 && st - s.at < 360).map((s) => s.s) : [];
+  const flashS = snap ? snap.shots.filter((s) => st - s.at > 120 && st - s.at < 280).map((s) => s.s) : [];
   const lastStrike = snap ? snap.shots.filter((s) => s.strike).reduce((m, s) => Math.max(m, s.at), -1e9) : -1e9;
   const starCast = snap ? snap.stars.some((s) => s.impactAt - st > STAR_WARN_MS - 600) : false;
   const roar = Math.max(starCast ? 0.8 : 0, Math.max(0, 1 - (st - lastStrike) / 600) * 0.6, shieldWarn * 0.7);
   drawSerpent(ctx, headS, timeMs, { eclipse, shield, shieldWarn: shield > 0 ? 0 : shieldWarn, flashS, dive: snap?.dive ?? 0, roar });
   if (snap) {
+    opts.fx?.drawAir(ctx, timeMs);
     drawShots(ctx, snap, timeMs);
     drawNameTags(ctx, snap);
   }

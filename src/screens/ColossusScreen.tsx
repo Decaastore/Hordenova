@@ -27,7 +27,7 @@ import {
 } from "@/config/colossus";
 import { createTowerInstance, getTowerStats, type TowerInstance } from "@/entities/Tower";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
-import { COLOSSUS_VIEW_H, COLOSSUS_VIEW_W, drawColossusFrame, drawColossusShowcase, formatShort } from "@/rendering/colossusRenderer";
+import { ColossusFxLayer, COLOSSUS_VIEW_H, COLOSSUS_VIEW_W, drawColossusFrame, drawColossusShowcase, formatShort } from "@/rendering/colossusRenderer";
 import { drawEclipseOver, drawEclipseUnder } from "@/rendering/eclipseAura";
 import { drawTower } from "@/rendering/EntityRenderer";
 import { PAGE_CSS } from "@/ui/pageChrome";
@@ -401,6 +401,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
   const towersRef = useRef<TowerInstance[]>([]);
   const finishedRef = useRef(false);
   const countdownRef = useRef<number | null>(null);
+  const fxRef = useRef<ColossusFxLayer | null>(null);
 
   useEffect(() => {
     let raf = 0;
@@ -416,6 +417,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
           acc -= steps;
         }
       }
+      const frameDt = Math.min(100, now - last);
       last = now;
       const s = e ? e.snapshot() : null;
       if (s && towersRef.current.length === 0) {
@@ -423,6 +425,10 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
           const lvl = p.isYou ? best.level : 12 + Math.floor((Math.sin(i * 91.7) * 0.5 + 0.5) * 18);
           return createTowerInstance(`c${i}`, p.type, { x: 0, y: 0 }, lvl, null, 0, p.isYou ? best.skin : null, p.isYou ? best.mastery : 0);
         });
+      }
+      if (s) {
+        if (!fxRef.current) fxRef.current = new ColossusFxLayer();
+        fxRef.current.sync(s, towersRef.current, frameDt);
       }
       const cv = canvasRef.current;
       const ctx = cv?.getContext("2d");
@@ -441,7 +447,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
         ctx.setTransform(sc, 0, 0, sc, (cv.width - W * sc) / 2, (cv.height - H * sc) / 2);
         const you = s?.players.find((p) => p.isYou);
         const canMove = !!s && !!you && s.timeMs >= you.moveReadyAt && s.timeMs >= you.stunnedUntil && s.timeMs < COLOSSUS_LENGTH_MS;
-        drawColossusFrame(ctx, s, towersRef.current, now, { pickMode: !e, hoverSlot: hoverRef.current, canMove, youLabel: t("colossus.you") });
+        drawColossusFrame(ctx, s, towersRef.current, now, { pickMode: !e, hoverSlot: hoverRef.current, canMove, youLabel: t("colossus.you"), fx: fxRef.current });
       }
       if (s) setSnap(s);
       if (s?.over && !finishedRef.current && e) {
