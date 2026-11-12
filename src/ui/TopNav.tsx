@@ -7,7 +7,7 @@ import { BrandLogo } from "./BrandLogo";
 import { getPassView } from "@/engine/SeasonPassService";
 import { PASS_CHANGED_EVENT } from "./SeasonPassSection";
 
-export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE";
+export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE" | "ACCOUNT";
 
 interface TopNavProps {
   active: NavView;
@@ -75,6 +75,13 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
           selector must be reachable from every page the global track plays
           on, so they live here unconditionally. */}
       <div className="tn-tools">
+        <button className={`tn-acct${active === "ACCOUNT" ? " is-active" : ""}`} onClick={() => onNavigate("ACCOUNT")} aria-current={active === "ACCOUNT" ? "page" : undefined} title={t("nav.account")} data-testid="nav-account">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="8" r="4.2" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            <path d="M3.8 21c1.2-4.4 4.4-6.4 8.2-6.4s7 2 8.2 6.4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+          </svg>
+          <span>{t("nav.account")}</span>
+        </button>
         <LanguageSelector inline />
         <MusicControl />
         <button className="tn-play" onClick={onPlay}>
@@ -119,6 +126,10 @@ nav.tn .tn-link.is-active::after { content: ""; position: absolute; left: 50%; b
   transform: translateX(-50%) rotate(45deg); box-shadow: 0 0 8px ${PALETTE.uiAccent}; }
 .tn-dot { position: absolute; top: 20px; right: -2px; width: 7px; height: 7px; border-radius: 50%; background: ${PALETTE.uiAccentBright}; box-shadow: 0 0 6px ${PALETTE.uiAccent}; }
 .tn-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.tn-acct { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px; border-radius: 6px; border: 1px solid rgba(232,176,75,0.5); background: rgba(0,0,0,0.35); color: #f1dcae; font: inherit; font-weight: 700; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; }
+.tn-acct:hover, .tn-acct.is-active { border-color: #e8b04b; background: rgba(232,176,75,0.14); }
+.tn-acct:focus-visible { outline: 2px solid #e8b04b; outline-offset: 2px; }
+@media (max-width: 1560px) { .tn-acct span { display: none; } .tn-acct { padding: 0 8px; } }
 nav.tn .tn-play {
   margin-left: 8px; padding: 10px 26px; cursor: pointer; border-radius: 6px;
   font: 800 13px/1 system-ui, -apple-system, 'Segoe UI', sans-serif; letter-spacing: 2px; text-transform: uppercase; color: #fff2c9;

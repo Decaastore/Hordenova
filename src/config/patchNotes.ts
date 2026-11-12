@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v113",
+    dateIso: "2026-11-12",
+    category: "INTERFACE",
+    title: {
+      en: "New Account page",
+      ptBR: "Nova página Conta",
+    },
+    description: {
+      en: "A new Account page, opened from the person icon in the top bar, shows everything your account holds in one place.",
+      ptBR: "Uma página nova, Conta, que abre pelo ícone de pessoa na barra de cima e mostra tudo o que a sua conta tem num lugar só.",
+    },
+    highlights: [
+      {
+        en: "Every currency and material with its picture, amount, where it comes from and what it's for: Free and Purchased Gems, Gem Shards, the gold of each castle, Eternal Marks, Duel Coins, Splinters and the four Essences.",
+        ptBR: "Cada moeda e material com imagem, quantidade, de onde vem e para que serve: Gemas grátis e compradas, fragmentos de gema, o ouro de cada castelo, Marcas Eternas, Moedas de Duelo, Estilhaços e as quatro Essências.",
+      },
+      {
+        en: "Your Season and Eternal castles, your Duel rank and record, your items by rarity, skins, achievements and Bestiary, VIP and age status.",
+        ptBR: "Seus castelos da Season e Eterno, patente e histórico do Duelo, itens por raridade, skins, conquistas e Bestiário, além da situação de VIP e de idade.",
+      },
+      {
+        en: "The last 12 movements of Gems and Gem Shards, with where each one came from.",
+        ptBR: "As 12 últimas movimentações de Gemas e fragmentos de gema, com a origem de cada uma.",
+      },
+    ],
+  },
+  {
     id: "v112",
     dateIso: "2026-11-12",
     category: "INTERFACE",

@@ -1,3 +1,4 @@
+import { AccountScreen } from "./screens/AccountScreen";
 import { DuelScreen } from "./screens/DuelScreen";
 import { useEffect, useState } from "react";
 import { MainMenu } from "./screens/MainMenu";
@@ -96,6 +97,8 @@ export default function App() {
         <WikiScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "NOVIDADES" ? (
         <NovidadesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
+      ) : view === "ACCOUNT" ? (
+        <AccountScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "STORE" ? (
         <StoreScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "PASS" ? (

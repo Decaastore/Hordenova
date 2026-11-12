@@ -3,7 +3,7 @@
  * Splinters, the four Essences, Duel Coins, Gem Shards and Eternal Marks.
  * Drawn as SVG so they stay sharp at any size and match in every panel.
  */
-export type MaterialKind = "SPLINTERS" | "RARE" | "EPIC" | "LEGENDARY" | "MYTHIC" | "DUEL_COINS" | "SHARDS" | "MARKS" | "GOLD";
+export type MaterialKind = "SPLINTERS" | "RARE" | "EPIC" | "LEGENDARY" | "MYTHIC" | "DUEL_COINS" | "SHARDS" | "MARKS" | "GOLD" | "GEMS_FREE" | "GEMS_PAID";
 
 const ESSENCE: Record<"RARE" | "EPIC" | "LEGENDARY" | "MYTHIC", [string, string, string]> = {
   RARE: ["#bfe0ff", "#3a8aff", "#123a8a"],
@@ -77,6 +77,25 @@ export function MaterialIcon({ kind, size = 20, title }: { kind: MaterialKind; s
         <path d="M10 22 L22 10 M22 22 L10 10" stroke="#3a1e0a" strokeWidth="2.4" strokeLinecap="round" />
         <path d="M10 22 L22 10 M22 22 L10 10" stroke="#fff2d0" strokeWidth="1" strokeLinecap="round" />
         <path d="M8.5 19.5 L12.5 23.5 M23.5 19.5 L19.5 23.5" stroke="#3a1e0a" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (kind === "GEMS_FREE" || kind === "GEMS_PAID") {
+    // a cut gem: violet for Free Gems, cyan for Purchased Gems
+    const [hi, mid, lo] = kind === "GEMS_FREE" ? ["#f0d8ff", "#b47cff", "#3a1270"] : ["#d8fbff", "#4ad8ff", "#0a4a7a"];
+    return (
+      <svg {...common}>
+        {title && <title>{title}</title>}
+        <defs>
+          <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={hi} />
+            <stop offset="0.45" stopColor={mid} />
+            <stop offset="1" stopColor={lo} />
+          </linearGradient>
+        </defs>
+        <path d="M9 5 L23 5 L29 12 L16 29 L3 12 Z" fill={`url(#${id})`} stroke="#120a1e" strokeWidth="1.3" strokeLinejoin="round" />
+        <path d="M3 12 L29 12 M9 5 L12 12 L16 29 M23 5 L20 12 L16 29 M12 12 L16 5 L20 12" stroke="rgba(255,255,255,0.5)" strokeWidth="0.9" fill="none" />
+        <path d="M8 11 L11 6.5" stroke="#fff" strokeWidth="1.3" strokeLinecap="round" opacity="0.9" />
       </svg>
     );
   }
