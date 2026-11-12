@@ -83,3 +83,27 @@ describe("ColossusEngine — the Serpent raid", () => {
     expect(fired).toBe(true);
   });
 });
+
+describe("ColossusEngine — fair play", () => {
+  const run = (type: "IRONWOOD" | "INFERNO" | "FROSTBORN" | "STORMCALLER", slot: number, seed: number) => {
+    const e = new ColossusEngine({ seed, you: { name: "Eu", type, power: 2000, skin: null }, slot });
+    e.advance(COLOSSUS_LENGTH_MS + 3000);
+    return e.snapshot().players[0]!.damage;
+  };
+  const avg = (f: (seed: number) => number) => {
+    let sum = 0;
+    for (let seed = 1; seed <= 12; seed++) sum += f(seed);
+    return sum / 12;
+  };
+
+  it("every tower type deals about the same damage from the same slot", () => {
+    const types = ["IRONWOOD", "INFERNO", "FROSTBORN", "STORMCALLER"] as const;
+    const d = types.map((ty) => avg((seed) => run(ty, 4, seed)));
+    expect(Math.max(...d) / Math.min(...d)).toBeLessThan(1.12);
+  });
+
+  it("every slot is worth about the same over a full attempt", () => {
+    const d = COLOSSUS_SLOTS.map((_, slot) => avg((seed) => run("INFERNO", slot, seed)));
+    expect(Math.max(...d) / Math.min(...d)).toBeLessThan(1.25);
+  });
+});

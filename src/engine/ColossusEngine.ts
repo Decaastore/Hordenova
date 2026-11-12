@@ -93,7 +93,12 @@ export const SLOT_COUNT = COLOSSUS_SLOTS.length;
 /** The Serpent: a head and BODY_SEGMENTS plates trailing behind it. */
 export const BODY_SEGMENTS = 30;
 export const SEGMENT_GAP = 19;
+/** The same range for every tower type, whatever its level or kind. */
 export const TOWER_RANGE = 185;
+const IRONWOOD_CRIT_CHANCE = 0.25;
+const IRONWOOD_CRIT_MULT = 1.8;
+/** Ironwood's base hit, chosen so its average with crits is exactly 1.0 like every other tower. */
+const IRONWOOD_BASE = 1 / (1 - IRONWOOD_CRIT_CHANCE + IRONWOOD_CRIT_CHANCE * IRONWOOD_CRIT_MULT);
 const HEAD_WEAK_POINT = 1.6;
 const ECLIPSE_BONUS = 1.25;
 const SHIELD_FACTOR = 0.2;
@@ -107,6 +112,38 @@ const SHIELD_FIRST_MS = 104_000;
 const SHIELD_EVERY_MS = 14_000;
 export const SHIELD_MS = 4_000;
 const DIVE_MS = 2_500;
+
+/** Whether a tower on `slot` can reach the body part at distance `s` (same test for every tower). */
+function inRange(slot: Pt, s: number): boolean {
+  const pt = pathAt(s);
+  return Math.hypot(pt.x - slot.x, (pt.y - slot.y) * 1.15) <= TOWER_RANGE;
+}
+
+/**
+ * FAIR PLAY — some slots see the Serpent for longer than others (the outer
+ * turns are longer). Each slot's damage is scaled so every slot has the same
+ * expected damage over a full attempt: the choice of slot is about WHEN you
+ * fight (early or late, head or body), never about how much.
+ */
+export const SLOT_FAIRNESS: readonly number[] = (() => {
+  const exposure = COLOSSUS_SLOTS.map((slot) => {
+    let e = 0;
+    for (let t = 0; t <= COLOSSUS_LENGTH_MS; t += 250) {
+      const head = (PATH_LENGTH * t) / COLOSSUS_LENGTH_MS;
+      for (let k = 0; k <= BODY_SEGMENTS; k++) {
+        const s = head - k * SEGMENT_GAP;
+        if (s < 0 || s > PATH_LENGTH) continue;
+        if (inRange(slot, s)) {
+          e += k === 0 ? HEAD_WEAK_POINT : 1;
+          break;
+        }
+      }
+    }
+    return Math.max(1, e);
+  });
+  const mean = exposure.reduce((a, b) => a + b, 0) / exposure.length;
+  return exposure.map((e) => mean / e);
+})();
 
 const ATTACK_MS: Record<TowerType, number> = { IRONWOOD: 800, INFERNO: 1200, FROSTBORN: 1000, STORMCALLER: 1100 };
 
@@ -287,8 +324,7 @@ export class ColossusEngine {
     for (let k = 0; k <= BODY_SEGMENTS; k++) {
       const s = head - k * SEGMENT_GAP;
       if (s < 0 || s > PATH_LENGTH) continue;
-      const pt = pathAt(s);
-      if (Math.hypot(pt.x - slot.x, (pt.y - slot.y) * 1.15) <= TOWER_RANGE) return { s, head: k === 0 };
+      if (inRange(slot, s)) return { s, head: k === 0 };
     }
     return null;
   }
@@ -297,13 +333,18 @@ export class ColossusEngine {
     const p = this.players[who]!;
     const interval = ATTACK_MS[p.type] / 1000;
     let amount = p.power * interval * mult * (target.head ? HEAD_WEAK_POINT : 1);
+    // FAIR PLAY — every tower type deals the same damage on average (Ironwood's
+    // crits are paid for by a lower base hit), and every slot is evened out
+    // by SLOT_FAIRNESS, so no tower and no slot starts ahead.
     let crit = false;
-    if (p.type === "IRONWOOD" && !strike && this.rng() < 0.25) {
-      amount *= 2.2;
-      crit = true;
+    if (p.type === "IRONWOOD" && !strike) {
+      amount *= IRONWOOD_BASE;
+      if (this.rng() < IRONWOOD_CRIT_CHANCE) {
+        amount *= IRONWOOD_CRIT_MULT;
+        crit = true;
+      }
     }
-    if (p.type === "INFERNO" && !strike) amount *= 1.15; // splash over the neighbouring plates
-    if (p.type === "STORMCALLER" && !strike) amount *= 1.12; // chain
+    amount *= SLOT_FAIRNESS[p.slot] ?? 1;
     if (this.t < this.frostUntil) amount *= 1.1;
     if (colossusPhaseAt(this.t) === "ECLIPSE") amount *= ECLIPSE_BONUS;
     const shielded = this.shielded();

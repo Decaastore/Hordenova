@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v121",
+    dateIso: "2026-11-12",
+    category: "BALANCE",
+    title: {
+      en: "Global Boss: same range, same damage for everyone",
+      ptBR: "Chefe Global: mesmo alcance e mesmo dano para todos",
+    },
+    description: {
+      en: "In the Serpent of the Eclipse raid no tower and no slot starts ahead anymore. What sets players apart is dodging the stars and landing the Star Strike.",
+      ptBR: "No raide da Serpente do Eclipse nenhuma torre e nenhuma vaga sai mais na frente. O que separa os jogadores é desviar das estrelas e acertar o Golpe Estelar.",
+    },
+    highlights: [
+      {
+        en: "Every tower has the same range, whatever its type or level.",
+        ptBR: "Toda torre tem o mesmo alcance, qualquer que seja o tipo ou o nível.",
+      },
+      {
+        en: "The four tower types now deal the same damage on average: Ironwood still crits, but its normal hit is lower to match, and Inferno and Stormcaller lost their extra bonus.",
+        ptBR: "Os quatro tipos de torre agora causam o mesmo dano em média: o Ironwood continua dando crítico, mas o golpe normal ficou menor para compensar, e Inferno e Stormcaller perderam o bônus extra.",
+      },
+      {
+        en: "Slots that see the Serpent for less time now hit harder, so every slot is worth the same total damage over an attempt.",
+        ptBR: "Vagas que veem a Serpente por menos tempo agora batem mais forte, então toda vaga rende o mesmo dano total na tentativa.",
+      },
+    ],
+  },
+  {
     id: "v120",
     dateIso: "2026-11-12",
     category: "BOSSES",
