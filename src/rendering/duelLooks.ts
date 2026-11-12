@@ -34,7 +34,7 @@ const rnd = (i: number, k: number) => {
 export function drawKillFx(ctx: CanvasRenderingContext2D, fx: KillFxId, x: number, y: number, t: number, seed: number, big = false): void {
   const s = big ? 1.6 : 1;
   ctx.save();
-  ctx.globalCompositeOperation = fx === "GOLD" ? "source-over" : "lighter";
+  ctx.globalCompositeOperation = fx === "GOLD" || fx === "BLOOD" ? "source-over" : "lighter";
   const n = big ? 14 : 9;
   for (let i = 0; i < n; i++) {
     const a = rnd(seed, i) * Math.PI * 2;
@@ -73,6 +73,29 @@ export function drawKillFx(ctx: CanvasRenderingContext2D, fx: KillFxId, x: numbe
       ctx.beginPath();
       ctx.arc(px, py, 9 * s, 0, Math.PI * 2);
       ctx.fill();
+    } else if (fx === "LIGHTNING") {
+      if (i > 4) continue;
+      // forked bolts striking outwards
+      ctx.strokeStyle = `rgba(200,180,255,${fade})`;
+      ctx.lineWidth = 1.6 * s;
+      ctx.beginPath();
+      let px = x;
+      let py = y - 8;
+      ctx.moveTo(px, py);
+      for (let k = 0; k < 4; k++) {
+        px += Math.cos(a) * sp * 0.35 + (rnd(seed + k, i) - 0.5) * 8;
+        py += Math.sin(a) * sp * 0.25 + (rnd(seed + k + 9, i) - 0.5) * 8;
+        ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    } else if (fx === "BLOOD") {
+      // a blood-red mist that rises and a dark splash on the ground
+      const px = x + Math.cos(a) * sp * t * 0.7;
+      const py = y - 4 + Math.sin(a) * sp * t * 0.3 - t * 16 * s;
+      ctx.fillStyle = `rgba(200,20,40,${0.8 * fade})`;
+      ctx.beginPath();
+      ctx.arc(px, py, (3 - t * 2) * s, 0, Math.PI * 2);
+      ctx.fill();
     } else {
       // GOLD: coins that pop up and fall
       const vx = Math.cos(a) * sp * 0.9;
@@ -89,7 +112,7 @@ export function drawKillFx(ctx: CanvasRenderingContext2D, fx: KillFxId, x: numbe
   }
   if (fx !== "SOULS") {
     const g = ctx.createRadialGradient(x, y - 6, 0, x, y - 6, 22 * s * (0.5 + t));
-    const c = fx === "EMBERS" ? "255,140,40" : fx === "FROST" ? "150,220,255" : "255,220,90";
+    const c = fx === "EMBERS" ? "255,140,40" : fx === "FROST" ? "150,220,255" : fx === "LIGHTNING" ? "180,160,255" : fx === "BLOOD" ? "220,30,50" : "255,220,90";
     g.addColorStop(0, `rgba(${c},${0.45 * (1 - t)})`);
     g.addColorStop(1, `rgba(${c},0)`);
     ctx.globalCompositeOperation = "lighter";

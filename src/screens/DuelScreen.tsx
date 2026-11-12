@@ -35,6 +35,8 @@ import {
   TOURNEY_BANNER,
   applyTourneyResult,
   tourneyState,
+  earnedHow,
+  LEAGUE_UNLOCKS,
   weeklyChallenge,
   duelKillFx,
   duelSkinLooks,
@@ -161,6 +163,7 @@ type MatchResult = {
   streakBonus: number | null;
   tourneyRound?: number | null;
   tourneyWon?: boolean;
+  unlocked?: string[];
 };
 
 const LEAGUE_COLOR: Record<LeagueId, [string, string]> = {
@@ -336,7 +339,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const r = applyDuelResult(cur.duel, { outcome, myCastle: snap.players[0]!.castle, foeCastle: snap.players[1]!.castle, sends: snap.players[0]!.sends, deck: cur.duel.deck }, Date.now());
     const next = updateSave({ ...grantPrize(cur, r.prize, "duel_match"), duel: r.profile });
     setSave(next);
-    setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus });
+    setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus, unlocked: r.unlocked });
   };
 
   const claimMission = (id: string) => {
@@ -344,7 +347,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const r = claimDuelMission(cur.duel, id, Date.now());
     if (!r) return;
     setSave(updateSave({ ...grantPrize(cur, { ...NO_PRIZE, gems: r.gems }, "duel_missions"), duel: r.profile }));
-    if (r.gems > 0) setNotice(t("duel.missionsAllDone", { n: r.gems }));
+    if (r.bonus) setNotice(t("duel.missionsAllDone", { n: MISSIONS_ALL_DONE_PRIZE.coins }));
   };
 
   const buy = (id: string) => {
@@ -469,6 +472,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                       <strong>{rankName(rankFor(r.from))}</strong>
                       <small>🏆 {fmt(r.from)}</small>
                       <PrizeLine prize={rankPrize(r.i)} />
+                      {(LEAGUE_UNLOCKS[r.league] ?? []).length > 0 && (
+                        <span className="du-unlock">✦ {(LEAGUE_UNLOCKS[r.league] ?? []).map((id) => t(`duel.shop.${id}` as TranslationKey)).join(", ")}</span>
+                      )}
                     </div>
                     <span className="du-step-tag">{reached ? "✓" : ""}</span>
                   </div>
@@ -609,7 +615,13 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                         {item.weekly && <small>{t("duel.shopWeekly")}</small>}
                         {item.earnedOnly && !owned ? (
                           <button className="pg-btn-ghost" disabled>
-                            {item.id === TOURNEY_BANNER ? t("duel.tourneyOnly") : t("duel.earnedOnly")}
+                            {(() => {
+                              const how = earnedHow(item.id);
+                              if (how.league) return t("duel.earnedLeague", { name: t(`duel.league.${how.league}` as TranslationKey) });
+                              if (how.tourney || item.id === TOURNEY_BANNER) return t("duel.tourneyOnly");
+                              if (how.weekly) return t("duel.earnedWeekly");
+                              return t("duel.earnedOnly");
+                            })()}
                           </button>
                         ) : owned ? (
                           <button className="pg-btn-ghost" onClick={() => wear(item.id)}>
@@ -814,6 +826,9 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
             )}
             {result.tourneyWon && <p className="dm-tag is-gold">{t("duel.tourneyChampion")}</p>}
             {!result.tourneyWon && result.tourneyRound ? <p className="dm-tag">{t("duel.tourneyNext", { n: result.tourneyRound + 1 })}</p> : null}
+            {result.unlocked && result.unlocked.length > 0 && (
+              <p className="dm-tag is-gold">{t("duel.unlockedTag", { list: result.unlocked.map((id) => t(`duel.shop.${id}` as TranslationKey)).join(", ") })}</p>
+            )}
             {result.firstWin && <p className="dm-tag">{t("duel.firstWinTag")}</p>}
             {result.streakBonus && <p className="dm-tag">{t("duel.streakTag", { n: result.streakBonus })}</p>}
             {(result.prize.coins || result.prize.gems || result.prize.shards) > 0 && (
@@ -912,6 +927,7 @@ const LOBBY_CSS = `
 .du-step strong { font-family: var(--display); font-size: 18px; color: var(--bone); }
 .du-step small { color: var(--ash); }
 .du-step.is-done { border-color: rgba(155,227,122,0.45); }
+.du-unlock { color: #ffd56a; font-weight: 700; font-size: 12.5px; }
 .du-step-tag { font-size: 20px; color: #9be37a; font-weight: 800; }
 .du-streaks { margin: 6px 0 0; padding-left: 18px; color: var(--ash); font-size: 14px; display: grid; gap: 4px; }
 .du-coins { font-size: 18px; font-weight: 800; color: #8ae0d0; }

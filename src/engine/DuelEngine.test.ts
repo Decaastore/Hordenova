@@ -105,15 +105,16 @@ describe("Duel profile", () => {
     const ms = duelMissionsFor(1000);
     expect(ms).toHaveLength(3);
     for (let i = 0; i < 20; i++) p = applyDuelResult(p, { outcome: "WIN", myCastle: 20, foeCastle: 0, sends: 5, deck: ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "S_SHIELDS"] }, day).profile;
-    let gems = 0;
+    let bonuses = 0;
     for (const m of ms) {
       const c = claimDuelMission(p, m.id, day)!;
-      expect(c.profile.coins).toBe(p.coins + m.coins);
-      gems += c.gems;
+      expect(c.profile.coins).toBe(p.coins + m.coins + (c.bonus ? 30 : 0));
+      if (c.bonus) bonuses++;
+      expect(c.gems).toBe(0);
       p = c.profile;
       expect(claimDuelMission(p, m.id, day)).toBeNull();
     }
-    expect(gems).toBe(3); // all three done: Free Gems bonus, once
+    expect(bonuses).toBe(1); // all three done: one coin bonus
   });
 
   it("weekly wins pay Free Gems once per goal, and the Weekend Tournament crowns a champion", async () => {
@@ -126,7 +127,8 @@ describe("Duel profile", () => {
       p = r.profile;
     }
     expect(p.weekWins.paid).toEqual([10, 25]);
-    expect(gems).toBeGreaterThanOrEqual(WEEKLY_WIN_GOALS[0]!.prize.gems + WEEKLY_WIN_GOALS[1]!.prize.gems);
+    expect(WEEKLY_WIN_GOALS.every((g) => g.prize.gems === 0)).toBe(true);
+    expect(gems).toBe(0);
     // a Saturday and a Wednesday
     const sat = Date.UTC(2026, 10, 14, 12);
     const wed = Date.UTC(2026, 10, 11, 12);
@@ -140,7 +142,7 @@ describe("Duel profile", () => {
     }
     expect(q.tourney.won).toBe(true);
     expect(q.owned).toContain(TOURNEY_BANNER);
-    expect(tg).toBe(25);
+    expect(tg).toBe(3);
     expect(applyTourneyResult(q, "WIN", sat)).toBeNull(); // one run per weekend
     const lost = applyTourneyResult(createDuelProfile(), "LOSS", sat)!;
     expect(lost.profile.tourney.out).toBe(true);
@@ -212,5 +214,21 @@ describe("Duel cosmetics", () => {
     new GameEngine().startRun();
     expect(lookSkinId("INFERNO", "INFERNO_BLUE_FLAME")).toBe("INFERNO_BLUE_FLAME");
     expect(activeKillFx()).toBeNull();
+  });
+});
+
+describe("Duel economy keeps Gems scarce", () => {
+  it("Gems from the Duel are tiny; leagues give exclusive looks instead", async () => {
+    const { RANK_STEPS: steps, rankPrize: rp, LEAGUE_UNLOCKS, applyDuelResult: apply, createDuelProfile: fresh, DUEL_SHOP, WEEKLY_CHALLENGE_GEMS, FIRST_WIN_PRIZE: fw, STREAK_PRIZES } = await import("@/config/duel");
+    const total = steps.reduce((s, _, i) => s + rp(i).gems, 0);
+    expect(total).toBeLessThanOrEqual(10); // every league together
+    expect(WEEKLY_CHALLENGE_GEMS).toBeLessThanOrEqual(2);
+    expect(fw.gems).toBe(0);
+    for (const s of STREAK_PRIZES) expect(s.prize.gems).toBe(0);
+    for (const ids of Object.values(LEAGUE_UNLOCKS)) for (const id of ids ?? []) expect(DUEL_SHOP.find((x) => x.id === id)?.earnedOnly).toBe(true);
+    // reaching Silver unlocks its frame
+    const r = apply({ ...fresh(), trophies: 290, bestTrophies: 290, rankPaidUpTo: 2 }, { outcome: "WIN", myCastle: 20, foeCastle: 0, sends: 0, deck: [] }, 1000 * 86_400_000);
+    expect(r.unlocked).toEqual(["FRAME_SILVER"]);
+    expect(r.profile.owned).toContain("FRAME_SILVER");
   });
 });

@@ -218,16 +218,16 @@ export function addPrize(a: DuelPrize, b: DuelPrize): DuelPrize {
 }
 
 export const MATCH_COINS: Record<DuelOutcome, number> = { WIN: 12, LOSS: 4, DRAW: 6 };
-export const FIRST_WIN_PRIZE = P({ coins: 40, gems: 2 });
+export const FIRST_WIN_PRIZE = P({ coins: 40 });
 
 /** Ranked wins in a week (Monday UTC) that pay Free Gems, once each per week. */
 export const WEEKLY_WIN_GOALS: readonly { wins: number; prize: DuelPrize }[] = [
-  { wins: 10, prize: P({ coins: 60, gems: 5 }) },
-  { wins: 25, prize: P({ coins: 120, gems: 10 }) },
-  { wins: 50, prize: P({ coins: 250, gems: 20 }) },
+  { wins: 10, prize: P({ coins: 60 }) },
+  { wins: 25, prize: P({ coins: 120 }) },
+  { wins: 50, prize: P({ coins: 250 }) },
 ];
 /** Finishing all three daily missions adds this. */
-export const MISSIONS_ALL_DONE_PRIZE = P({ gems: 3 });
+export const MISSIONS_ALL_DONE_PRIZE = P({ coins: 30 });
 export const STREAK_PRIZES: readonly { at: number; prize: DuelPrize }[] = [
   { at: 3, prize: P({ coins: 30 }) },
   { at: 5, prize: P({ coins: 60 }) },
@@ -241,12 +241,12 @@ export function rankPrize(index: number): DuelPrize {
   if (step.division !== 1) return P({ coins: 80 });
   const byLeague: Record<LeagueId, [number, number]> = {
     BRONZE: [0, 0],
-    SILVER: [250, 5],
-    GOLD: [400, 10],
-    PLATINUM: [600, 20],
-    DIAMOND: [900, 30],
-    MASTER: [1500, 50],
-    LEGEND: [3000, 100],
+    SILVER: [250, 0],
+    GOLD: [400, 0],
+    PLATINUM: [600, 0],
+    DIAMOND: [900, 0],
+    MASTER: [1500, 0],
+    LEGEND: [3000, 10],
   };
   const [coins, gems] = byLeague[step.league];
   return P({ coins, gems });
@@ -315,7 +315,7 @@ export function missionStep(m: DuelMission, st: DuelMatchStats): number {
 // ── Duel shop ───────────────────────────────────────────────────────────
 export type DuelCosmeticKind = "BANNER" | "FRAME" | "TOWER_SKIN" | "KILL_FX";
 /** Kill effects: what a creature leaves when it falls, in the Duel and the Eternal castle. */
-export type KillFxId = "EMBERS" | "FROST" | "SOULS" | "GOLD";
+export type KillFxId = "EMBERS" | "FROST" | "SOULS" | "GOLD" | "LIGHTNING" | "BLOOD";
 export interface DuelShopItem {
   id: string;
   price: number;
@@ -333,6 +333,18 @@ export const DUEL_SHOP: readonly DuelShopItem[] = [
   { id: "BANNER_AZURE", price: 300, cosmetic: { kind: "BANNER", color: "#2a5ab0", color2: "#e8e8f0" } },
   { id: "BANNER_EMERALD", price: 450, cosmetic: { kind: "BANNER", color: "#1f7a4a", color2: "#f0d080" } },
   { id: "BANNER_CHAMPION", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#ffd56a", color2: "#7a1414" } },
+  // exclusive — only earned in the Duel (leagues, tournament, weekly wins), never sold
+  { id: "FRAME_SILVER", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#e8eef4", color2: "#5a6470" } },
+  { id: "BANNER_GOLD", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#ffd56a", color2: "#8a5a10" } },
+  { id: "KILL_LIGHTNING", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#c8b0ff", color2: "#2a1a6a", fx: "LIGHTNING" } },
+  { id: "FRAME_DIAMOND", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#9ac8ff", color2: "#2a3aa8" } },
+  { id: "BANNER_MASTER", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#e0a0ff", color2: "#3a0a6a" } },
+  { id: "KILL_BLOOD", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#ff3a4a", color2: "#3a0608", fx: "BLOOD" } },
+  { id: "FRAME_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#ff3a5a", color2: "#ffc040" } },
+  { id: "SKIN_IRONWOOD_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "IRONWOOD_LEGEND", tower: "IRONWOOD" } },
+  { id: "SKIN_INFERNO_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "INFERNO_LEGEND", tower: "INFERNO" } },
+  { id: "SKIN_FROSTBORN_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "FROSTBORN_LEGEND", tower: "FROSTBORN" } },
+  { id: "SKIN_STORMCALLER_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "STORMCALLER_LEGEND", tower: "STORMCALLER" } },
   { id: "BANNER_VOID", price: 700, cosmetic: { kind: "BANNER", color: "#3a1a5a", color2: "#d090ff" } },
   { id: "FRAME_GOLD", price: 500, cosmetic: { kind: "FRAME", color: "#e8b04b", color2: "#7a5a1a" } },
   { id: "FRAME_FROST", price: 650, cosmetic: { kind: "FRAME", color: "#9ad8ff", color2: "#2a5a7a" } },
@@ -474,6 +486,8 @@ export interface DuelResult {
   streakBonus: number | null;
   /** Rank steps reached for the first time this match. */
   newRanks: number[];
+  /** Exclusive looks won this match. */
+  unlocked: string[];
 }
 
 /** Applies a ranked match: trophies (with the league floor), coins, first win of the day, streak and first-time rank prizes, and mission progress. */
@@ -489,6 +503,7 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
   const streak = win ? p.streak + 1 : st.outcome === "LOSS" ? 0 : p.streak;
   const streakHit = win ? STREAK_PRIZES.find((s) => s.at === streak) : undefined;
   if (streakHit) prize = addPrize(prize, streakHit.prize);
+  let pendingWeeklyUnlock = false;
   const week = duelWeek(nowMs);
   const ww = p.weekWins.week === week ? p.weekWins : { week, wins: 0, paid: [] as number[] };
   const weekWinsNow = ww.wins + (win ? 1 : 0);
@@ -497,13 +512,17 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
     if (weekWinsNow >= g.wins && !newPaid.includes(g.wins)) {
       newPaid.push(g.wins);
       prize = addPrize(prize, g.prize);
+      if (g.wins === WEEKLY_WIN_GOALS[WEEKLY_WIN_GOALS.length - 1]!.wins && !p.owned.includes(WEEKLY_TOP_UNLOCK)) pendingWeeklyUnlock = true;
     }
   const bestTrophies = Math.max(p.bestTrophies, trophies);
   const reached = rankFor(bestTrophies).index;
   const newRanks: number[] = [];
+  const unlocked: string[] = pendingWeeklyUnlock ? [WEEKLY_TOP_UNLOCK] : [];
   for (let i = p.rankPaidUpTo + 1; i <= reached; i++) {
     newRanks.push(i);
     prize = addPrize(prize, rankPrize(i));
+    const step = RANK_STEPS[i]!;
+    if (step.division === 1) for (const id of LEAGUE_UNLOCKS[step.league] ?? []) if (!p.owned.includes(id)) unlocked.push(id);
   }
   // missions (progress only; claimed from the lobby)
   const missions = p.missions.day === day ? p.missions : { day, progress: {}, claimed: [] };
@@ -523,7 +542,9 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
       rankPaidUpTo: Math.max(p.rankPaidUpTo, reached),
       missions: { ...missions, progress },
       weekWins: { week, wins: weekWinsNow, paid: newPaid },
+      owned: [...p.owned, ...unlocked],
     },
+    unlocked,
     prize,
     trophyChange: trophies - p.trophies,
     rankBefore,
@@ -535,7 +556,7 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
 }
 
 /** Claims a finished mission's coins. */
-export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { profile: DuelProfile; gems: number } | null {
+export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { profile: DuelProfile; gems: number; bonus: boolean } | null {
   const day = Math.floor(nowMs / 86_400_000);
   const all = duelMissionsFor(day);
   const m = all.find((x) => x.id === id);
@@ -543,8 +564,9 @@ export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { p
   const claimed = [...p.missions.claimed, id];
   const bonus = !p.missions.bonusPaid && all.every((x) => claimed.includes(x.id));
   return {
-    profile: { ...p, coins: p.coins + m.coins, missions: { ...p.missions, claimed, bonusPaid: p.missions.bonusPaid || bonus } },
+    profile: { ...p, coins: p.coins + m.coins + (bonus ? MISSIONS_ALL_DONE_PRIZE.coins : 0), missions: { ...p.missions, claimed, bonusPaid: p.missions.bonusPaid || bonus } },
     gems: bonus ? MISSIONS_ALL_DONE_PRIZE.gems : 0,
+    bonus,
   };
 }
 
@@ -558,8 +580,8 @@ export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { p
  */
 export const TOURNEY_ROUNDS: readonly { ai: number; prize: DuelPrize }[] = [
   { ai: 0.75, prize: P({ coins: 60 }) },
-  { ai: 0.88, prize: P({ coins: 120, gems: 5 }) },
-  { ai: 0.97, prize: P({ coins: 250, gems: 20 }) },
+  { ai: 0.88, prize: P({ coins: 120 }) },
+  { ai: 0.97, prize: P({ coins: 250, gems: 3 }) },
 ];
 export const TOURNEY_BANNER = "BANNER_CHAMPION";
 
@@ -616,7 +638,7 @@ export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { pr
 /** Duel Coins for beating the Weekly Challenge (once a week). */
 export const WEEKLY_CHALLENGE_COINS = 150;
 /** Free Gems for beating the Weekly Challenge — they work in the whole game. */
-export const WEEKLY_CHALLENGE_GEMS = 20;
+export const WEEKLY_CHALLENGE_GEMS = 2;
 export const WEEKLY_CHALLENGE_AI = 0.95;
 
 export interface WeeklyChallenge {
@@ -679,4 +701,25 @@ export function duelSkinLooks(p: DuelProfile): Partial<Record<TowerType, string>
 
 export function duelKillFx(p: DuelProfile): KillFxId | null {
   return p.killFx ? getShopItem(p.killFx)?.cosmetic?.fx ?? null : null;
+}
+
+// ── exclusive Duel cosmetics ───────────────────────────────────────────
+/** Exclusive looks each league gives the first time you reach it. */
+export const LEAGUE_UNLOCKS: Partial<Record<LeagueId, readonly string[]>> = {
+  SILVER: ["FRAME_SILVER"],
+  GOLD: ["BANNER_GOLD"],
+  PLATINUM: ["KILL_LIGHTNING"],
+  DIAMOND: ["FRAME_DIAMOND"],
+  MASTER: ["BANNER_MASTER"],
+  LEGEND: ["FRAME_LEGEND", "SKIN_IRONWOOD_LEGEND", "SKIN_INFERNO_LEGEND", "SKIN_FROSTBORN_LEGEND", "SKIN_STORMCALLER_LEGEND"],
+};
+/** The first week you reach the top weekly-wins goal, this kill effect is yours. */
+export const WEEKLY_TOP_UNLOCK = "KILL_BLOOD";
+
+/** Where an exclusive look comes from (for the shop label). */
+export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; weekly?: boolean } {
+  for (const [l, ids] of Object.entries(LEAGUE_UNLOCKS)) if (ids?.includes(id)) return { league: l as LeagueId };
+  if (id === "BANNER_CHAMPION") return { tourney: true };
+  if (id === WEEKLY_TOP_UNLOCK) return { weekly: true };
+  return {};
 }

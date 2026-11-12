@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v117",
+    dateIso: "2026-11-12",
+    category: "BALANCE",
+    title: {
+      en: "Duel: exclusive looks instead of Gems",
+      ptBR: "Duelo: visuais exclusivos no lugar de Gemas",
+    },
+    description: {
+      en: "Gems are a paid currency, so the Duel now pays almost none. In their place, every league gives an exclusive look that can't be bought, up to four Legendary tower skins for those who reach Legend.",
+      ptBR: "Gemas são uma moeda paga, então o Duelo quase não dá mais. No lugar delas, cada liga dá um visual exclusivo que não se compra, até quatro skins de torre Lendárias para quem chega à Lenda.",
+    },
+    highlights: [
+      {
+        en: "Exclusive league looks: Silver Frame (Silver), Gold Banner (Gold), Lightning kill effect (Platinum), Diamond Frame (Diamond), Master's Banner (Master), and at Legend the Legendary Frame plus Legendary skins for all four towers.",
+        ptBR: "Visuais exclusivos por liga: Moldura de Prata (Prata), Estandarte de Ouro (Ouro), efeito de abate Raios (Platina), Moldura de Diamante (Diamante), Estandarte do Mestre (Mestre) e, na Lenda, a Moldura Lendária e skins Lendárias para as quatro torres.",
+      },
+      {
+        en: "50 wins in one week gives the exclusive Blood Moon kill effect, the first time. The Weekend Tournament keeps its Champion Banner.",
+        ptBR: "50 vitórias numa semana dão o efeito de abate exclusivo Lua de Sangue, na primeira vez. O Torneio de Fim de Semana continua com o Estandarte do Campeão.",
+      },
+      {
+        en: "Free Gems left in the Duel: 2 for the Weekly Challenge, 3 for winning the Weekend Tournament and 10 once at Legend. Everything else now pays Duel Coins (all three daily missions: +30 coins).",
+        ptBR: "Gemas grátis que ficaram no Duelo: 2 no Desafio da Semana, 3 por vencer o Torneio de Fim de Semana e 10 uma vez na Lenda. Todo o resto agora paga Moedas de Duelo (as três missões do dia: +30 moedas).",
+      },
+    ],
+  },
+  {
     id: "v116",
     dateIso: "2026-11-12",
     category: "BALANCE",
