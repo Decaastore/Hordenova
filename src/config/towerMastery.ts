@@ -174,20 +174,38 @@ export interface MasteryBonuses {
 // flat damage, so a Mastery point buys a tower-specific behavior (crit,
 // AoE/burn, slow/freeze, chain/armor-pen) as well as a smaller flat-damage
 // bump, rather than only ever flat damage.
-const MASTERY_DAMAGE_PER_POINT = 0.0015;
-const MASTERY_ATTACK_SPEED_PER_POINT = 0.0045;
+// MAESTRIA FIX (player feedback: "upa e não dá nada") — at 0.0015/0.0045 a
+// level-10 tower got +1.3% damage, which nobody can feel. Raised so every
+// level is a real, visible step, and each cosmetic tier now also pays a flat
+// milestone bonus (MASTERY_MILESTONE_DAMAGE below). Validated with the
+// greedy-bot pace probe: the Gold curve stays the limiter.
+const MASTERY_DAMAGE_PER_POINT = 0.004;
+const MASTERY_ATTACK_SPEED_PER_POINT = 0.006;
 const MASTERY_RANGE_PER_POINT = 0.006;
 const MASTERY_GOLD_DISCOUNT_PER_POINT = 0.005;
 const MASTERY_GOLD_DISCOUNT_MAX = 0.5;
 const MASTERY_SIEGE_RESISTANCE_PER_POINT = 0.005;
 const MASTERY_SIEGE_RESISTANCE_MAX = 0.8;
 
+/**
+ * Extra flat bonus paid to damage, attack speed AND range by EACH Mastery
+ * tier reached (levels 5/15/30/60/120) — the "milestone" a player can aim
+ * for. Same amount on all three, so damage stays the smallest lever overall.
+ */
+export const MASTERY_MILESTONE_BONUS = 0.02;
+
+/** How many MASTERY_COSMETIC_TIERS milestones `masteryLevel` has reached. */
+export function getMasteryMilestonesReached(masteryLevel: number): number {
+  return MASTERY_COSMETIC_TIERS.filter((tier) => masteryLevel >= tier.level).length;
+}
+
 export function getMasteryBonuses(masteryLevel: number): MasteryBonuses {
   const scale = masteryEffectScale(masteryLevel);
+  const milestone = getMasteryMilestonesReached(masteryLevel) * MASTERY_MILESTONE_BONUS;
   return {
-    damageMultiplier: 1 + scale * MASTERY_DAMAGE_PER_POINT,
-    attackSpeedMultiplier: 1 + scale * MASTERY_ATTACK_SPEED_PER_POINT,
-    rangeMultiplier: 1 + scale * MASTERY_RANGE_PER_POINT,
+    damageMultiplier: 1 + scale * MASTERY_DAMAGE_PER_POINT + milestone,
+    attackSpeedMultiplier: 1 + scale * MASTERY_ATTACK_SPEED_PER_POINT + milestone,
+    rangeMultiplier: 1 + scale * MASTERY_RANGE_PER_POINT + milestone,
     goldCostReduction: Math.min(MASTERY_GOLD_DISCOUNT_MAX, scale * MASTERY_GOLD_DISCOUNT_PER_POINT),
     siegeResistance: Math.min(MASTERY_SIEGE_RESISTANCE_MAX, scale * MASTERY_SIEGE_RESISTANCE_PER_POINT),
   };

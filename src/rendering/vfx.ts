@@ -584,6 +584,24 @@ export class VfxManager {
     });
   }
 
+  /** MAESTRIA — golden double ring plus the new level, so a Mastery purchase is impossible to miss. */
+  spawnMasteryBurst(position: Vector2, level: number): void {
+    this.pushRing({ x: position.x, y: position.y, color: "#ffd36b", remainingMs: 520, totalMs: 520, maxRadius: 34 });
+    this.pushRing({ x: position.x, y: position.y, color: "#fff2c4", remainingMs: 340, totalMs: 340, maxRadius: 20 });
+    this.pushFloatingText({
+      x: position.x,
+      y: position.y - 24,
+      text: `\u2605 ${level}`,
+      color: "#ffd36b",
+      remainingMs: 900,
+      totalMs: 900,
+      amount: 0,
+      kind: "OTHER",
+      isCrit: false,
+      fontSizePx: 14,
+    });
+  }
+
   private pushFloatingText(entry: FloatingText): void {
     if (entry.kind !== "OTHER") this.declutter(entry);
     this.floatingTexts.push(entry);

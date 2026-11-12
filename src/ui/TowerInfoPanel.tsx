@@ -12,7 +12,7 @@ import {
   getTowerStats,
   getTowerUpgradeCost,
 } from "@/entities/Tower";
-import { getMasteryCosmeticTier, getMasteryUnlockGoldCost, getNextMasteryCosmeticTier } from "@/config/towerMastery";
+import { getMasteryBonuses, getMasteryCosmeticTier, getMasteryUnlockGoldCost, getNextMasteryCosmeticTier, MASTERY_MILESTONE_BONUS } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import {
   getMilestoneUnlockForLevel,
@@ -559,6 +559,7 @@ function MasterySection({
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.masterySection")}</div>
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim }}>{t("towerInfo.masteryLevel", { level: tower.masteryLevel })}</div>
+      <MasteryBonusLines level={tower.masteryLevel} accent={theme.accent} t={t} />
       {currentTier && (
         <div style={{ fontSize: 10, color: theme.accent, marginTop: 1 }}>
           {t("towerInfo.masteryCosmeticActive", { name: t(`towerInfo.masteryCosmetic.${currentTier.nameKey}` as TranslationKey) })}
@@ -569,6 +570,7 @@ function MasterySection({
           {t("towerInfo.masteryCosmeticNext", {
             name: t(`towerInfo.masteryCosmetic.${nextTier.nameKey}` as TranslationKey),
             level: nextTier.level,
+            bonus: Math.round(MASTERY_MILESTONE_BONUS * 100),
           })}
         </div>
       )}
@@ -585,6 +587,34 @@ function MasterySection({
         </button>
       )}
     </>
+  );
+}
+
+/** MAESTRIA — what the current level gives right now, and exactly what the next one adds. */
+function MasteryBonusLines({ level, accent, t }: { level: number; accent: string; t: Translate }) {
+  const pct = (x: number) => (x * 100).toFixed(1).replace(/\.0$/, "");
+  const now = getMasteryBonuses(level);
+  const next = getMasteryBonuses(level + 1);
+  return (
+    <div data-testid="mastery-bonus" style={{ fontSize: 9.5, lineHeight: 1.35, marginTop: 2 }}>
+      <div style={{ color: level > 0 ? accent : PALETTE.uiTextDim }}>
+        {level > 0
+          ? t("towerInfo.masteryBonusNow", {
+              dmg: pct(now.damageMultiplier - 1),
+              spd: pct(now.attackSpeedMultiplier - 1),
+              rng: pct(now.rangeMultiplier - 1),
+              gold: pct(now.goldCostReduction),
+            })
+          : t("towerInfo.masteryBonusNone")}
+      </div>
+      <div style={{ color: PALETTE.uiTextDim }}>
+        {t("towerInfo.masteryBonusNext", {
+          dmg: pct(next.damageMultiplier - now.damageMultiplier),
+          spd: pct(next.attackSpeedMultiplier - now.attackSpeedMultiplier),
+          rng: pct(next.rangeMultiplier - now.rangeMultiplier),
+        })}
+      </div>
+    </div>
   );
 }
 

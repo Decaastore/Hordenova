@@ -181,6 +181,9 @@ const MAX_DEATH_ANIMATIONS = 14;
  * (damage numbers, death bursts, build/upgrade/gold feedback) with no
  * connection back to GameEngine.
  */
+/** Last seen Mastery level per tower id — render-side diff for the Mastery level-up burst. */
+const prevTowerMastery = new Map<string, number>();
+
 /**
  * Turns a turreted tower (Ironwood's ballista) towards the enemy it is really
  * shooting at — the same "furthest along the path within range" pick the
@@ -885,6 +888,12 @@ export function detectVfxEvents(
     } else if (tower.level > prevLevel) {
       vfx.spawnUpgradeBurst(tower.position, TOWER_THEME[tower.type].accent);
     }
+    // MAESTRIA — a level bought shows on every tower of that type at once.
+    const prevMastery = prevTowerMastery.get(tower.id);
+    if (prevMastery !== undefined && tower.masteryLevel > prevMastery) {
+      vfx.spawnMasteryBurst(tower.position, tower.masteryLevel);
+    }
+    prevTowerMastery.set(tower.id, tower.masteryLevel);
 
     // Boss Siege Attack impact (spec section 13/15) — a tower's HP only
     // ever drops via applySiegeDamage (GameEngine.ts), so this is a

@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v118",
+    dateIso: "2026-11-12",
+    category: "BALANCE",
+    title: {
+      en: "Mastery you can feel and see",
+      ptBR: "Maestria que dá para sentir e ver",
+    },
+    description: {
+      en: "Leveling Mastery used to give bonuses so small nobody noticed. Every level now adds real damage, speed and range to every tower of that type, the panel shows exactly what you have and what the next level adds, and each milestone changes how the tower looks.",
+      ptBR: "Subir a Maestria dava bônus tão pequenos que ninguém percebia. Agora cada nível soma dano, velocidade e alcance de verdade para todas as torres daquele tipo, o painel mostra exatamente o que você tem e o que o próximo nível acrescenta, e cada marco muda o visual da torre.",
+    },
+    highlights: [
+      {
+        en: "Stronger per-level bonus: at Mastery 10 a tower type gets about +5% damage, +7% speed and +7% range (it was +1.3% damage). Milestones at levels 5, 15, 30, 60 and 120 each add another +2% damage, speed and range.",
+        ptBR: "Bônus por nível mais forte: na Maestria 10 um tipo de torre ganha cerca de +5% de dano, +7% de velocidade e +7% de alcance (antes era +1,3% de dano). Os marcos nos níveis 5, 15, 30, 60 e 120 somam mais +2% de dano, velocidade e alcance cada.",
+      },
+      {
+        en: "The tower panel lists your current Mastery bonus and what the next level adds, before you spend the Gold.",
+        ptBR: "O painel da torre mostra o bônus atual da Maestria e o que o próximo nível acrescenta, antes de você gastar o Ouro.",
+      },
+      {
+        en: "Mastery now shows on the map: a golden ring from level 1, then Ember Ring (5), Veteran Aura (15), Runic Sigils (30), Ascendant Halo (60) and Mythic Crown (120). Each level bought also flashes a golden burst over the towers.",
+        ptBR: "A Maestria agora aparece no mapa: um anel dourado desde o nível 1, depois Anel de Brasas (5), Aura Veterana (15), Runas Sagradas (30), Halo Ascendente (60) e Coroa Mítica (120). Cada nível comprado também solta um brilho dourado sobre as torres.",
+      },
+    ],
+  },
+  {
     id: "v117",
     dateIso: "2026-11-12",
     category: "BALANCE",

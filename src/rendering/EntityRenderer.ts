@@ -9,6 +9,7 @@ import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_PRESENTATION_SCALE } from "
 import { getTowerSkinDefinition, type SkinMaterialFinish, type SkinParticleStyle, type TowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_DISPLAY_SCALE, ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
 import { drawSkinEvolution, isSkinEvolved } from "./skinEvolution";
+import { drawMasteryOver, drawMasteryUnder } from "./masteryFx";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
@@ -279,6 +280,9 @@ function drawSkinMaterialOverlay(
   ctx.restore();
 }
 
+/** MAESTRIA — where each tower's body ends, so the halo and crown sit just above it. */
+const MASTERY_TOP_Y: Record<TowerInstance["type"], number> = { IRONWOOD: -32, INFERNO: -24, FROSTBORN: -36, STORMCALLER: -40 };
+
 export function drawTower(
   ctx: CanvasRenderingContext2D,
   tower: TowerInstance,
@@ -313,6 +317,7 @@ export function drawTower(
   // Pre-rendered 3D body when one exists for this type/skin/stage (see
   // towerSprites.ts); otherwise the original vector tower below.
   const sprite = getTowerSprite(tower.type, lookId, visualStage);
+  if (!bodyOnly) drawMasteryUnder(ctx, tower.masteryLevel, theme.accent, timeMs);
   if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
     drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
@@ -333,6 +338,8 @@ export function drawTower(
       drawStormcaller(ctx, theme, stats.level, timeMs, visualStage, readiness, attackFlashMs, skin);
       break;
   }
+
+  if (!bodyOnly) drawMasteryOver(ctx, tower.masteryLevel, theme.accent, timeMs, MASTERY_TOP_Y[tower.type]);
 
   ctx.restore();
 
