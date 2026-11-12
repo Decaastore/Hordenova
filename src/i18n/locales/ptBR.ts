@@ -514,6 +514,102 @@ export const ptBR: TranslationSchema = {
     STORMCALLER_STORMLORD: { name: "Senhor da Tempestade", description: "A penetração de armadura continua aumentando bem além do limite do nível 20." },
   },
   towerSkins: {
+    IRONWOOD_AUTUMN: {
+      name: "Outono",
+      description: "Madeira avermelhada, folhas cor de fogo e veios âmbar na balista.",
+      attributeName: "Outono",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    IRONWOOD_BIRCH: {
+      name: "Bétula",
+      description: "Casca clara de bétula, musgo verde-vivo e veios verde-claros.",
+      attributeName: "Bétula",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    IRONWOOD_BLOODWOOD: {
+      name: "Lenho Sangrento",
+      description: "Madeira escura cor de sangue com veios vermelhos que pulsam.",
+      attributeName: "Lenho Sangrento",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    IRONWOOD_FROSTPINE: {
+      name: "Pinheiro Gélido",
+      description: "Casca azulada coberta de neve e veios de gelo na balista.",
+      attributeName: "Pinheiro Gélido",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    INFERNO_COPPER: {
+      name: "Fornalha de Cobre",
+      description: "Chapas de cobre batido e latão claro em volta do fogo.",
+      attributeName: "Fornalha de Cobre",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    INFERNO_SOOT: {
+      name: "Fuligem",
+      description: "Ferro enegrecido de fuligem, com o fogo laranja ainda mais vivo.",
+      attributeName: "Fuligem",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    INFERNO_BLUE_FLAME: {
+      name: "Chama Azul",
+      description: "Metal azulado e um fogo azul, mais quente que o comum.",
+      attributeName: "Chama Azul",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    INFERNO_EMERALD: {
+      name: "Fogo Esmeralda",
+      description: "Tijolos verde-escuros e uma chama verde que custa a apagar.",
+      attributeName: "Fogo Esmeralda",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    FROSTBORN_SANDSTONE: {
+      name: "Arenito",
+      description: "Obelisco de arenito do deserto, com o gelo azul de sempre no topo.",
+      attributeName: "Arenito",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    FROSTBORN_MOONSTONE: {
+      name: "Pedra-da-Lua",
+      description: "Pedra cinza-lilás e um orbe de luz fria e pálida.",
+      attributeName: "Pedra-da-Lua",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    FROSTBORN_AURORA: {
+      name: "Aurora",
+      description: "Pedra escura com runas verdes e cristais que mudam entre verde e violeta.",
+      attributeName: "Aurora",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    FROSTBORN_OBSIDIAN: {
+      name: "Obsidiana Gelada",
+      description: "Obsidiana negra com runas e gelo vermelhos.",
+      attributeName: "Obsidiana Gelada",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    STORMCALLER_COPPER: {
+      name: "Bobina de Cobre",
+      description: "Pilar de cobre e um orbe de raios cor de âmbar.",
+      attributeName: "Bobina de Cobre",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    STORMCALLER_SLATE: {
+      name: "Ardósia",
+      description: "Pedra cinza de ardósia, haste de aço e raios azul-claros.",
+      attributeName: "Ardósia",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    STORMCALLER_RUBY: {
+      name: "Raio Rubi",
+      description: "Pedra vinho, haste dourada e raios vermelhos como rubi.",
+      attributeName: "Raio Rubi",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
+    STORMCALLER_SUNSTORM: {
+      name: "Tempestade Solar",
+      description: "Pedra clara e dourada com um orbe de raios cor de sol.",
+      attributeName: "Tempestade Solar",
+      attributeDescription: "Só muda a aparência da torre.",
+    },
     // IRONWOOD — Cerco de Precisão / Balista.
     IRONWOOD_WARDEN_OF_THE_ABYSS: {
       name: "Guardião do Abismo",
@@ -1091,6 +1187,10 @@ export const ptBR: TranslationSchema = {
     },
   },
   store: {
+    tier: { ENTRY: "Entrada", INTERMEDIATE: "Intermediária", PREMIUM: "Premium", PRESTIGE: "Prestígio" },
+    evolve: "Evoluir: a mesma skin, viva (anel de runas girando, brilho e faíscas)",
+    evolvedTag: "✦ Evoluída",
+    evolved: "{name} evoluiu.",
     essenceN: "{n} {r}",
     splintersN: "{n} Estilhaços",
     gemsN: "{n} Gemas compradas",

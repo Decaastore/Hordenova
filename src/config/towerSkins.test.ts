@@ -92,8 +92,11 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
   });
 
   describe("TOWER SKIN SYSTEM v2/v3 — every tower gets 1 reformulated + 4 new premium skins, each visually distinct", () => {
-    it("every tower type has exactly 5 commercial skins", () => {
-      for (const type of TOWER_TYPES) expect(getSkinsForTower(type).length).toBe(5);
+    it("every tower type has 5 Premium skins, plus 2 Entry and 2 Intermediate", () => {
+      for (const type of TOWER_TYPES) {
+        expect(getSkinsForTower(type).filter((s) => s.tier === "PREMIUM").length).toBe(5);
+        expect(getSkinsForTower(type).length).toBe(9);
+      }
     });
 
     it("every skin id is unique across the whole commercial catalog", () => {
@@ -104,8 +107,11 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
     it("every skin has a non-empty material/coreShape/weaponDetail/projectileStyle and a valid particleStyle", () => {
       for (const skin of TOWER_SKINS) {
         expect(skin.material.length).toBeGreaterThan(0);
-        expect(skin.coreShape.length).toBeGreaterThan(0);
-        expect(skin.weaponDetail.length).toBeGreaterThan(0);
+        // Entry/Intermediate skins are new materials and colours on the baked body; only Premium ones add their own core and weapon pieces
+        if (skin.tier === "PREMIUM") {
+          expect(skin.coreShape.length).toBeGreaterThan(0);
+          expect(skin.weaponDetail.length).toBeGreaterThan(0);
+        }
         expect(skin.projectileStyle.length).toBeGreaterThan(0);
         expect(skin.particleStyle.color.length).toBeGreaterThan(0);
         expect(skin.particleStyle.behavior.length).toBeGreaterThan(0);
@@ -114,7 +120,7 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
 
     it("no skin is a plain recolor of another skin on the same tower — coreShape and weaponDetail are unique within a tower type", () => {
       for (const type of TOWER_TYPES) {
-        const skins = getSkinsForTower(type);
+        const skins = getSkinsForTower(type).filter((s) => s.tier === "PREMIUM");
         expect(new Set(skins.map((s) => s.coreShape)).size).toBe(skins.length);
         expect(new Set(skins.map((s) => s.weaponDetail)).size).toBe(skins.length);
       }
@@ -172,6 +178,10 @@ describe("Tower Skin architecture (Progression 2.0 spec section 10/11, CORREÇÃ
     it("every commercial skin pairs at least one buff with at least one downside — never a strict, drawback-free upgrade", () => {
       for (const skin of TOWER_SKINS) {
         const entries = Object.entries(skin.gameplayEffect) as [keyof SkinGameplayEffect, number][];
+        if (skin.tier === "ENTRY") {
+          expect(entries).toHaveLength(0); // Entry skins only change the look
+          continue;
+        }
         expect(entries.length).toBeGreaterThanOrEqual(2);
         const buffs = entries.filter(([key, value]) => isBuffField(key, value));
         const downsides = entries.filter(([key, value]) => !isBuffField(key, value));

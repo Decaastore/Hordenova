@@ -1,7 +1,7 @@
 import { loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { getCurrentDayIndex } from "./DailyClock";
-import { getTowerSkinDefinition, getTowerSkinDualPrice, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
+import { canEvolveSkin, getTowerSkinDefinition, getTowerSkinDualPrice, SKIN_EVOLUTION_PRICE, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
 import { canPayWithRealMoney } from "@/config/ageGate";
@@ -26,8 +26,10 @@ export type SkinStatus =
   | { kind: "AVAILABLE" };
 
 /** Commercial tower skins in store order: by tower type, cheapest first. */
+const STORE_TYPE_ORDER: readonly TowerType[] = ["IRONWOOD", "INFERNO", "FROSTBORN", "STORMCALLER"];
+
 export function getStoreTowerSkins(): readonly TowerSkinDefinition[] {
-  return TOWER_SKINS;
+  return [...TOWER_SKINS].sort((a, b) => STORE_TYPE_ORDER.indexOf(a.towerType) - STORE_TYPE_ORDER.indexOf(b.towerType) || a.gemCost - b.gemCost);
 }
 
 function highestLevelOfType(save: SaveData, type: TowerType): number {
@@ -157,4 +159,24 @@ export function claimVipGift(nowMs: number = Date.now()): SaveData | null {
   if (!vipGiftAvailable(save.vip, nowMs)) return null;
   appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: save.playerId, source: "vip_daily", amount: VIP_DAILY_GEMS, currency: "PURCHASED" });
   return updateSave({ purchasedGems: save.purchasedGems + VIP_DAILY_GEMS, vip: { ...save.vip, lastGiftDay: shopDay(nowMs) } });
+}
+
+// ── EVOLUÇÃO DE SKIN (config/towerSkins.ts) ────────────────────────────
+
+/** Evolves an owned Premium skin into its animated version (permanent). */
+export function buySkinEvolution(skinId: string, currency: GemCurrency): StoreResult {
+  const save = loadSave();
+  const def = getTowerSkinDefinition(skinId);
+  if (!def || !canEvolveSkin(def)) return { ok: false, reason: "UNKNOWN" };
+  if (!save.ownedTowerSkinIds.includes(skinId)) return { ok: false, reason: "NOT_OWNED" };
+  if (save.evolvedSkinIds.includes(skinId)) return { ok: false, reason: "OWNED" };
+  const cost = gemPriceForCurrency(SKIN_EVOLUTION_PRICE, currency);
+  const balance = currency === "FREE" ? save.freeGems : save.purchasedGems;
+  if (balance < cost) return { ok: false, reason: "INSUFFICIENT_GEMS" };
+  appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: `skin_evolution:${skinId}`, amount: cost, currency });
+  const next = updateSave({
+    ...(currency === "FREE" ? { freeGems: save.freeGems - cost } : { purchasedGems: save.purchasedGems - cost }),
+    evolvedSkinIds: [...save.evolvedSkinIds, skinId],
+  });
+  return { ok: true, save: next };
 }

@@ -513,6 +513,102 @@ export const en = {
     STORMCALLER_STORMLORD: { name: "Stormlord", description: "Armor penetration keeps climbing well past the level-20 cap." },
   },
   towerSkins: {
+    IRONWOOD_AUTUMN: {
+      name: "Autumn",
+      description: "Reddish wood, fire-coloured leaves and amber veins on the ballista.",
+      attributeName: "Autumn",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    IRONWOOD_BIRCH: {
+      name: "Birch",
+      description: "Pale birch bark, bright green moss and light green veins.",
+      attributeName: "Birch",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    IRONWOOD_BLOODWOOD: {
+      name: "Bloodwood",
+      description: "Dark blood-red wood with pulsing red veins.",
+      attributeName: "Bloodwood",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    IRONWOOD_FROSTPINE: {
+      name: "Frostpine",
+      description: "Bluish snow-covered bark and icy veins on the ballista.",
+      attributeName: "Frostpine",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    INFERNO_COPPER: {
+      name: "Copper Furnace",
+      description: "Hammered copper plates and light brass around the fire.",
+      attributeName: "Copper Furnace",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    INFERNO_SOOT: {
+      name: "Soot",
+      description: "Soot-blackened iron, with the orange fire even brighter.",
+      attributeName: "Soot",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    INFERNO_BLUE_FLAME: {
+      name: "Blue Flame",
+      description: "Bluish metal and a blue fire, hotter than the usual.",
+      attributeName: "Blue Flame",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    INFERNO_EMERALD: {
+      name: "Emerald Fire",
+      description: "Dark green bricks and a green flame that is slow to die.",
+      attributeName: "Emerald Fire",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    FROSTBORN_SANDSTONE: {
+      name: "Sandstone",
+      description: "A desert sandstone obelisk, with the usual blue ice on top.",
+      attributeName: "Sandstone",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    FROSTBORN_MOONSTONE: {
+      name: "Moonstone",
+      description: "Grey-lilac stone and an orb of pale, cold light.",
+      attributeName: "Moonstone",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    FROSTBORN_AURORA: {
+      name: "Aurora",
+      description: "Dark stone with green runes and crystals shifting from green to violet.",
+      attributeName: "Aurora",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    FROSTBORN_OBSIDIAN: {
+      name: "Frozen Obsidian",
+      description: "Black obsidian with red runes and red ice.",
+      attributeName: "Frozen Obsidian",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    STORMCALLER_COPPER: {
+      name: "Copper Coil",
+      description: "A copper pillar and an amber lightning orb.",
+      attributeName: "Copper Coil",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    STORMCALLER_SLATE: {
+      name: "Slate",
+      description: "Grey slate stone, a steel rod and light blue lightning.",
+      attributeName: "Slate",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    STORMCALLER_RUBY: {
+      name: "Ruby Bolt",
+      description: "Wine-red stone, a golden rod and ruby-red lightning.",
+      attributeName: "Ruby Bolt",
+      attributeDescription: "Only changes the tower's look.",
+    },
+    STORMCALLER_SUNSTORM: {
+      name: "Sunstorm",
+      description: "Light golden stone with a sun-coloured lightning orb.",
+      attributeName: "Sunstorm",
+      attributeDescription: "Only changes the tower's look.",
+    },
     // IRONWOOD — Precision Siege / Ballista.
     IRONWOOD_WARDEN_OF_THE_ABYSS: {
       name: "Warden of the Abyss",
@@ -1090,6 +1186,10 @@ export const en = {
     },
   },
   store: {
+    tier: { ENTRY: "Entry", INTERMEDIATE: "Intermediate", PREMIUM: "Premium", PRESTIGE: "Prestige" },
+    evolve: "Evolve: the same skin, alive (turning rune ring, glow and sparks)",
+    evolvedTag: "✦ Evolved",
+    evolved: "{name} evolved.",
     essenceN: "{n} {r}",
     splintersN: "{n} Splinters",
     gemsN: "{n} Purchased Gems",

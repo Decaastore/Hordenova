@@ -275,6 +275,8 @@ export interface SaveData {
   momentOffers: MomentOfferState;
   /** VIP — paid period and the last daily VIP gift. Account-level; only a real payment ever sets `until`. */
   vip: VipState;
+  /** EVOLUÇÃO DE SKIN — Premium skins this account has evolved (animated). Account-level, permanent. */
+  evolvedSkinIds: string[];
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -390,6 +392,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   dailyShop: createDailyShopState(),
   momentOffers: createMomentOfferState(),
   vip: createVipState(),
+  evolvedSkinIds: [],
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -938,6 +941,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       dailyShop: sanitizeDailyShopState(parsed.dailyShop),
       momentOffers: sanitizeMomentOfferState(parsed.momentOffers),
       vip: sanitizeVipState(parsed.vip),
+      evolvedSkinIds: Array.isArray(parsed.evolvedSkinIds) ? [...new Set((parsed.evolvedSkinIds as unknown[]).filter((x): x is string => typeof x === "string"))] : [],
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as

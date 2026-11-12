@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v104",
+    dateIso: "2026-11-11",
+    category: "TOWERS",
+    title: {
+      en: "16 New Tower Skins and Skin Evolutions",
+      ptBR: "16 Novas Skins de Torre e Evolução de Skin",
+    },
+    description: {
+      en: "Every tower gets 4 new, cheaper skins: 2 Entry skins that only change the look, and 2 Intermediate ones with a small trade-off. Premium skins you own can now be evolved into a living version.",
+      ptBR: "Cada torre ganha 4 skins novas e mais baratas: 2 de Entrada, que só mudam a aparência, e 2 Intermediárias, com uma pequena troca de atributos. As skins Premium que você tem agora podem evoluir para uma versão viva.",
+    },
+    highlights: [
+      {
+        en: "Ironwood: Autumn, Birch, Bloodwood and Frostpine. Inferno: Copper Furnace, Soot, Blue Flame and Emerald Fire. Frostborn: Sandstone, Moonstone, Aurora and Frozen Obsidian. Stormcaller: Copper Coil, Slate, Ruby Bolt and Sunstorm.",
+        ptBR: "Ironwood: Outono, Bétula, Lenho Sangrento e Pinheiro Gélido. Inferno: Fornalha de Cobre, Fuligem, Chama Azul e Fogo Esmeralda. Frostborn: Arenito, Pedra-da-Lua, Aurora e Obsidiana Gelada. Stormcaller: Bobina de Cobre, Ardósia, Raio Rubi e Tempestade Solar.",
+      },
+      {
+        en: "Entry skins cost 120 Gems and Intermediate 350; like every paid skin they add +5% gold and Gem Shards and +10% mana while equipped.",
+        ptBR: "Skins de Entrada custam 120 Gemas e Intermediárias 350; como toda skin paga, dão +5% de ouro e fragmentos e +10% de mana enquanto equipadas.",
+      },
+      {
+        en: "Evolution (400 Gems): the same Premium skin with a turning rune ring, a breathing glow and sparks in its own colours. Purely visual and permanent.",
+        ptBR: "Evolução (400 Gemas): a mesma skin Premium com um anel de runas girando, um brilho que pulsa e faíscas nas cores dela. Só visual e permanente.",
+      },
+      {
+        en: "The Store now lists each tower's skins from the cheapest up and shows each skin's tier.",
+        ptBR: "A Loja agora lista as skins de cada torre da mais barata para a mais cara e mostra o nível de cada uma.",
+      },
+    ],
+  },
+  {
     id: "v103",
     dateIso: "2026-11-11",
     category: "SYSTEMS",

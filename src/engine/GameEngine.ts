@@ -146,6 +146,7 @@ import { getMilestoneUnlockForLevel } from "@/config/towerStats";
 import { adaptAfterWave, createHordeAdaptation, emptyShares, strongestResistance, ADAPTATION_ANNOUNCE_STEP, type DamageShares, type HordeAdaptation } from "@/config/hordeAdaptation";
 import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FIRES_PER_BOSS_BREACH, CITY_FIRES_PER_LEAKED_WAVE, igniteBuildings, type CityBuildingId, type CityState } from "@/config/city";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
+import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import {
   addEssences,
   BOSS_SPLINTERS,
@@ -715,6 +716,7 @@ export class GameEngine {
     this.expeditions = save.expeditions;
     this.momentOffers = save.momentOffers;
     this.vip = save.vip;
+    setEvolvedSkins(save.evolvedSkinIds);
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;

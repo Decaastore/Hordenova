@@ -7,6 +7,7 @@ import { getTowerStats } from "@/entities/Tower";
 import { getTowerVisualStage, MAX_TOWER_LEVEL, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
 import { getTowerSkinDefinition, type SkinMaterialFinish, type SkinParticleStyle, type TowerSkinDefinition } from "@/config/towerSkins";
 import { ENEMY_DISPLAY_SCALE, ENEMY_THEME, STATUS_COLORS, TOWER_THEME } from "./theme";
+import { drawSkinEvolution, isSkinEvolved } from "./skinEvolution";
 import { drawContactShadow, drawEnergyCrack, drawFloatingMotes, drawMagicCore, rimHighlight, type FloatingMoteStyle } from "./lighting";
 import { getMovementVfxCategory } from "@/config/movementVfx";
 import { getBossVfxProfile, getCreatureVfxProfile, type CreatureVfxProfile, type CreatureWeightClass } from "@/config/creatureVfxProfile";
@@ -311,6 +312,7 @@ export function drawTower(
   if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
     drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
+    if (skin && isSkinEvolved(skin.id)) drawSkinEvolution(ctx, skin, timeMs, visualStage);
   } else if (tower.type !== "IRONWOOD") drawPlinth(ctx);
 
   if (!sprite) switch (tower.type) {

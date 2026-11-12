@@ -10,10 +10,11 @@ import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
-import { buyDailyOffer, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
+import { buyDailyOffer, buySkinEvolution, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
 import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_PRICE_BRL, vipGiftAvailable, type DailyOffer, type MomentOffer } from "@/config/shopOffers";
 import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
-import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
+import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { GemIcon } from "@/ui/icons";
@@ -69,6 +70,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
     }
   };
 
+  setEvolvedSkins(save.evolvedSkinIds);
   const now = Date.now();
   const daily = getDailyOffers(save, now);
   const moment = activeMomentOffer(save.momentOffers, now);
@@ -105,6 +107,14 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
       setSave(next);
       setNotice(t("store.vipGiftClaimed", { gems: VIP_DAILY_GEMS }));
     }
+  };
+
+  const onEvolve = (skin: TowerSkinDefinition, currency: GemCurrency) => {
+    const result = buySkinEvolution(skin.id, currency);
+    if (result.ok) {
+      setSave(result.save);
+      setNotice(t("store.evolved", { name: t(`towerSkins.${skin.id}.name` as TranslationKey) }));
+    } else if (result.reason === "INSUFFICIENT_GEMS") setNotice(t(currency === "FREE" ? "store.notEnoughFree" : "store.notEnoughPurchased"));
   };
 
   const onEquip = (skin: TowerSkinDefinition, equip: boolean) => {
@@ -308,7 +318,9 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                       <TowerPortrait type={skin.towerType} level={MAX_TOWER_LEVEL} skinId={skin.id} width={132} height={132} zoom={1.9} baseY={0.72} />
                     </div>
                     <div className="st-skin-body">
-                      <p className="st-type">{t(`towers.${skin.towerType}.name` as TranslationKey)}</p>
+                      <p className="st-type">
+                        {t(`towers.${skin.towerType}.name` as TranslationKey)} · {t(`store.tier.${skin.tier}` as TranslationKey)}
+                      </p>
                       <h3>{t(`towerSkins.${skin.id}.name` as TranslationKey)}</h3>
                       <p className="st-desc">{t(`towerSkins.${skin.id}.description` as TranslationKey)}</p>
                       {effects.length > 0 && (
@@ -348,6 +360,23 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                         )}
                         {status?.kind === "OWNED" && <span className="st-owned">{status.equipped ? t("store.equipped") : t("store.owned")}</span>}
                       </div>
+                      {status?.kind === "OWNED" && canEvolveSkin(skin) && (
+                        <div className="st-evolve" data-testid={`evolve-${skin.id}`}>
+                          {save.evolvedSkinIds.includes(skin.id) ? (
+                            <span className="st-evolved">{t("store.evolvedTag")}</span>
+                          ) : (
+                            <>
+                              <span className="st-evolve-label">{t("store.evolve")}</span>
+                              <button className="st-pay" disabled={save.freeGems < SKIN_EVOLUTION_PRICE.free} onClick={() => onEvolve(skin, "FREE")}>
+                                <span>{t("store.payFree")}</span> {num.format(SKIN_EVOLUTION_PRICE.free)}
+                              </button>
+                              <button className="st-pay is-gem" disabled={save.purchasedGems < SKIN_EVOLUTION_PRICE.purchased} onClick={() => onEvolve(skin, "PURCHASED")}>
+                                <span>{t("store.payPurchased")}</span> {num.format(SKIN_EVOLUTION_PRICE.purchased)}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </article>
                 );
@@ -361,6 +390,9 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 }
 
 const STORE_CSS = `
+.st-evolve { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+.st-evolve-label { width: 100%; font-size: 12.5px; color: #e3cdff; font-weight: 700; }
+.st-evolved { font-size: 12.5px; font-weight: 700; color: #e3cdff; }
 .st-moment { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-top: 26px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(224,100,75,0.6); background: linear-gradient(100deg, rgba(224,100,75,0.16), rgba(24,18,12,0.6) 65%); }
 .st-moment h2 { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: #ffb59f; }
 .st-moment p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 60ch; }
