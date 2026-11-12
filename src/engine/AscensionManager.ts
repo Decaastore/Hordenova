@@ -1,3 +1,5 @@
+import { mergeCastles } from "@/config/eternal";
+import { loadEternalCastle, pickCastle, writeEternalCastle } from "./SaveSystem";
 import { createRiftState } from "@/config/rifts";
 import { createHordeAdaptation } from "@/config/hordeAdaptation";
 import { createCityState } from "@/config/city";
@@ -244,6 +246,14 @@ export function syncSeasonIfNeeded(): void {
   // strip it, and the equipped items themselves remain permanently owned in
   // SaveData.inventory regardless). Losing this on every reset would have
   // been a silent, contract-inconsistent regression.
+  // MODO ETERNO — before the Season castle resets, it joins the Eternal
+  // castle (config/eternal.ts's mergeCastles): nobody loses what they built.
+  if (main.seasonBestWave > 0 || main.towerLoadout.length > 0) {
+    const seasonCastle = pickCastle(main);
+    const merged = mergeCastles(seasonCastle, loadEternalCastle());
+    writeEternalCastle(merged);
+  }
+
   const resetLoadout: TowerLoadoutEntry[] = main.towerLoadout.map((entry) => ({
     slotId: entry.slotId,
     type: entry.type,

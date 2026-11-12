@@ -8,6 +8,7 @@ import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMute
 import { phaseNumberFromWave, waveInPhase, WAVES_PER_PHASE } from "@/config/wavePhase";
 import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config/phaseConfig";
 import { riftRewardPct } from "@/config/rifts";
+import { romanDepth } from "@/config/eternal";
 import { BrandLogo } from "./BrandLogo";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
 import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
@@ -30,9 +31,11 @@ interface HUDProps {
   onToggleTalents?: () => void;
   /** BESTIÁRIO E CONQUISTAS — opens the bestiary panel. */
   onToggleBestiary?: () => void;
+  /** MODO ETERNO — opens the Eternal panel (only shown in the Eternal castle). */
+  onToggleEternal?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -58,6 +61,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
 
         <div className="hh-wave" title={t("hud.checkpointTooltip", { onda, total: WAVES_PER_PHASE })}>
           <div className="hh-wave-top">
+            {hud.eternal.active && (
+              <span className="hh-eternal" title={t("eternal.tooltip")}>
+                {t("eternal.badge")}
+                {hud.eternal.depth > 0 ? ` · ${romanDepth(hud.eternal.depth)}` : ""}
+              </span>
+            )}
             <span className="hh-wave-phase">{t("hud.phaseLabel", { phase: phaseNumberFromWave(hud.wave) })}</span>
             <span className="hh-wave-onda">{t("hud.waveOfPhase", { onda, total: WAVES_PER_PHASE })}</span>
           </div>
@@ -153,6 +162,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <ScrollIcon size={13} />
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
+            </button>
+          )}
+          {onToggleEternal && hud.eternal.active && (
+            <button onClick={onToggleEternal} className="hh-btn hh-rift" data-testid="eternal-button" title={t("eternal.tooltip")}>
+              <span aria-hidden="true" className="hh-rift-glyph">◆</span>
+              <span className="hh-btn-txt">{t("eternal.button")}</span>
+              {hud.eternal.contractsReady > 0 && <span className="hh-badge is-rift">{hud.eternal.contractsReady}</span>}
             </button>
           )}
           {onToggleTalents && (
@@ -434,6 +450,7 @@ div.hh-brand { cursor: default; }
 
 .hh-wave { min-width: 190px; cursor: help; }
 .hh-wave-top { display: flex; align-items: baseline; gap: 8px; white-space: nowrap; }
+.hh-eternal { align-self: center; padding: 1px 6px; border-radius: 4px; border: 1px solid #8a5cc8; background: rgba(140,90,210,0.22); color: #e3cdff; font-size: 10px; font-weight: 800; letter-spacing: 0.8px; }
 .hh-wave-phase { font-family: Georgia, 'Times New Roman', serif; font-size: 17px; font-weight: 700; color: ${PALETTE.uiAccentBright}; letter-spacing: 0.4px; }
 .hh-wave-onda { font-size: 13px; font-weight: 700; color: ${PALETTE.uiText}; }
 .hh-wave-place { font-size: 10px; color: ${PALETTE.uiTextDim}; margin-top: 3px; white-space: nowrap; }

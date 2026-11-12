@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { loadSave } from "@/engine/SaveSystem";
+import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
+import { depthOfWave, romanDepth } from "@/config/eternal";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
@@ -18,6 +19,8 @@ import { SeasonPassSection } from "@/ui/SeasonPassSection";
 interface SeasonScreenProps {
   onNavigate: (view: NavView) => void;
   onPlay: () => void;
+  /** MODO ETERNO — opens the Eternal castle. */
+  onPlayEternal?: () => void;
 }
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
@@ -40,7 +43,7 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
  * the top five will earn. No backend yet, so nothing about other players
  * is ever invented (same stance as RankingScreen.tsx).
  */
-export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
+export function SeasonScreen({ onNavigate, onPlay, onPlayEternal }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
@@ -53,6 +56,7 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
   }, []);
 
   const save = useMemo(() => loadSave(), [refreshTick]);
+  const eternalCastle = useMemo(() => loadEternalCastle(), [refreshTick]);
   const status = useMemo(() => getAscensionStatus(), [refreshTick]);
   const elapsed = Math.max(0, SEASON_DURATION_MS - status.timeRemainingMs);
   const progress = Math.min(1, elapsed / SEASON_DURATION_MS);
@@ -73,7 +77,7 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
 
   return (
     <div className="pg-root">
-      <style>{PAGE_CSS}</style>
+      <style>{PAGE_CSS + ETERNAL_CSS}</style>
       <TopNav active="SEASON" onNavigate={onNavigate} onPlay={onPlay} />
       <div className="pg-scroll">
         <header className="pg-hero">
@@ -131,6 +135,36 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
               <dd>{save.ascensionTop5}</dd>
             </div>
           </dl>
+
+          {onPlayEternal && (
+            <section className="et-card" data-testid="eternal-card">
+              <div className="et-text">
+                <p className="et-kicker">{t("eternal.kicker")}</p>
+                <h2 className="pg-h2">{t("eternal.title")}</h2>
+                <p className="pg-sub">{t("eternal.lead")}</p>
+                <dl className="et-figs">
+                  <div>
+                    <dt>{t("eternal.record")}</dt>
+                    <dd>{eternalCastle && eternalCastle.seasonBestWave > 0 ? t("eternal.waveN", { n: eternalCastle.seasonBestWave }) : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("eternal.depth")}</dt>
+                    <dd>{eternalCastle ? romanDepth(depthOfWave(Math.max(1, eternalCastle.currentWave))) : "—"}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("eternal.marks")}</dt>
+                    <dd>{save.eternal.marks.toLocaleString(locale)}</dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="et-actions">
+                <button className="pg-btn" onClick={onPlayEternal} data-testid="play-eternal">
+                  {eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start")}
+                </button>
+                <small>{t("eternal.mergeNote")}</small>
+              </div>
+            </section>
+          )}
 
           <SeasonPassSection />
 
@@ -243,3 +277,15 @@ export function SeasonScreen({ onNavigate, onPlay }: SeasonScreenProps) {
     </div>
   );
 }
+
+const ETERNAL_CSS = `
+.et-card { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; margin: 32px 0 8px; padding: 22px 24px; border-radius: 12px;
+  border: 1px solid rgba(180,124,255,0.4); background: linear-gradient(135deg, rgba(48,28,66,0.75), rgba(20,14,24,0.85)); }
+.et-kicker { margin: 0 0 4px; font-size: 12px; font-weight: 700; color: #c9a2ff; }
+.et-figs { display: flex; gap: 28px; margin: 14px 0 0; flex-wrap: wrap; }
+.et-figs dt { font-size: 12px; color: var(--ash); }
+.et-figs dd { margin: 2px 0 0; font-family: var(--display); font-size: 22px; color: #e3cdff; }
+.et-actions { display: grid; gap: 8px; justify-items: center; text-align: center; max-width: 260px; }
+.et-actions small { color: var(--ash); font-size: 12px; line-height: 1.4; }
+@media (max-width: 720px) { .et-card { grid-template-columns: 1fr; } .et-actions { justify-items: stretch; max-width: none; } }
+`;

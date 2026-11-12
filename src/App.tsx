@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { MainMenu } from "./screens/MainMenu";
-import { GameScreen } from "./screens/GameScreen";
+import { GameScreen, type GameMode } from "./screens/GameScreen";
+import { syncSeasonIfNeeded } from "./engine/AscensionManager";
 import { SeasonScreen } from "./screens/SeasonScreen";
 import { RankingScreen } from "./screens/RankingScreen";
 import { WikiScreen } from "./screens/WikiScreen";
@@ -20,6 +21,18 @@ type View = NavView | "GAME";
 
 export default function App() {
   const [view, setView] = useState<View>("HOME");
+  // MODO ETERNO — which castle the game screen plays.
+  const [mode, setMode] = useState<GameMode>("SEASON");
+  const playSeason = () => {
+    setMode("SEASON");
+    setView("GAME");
+  };
+  const playEternal = () => {
+    // a Season that ended joins the Eternal castle before that castle is opened
+    syncSeasonIfNeeded();
+    setMode("ETERNAL");
+    setView("GAME");
+  };
 
   const navigate = (next: NavView) => setView(next);
 
@@ -66,14 +79,14 @@ export default function App() {
   return (
     <LanguageProvider>
       {view === "GAME" ? (
-        <GameScreen onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
+        <GameScreen key={mode} mode={mode} onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
       ) : view === "SEASON" ? (
         // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the ONLY "JOGAR"
         // that goes straight into gameplay: the player is already looking
         // at the current Season (name/theme/timer/best/ranking) before this
         // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
         // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
-        <SeasonScreen onNavigate={navigate} onPlay={() => setView("GAME")} />
+        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={playEternal} />
       ) : view === "RANKING" ? (
         <RankingScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "WIKI" ? (

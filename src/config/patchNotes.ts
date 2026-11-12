@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v101",
+    dateIso: "2026-11-11",
+    category: "CONTENT",
+    title: {
+      en: "New Mode — The Eternal Castle",
+      ptBR: "Novo Modo: o Castelo Eterno",
+    },
+    description: {
+      en: "Besides the Season, every account now has an Eternal castle that never resets. Play it whenever you like from the Season page: it goes on forever, with goals along the way. At the end of each Season, your Season castle joins it, so nothing you built is lost.",
+      ptBR: "Além da Season, toda conta agora tem um castelo Eterno que nunca zera. Jogue quando quiser pela página da Season: ele não tem fim e tem objetivos pelo caminho. No fim de cada Season, o castelo da Season se junta a ele, então nada do que você construiu se perde.",
+    },
+    highlights: [
+      {
+        en: "Season end: each tower keeps the higher level between the two castles, Mastery and Mana keep the higher level, and the gold of both is added up.",
+        ptBR: "Fim de Season: cada torre fica com o nível mais alto entre os dois castelos, Maestria e Mana também, e o ouro dos dois é somado.",
+      },
+      {
+        en: "Depths every 100 waves: the map grows more corrupted and the first time you reach each depth you earn Eternal Marks.",
+        ptBR: "Profundidades a cada 100 ondas: o mapa fica mais corrompido e a primeira vez que você chega em cada uma rende Marcas Eternas.",
+      },
+      {
+        en: "A reward every 50 waves of your Eternal record: Eternal Marks and Gem Shards.",
+        ptBR: "Um prêmio a cada 50 ondas do seu recorde Eterno: Marcas Eternas e Fragmentos de Gema.",
+      },
+      {
+        en: "Three weekly contracts, the same for everyone, renewed every Monday.",
+        ptBR: "Três contratos por semana, iguais para todos, renovados toda segunda-feira.",
+      },
+      {
+        en: "The Eternal Merchant trades Marks for Gem Shards, Rift charges and item rolls on the Rift table.",
+        ptBR: "O Mercador Eterno troca Marcas por Fragmentos de Gema, cargas de Fenda e sorteios de item na tabela das Fendas.",
+      },
+    ],
+  },
+  {
     id: "v100",
     dateIso: "2026-11-11",
     category: "SYSTEMS",

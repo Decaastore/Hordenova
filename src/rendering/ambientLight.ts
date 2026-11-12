@@ -558,3 +558,31 @@ export function drawLightningFlash(ctx: CanvasRenderingContext2D, bounds: Visibl
   ctx.fillRect(bounds.x0, bounds.y0, bounds.x1 - bounds.x0, bounds.y1 - bounds.y0);
   ctx.restore();
 }
+
+/**
+ * MODO ETERNO — a corrupted map for each depth below the first 100 waves:
+ * a violet-crimson cast over the ground and a slow, dark red pulse at the
+ * edges, a little stronger with each depth (capped so creatures stay
+ * readable). Drawn right after the grade, before lights and effects.
+ */
+export function drawCorruption(ctx: CanvasRenderingContext2D, bounds: VisibleBounds, depth: number, timeMs: number): void {
+  if (depth <= 0) return;
+  const k = Math.min(1, 0.45 + depth * 0.15);
+  const w = bounds.x1 - bounds.x0;
+  const h = bounds.y1 - bounds.y0;
+  const pulse = 0.85 + 0.15 * Math.sin(timeMs / 2200);
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = `rgba(${Math.round(255 - 40 * k)},${Math.round(255 - 75 * k)},${Math.round(255 - 30 * k)},1)`;
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.fillStyle = `rgba(120,30,90,${0.28 * k})`;
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  ctx.globalCompositeOperation = "source-over";
+  const v = ctx.createRadialGradient(500, 300, 260, 500, 300, 760);
+  v.addColorStop(0, "rgba(90,0,30,0)");
+  v.addColorStop(1, `rgba(90,0,30,${0.32 * k * pulse})`);
+  ctx.fillStyle = v;
+  ctx.fillRect(bounds.x0, bounds.y0, w, h);
+  ctx.restore();
+}

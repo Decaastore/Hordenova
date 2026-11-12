@@ -1,3 +1,4 @@
+import { createEternalState, sanitizeEternalState, type EternalState } from "@/config/eternal";
 import { createAgeVerification, sanitizeAgeVerification, type AgeVerification } from "@/config/ageGate";
 import { isAchievementId, sanitizeBestiaryKills, type AchievementId, type BestiaryKills } from "@/config/achievements";
 import { sanitizeTalentRanks, type TalentRanks } from "@/config/talents";
@@ -262,6 +263,8 @@ export interface SaveData {
   rift: RiftState;
   /** ÁRVORE DE TALENTOS — ranks per talent (config/talents.ts). Season-scoped. */
   talents: TalentRanks;
+  /** MODO ETERNO — marks, depth/milestone rewards paid, this week's contracts (config/eternal.ts). Account-level, permanent. */
+  eternal: EternalState;
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -372,6 +375,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   rift: createRiftState(),
   talents: {},
   ageVerification: createAgeVerification(),
+  eternal: createEternalState(0),
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -756,19 +760,10 @@ function parseEquippedTowerSkinByType(raw: unknown): Partial<Record<TowerType, s
   return result;
 }
 
-/** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
-export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
-  if (!isStorageAvailable()) return { ...emptySaveData(), playerId: generateId("player") };
 
-  try {
-    const raw = window.localStorage.getItem(storageKey);
-    if (!raw) {
-      const fresh = { ...emptySaveData(), playerId: generateId("player") };
-      writeSave(fresh, storageKey);
-      return fresh;
-    }
-
-    const parsed = JSON.parse(raw) as Partial<SaveData>;
+/** Builds a valid SaveData from a parsed (possibly old or broken) save object — every field sanitized. Shared by the main save and the Eternal castle view. */
+function parseSaveObject(parsed: Partial<SaveData>): SaveData {
+  {
     // HORDENOVA Season/Progression v1.0 (save v15 -> v16) — a save written
     // before this migration never had masteryUnlocked/unlockedSpecializationIds
     // at all, so its existing (permanent, pre-split) progress must be
@@ -924,6 +919,7 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       riftsCleared: typeof parsed.riftsCleared === "number" && Number.isFinite(parsed.riftsCleared) ? Math.max(0, Math.floor(parsed.riftsCleared)) : 0,
       bestRarityFound: typeof parsed.bestRarityFound === "number" && Number.isFinite(parsed.bestRarityFound) ? Math.max(-1, Math.min(5, Math.floor(parsed.bestRarityFound))) : -1,
       ageVerification: sanitizeAgeVerification(parsed.ageVerification),
+      eternal: sanitizeEternalState(parsed.eternal),
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as
@@ -940,6 +936,25 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
       // every other additive migration in this function.
       activeTradeSession: parseActiveTradeSession(parsed.activeTradeSession),
     };
+    return result;
+  }
+}
+
+/** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
+export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
+  if (storageKey === ETERNAL_STORAGE_KEY) return loadEternalView();
+  if (!isStorageAvailable()) return { ...emptySaveData(), playerId: generateId("player") };
+
+  try {
+    const raw = window.localStorage.getItem(storageKey);
+    if (!raw) {
+      const fresh = { ...emptySaveData(), playerId: generateId("player") };
+      writeSave(fresh, storageKey);
+      return fresh;
+    }
+
+    const parsed = JSON.parse(raw) as Partial<SaveData>;
+    const result = parseSaveObject(parsed);
     if (result.playerId !== parsed.playerId) writeSave(result, storageKey);
     return result;
   } catch {
@@ -949,6 +964,10 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
 
 export function writeSave(data: SaveData, storageKey: string = SAVE_STORAGE_KEY): void {
   if (!isStorageAvailable()) return;
+  if (storageKey === ETERNAL_STORAGE_KEY) {
+    writeEternalView(data);
+    return;
+  }
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(data));
   } catch {
@@ -990,4 +1009,90 @@ function sanitizeItemRolls<T extends { itemDefinitionId: string; rolls?: unknown
     return typeof v === "number" && Number.isFinite(v) && v >= min - 1e-9 && v <= max + 1e-9 ? v : effect.value;
   });
   return { ...item, rolls };
+}
+
+
+// ---------------------------------------------------------------------------
+// MODO ETERNO — a second castle on the same account. The account (gems,
+// items, skins, bestiary, achievements, pass, prestige…) is ONE save under
+// SAVE_STORAGE_KEY; the Eternal castle only keeps its own castle progress
+// (CASTLE_FIELDS) under ETERNAL_STORAGE_KEY. A GameEngine pointed at
+// ETERNAL_STORAGE_KEY reads the account with the Eternal castle laid over it
+// and, on every write, puts the account part back into the main save and the
+// castle part into the Eternal one — so nothing account-wide can drift
+// between the two castles. In the Eternal view `seasonBestWave` is the
+// Eternal record (it never resets).
+// ---------------------------------------------------------------------------
+export const ETERNAL_STORAGE_KEY = "hordenova.eternal.save.v1";
+
+export const CASTLE_FIELDS = [
+  "currentWave",
+  "gold",
+  "towerLoadout",
+  "mapLayoutId",
+  "seasonBestWave",
+  "towerMasteryLevels",
+  "towerManaLevels",
+  "castleHpBonus",
+  "hordeAdaptation",
+  "city",
+  "rift",
+  "talents",
+  "bossSiege",
+] as const satisfies readonly (keyof SaveData)[];
+
+export type CastleFields = Pick<SaveData, (typeof CASTLE_FIELDS)[number]>;
+
+export function pickCastle(data: SaveData): CastleFields {
+  return Object.fromEntries(CASTLE_FIELDS.map((k) => [k, data[k]])) as CastleFields;
+}
+
+/** A brand-new Eternal castle: wave 1, starting gold, no towers. */
+export function freshCastle(): CastleFields {
+  return pickCastle({ ...emptySaveData(), playerId: "" });
+}
+
+function readEternalRaw(): Record<string, unknown> | null {
+  if (!isStorageAvailable()) return null;
+  try {
+    const raw = window.localStorage.getItem(ETERNAL_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Does this account already have an Eternal castle? */
+export function hasEternalCastle(): boolean {
+  return readEternalRaw() !== null;
+}
+
+function loadEternalView(): SaveData {
+  const main = loadSave(SAVE_STORAGE_KEY);
+  const raw = readEternalRaw();
+  const castle: Record<string, unknown> = raw ? Object.fromEntries(CASTLE_FIELDS.filter((k) => k in raw).map((k) => [k, raw[k]])) : { ...freshCastle() };
+  return parseSaveObject({ ...(JSON.parse(JSON.stringify(main)) as Partial<SaveData>), ...(castle as Partial<SaveData>) });
+}
+
+function writeEternalView(data: SaveData): void {
+  const main = loadSave(SAVE_STORAGE_KEY);
+  const account: SaveData = { ...data };
+  for (const k of CASTLE_FIELDS) (account as unknown as Record<string, unknown>)[k] = main[k];
+  writeSave(account, SAVE_STORAGE_KEY);
+  writeEternalCastle(pickCastle(data));
+}
+
+export function writeEternalCastle(castle: CastleFields): void {
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.setItem(ETERNAL_STORAGE_KEY, JSON.stringify(castle));
+  } catch {
+    /* storage full — the castle simply won't persist this session */
+  }
+}
+
+/** The Eternal castle as it stands (sanitized), or null when the account has none yet. */
+export function loadEternalCastle(): CastleFields | null {
+  if (!hasEternalCastle()) return null;
+  return pickCastle(loadEternalView());
 }

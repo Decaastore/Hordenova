@@ -1,7 +1,7 @@
 import { LootFx } from "./lootFx";
 import type { ProjectileInstance } from "@/entities/Projectile";
 import { CombatFx, preloadCombatFxArt } from "./combatFx";
-import { drawGrimGrade, drawGroundMist, drawLightningFlash, drawWeather, drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
+import { drawCorruption, drawGrimGrade, drawGroundMist, drawLightningFlash, drawWeather, drawFireflies, drawLighting, drawSkyLife, drawSunShafts, rgbOf, timeOfDay, type LightSource } from "./ambientLight";
 import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
 import { getCityPlots } from "@/data/cityPlots";
@@ -618,6 +618,7 @@ export function CanvasRenderer({
         const tod = timeOfDay(Date.now());
         // CLIMA SOMBRIO — grade the world cold and heavy first; lights and effects drawn after stay vivid.
         drawGrimGrade(ctx, biome, visibleBounds);
+        drawCorruption(ctx, visibleBounds, snapshot.depth, timestamp);
         drawGroundMist(ctx, visibleBounds, tod, timestamp);
         drawSunShafts(ctx, biome, visibleBounds, tod, timestamp);
         const lights: LightSource[] = [];

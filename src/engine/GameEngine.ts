@@ -1,7 +1,9 @@
+import { claimableMilestones, contractsForWeek, depthOfWave, depthReward, MERCHANT_OFFERS, milestoneReward, rollWeek, SHARD_POUCH_AMOUNT, type EternalState, type MerchantOfferId, createEternalState } from "@/config/eternal";
+import { ETERNAL_STORAGE_KEY } from "./SaveSystem";
 import { bestiaryStats, reachedAchievements, type AchievementId, type AchievementStats, type BestiaryKills } from "@/config/achievements";
 import { RARITY_DEFINITIONS } from "@/config/rarity";
 import { canRaiseTalent, LAST_STAND_HP_FRACTION, sanitizeTalentRanks, talentBonus, talentPointsFree, type TalentId, type TalentRanks } from "@/config/talents";
-import { chargeAfterWave, createRiftState, riftReward, RIFT_DROP_TABLE_ID, RIFT_FRAGILE_BREACH, RIFT_HASTE_SPEED, RIFT_TOUGH_HP, withHordeExtra, type RiftModId, type RiftReward, type RiftState } from "@/config/rifts";
+import { chargeAfterWave, MAX_RIFT_CHARGES, createRiftState, riftReward, RIFT_DROP_TABLE_ID, RIFT_FRAGILE_BREACH, RIFT_HASTE_SPEED, RIFT_TOUGH_HP, withHordeExtra, type RiftModId, type RiftReward, type RiftState } from "@/config/rifts";
 import { ELITE_SHARD_DROP_AMOUNT, ELITE_SHARD_DROP_CHANCE, MAX_RECENT_LOOT, shardPileRarity, type LootDrop } from "@/config/loot";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { phaseNumberFromWave, phaseStartWave } from "@/config/wavePhase";
@@ -241,6 +243,14 @@ export interface HudSnapshot {
     goldShare: number;
     lastEvent: { seq: number; kind: "BUILT" | "BURNED" | "REBUILT" | "INCOME"; ids: readonly CityBuildingId[]; amount: number } | null;
   };
+  /** MODO ETERNO — whether this is the Eternal castle, its marks, depth and the latest depth/milestone reward (seq bumps). */
+  eternal: {
+    active: boolean;
+    marks: number;
+    depth: number;
+    lastEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null;
+    contractsReady: number;
+  };
   /** CONQUISTAS — the latest achievement unlocked (seq bumps) and the title worn. */
   achievement: { last: { seq: number; id: AchievementId } | null; title: AchievementId | null; count: number };
   /** ÁRVORE DE TALENTOS — ranks and points still free. */
@@ -329,6 +339,8 @@ export interface RenderSnapshot {
   mapLayoutId: string;
   /** Recent loot that fell on the map (config/loot.ts), newest last. */
   lootDrops: readonly LootDrop[];
+  /** MODO ETERNO — the depth being fought (0 outside the Eternal castle); deeper maps are drawn corrupted. */
+  depth: number;
 }
 
 function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
@@ -384,6 +396,10 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.achievement.last?.seq === b.achievement.last?.seq &&
     a.achievement.title === b.achievement.title &&
     a.achievement.count === b.achievement.count &&
+    a.eternal.marks === b.eternal.marks &&
+    a.eternal.depth === b.eternal.depth &&
+    a.eternal.lastEvent?.seq === b.eternal.lastEvent?.seq &&
+    a.eternal.contractsReady === b.eternal.contractsReady &&
     JSON.stringify(a.rift.armed) === JSON.stringify(b.rift.armed) &&
     a.rift.active?.wave === b.rift.active?.wave &&
     a.rift.lastResult?.seq === b.rift.lastResult?.seq &&
@@ -542,6 +558,8 @@ export class GameEngine {
   private city: CityState = createCityState();
   private rift: RiftState = createRiftState();
   private talents: TalentRanks = {};
+  private eternal: EternalState = createEternalState();
+  private lastEternalEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null = null;
   private bestiaryKills: BestiaryKills = {};
   private achievements: AchievementId[] = [];
   private equippedTitle: AchievementId | null = null;
@@ -660,6 +678,7 @@ export class GameEngine {
     this.hordeAdaptation = { memory: { ...save.hordeAdaptation.memory }, multipliers: { ...save.hordeAdaptation.multipliers } };
     this.city = { burning: { ...save.city.burning }, firesStarted: save.city.firesStarted };
     this.talents = sanitizeTalentRanks(save.talents, save.seasonBestWave);
+    this.eternal = rollWeek(save.eternal, Date.now());
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
@@ -2284,7 +2303,92 @@ export class GameEngine {
     this.itemBonusDirty = true;
     this.lastRiftResult = { seq: (this.lastRiftResult?.seq ?? 0) + 1, won: true, reward };
     this.riftsCleared += 1;
+    this.bumpContract("RIFTS", 1, (c) => active.mods.length >= (c.minCurses ?? 0));
     this.checkAchievements();
+  }
+
+  /** MODO ETERNO — this engine plays the Eternal castle (see SaveSystem's ETERNAL_STORAGE_KEY). */
+  get isEternal(): boolean {
+    return this.storageKey === ETERNAL_STORAGE_KEY;
+  }
+
+  private bumpContract(kind: string, amount = 1, match?: (c: ReturnType<typeof contractsForWeek>[number]) => boolean): void {
+    if (!this.isEternal) return;
+    this.eternal = rollWeek(this.eternal, Date.now());
+    for (const c of contractsForWeek(this.eternal.week)) {
+      if (c.kind !== kind || (match && !match(c))) continue;
+      const cur = this.eternal.progress[c.id] ?? 0;
+      if (cur >= c.target) continue;
+      this.eternal = { ...this.eternal, progress: { ...this.eternal.progress, [c.id]: Math.min(c.target, cur + amount) } };
+    }
+  }
+
+  /** This week's three contracts with progress, done and claimed flags. */
+  getEternalContracts() {
+    const week = rollWeek(this.eternal, Date.now()).week;
+    return contractsForWeek(week).map((c) => {
+      const progress = week === this.eternal.week ? (this.eternal.progress[c.id] ?? 0) : 0;
+      return { ...c, progress, done: progress >= c.target, claimed: week === this.eternal.week && this.eternal.claimed.includes(c.id) };
+    });
+  }
+
+  getEternalState(): Readonly<EternalState> {
+    return this.eternal;
+  }
+
+  /** Pays a finished contract's Eternal Marks (once). */
+  claimEternalContract(id: string): boolean {
+    if (!this.isEternal) return false;
+    this.eternal = rollWeek(this.eternal, Date.now());
+    const c = this.getEternalContracts().find((x) => x.id === id);
+    if (!c || !c.done || c.claimed) return false;
+    this.eternal = { ...this.eternal, marks: this.eternal.marks + c.marks, claimed: [...this.eternal.claimed, id] };
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Buys from the Eternal Merchant with Marks. Returns the item granted by a relic roll, if any. */
+  buyFromMerchant(id: MerchantOfferId): boolean {
+    const offer = MERCHANT_OFFERS.find((o) => o.id === id);
+    if (!offer || this.eternal.marks < offer.price) return false;
+    if (id === "RIFT_SCROLL" && this.rift.charges >= MAX_RIFT_CHARGES) return false;
+    this.eternal = { ...this.eternal, marks: this.eternal.marks - offer.price };
+    if (id === "SHARD_POUCH") this.addGemShards(SHARD_POUCH_AMOUNT, "eternal_merchant");
+    else if (id === "RIFT_SCROLL") this.rift = { ...this.rift, charges: this.rift.charges + 1 };
+    else {
+      const table = getDropTable(RIFT_DROP_TABLE_ID);
+      if (table) {
+        const item = createItemInstance(rollDropTable(table), this.playerId, { type: "MINI_BOSS_DROP", refId: "eternal_merchant" });
+        const result = addItemWithCapacity(this.inventory, this.overflowInventory, item, this.inventoryCapacity);
+        this.inventory = result.inventory;
+        this.overflowInventory = result.overflow;
+        this.pendingItemRewards.push(item);
+        appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "eternal_merchant", eventType: "ITEM_CREATED", fromOwner: null, toOwner: this.playerId });
+        appendLedgerEvent({ itemInstanceId: item.instanceId, itemDefinitionId: item.itemDefinitionId, source: "eternal_merchant", eventType: "ITEM_ACQUIRED", fromOwner: null, toOwner: this.playerId });
+      }
+    }
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Depth and wave-milestone rewards of the Eternal record — paid automatically when reached. */
+  private payEternalRecordRewards(): void {
+    if (!this.isEternal) return;
+    const depth = depthOfWave(this.seasonBestWave);
+    while (this.eternal.depthRewarded < depth) {
+      const d = this.eternal.depthRewarded + 1;
+      const marks = depthReward(d);
+      this.eternal = { ...this.eternal, depthRewarded: d, marks: this.eternal.marks + marks };
+      this.lastEternalEvent = { seq: (this.lastEternalEvent?.seq ?? 0) + 1, kind: "DEPTH", value: d, marks, shards: 0 };
+    }
+    for (const n of claimableMilestones(this.seasonBestWave, this.eternal.milestonesClaimed)) {
+      const r = milestoneReward(n);
+      this.eternal = { ...this.eternal, milestonesClaimed: n, marks: this.eternal.marks + r.marks };
+      this.addGemShards(r.shards, "eternal_milestone");
+      this.lastEternalEvent = { seq: (this.lastEternalEvent?.seq ?? 0) + 1, kind: "MILESTONE", value: n * 50, marks: r.marks, shards: r.shards };
+    }
   }
 
   private lootDrops: LootDrop[] = [];
@@ -2547,11 +2651,13 @@ export class GameEngine {
         this.trackMission("KILL_ENEMIES");
         if (enemy.boss && !enemy.boss.isMainBoss) {
           this.trackMission("DEFEAT_MINI_BOSSES");
+          this.bumpContract("MINI_BOSSES");
           this.addPassXp("MINI_BOSS");
         }
         if (enemy.boss?.isMainBoss) this.addPassXp("MAIN_BOSS");
         recordKill(this.battleStats, enemy);
         this.bestiaryKills[enemy.type] = (this.bestiaryKills[enemy.type] ?? 0) + 1;
+        this.bumpContract("KILL_FAMILY", 1, (c) => c.family === ENEMY_VOICE_FAMILY[enemy.type]);
         const tier = this.classifyEnemyTier(enemy);
         const flavor = enemy.burn ? "fire" : enemy.slow?.percent === 1 ? "ice" : undefined;
         this.emitAudio({ type: "enemy_death", tier, flavor, family: ENEMY_VOICE_FAMILY[enemy.type] });
@@ -2690,6 +2796,9 @@ export class GameEngine {
     if (this.lastFinishedWave === wave) return;
     this.lastFinishedWave = wave;
 
+    this.bumpContract("CLEAR_WAVES");
+    if (!this.waveLeaked) this.bumpContract("CLEAN_WAVES");
+    this.payEternalRecordRewards();
     if (this.rift.active && this.rift.active.wave === wave) this.completeRift();
     this.checkAchievements();
     const repair = talentBonus(this.talents).castleRepairPct;
@@ -3161,6 +3270,7 @@ export class GameEngine {
         city: this.city,
         rift: this.rift,
         talents: this.talents,
+        eternal: this.eternal,
         bestiaryKills: this.bestiaryKills,
         achievements: this.achievements,
         equippedTitle: this.equippedTitle,
@@ -3228,6 +3338,13 @@ export class GameEngine {
       rift: { charges: this.rift.charges, armed: this.rift.armed, active: this.rift.active, lastResult: this.lastRiftResult },
       talents: { ranks: this.talents, free: talentPointsFree(this.talents, this.seasonBestWave) },
       achievement: { last: this.lastAchievement, title: this.equippedTitle, count: this.achievements.length },
+      eternal: {
+        active: this.isEternal,
+        marks: this.eternal.marks,
+        depth: this.isEternal ? depthOfWave(this.wave.currentWave) : 0,
+        lastEvent: this.lastEternalEvent,
+        contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
+      },
     };
 
     const prev = this.cachedHud;
@@ -3247,6 +3364,7 @@ export class GameEngine {
       biomeId: getPhaseForWave(this.wave.currentWave).biomeId,
       mapLayoutId: this.layout.id,
       lootDrops: this.lootDrops,
+      depth: this.isEternal ? depthOfWave(this.wave.currentWave) : 0,
     };
   }
 }
