@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v124",
+    dateIso: "2026-11-12",
+    category: "ITEMS",
+    title: {
+      en: "Season Pass: items equip again, and the Supreme Pass",
+      ptBR: "Passe da Season: itens voltam a equipar, e chega o Passe Supremo",
+    },
+    description: {
+      en: "Pass items can be equipped again. They still can't be sold or traded, but a successful Fusion with them gives a normal item that can. The regular Pass now only gives Common and Uncommon items; Rare, Epic and Legendary items come only in the new Supreme Pass.",
+      ptBR: "Os itens do Passe voltam a poder ser equipados. Eles continuam sem poder ser vendidos ou trocados, mas uma Fusão que dá certo com eles gera um item normal, que pode. O Passe normal agora só dá itens Comuns e Incomuns; Raros, Épicos e Lendários vêm só no novo Passe Supremo.",
+    },
+    highlights: [
+      {
+        en: "Free track: an Uncommon item on levels 5, 15, 25 and 30. Premium track: two Uncommon items on levels 10 and 20, so you can gather three for a Fusion.",
+        ptBR: "Trilha Grátis: um item Incomum nos níveis 5, 15, 25 e 30. Trilha Premium: dois itens Incomuns nos níveis 10 e 20, para juntar três numa Fusão.",
+      },
+      {
+        en: "Supreme Pass (R$ 49,90): everything in Premium plus its own track with Rare items (5, 15, 25), Epic items (10, 20) and a Legendary item with 15 Gems at level 30. On sale only in the first week of each Season. Like Premium, it unlocks once Pix and card payments arrive.",
+        ptBR: "Passe Supremo (R$ 49,90): tudo do Premium e mais uma trilha própria com itens Raros (5, 15, 25), Épicos (10, 20) e um Lendário com 15 Gemas no nível 30. À venda só na primeira semana de cada Season. Como o Premium, libera quando chegar o pagamento por Pix e cartão.",
+      },
+    ],
+  },
+  {
     id: "v123",
     dateIso: "2026-11-12",
     category: "ITEMS",

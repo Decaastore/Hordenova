@@ -33,7 +33,7 @@ import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getRarityDefinition } from "@/config/rarity";
-import { isPassItem, type ItemInstance } from "@/entities/Item";
+import type { ItemInstance } from "@/entities/Item";
 import { PALETTE, TOWER_THEME } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -432,16 +432,9 @@ function EquipmentPicker({
   onPick: (instanceId: string) => void;
 }) {
   const eligible = inventory.filter((item) => canEquipToSlot(item.instanceId, slotIndex));
-  const hasPassItems = inventory.some((item) => isPassItem(item));
-  const passHint = hasPassItems ? <div style={equipmentPickerEmptyStyle}>{t("towerInfo.equipment.passHint")}</div> : null;
 
   if (eligible.length === 0) {
-    return (
-      <>
-        <div style={equipmentPickerEmptyStyle}>{t("towerInfo.equipment.noItems")}</div>
-        {passHint}
-      </>
-    );
+    return <div style={equipmentPickerEmptyStyle}>{t("towerInfo.equipment.noItems")}</div>;
   }
 
   return (
@@ -461,7 +454,6 @@ function EquipmentPicker({
           </button>
         );
       })}
-      {passHint}
     </div>
   );
 }

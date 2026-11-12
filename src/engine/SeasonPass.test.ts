@@ -72,8 +72,8 @@ describe("Season Pass", () => {
   });
 });
 
-describe("Season Pass items are Fusion material only", () => {
-  it("can't be equipped, but fusing them gives a normal item that can be sold and traded", async () => {
+describe("Season Pass items: equip and fuse, never sell or trade", () => {
+  it("can be equipped, and fusing them gives a normal item that can be sold and traded", async () => {
     const { vi } = await import("vitest");
     const { createItemInstance } = await import("@/entities/Item");
     const { canEquipItem, createTowerInstance } = await import("@/entities/Tower");
@@ -87,7 +87,8 @@ describe("Season Pass items are Fusion material only", () => {
     });
     const tower = createTowerInstance("t", "IRONWOOD", { x: 0, y: 0 }, 10);
     tower.unlockedItemSlots = [true, true, true];
-    expect(canEquipItem(tower, 0, passItems[0]!, false)).toBe(false);
+    expect(canEquipItem(tower, 0, passItems[0]!, false)).toBe(true);
+    expect(passItems[0]!.tradable).toBe(false);
 
     updateSave({ inventory: passItems, overflowInventory: [] });
     const engine = new GameEngine();
@@ -100,5 +101,21 @@ describe("Season Pass items are Fusion material only", () => {
     expect(result).toBeTruthy();
     expect(result.tradable).toBe(getItemDefinition(result.itemDefinitionId)!.tradable);
     expect(canEquipItem(tower, 0, result, false)).toBe(true);
+  });
+});
+
+describe("Season Pass item rarities", () => {
+  it("the regular pass (free and premium) only gives items below Rare; Rare and up come only from the Supreme pass", async () => {
+    const { supremeRewardForLevel, supremeOnSale, SUPREME_SALE_DAYS } = await import("@/config/seasonPass");
+    const low = new Set(["COMMON", "UNCOMMON"]);
+    for (let level = 1; level <= PASS_LEVELS; level++) {
+      for (const part of [...freeRewardForLevel(level), ...premiumRewardForLevel(level, 5)]) if (part.kind === "ITEM") expect(low.has(part.rarity)).toBe(true);
+    }
+    const supreme = Array.from({ length: PASS_LEVELS }, (_, i) => supremeRewardForLevel(i + 1)).flat().filter((p) => p.kind === "ITEM").map((p) => (p as { rarity: string }).rarity);
+    expect(supreme).toContain("EPIC");
+    expect(supreme).toContain("LEGENDARY");
+    const DAY = 86_400_000;
+    expect(supremeOnSale({ startAtMs: 0 }, 2 * DAY)).toBe((SUPREME_SALE_DAYS - 2) * DAY);
+    expect(supremeOnSale({ startAtMs: 0 }, SUPREME_SALE_DAYS * DAY)).toBeNull();
   });
 });

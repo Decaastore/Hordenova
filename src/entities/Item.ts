@@ -57,10 +57,9 @@ export function createItemInstance(itemDefinitionId: string, ownerId: string, so
 }
 
 /**
- * SEASON PASS items are FUSION MATERIAL ONLY: they can't be equipped on a
- * tower, sold on the Marketplace or traded (they arrive account-bound). Fusing
- * them is the way to use them — and a successful Fusion's result is a normal
- * item, free to equip, sell or trade (GameEngine.fuseItems).
+ * SEASON PASS items arrive account-bound: they can be equipped and fused,
+ * but never sold on the Marketplace or traded. A successful Fusion with them
+ * gives a normal item, free to sell and trade (GameEngine.attemptFusion).
  */
 export function isPassItem(item: { source?: ItemAcquiredFrom }): boolean {
   return item.source?.type === "SEASON_PASS";

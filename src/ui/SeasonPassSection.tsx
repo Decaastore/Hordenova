@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { loadSave } from "@/engine/SaveSystem";
 import { claimAllFreePassLevels, claimFreePassLevel, getPassView } from "@/engine/SeasonPassService";
-import { freeRewardForLevel, PASS_LEVELS, PASS_XP, PREMIUM_PASS_PRICE_BRL, premiumRewardForLevel, type PassReward } from "@/config/seasonPass";
+import { freeRewardForLevel, PASS_LEVELS, PASS_XP, PREMIUM_PASS_PRICE_BRL, premiumRewardForLevel, SUPREME_PASS_PRICE_BRL, supremeOnSale, supremeRewardForLevel, type PassReward } from "@/config/seasonPass";
+import { formatDurationShort } from "@/utils/formatDuration";
 import { REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
 import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { seasonClock } from "@/engine/SeasonClock";
@@ -24,8 +25,11 @@ export function SeasonPassSection({ showTitle = true }: { showTitle?: boolean } 
   const levels = Array.from({ length: PASS_LEVELS }, (_, i) => i + 1);
   const brl = new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(PREMIUM_PASS_PRICE_BRL);
 
+  const supremeBrl = new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(SUPREME_PASS_PRICE_BRL);
   const save = loadSave();
-  const season = seasonClock.getCurrentSeasonWindow().seasonNumber;
+  const seasonWindow = seasonClock.getCurrentSeasonWindow();
+  const season = seasonWindow.seasonNumber;
+  const supremeLeft = supremeOnSale(seasonWindow, seasonClock.now());
   const reward = (r: PassReward) => <RewardPartsLabel parts={r} currentWave={save.currentWave} />;
 
   return (
@@ -64,6 +68,7 @@ export function SeasonPassSection({ showTitle = true }: { showTitle?: boolean } 
           <span />
           <span>{t("pass.freeTrack")}</span>
           <span>{t("pass.premiumTrack")}</span>
+          <span className="sp-supreme-label">{t("pass.supremeTrack")}</span>
         </div>
         {levels.map((level) => {
           const reached = level <= view.level;
@@ -89,12 +94,18 @@ export function SeasonPassSection({ showTitle = true }: { showTitle?: boolean } 
                 {claimed && <span className="sp-done">{t("pass.claimed")}</span>}
               </div>
               <div className="sp-cell is-premium">{reward(premiumRewardForLevel(level, season))}</div>
+              <div className="sp-cell is-premium is-supreme" data-testid={`pass-supreme-${level}`}>
+                {reward(supremeRewardForLevel(level))}
+              </div>
             </div>
           );
         })}
       </div>
       <p className="pg-note">{t("pass.boundNote")}</p>
       <p className="pg-note">{REAL_MONEY_PAYMENTS_ENABLED ? t("pass.premiumOn", { price: brl }) : t("pass.premiumSoon", { price: brl })}</p>
+      <p className="pg-note sp-supreme-note" data-testid="pass-supreme-note">
+        {supremeLeft !== null ? t("pass.supremeOnSale", { price: supremeBrl, time: formatDurationShort(supremeLeft) }) : t("pass.supremeOffSale", { price: supremeBrl })}
+      </p>
       <p className="pg-note">{t("pass.adultOnly", { age: PURCHASE_MIN_AGE })}</p>
     </section>
   );
@@ -108,9 +119,9 @@ const PASS_CSS = `
 .sp-progress strong { font-family: var(--display); font-size: 24px; color: var(--gold-hi); white-space: nowrap; }
 .sp-progress span { white-space: nowrap; font-variant-numeric: tabular-nums; }
 .sp-track { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 12px; scrollbar-width: thin; }
-.sp-labels { position: sticky; left: 0; z-index: 1; display: grid; grid-template-rows: 22px 96px 96px; gap: 6px; flex: 0 0 72px; padding-right: 6px; background: var(--night); font-size: 12px; color: var(--ash); }
+.sp-labels { position: sticky; left: 0; z-index: 1; display: grid; grid-template-rows: 22px 96px 96px 96px; gap: 6px; flex: 0 0 72px; padding-right: 6px; background: var(--night); font-size: 12px; color: var(--ash); }
 .sp-labels span { display: flex; align-items: center; }
-.sp-col { display: grid; grid-template-rows: 22px 96px 96px; gap: 6px; flex: 0 0 112px; }
+.sp-col { display: grid; grid-template-rows: 22px 96px 96px 96px; gap: 6px; flex: 0 0 112px; }
 .sp-num { display: flex; align-items: center; justify-content: center; font-family: var(--display); font-weight: 700; font-size: 17px; color: var(--ash-2); }
 .sp-col.is-reached .sp-num { color: var(--gold-hi); }
 .sp-col.is-next .sp-num { color: var(--bone); text-decoration: underline; text-decoration-color: var(--gold); text-underline-offset: 4px; }
@@ -119,6 +130,9 @@ const PASS_CSS = `
 .sp-cell.is-claimed { opacity: 0.55; }
 .sp-cell.is-premium { color: var(--ash); background: rgba(24,18,12,0.4); border-style: dashed; }
 .sp-cell.is-premium > span { opacity: 0.85; }
+.sp-cell.is-supreme { border-color: rgba(255,170,90,0.45); background: linear-gradient(180deg, rgba(255,170,90,0.08), rgba(24,18,12,0.4)); }
+.sp-supreme-label { color: #ffb36b; font-weight: 700; }
+.sp-supreme-note { color: #ffcf9a !important; }
 .sp-claim { margin-top: 2px; padding: 3px 10px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 800; border: 1px solid #f2c873; color: #2b1906 !important; background: var(--gold); }
 .sp-done { font-size: 11.5px; color: var(--ok); font-weight: 600; }
 `;

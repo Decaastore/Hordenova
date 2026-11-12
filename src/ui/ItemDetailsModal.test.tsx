@@ -21,14 +21,14 @@ function render(source: "SEASON_PASS" | "BOSS_DROP") {
       </LanguageProvider>,
     );
   });
-  const text = container.textContent ?? "";
+  const passTag = !!container.querySelector("[data-testid=item-pass-only]");
   act(() => root.unmount());
   container.remove();
-  return { text, passTag: text.includes("Fusion only") || text.includes("Fusão") };
+  return { passTag };
 }
 
 describe("ItemDetailsModal — Season Pass items", () => {
-  it("tells the player a Pass item is Fusion material only", () => {
+  it("tells the player a Pass item can't be sold or traded", () => {
     expect(render("SEASON_PASS").passTag).toBe(true);
     expect(render("BOSS_DROP").passTag).toBe(false);
   });
