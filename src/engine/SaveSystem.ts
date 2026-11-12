@@ -1,3 +1,4 @@
+import { createDailyShopState, createMomentOfferState, createVipState, sanitizeDailyShopState, sanitizeMomentOfferState, sanitizeVipState, type DailyShopState, type MomentOfferState, type VipState } from "@/config/shopOffers";
 import { createExpeditionState, sanitizeExpeditionState, type ExpeditionState } from "@/config/expeditions";
 import { createEternalState, sanitizeEternalState, type EternalState } from "@/config/eternal";
 import { createAgeVerification, sanitizeAgeVerification, type AgeVerification } from "@/config/ageGate";
@@ -268,6 +269,12 @@ export interface SaveData {
   eternal: EternalState;
   /** EXPEDIÇÕES E FORJA — scout groups, trips under way, Forge materials and the item being forged (config/expeditions.ts). Account-level. */
   expeditions: ExpeditionState;
+  /** LOJA DIÁRIA — today's purchases (config/shopOffers.ts). Account-level. */
+  dailyShop: DailyShopState;
+  /** OFERTAS DE MOMENTO — the offer on screen now and when each last showed. Account-level. */
+  momentOffers: MomentOfferState;
+  /** VIP — paid period and the last daily VIP gift. Account-level; only a real payment ever sets `until`. */
+  vip: VipState;
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -380,6 +387,9 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ageVerification: createAgeVerification(),
   eternal: createEternalState(0),
   expeditions: createExpeditionState(),
+  dailyShop: createDailyShopState(),
+  momentOffers: createMomentOfferState(),
+  vip: createVipState(),
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -925,6 +935,9 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       ageVerification: sanitizeAgeVerification(parsed.ageVerification),
       eternal: sanitizeEternalState(parsed.eternal),
       expeditions: sanitizeExpeditionState(parsed.expeditions),
+      dailyShop: sanitizeDailyShopState(parsed.dailyShop),
+      momentOffers: sanitizeMomentOfferState(parsed.momentOffers),
+      vip: sanitizeVipState(parsed.vip),
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
       // "sensible fresh-account default for a pre-existing save" pattern as

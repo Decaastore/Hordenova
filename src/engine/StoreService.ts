@@ -6,6 +6,8 @@ import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
 import { canPayWithRealMoney } from "@/config/ageGate";
 import type { TowerType } from "@/config/towerStats";
+import { addEssences, NO_ESSENCES } from "@/config/expeditions";
+import { dailyOffers, dailyShopFor, MOMENT_OFFERS, shopDay, VIP_DAILY_GEMS, vipGiftAvailable, type DailyOffer } from "@/config/shopOffers";
 
 /**
  * STORE — the Loja page's actions, read and written straight on the save
@@ -98,7 +100,7 @@ export function requestGemPackPurchase(
   packId: string,
   save: SaveData = loadSave(),
 ): { ok: false; reason: "PAYMENTS_NOT_ENABLED" | "UNKNOWN_PACK" | "AGE_VERIFICATION_REQUIRED" | "UNDER_AGE" } {
-  if (packId !== STARTER_PACK.id && !GEM_PACKS.some((p) => p.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
+  if (packId !== STARTER_PACK.id && packId !== "VIP" && !GEM_PACKS.some((p) => p.id === packId) && !MOMENT_OFFERS.some((o) => o.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
   if (!REAL_MONEY_PAYMENTS_ENABLED) return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
   // COMPRAS SÓ PARA MAIORES (config/ageGate.ts): a denied account never pays; an unverified one is
   // verified first, by the payment provider, as part of this same checkout.
@@ -106,4 +108,53 @@ export function requestGemPackPurchase(
   if (!canPayWithRealMoney(save.ageVerification)) return { ok: false, reason: "AGE_VERIFICATION_REQUIRED" };
   // The checkout integration goes here (see config/store.ts's header).
   return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
+}
+
+// ── LOJA DIÁRIA (config/shopOffers.ts) ─────────────────────────────────
+
+/** Today's offers, each with whether it was already bought today. */
+export function getDailyOffers(save: SaveData = loadSave(), nowMs: number = Date.now()): { offer: DailyOffer; bought: boolean; owned: boolean }[] {
+  const shop = dailyShopFor(save.dailyShop, nowMs);
+  return dailyOffers(shopDay(nowMs)).map((offer) => ({
+    offer,
+    bought: shop.bought.includes(offer.id),
+    owned: offer.kind === "SKIN" && !!offer.skinId && save.ownedTowerSkinIds.includes(offer.skinId),
+  }));
+}
+
+export type DailyOfferResult = { ok: true; save: SaveData } | { ok: false; reason: "UNKNOWN" | "BOUGHT" | "OWNED" | "INSUFFICIENT_GEMS" };
+
+/** Buys one of today's offers (once per day each). */
+export function buyDailyOffer(offerId: string, currency: GemCurrency, nowMs: number = Date.now()): DailyOfferResult {
+  const save = loadSave();
+  const entry = getDailyOffers(save, nowMs).find((e) => e.offer.id === offerId);
+  if (!entry) return { ok: false, reason: "UNKNOWN" };
+  if (entry.bought) return { ok: false, reason: "BOUGHT" };
+  if (entry.owned) return { ok: false, reason: "OWNED" };
+  const { offer } = entry;
+  const cost = gemPriceForCurrency(offer.price, currency);
+  const balance = currency === "FREE" ? save.freeGems : save.purchasedGems;
+  if (balance < cost) return { ok: false, reason: "INSUFFICIENT_GEMS" };
+  appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: `daily_shop:${offer.id}`, amount: cost, currency });
+  const shop = dailyShopFor(save.dailyShop, nowMs);
+  const exp = save.expeditions;
+  const next = updateSave({
+    ...(currency === "FREE" ? { freeGems: save.freeGems - cost } : { purchasedGems: save.purchasedGems - cost }),
+    dailyShop: { ...shop, bought: [...shop.bought, offer.id] },
+    ...(offer.kind === "SKIN" && offer.skinId ? { ownedTowerSkinIds: [...save.ownedTowerSkinIds, offer.skinId] } : {}),
+    ...(offer.kind !== "SKIN"
+      ? { expeditions: { ...exp, splinters: exp.splinters + (offer.splinters ?? 0), essences: addEssences(exp.essences, offer.essences ?? NO_ESSENCES) } }
+      : {}),
+  });
+  return { ok: true, save: next };
+}
+
+// ── VIP (config/shopOffers.ts) ─────────────────────────────────────────
+
+/** Collects today's VIP Gems. Only an active, paid VIP has any to collect. */
+export function claimVipGift(nowMs: number = Date.now()): SaveData | null {
+  const save = loadSave();
+  if (!vipGiftAvailable(save.vip, nowMs)) return null;
+  appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: save.playerId, source: "vip_daily", amount: VIP_DAILY_GEMS, currency: "PURCHASED" });
+  return updateSave({ purchasedGems: save.purchasedGems + VIP_DAILY_GEMS, vip: { ...save.vip, lastGiftDay: shopDay(nowMs) } });
 }

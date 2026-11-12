@@ -1,4 +1,5 @@
 import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
+import { MomentOfferCard } from "@/ui/MomentOfferCard";
 import { EternalPanel } from "@/ui/EternalPanel";
 import { romanDepth } from "@/config/eternal";
 import { ETERNAL_STORAGE_KEY } from "@/engine/SaveSystem";
@@ -702,9 +703,13 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
           />
         )}
 
+        {hud.momentOffer && !expeditionsOpen && !eternalOpen && (
+          <MomentOfferCard offerId={hud.momentOffer.id} expiresAt={hud.momentOffer.expiresAt} onOpenStore={onOpenStore} onDismiss={() => engine.dismissMomentOffer()} />
+        )}
         {expeditionsOpen && (
           <ExpeditionPanel
             state={engine.getExpeditionState()}
+            groupsNow={engine.scoutGroups()}
             record={engine.getExpeditionRecord()}
             freeGems={hud.freeGems}
             purchasedGems={hud.purchasedGems}

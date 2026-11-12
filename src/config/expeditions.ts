@@ -156,7 +156,7 @@ export function sanitizeExpeditionState(raw: unknown): ExpeditionState {
         .filter((e): e is Record<string, unknown> => !!e && typeof e === "object")
         .map((e) => ({ regionIndex: int(e.regionIndex), hours: int(e.hours) as ExpeditionHours, startedAt: int(e.startedAt), endsAt: int(e.endsAt) }))
         .filter((e) => e.regionIndex < regions && (EXPEDITION_HOURS as readonly number[]).includes(e.hours))
-        .slice(0, groups)
+        .slice(0, MAX_SCOUT_GROUPS + 1) // +1: a VIP group's trip outlives the subscription
     : [];
   const ess = (r.essences && typeof r.essences === "object" ? r.essences : {}) as Record<string, unknown>;
   const f = r.forging as Record<string, unknown> | null | undefined;

@@ -10,7 +10,10 @@ import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
-import { buyTowerSkin, claimDailyGift, equipTowerSkin, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
+import { buyDailyOffer, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
+import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_PRICE_BRL, vipGiftAvailable, type DailyOffer, type MomentOffer } from "@/config/shopOffers";
+import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
+import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { GemIcon } from "@/ui/icons";
@@ -66,6 +69,44 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
     }
   };
 
+  const now = Date.now();
+  const daily = getDailyOffers(save, now);
+  const moment = activeMomentOffer(save.momentOffers, now);
+  const vipOn = isVipActive(save.vip, now);
+  const msToReset = 86_400_000 - (now % 86_400_000);
+  const hm = (ms: number) => {
+    const m = Math.max(0, Math.ceil(ms / 60_000));
+    return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, "0")}m`;
+  };
+  const essenceText = (e: Essences | undefined) =>
+    ESSENCE_RARITIES.filter((r) => (e?.[r] ?? 0) > 0)
+      .map((r) => t("store.essenceN", { n: e![r], r: t(`expeditions.essenceName.${r}` as TranslationKey) }))
+      .join(" · ");
+  const offerTitle = (o: DailyOffer) =>
+    o.kind === "SKIN" && o.skinId
+      ? t(`towerSkins.${o.skinId}.name` as TranslationKey)
+      : o.kind === "SPLINTERS"
+        ? t("store.splintersN", { n: o.splinters ?? 0 })
+        : essenceText(o.essences);
+  const momentContents = (o: MomentOffer) =>
+    [t("store.gemsN", { n: num.format(o.purchasedGems) }), t("store.splintersN", { n: o.splinters }), essenceText(o.essences)].filter(Boolean).join(" · ");
+
+  const onBuyDaily = (offerId: string, currency: GemCurrency) => {
+    const result = buyDailyOffer(offerId, currency);
+    if (result.ok) {
+      setSave(result.save);
+      setNotice(t("store.dailyBought"));
+    } else if (result.reason === "INSUFFICIENT_GEMS") setNotice(t(currency === "FREE" ? "store.notEnoughFree" : "store.notEnoughPurchased"));
+  };
+
+  const onClaimVip = () => {
+    const next = claimVipGift();
+    if (next) {
+      setSave(next);
+      setNotice(t("store.vipGiftClaimed", { gems: VIP_DAILY_GEMS }));
+    }
+  };
+
   const onEquip = (skin: TowerSkinDefinition, equip: boolean) => {
     const result = equipTowerSkin(skin.towerType, equip ? skin.id : null);
     if (result.ok) setSave(result.save);
@@ -106,6 +147,66 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
             </button>
           </section>
 
+          {moment && (
+            <section className="st-moment" data-testid="moment-offer">
+              <div>
+                <p className="st-moment-kicker">{t("store.momentKicker", { time: hm(moment.expiresAt - now) })}</p>
+                <h2>{t(`store.moment.${moment.offer.id}.name` as TranslationKey)}</h2>
+                <p>{t(`store.moment.${moment.offer.id}.why` as TranslationKey)}</p>
+                <p className="st-moment-list">{momentContents(moment.offer)}</p>
+              </div>
+              <div className="st-starter-buy">
+                <span className="st-price">{brl.format(moment.offer.priceBrl)}</span>
+                <button className="st-buy" disabled={!REAL_MONEY_PAYMENTS_ENABLED} onClick={() => onBuyPack(moment.offer.id)}>
+                  {REAL_MONEY_PAYMENTS_ENABLED ? t("store.buy") : t("store.soon")}
+                </button>
+                <small>{t("store.adultShort", { age: PURCHASE_MIN_AGE })}</small>
+              </div>
+            </section>
+          )}
+
+          <section className="st-section" data-testid="daily-shop">
+            <div className="pg-head">
+              <h2 className="pg-h2">{t("store.dailyTitle")}</h2>
+              <span className="st-reset">{t("store.dailyResets", { time: hm(msToReset) })}</span>
+            </div>
+            <p className="pg-sub">{t("store.dailySub")}</p>
+            <div className="st-daily">
+              {daily.map(({ offer, bought, owned }) => {
+                const skinDef = offer.skinId ? getTowerSkinDefinition(offer.skinId) : null;
+                const done = bought || owned;
+                return (
+                  <article key={offer.id} className={`st-day${offer.kind === "SKIN" ? " is-skin" : ""}`} data-testid={`daily-${offer.kind}`}>
+                    {skinDef ? (
+                      <div className="st-day-art">
+                        <TowerPortrait type={skinDef.towerType} level={MAX_TOWER_LEVEL} skinId={skinDef.id} width={96} height={96} zoom={1.9} baseY={0.72} />
+                      </div>
+                    ) : (
+                      <div className={`st-day-art is-mat is-${offer.kind}`} aria-hidden="true">
+                        {offer.kind === "SPLINTERS" ? "✦" : "◆"}
+                      </div>
+                    )}
+                    <p className="st-type">{t(`store.dailyKind.${offer.kind}` as TranslationKey)}</p>
+                    <h3>{offerTitle(offer)}</h3>
+                    {offer.discountPct ? <p className="st-off">{t("store.dailyOff", { pct: offer.discountPct })}</p> : <p className="st-off is-plain">{t("store.dailyForge")}</p>}
+                    {done ? (
+                      <p className="st-owned">{owned ? t("store.owned") : t("store.dailyBoughtTag")}</p>
+                    ) : (
+                      <div className="st-actions">
+                        <button className="st-pay" disabled={save.freeGems < offer.price.free} onClick={() => onBuyDaily(offer.id, "FREE")}>
+                          <span>{t("store.payFree")}</span> {num.format(offer.price.free)}
+                        </button>
+                        <button className="st-pay is-gem" disabled={save.purchasedGems < offer.price.purchased} onClick={() => onBuyDaily(offer.id, "PURCHASED")}>
+                          <span>{t("store.payPurchased")}</span> {num.format(offer.price.purchased)}
+                        </button>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
+
           {notice && (
             <p className="st-notice" role="status">
               {notice}
@@ -138,6 +239,30 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                   {REAL_MONEY_PAYMENTS_ENABLED ? t("store.buy") : t("store.soon")}
                 </button>
                 {!REAL_MONEY_PAYMENTS_ENABLED && <small>{t("store.starterSoon")}</small>}
+              </div>
+            </article>
+            <article className="st-vip" data-testid="vip-card">
+              <div>
+                <h3>{t("store.vipTitle")}</h3>
+                <p>{t("store.vipBody", { days: VIP_DAYS })}</p>
+                <ul className="st-vip-perks">
+                  <li>{t("store.vipPerkGems", { gems: VIP_DAILY_GEMS })}</li>
+                  <li>{t("store.vipPerkGroup", { n: VIP_EXTRA_SCOUT_GROUPS })}</li>
+                  <li>{t("store.vipPerkFair")}</li>
+                </ul>
+              </div>
+              <div className="st-starter-buy">
+                <span className="st-price">{brl.format(VIP_PRICE_BRL)}</span>
+                <small>{t("store.vipPerMonth")}</small>
+                {vipOn ? (
+                  <button className="st-buy" disabled={!vipGiftAvailable(save.vip, now)} onClick={onClaimVip}>
+                    {vipGiftAvailable(save.vip, now) ? t("store.vipClaim", { gems: VIP_DAILY_GEMS }) : t("store.giftTomorrow")}
+                  </button>
+                ) : (
+                  <button className="st-buy" disabled={!REAL_MONEY_PAYMENTS_ENABLED} onClick={() => onBuyPack("VIP")}>
+                    {REAL_MONEY_PAYMENTS_ENABLED ? t("store.vipSubscribe") : t("store.soon")}
+                  </button>
+                )}
               </div>
             </article>
             <div className="st-packs">
@@ -236,6 +361,27 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 }
 
 const STORE_CSS = `
+.st-moment { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-top: 26px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(224,100,75,0.6); background: linear-gradient(100deg, rgba(224,100,75,0.16), rgba(24,18,12,0.6) 65%); }
+.st-moment h2 { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: #ffb59f; }
+.st-moment p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 60ch; }
+.st-moment-kicker { font-size: 12.5px !important; font-weight: 700; color: #ff9a85 !important; }
+.st-moment-list { color: var(--bone) !important; font-weight: 600; }
+.st-reset { font-size: 13px; color: var(--ash); font-variant-numeric: tabular-nums; }
+.st-daily { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+.st-day { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 16px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); }
+.st-day.is-skin { border-color: rgba(232,176,75,0.5); }
+.st-day h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 19px; color: var(--bone); line-height: 1.2; }
+.st-day-art { width: 96px; height: 96px; display: grid; place-items: center; border-radius: 10px; background: rgba(0,0,0,0.25); margin-bottom: 6px; }
+.st-day-art.is-mat { font-size: 40px; color: var(--gold-hi); }
+.st-day-art.is-RARE_ESSENCE { color: #6aa8ff; }
+.st-day-art.is-EPIC_ESSENCE { color: #b47cff; }
+.st-off { margin: 0; font-size: 13px; font-weight: 700; color: #9be37a; }
+.st-off.is-plain { color: var(--ash); font-weight: 500; }
+.st-day .st-actions { margin-top: auto; padding-top: 10px; }
+.st-vip { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px 32px; margin-bottom: 18px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(159,211,255,0.45); background: linear-gradient(100deg, rgba(159,211,255,0.12), rgba(24,18,12,0.6) 60%); }
+.st-vip h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; color: #cfe8ff; }
+.st-vip p { margin: 4px 0 0; font-size: 14px; color: #d9cdb6; max-width: 56ch; }
+.st-vip-perks { margin: 10px 0 0; padding-left: 18px; font-size: 14px; color: var(--bone); display: grid; gap: 3px; }
 .st-adult { display: flex; align-items: center; gap: 10px; margin: -4px 0 16px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0,0,0,0.25); font-size: 13px; color: var(--ash); max-width: 720px; line-height: 1.45; }
 .st-adult-badge { flex: none; display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 26px; padding: 0 6px; border-radius: 6px; border: 1.5px solid #e0644b; color: #ff9a85; font-weight: 800; font-size: 13px; }
 

@@ -22,6 +22,8 @@ import {
 
 interface ExpeditionPanelProps {
   state: ExpeditionState;
+  /** Groups usable now (owned, plus one while VIP). */
+  groupsNow: number;
   record: number;
   freeGems: number;
   purchasedGems: number;
@@ -62,13 +64,13 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
   const region = expeditionRegions()[regionIndex];
   const s = p.state;
   const regionName = (i: number) => t(`phases.${expeditionRegions()[i]!.i18nKey}.name` as TranslationKey);
-  const rarityName = (r: string) => t(`rarity.${r}` as TranslationKey);
+  const rarityName = (r: string) => t(`expeditions.essenceShort.${r}` as TranslationKey);
 
   const prizeLines = (pr: ExpeditionPrize) => [
     t("expeditions.gold", { n: fmt(pr.gold) }),
     ...(pr.shards > 0 ? [t("expeditions.shards", { n: pr.shards })] : []),
     t("expeditions.splinters", { n: pr.splinters }),
-    ...ESSENCE_RARITIES.filter((r) => pr.essences[r] > 0).map((r) => t("expeditions.essence", { n: pr.essences[r], r: rarityName(r) })),
+    ...ESSENCE_RARITIES.filter((r) => pr.essences[r] > 0).map((r) => t("expeditions.essence", { n: pr.essences[r], r: t(`expeditions.essenceName.${r}` as TranslationKey) })),
   ];
 
   const rushButtons = (msLeft: number, onRush: (c: GemCurrency) => void) => {
@@ -102,7 +104,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
       {tab === "trips" && (
         <>
           <div style={subStyle}>{t("expeditions.lead")}</div>
-          <div style={{ ...subStyle, color: PALETTE.uiText, fontWeight: 700 }}>{t("expeditions.groups", { used: s.active.length, total: s.groups })}</div>
+          <div style={{ ...subStyle, color: PALETTE.uiText, fontWeight: 700 }}>{t("expeditions.groups", { used: s.active.length, total: p.groupsNow })}</div>
 
           <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
             {s.active.map((e, i) => {
@@ -162,12 +164,12 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
                 </div>
               )}
               <button
-                style={{ ...btnStyle, marginTop: 10, width: "100%", opacity: s.active.length < s.groups ? 1 : 0.45 }}
-                disabled={s.active.length >= s.groups}
+                style={{ ...btnStyle, marginTop: 10, width: "100%", opacity: s.active.length < p.groupsNow ? 1 : 0.45 }}
+                disabled={s.active.length >= p.groupsNow}
                 onClick={() => p.onSend(regionIndex, hours)}
                 data-testid="expedition-send"
               >
-                {s.active.length < s.groups ? t("expeditions.send") : t("expeditions.noGroupFree")}
+                {s.active.length < p.groupsNow ? t("expeditions.send") : t("expeditions.noGroupFree")}
               </button>
             </div>
           )}

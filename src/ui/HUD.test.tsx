@@ -33,6 +33,7 @@ function makeHud(overrides: Partial<HudSnapshot> = {}): HudSnapshot {
     achievement: { last: null, title: null, count: 0 },
     eternal: { active: false, marks: 0, depth: 0, lastEvent: null, contractsReady: 0 },
     expeditions: { ready: 0, away: 0, forging: false, splinters: 0 },
+    momentOffer: null,
     nextWaveInS: null,
     selectedTowerId: null,
     bossNameKey: null,

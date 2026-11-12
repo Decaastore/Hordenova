@@ -165,6 +165,7 @@ import {
   type ExpeditionPrize,
   type ExpeditionState,
 } from "@/config/expeditions";
+import { activeMomentOffer, createMomentOfferState, createVipState, isVipActive, triggerMomentOffer, VIP_EXTRA_SCOUT_GROUPS, type MomentOfferState, type MomentTrigger, type VipState } from "@/config/shopOffers";
 
 /** Elite spec (section 5): real stat multipliers plus a passive-regen "special ability", not just a bigger HP number. */
 const ELITE_MODIFIER: EliteModifier = {
@@ -272,6 +273,8 @@ export interface HudSnapshot {
   };
   /** EXPEDIÇÕES E FORJA — trips and forge ready to collect, and trips under way. */
   expeditions: { ready: number; away: number; forging: boolean; splinters: number };
+  /** OFERTAS DE MOMENTO — the offer on screen, if any. */
+  momentOffer: { id: string; expiresAt: number } | null;
   /** CONQUISTAS — the latest achievement unlocked (seq bumps) and the title worn. */
   achievement: { last: { seq: number; id: AchievementId } | null; title: AchievementId | null; count: number };
   /** ÁRVORE DE TALENTOS — ranks and points still free. */
@@ -377,6 +380,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.expeditions.away === b.expeditions.away &&
     a.expeditions.forging === b.expeditions.forging &&
     a.expeditions.splinters === b.expeditions.splinters &&
+    a.momentOffer?.id === b.momentOffer?.id &&
+    a.momentOffer?.expiresAt === b.momentOffer?.expiresAt &&
     a.baseHp === b.baseHp &&
     a.maxBaseHp === b.maxBaseHp &&
     a.speed === b.speed &&
@@ -585,6 +590,8 @@ export class GameEngine {
   private talents: TalentRanks = {};
   private eternal: EternalState = createEternalState();
   private expeditions: ExpeditionState = createExpeditionState();
+  private momentOffers: MomentOfferState = createMomentOfferState();
+  private vip: VipState = createVipState();
   private lastEternalEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null = null;
   private bestiaryKills: BestiaryKills = {};
   private achievements: AchievementId[] = [];
@@ -706,6 +713,8 @@ export class GameEngine {
     this.talents = sanitizeTalentRanks(save.talents, save.seasonBestWave);
     this.eternal = rollWeek(save.eternal, Date.now());
     this.expeditions = save.expeditions;
+    this.momentOffers = save.momentOffers;
+    this.vip = save.vip;
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
@@ -2411,6 +2420,27 @@ export class GameEngine {
     return Math.max(this.bestWave, this.seasonBestWave);
   }
 
+  /** Scout groups usable now: owned groups, plus one while VIP. */
+  scoutGroups(nowMs: number = Date.now()): number {
+    return this.expeditions.groups + (isVipActive(this.vip, nowMs) ? VIP_EXTRA_SCOUT_GROUPS : 0);
+  }
+
+  /** OFERTAS DE MOMENTO — shows a real-money offer at a moment that calls for it (config/shopOffers.ts). */
+  private offerMoment(trigger: MomentTrigger): void {
+    this.momentOffers = triggerMomentOffer(this.momentOffers, trigger, Date.now());
+  }
+
+  getActiveMomentOffer() {
+    return activeMomentOffer(this.momentOffers, Date.now());
+  }
+
+  dismissMomentOffer(): void {
+    if (!this.momentOffers.active) return;
+    this.momentOffers = { ...this.momentOffers, active: null };
+    this.persist();
+    this.notify();
+  }
+
   getExpeditionState(): Readonly<ExpeditionState> {
     return this.expeditions;
   }
@@ -2422,7 +2452,7 @@ export class GameEngine {
   /** Sends a free scout group to a region the record has passed. */
   startExpedition(regionIndex: number, hours: ExpeditionHours, nowMs: number = Date.now()): boolean {
     const e = this.expeditions;
-    if (e.active.length >= e.groups) return false;
+    if (e.active.length >= this.scoutGroups(nowMs)) return false;
     if (!unlockedRegions(this.expeditionRecord()).some((r) => r.index === regionIndex)) return false;
     this.expeditions = { ...e, active: [...e.active, { regionIndex, hours, startedAt: nowMs, endsAt: nowMs + hours * 3_600_000 }] };
     this.persist();
@@ -2539,6 +2569,7 @@ export class GameEngine {
       const d = this.eternal.depthRewarded + 1;
       const marks = depthReward(d);
       this.eternal = { ...this.eternal, depthRewarded: d, marks: this.eternal.marks + marks };
+      this.offerMoment("NEW_DEPTH");
       this.lastEternalEvent = { seq: (this.lastEternalEvent?.seq ?? 0) + 1, kind: "DEPTH", value: d, marks, shards: 0 };
     }
     for (const n of claimableMilestones(this.seasonBestWave, this.eternal.milestonesClaimed)) {
@@ -3244,6 +3275,7 @@ export class GameEngine {
       return;
     }
     this.phase = "PROGRESSION_STOPPED";
+    this.offerMoment("CASTLE_FELL");
     if (this.rift.active) {
       this.rift = { ...this.rift, active: null };
       this.lastRiftResult = { seq: (this.lastRiftResult?.seq ?? 0) + 1, won: false, reward: null };
@@ -3284,6 +3316,7 @@ export class GameEngine {
     const left = Math.min(1, this.lastBossHpFraction + BOSS_RETREAT_RECOVERY);
     const assaults = (this.bossSiege?.wave === wave ? this.bossSiege.assaults : 0) + 1;
     this.bossSiege = { wave, hpFraction: left, assaults };
+    if (assaults >= 2) this.offerMoment("BOSS_HELD");
     this.emitAudio({ type: "boss_enrage" });
     this.resetAttemptState();
     this.lastBossHpFraction = 1;
@@ -3431,6 +3464,7 @@ export class GameEngine {
         talents: this.talents,
         eternal: this.eternal,
         expeditions: this.expeditions,
+        momentOffers: this.momentOffers,
         bestiaryKills: this.bestiaryKills,
         achievements: this.achievements,
         equippedTitle: this.equippedTitle,
@@ -3506,6 +3540,7 @@ export class GameEngine {
         contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
       },
       expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters },
+      momentOffer: this.momentOffers.active && this.momentOffers.active.expiresAt > Date.now() ? this.momentOffers.active : null,
     };
 
     const prev = this.cachedHud;

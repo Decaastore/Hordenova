@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v103",
+    dateIso: "2026-11-11",
+    category: "SYSTEMS",
+    title: {
+      en: "Today's Offers, Moment Offers and VIP",
+      ptBR: "Ofertas de Hoje, Ofertas de Momento e VIP",
+    },
+    description: {
+      en: "The Store now has four offers that change every day, the same for everyone: a tower skin 25% off and Forge materials, each bought once a day with Gems. Moment offers and the VIP subscription are also in the Store, and open together with real-money purchases.",
+      ptBR: "A Loja agora tem quatro ofertas que trocam todo dia, iguais para todos: uma skin de torre 25% mais barata e materiais da Forja, cada uma comprada uma vez por dia com Gemas. As ofertas de momento e a assinatura VIP também já estão na Loja e abrem junto com as compras com dinheiro.",
+    },
+    highlights: [
+      {
+        en: "Today's offers change at 00:00 UTC (21:00 in Brasília). Legendary and Mythic Essences are never sold: they only come from playing.",
+        ptBR: "As ofertas de hoje trocam às 21h (horário de Brasília). Essências Lendárias e Míticas nunca são vendidas: só vêm jogando.",
+      },
+      {
+        en: "Moment offers show up for a few hours when the castle falls, when a boss holds the wall twice, or when you reach a new Eternal Depth, at most once a day each.",
+        ptBR: "As ofertas de momento aparecem por algumas horas quando o castelo cai, quando um chefe segura a muralha duas vezes ou quando você chega a uma nova Profundidade do Eterno, no máximo uma vez por dia cada.",
+      },
+      {
+        en: "VIP (R$ 14.90 a month): 20 Gems a day when you enter the game and one more scout group. No damage or ranking bonus. Like every real-money purchase, adults 18+ only.",
+        ptBR: "VIP (R$ 14,90 por mês): 20 Gemas por dia ao entrar no jogo e mais um grupo de batedores. Sem bônus de dano nem de ranking. Como toda compra com dinheiro, só para maiores de 18.",
+      },
+    ],
+  },
+  {
     id: "v102",
     dateIso: "2026-11-11",
     category: "ITEMS",
