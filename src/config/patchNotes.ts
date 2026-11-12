@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v115",
+    dateIso: "2026-11-12",
+    category: "CONTENT",
+    title: {
+      en: "Duel: Free Gems, Weekend Tournament and weekly wins",
+      ptBR: "Duelo: Gemas grátis, Torneio de Fim de Semana e vitórias da semana",
+    },
+    description: {
+      en: "The Duel now also pays Free Gems, which work in the whole game: in the Store, on skins and on speed-ups. There's a new Weekend Tournament and a weekly wins track.",
+      ptBR: "O Duelo agora também paga Gemas grátis, que valem no jogo todo: na Loja, nas skins e nas acelerações. Chegaram o Torneio de Fim de Semana e uma trilha de vitórias da semana.",
+    },
+    highlights: [
+      {
+        en: "Weekly Challenge: 100 Free Gems plus 150 Duel Coins, once a week.",
+        ptBR: "Desafio da Semana: 100 Gemas grátis mais 150 Moedas de Duelo, uma vez por semana.",
+      },
+      {
+        en: "Weekend Tournament (Saturday and Sunday): three matches in a row against an ever stronger AI. Losing one ends your run until next weekend. Win all three for 125 Free Gems, 430 coins and the Champion Banner, which can't be bought.",
+        ptBR: "Torneio de Fim de Semana (sábado e domingo): três partidas seguidas contra uma IA cada vez mais forte. Perdeu uma, acabou até o próximo fim de semana. Vencendo as três, são 125 Gemas grátis, 430 moedas e o Estandarte do Campeão, que não se compra.",
+      },
+      {
+        en: "Wins this week: 10, 25 and 50 ranked wins pay 20, 40 and 80 Free Gems (plus coins), once each per week.",
+        ptBR: "Vitórias da semana: 10, 25 e 50 vitórias ranqueadas pagam 20, 40 e 80 Gemas grátis (mais moedas), uma vez cada por semana.",
+      },
+      {
+        en: "League prizes now add Free Gems too: Silver 25, Gold 50, Platinum 100, Diamond 150, Master 250 and Legend 500. First win of the day: +5 Gems; all three daily missions: +10 Gems.",
+        ptBR: "Os prêmios de liga agora somam Gemas grátis também: Prata 25, Ouro 50, Platina 100, Diamante 150, Mestre 250 e Lenda 500. Primeira vitória do dia: +5 Gemas; as três missões do dia: +10 Gemas.",
+      },
+    ],
+  },
+  {
     id: "v114",
     dateIso: "2026-11-12",
     category: "BALANCE",

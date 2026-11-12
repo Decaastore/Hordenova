@@ -28,6 +28,13 @@ import {
   STREAK_PRIZES,
   WEEKLY_CHALLENGE_AI,
   WEEKLY_CHALLENGE_COINS,
+  WEEKLY_CHALLENGE_GEMS,
+  WEEKLY_WIN_GOALS,
+  MISSIONS_ALL_DONE_PRIZE,
+  TOURNEY_ROUNDS,
+  TOURNEY_BANNER,
+  applyTourneyResult,
+  tourneyState,
   weeklyChallenge,
   duelKillFx,
   duelSkinLooks,
@@ -152,6 +159,8 @@ type MatchResult = {
   rankAfter: DuelRank | null;
   firstWin: boolean;
   streakBonus: number | null;
+  tourneyRound?: number | null;
+  tourneyWon?: boolean;
 };
 
 const LEAGUE_COLOR: Record<LeagueId, [string, string]> = {
@@ -197,6 +206,7 @@ function PrizeLine({ prize }: { prize: DuelPrize }) {
   const parts: [MaterialKind, number, string][] = (
     [
       ["DUEL_COINS", prize.coins, "coins"],
+      ["GEMS_FREE", prize.gems, "gems"],
       ["SHARDS", prize.shards, "shards"],
       ["SPLINTERS", prize.splinters, "splinters"],
       ["RARE", prize.rare, "rare"],
@@ -222,8 +232,11 @@ function PrizeLine({ prize }: { prize: DuelPrize }) {
 /** Puts a Duel prize on the account: Gem Shards and Forge materials (coins live in the Duel profile). */
 function grantPrize(cur: SaveData, prize: DuelPrize, source: string): Partial<SaveData> {
   if (prize.shards > 0) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source, amount: prize.shards });
+  // Free Gems won in the Duel work in the whole game (earned by playing — never a purchase)
+  if (prize.gems > 0) appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: cur.playerId, source, amount: prize.gems, currency: "FREE" });
   const e = cur.expeditions;
   return {
+    freeGems: cur.freeGems + prize.gems,
     gemShards: cur.gemShards + prize.shards,
     expeditions: {
       ...e,
@@ -246,7 +259,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
   const [matchNo, setMatchNo] = useState(0);
   const [result, setResult] = useState<MatchResult | null>(null);
-  const [challenge, setChallenge] = useState(false);
+  const [mode, setMode] = useState<"ranked" | "weekly" | "tourney">("ranked");
+  const challenge = mode === "weekly";
   const [notice, setNotice] = useState<string | null>(null);
   const now = Date.now();
   const day = Math.floor(now / 86_400_000);
@@ -273,7 +287,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const next = updateSave({ duel: { ...loadSave().duel, deck } });
     setSave(next);
     setResult(null);
-    setChallenge(false);
+    setMode("ranked");
     setMatchNo((n) => n + 1);
     setDuelLooks(duelSkinLooks(next.duel), duelKillFx(next.duel));
     setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], duelAiSkill(next.duel.trophies), next.equippedTowerSkinByType));
@@ -281,19 +295,40 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   const startWeekly = () => {
     setResult(null);
-    setChallenge(true);
+    setMode("weekly");
     setMatchNo((n) => n + 1);
     setDuelLooks(duelSkinLooks(save.duel), duelKillFx(save.duel));
     setMatch(new DuelEngine(weekly.seed, [weekly.myDeck, weekly.foeDeck], WEEKLY_CHALLENGE_AI, save.equippedTowerSkinByType));
   };
 
+  const tourney = tourneyState(duel, now);
+  const startTourney = () => {
+    const tNow = tourneyState(loadSave().duel, Date.now());
+    if (!deckOk || !tNow || tNow.out || tNow.won) return;
+    const next = updateSave({ duel: { ...loadSave().duel, deck } });
+    setSave(next);
+    setResult(null);
+    setMode("tourney");
+    setMatchNo((n) => n + 1);
+    setDuelLooks(duelSkinLooks(next.duel), duelKillFx(next.duel));
+    setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck("ARENA_ABYSS")], TOURNEY_ROUNDS[tNow.round]!.ai, next.equippedTowerSkinByType));
+  };
+
   const finish = (snap: DuelSnapshot) => {
     const outcome = snap.outcome!;
     const cur = loadSave();
+    if (mode === "tourney") {
+      const r = applyTourneyResult(cur.duel, outcome, Date.now());
+      const prize = r?.prize ?? NO_PRIZE;
+      const next = updateSave({ ...grantPrize(cur, { ...prize, coins: 0 }, "duel_tourney"), duel: r?.profile ?? cur.duel });
+      setSave(next);
+      setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null, tourneyRound: r && outcome === "WIN" ? r.profile.tourney.round : null, tourneyWon: !!r?.profile.tourney.won });
+      return;
+    }
     if (challenge) {
       const paid = outcome === "WIN" && cur.duel.weeklyWonWeek !== week;
-      const prize = paid ? { ...NO_PRIZE, coins: WEEKLY_CHALLENGE_COINS } : NO_PRIZE;
-      const next = updateSave({ duel: { ...cur.duel, coins: cur.duel.coins + prize.coins, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
+      const prize = paid ? { ...NO_PRIZE, coins: WEEKLY_CHALLENGE_COINS, gems: WEEKLY_CHALLENGE_GEMS } : NO_PRIZE;
+      const next = updateSave({ ...grantPrize(cur, { ...prize, coins: 0 }, "duel_weekly"), duel: { ...cur.duel, coins: cur.duel.coins + prize.coins, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
       setSave(next);
       setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null });
       return;
@@ -306,9 +341,10 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   const claimMission = (id: string) => {
     const cur = loadSave();
-    const p = claimDuelMission(cur.duel, id, Date.now());
-    if (!p) return;
-    setSave(updateSave({ duel: p }));
+    const r = claimDuelMission(cur.duel, id, Date.now());
+    if (!r) return;
+    setSave(updateSave({ ...grantPrize(cur, { ...NO_PRIZE, gems: r.gems }, "duel_missions"), duel: r.profile }));
+    if (r.gems > 0) setNotice(t("duel.missionsAllDone", { n: r.gems }));
   };
 
   const buy = (id: string) => {
@@ -331,14 +367,14 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
       <DuelMatch
         key={matchNo}
         engine={match}
-        arenaId={challenge ? "ARENA_ABYSS" : arena.id}
-        biome={challenge ? "ABYSS" : arena.biome}
+        arenaId={mode !== "ranked" ? "ARENA_ABYSS" : arena.id}
+        biome={mode !== "ranked" ? "ABYSS" : arena.biome}
         banner={banner}
         frame={frame}
         result={result}
         rankName={rankName}
         onFinish={finish}
-        onAgain={challenge ? startWeekly : start}
+        onAgain={mode === "weekly" ? startWeekly : mode === "tourney" ? startTourney : start}
         onLobby={() => setMatch(null)}
       />
     );
@@ -392,7 +428,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
           <section className="du-block" data-testid="duel-missions">
             <h2 className="pg-h2">{t("duel.missionsTitle")}</h2>
-            <p className="pg-sub">{t("duel.missionsLead")}</p>
+            <p className="pg-sub">
+              {t("duel.missionsLead")} {t("duel.missionsBonus")} <PrizeLine prize={MISSIONS_ALL_DONE_PRIZE} />
+            </p>
             <div className="du-missions">
               {missions.map((m) => {
                 const prog = mState.progress[m.id] ?? 0;
@@ -450,10 +488,70 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
             </ul>
           </section>
 
+          <section className="du-tourney" data-testid="duel-tourney">
+            <div>
+              <h2 className="pg-h2">{t("duel.tourneyTitle")}</h2>
+              <p className="pg-sub">{t("duel.tourneyLead")}</p>
+              <ol className="du-rounds">
+                {TOURNEY_ROUNDS.map((r, i) => {
+                  const done = !!tourney && tourney.round > i;
+                  const lost = !!tourney && tourney.out && tourney.round === i;
+                  return (
+                    <li key={i} className={done ? "is-done" : lost ? "is-lost" : ""}>
+                      <strong>{t("duel.tourneyRound", { n: i + 1 })}</strong>
+                      <PrizeLine prize={r.prize} />
+                      {i === TOURNEY_ROUNDS.length - 1 && <small>{t("duel.tourneyBanner")}</small>}
+                    </li>
+                  );
+                })}
+              </ol>
+            </div>
+            {tourney === null ? (
+              <button className="pg-btn-ghost" disabled>
+                {t("duel.tourneyClosed")}
+              </button>
+            ) : tourney.won ? (
+              <button className="pg-btn-ghost" disabled>
+                {t("duel.tourneyWon")}
+              </button>
+            ) : tourney.out ? (
+              <button className="pg-btn-ghost" disabled>
+                {t("duel.tourneyOut")}
+              </button>
+            ) : (
+              <button className="pg-btn" disabled={!deckOk} onClick={startTourney} data-testid="duel-tourney-start">
+                {t("duel.tourneyPlay", { n: tourney.round + 1 })}
+              </button>
+            )}
+          </section>
+
+          <section className="du-block" data-testid="duel-weekwins">
+            <h2 className="pg-h2">{t("duel.weekWinsTitle")}</h2>
+            <p className="pg-sub">{t("duel.weekWinsLead", { n: duel.weekWins.week === week ? duel.weekWins.wins : 0 })}</p>
+            <div className="du-ladder">
+              {WEEKLY_WIN_GOALS.map((g) => {
+                const wins = duel.weekWins.week === week ? duel.weekWins.wins : 0;
+                const paid = duel.weekWins.week === week && duel.weekWins.paid.includes(g.wins);
+                return (
+                  <div key={g.wins} className={`du-step${paid ? " is-done" : ""}`}>
+                    <div>
+                      <strong>{t("duel.weekWinsGoal", { n: g.wins })}</strong>
+                      <div className="du-mbar">
+                        <div style={{ width: `${Math.min(100, (wins / g.wins) * 100)}%` }} />
+                      </div>
+                      <PrizeLine prize={g.prize} />
+                    </div>
+                    <span className="du-step-tag">{paid ? "✓" : ""}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="du-weekly" data-testid="duel-weekly">
             <div>
               <h2 className="pg-h2">{t("duel.weeklyTitle")}</h2>
-              <p className="pg-sub">{t("duel.weeklyLead", { coins: WEEKLY_CHALLENGE_COINS })}</p>
+              <p className="pg-sub">{t("duel.weeklyLead", { coins: WEEKLY_CHALLENGE_COINS, gems: WEEKLY_CHALLENGE_GEMS })}</p>
               <div className="du-weekly-decks">
                 <span>{t("duel.weeklyYours")}</span>
                 {weekly.myDeck.map((id) => (
@@ -509,7 +607,11 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                         {c?.tower && <small className="du-item-tower">{t(`towers.${c.tower}.name` as TranslationKey)}</small>}
                         {item.prize && <PrizeLine prize={item.prize} />}
                         {item.weekly && <small>{t("duel.shopWeekly")}</small>}
-                        {owned ? (
+                        {item.earnedOnly && !owned ? (
+                          <button className="pg-btn-ghost" disabled>
+                            {item.id === TOURNEY_BANNER ? t("duel.tourneyOnly") : t("duel.earnedOnly")}
+                          </button>
+                        ) : owned ? (
                           <button className="pg-btn-ghost" onClick={() => wear(item.id)}>
                             {worn ? t("duel.wearing") : t("duel.wear")}
                           </button>
@@ -710,9 +812,11 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
                 <span>{t(result.rankAfter.index > result.rankBefore.index ? "duel.promoted" : "duel.demoted", { name: rankName(result.rankAfter) })}</span>
               </div>
             )}
+            {result.tourneyWon && <p className="dm-tag is-gold">{t("duel.tourneyChampion")}</p>}
+            {!result.tourneyWon && result.tourneyRound ? <p className="dm-tag">{t("duel.tourneyNext", { n: result.tourneyRound + 1 })}</p> : null}
             {result.firstWin && <p className="dm-tag">{t("duel.firstWinTag")}</p>}
             {result.streakBonus && <p className="dm-tag">{t("duel.streakTag", { n: result.streakBonus })}</p>}
-            {(result.prize.coins || result.prize.shards) > 0 && (
+            {(result.prize.coins || result.prize.gems || result.prize.shards) > 0 && (
               <p>
                 <PrizeLine prize={result.prize} />
               </p>
@@ -835,6 +939,14 @@ const LOBBY_CSS = `
 .du-play > div { max-width: 70ch; display: grid; gap: 6px; }
 .du-play .pg-sub { margin: 0; }
 .du-deck { padding: 32px 0 96px; }
+.du-tourney { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; margin-top: 28px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(255,213,106,0.5); background: linear-gradient(100deg, rgba(255,213,106,0.12), rgba(24,18,12,0.6) 60%); }
+.du-tourney .pg-sub { margin: 4px 0 0; max-width: 62ch; }
+.du-rounds { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0 0; padding: 0; list-style: none; }
+.du-rounds li { display: grid; gap: 4px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,0.3); font-size: 13px; }
+.du-rounds li.is-done { border-color: rgba(155,227,122,0.6); }
+.du-rounds li.is-lost { border-color: rgba(224,100,75,0.6); opacity: 0.7; }
+.du-rounds strong { color: var(--bone); }
+.du-rounds small { color: #ffd56a; }
 .du-weekly { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; margin-top: 28px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(180,124,255,0.45); background: linear-gradient(100deg, rgba(180,124,255,0.12), rgba(24,18,12,0.6) 60%); }
 .du-weekly .pg-sub { margin: 4px 0 0; max-width: 60ch; }
 .du-weekly-decks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--ash); }
@@ -854,6 +966,7 @@ const MATCH_CSS = `
 .dm-rankchange.is-up { color: #ffd56a; box-shadow: 0 0 30px rgba(255,213,106,0.35); }
 .dm-rankchange.is-down { color: #e0a090; }
 .dm-tag { font-size: 14px !important; font-weight: 800; color: #ff9a5a; }
+.dm-tag.is-gold { color: #ffd56a; font-size: 18px !important; }
 .dm-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 22px; background: linear-gradient(180deg, #2a1f14, #140e09); border-bottom: 2px solid #5a4226; box-shadow: 0 2px 0 rgba(255,214,140,0.12) inset, 0 6px 18px rgba(0,0,0,0.5); }
 .dm-side { display: flex; align-items: center; gap: 12px; font-size: 15px; }
 .dm-side strong { font-family: Georgia, serif; font-size: 17px; color: #f4e2bb; letter-spacing: 0.02em; }

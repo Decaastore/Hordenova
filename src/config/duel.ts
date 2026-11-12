@@ -202,21 +202,32 @@ export const TROPHIES_LOSS = 20;
  */
 export interface DuelPrize {
   coins: number;
+  /** Free Gems — they work in the whole game (Store, skins, speed-ups). */
+  gems: number;
   shards: number;
   splinters: number;
   rare: number;
   epic: number;
   legendary: number;
 }
-export const NO_PRIZE: DuelPrize = { coins: 0, shards: 0, splinters: 0, rare: 0, epic: 0, legendary: 0 };
+export const NO_PRIZE: DuelPrize = { coins: 0, gems: 0, shards: 0, splinters: 0, rare: 0, epic: 0, legendary: 0 };
 const P = (p: Partial<DuelPrize>): DuelPrize => ({ ...NO_PRIZE, ...p });
 
 export function addPrize(a: DuelPrize, b: DuelPrize): DuelPrize {
-  return { coins: a.coins + b.coins, shards: a.shards + b.shards, splinters: a.splinters + b.splinters, rare: a.rare + b.rare, epic: a.epic + b.epic, legendary: a.legendary + b.legendary };
+  return { coins: a.coins + b.coins, gems: a.gems + b.gems, shards: a.shards + b.shards, splinters: a.splinters + b.splinters, rare: a.rare + b.rare, epic: a.epic + b.epic, legendary: a.legendary + b.legendary };
 }
 
 export const MATCH_COINS: Record<DuelOutcome, number> = { WIN: 12, LOSS: 4, DRAW: 6 };
-export const FIRST_WIN_PRIZE = P({ coins: 40 });
+export const FIRST_WIN_PRIZE = P({ coins: 40, gems: 5 });
+
+/** Ranked wins in a week (Monday UTC) that pay Free Gems, once each per week. */
+export const WEEKLY_WIN_GOALS: readonly { wins: number; prize: DuelPrize }[] = [
+  { wins: 10, prize: P({ coins: 60, gems: 20 }) },
+  { wins: 25, prize: P({ coins: 120, gems: 40 }) },
+  { wins: 50, prize: P({ coins: 250, gems: 80 }) },
+];
+/** Finishing all three daily missions adds this. */
+export const MISSIONS_ALL_DONE_PRIZE = P({ gems: 10 });
 export const STREAK_PRIZES: readonly { at: number; prize: DuelPrize }[] = [
   { at: 3, prize: P({ coins: 30 }) },
   { at: 5, prize: P({ coins: 60 }) },
@@ -228,8 +239,17 @@ export function rankPrize(index: number): DuelPrize {
   const step = RANK_STEPS[index];
   if (!step || index === 0) return NO_PRIZE;
   if (step.division !== 1) return P({ coins: 80 });
-  const byLeague: Record<LeagueId, number> = { BRONZE: 0, SILVER: 250, GOLD: 400, PLATINUM: 600, DIAMOND: 900, MASTER: 1500, LEGEND: 3000 };
-  return P({ coins: byLeague[step.league] });
+  const byLeague: Record<LeagueId, [number, number]> = {
+    BRONZE: [0, 0],
+    SILVER: [250, 25],
+    GOLD: [400, 50],
+    PLATINUM: [600, 100],
+    DIAMOND: [900, 150],
+    MASTER: [1500, 250],
+    LEGEND: [3000, 500],
+  };
+  const [coins, gems] = byLeague[step.league];
+  return P({ coins, gems });
 }
 
 // ── daily missions ─────────────────────────────────────────────────────
@@ -303,6 +323,8 @@ export interface DuelShopItem {
   prize?: DuelPrize;
   /** At most once a week. */
   weekly?: boolean;
+  /** Earned only (never sold) — e.g. the Weekend Tournament banner. */
+  earnedOnly?: boolean;
   cosmetic?: { kind: DuelCosmeticKind; color: string; color2: string; skinId?: string; tower?: TowerType; fx?: KillFxId };
 }
 
@@ -310,6 +332,7 @@ export const DUEL_SHOP: readonly DuelShopItem[] = [
   { id: "BANNER_CRIMSON", price: 300, cosmetic: { kind: "BANNER", color: "#b0302a", color2: "#f0c060" } },
   { id: "BANNER_AZURE", price: 300, cosmetic: { kind: "BANNER", color: "#2a5ab0", color2: "#e8e8f0" } },
   { id: "BANNER_EMERALD", price: 450, cosmetic: { kind: "BANNER", color: "#1f7a4a", color2: "#f0d080" } },
+  { id: "BANNER_CHAMPION", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#ffd56a", color2: "#7a1414" } },
   { id: "BANNER_VOID", price: 700, cosmetic: { kind: "BANNER", color: "#3a1a5a", color2: "#d090ff" } },
   { id: "FRAME_GOLD", price: 500, cosmetic: { kind: "FRAME", color: "#e8b04b", color2: "#7a5a1a" } },
   { id: "FRAME_FROST", price: 650, cosmetic: { kind: "FRAME", color: "#9ad8ff", color2: "#2a5a7a" } },
@@ -348,7 +371,11 @@ export interface DuelProfile {
   firstWinDay: number;
   /** Highest rank step whose prize was paid. */
   rankPaidUpTo: number;
-  missions: { day: number; progress: Record<string, number>; claimed: string[] };
+  missions: { day: number; progress: Record<string, number>; claimed: string[]; bonusPaid?: boolean };
+  /** Ranked wins this week and which weekly-win prizes were paid. */
+  weekWins: { week: number; wins: number; paid: number[] };
+  /** Weekend Tournament: the weekend it belongs to, rounds won, and whether the run is over. */
+  tourney: { weekend: number; round: number; out: boolean; won: boolean };
   /** Week the weekly shop item was last bought. */
   shopWeek: number;
   owned: string[];
@@ -381,6 +408,8 @@ export function createDuelProfile(): DuelProfile {
     frame: null,
     towerSkins: {},
     killFx: null,
+    weekWins: { week: -1, wins: 0, paid: [] },
+    tourney: { weekend: -1, round: 0, out: false, won: false },
     weeklyWonWeek: -1,
   };
 }
@@ -419,6 +448,14 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
       ),
     ) as Partial<Record<TowerType, string>>,
     killFx: pickOwned(r.killFx),
+    weekWins: (() => {
+      const w = (r.weekWins && typeof r.weekWins === "object" ? r.weekWins : {}) as Record<string, unknown>;
+      return { week: intOr(w.week, -1), wins: int(w.wins), paid: Array.isArray(w.paid) ? (w.paid as unknown[]).filter((x): x is number => typeof x === "number") : [] };
+    })(),
+    tourney: (() => {
+      const w = (r.tourney && typeof r.tourney === "object" ? r.tourney : {}) as Record<string, unknown>;
+      return { weekend: intOr(w.weekend, -1), round: Math.min(TOURNEY_ROUNDS.length, int(w.round)), out: w.out === true, won: w.won === true };
+    })(),
     weeklyWonWeek: intOr(r.weeklyWonWeek, -1),
   };
 }
@@ -452,6 +489,15 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
   const streak = win ? p.streak + 1 : st.outcome === "LOSS" ? 0 : p.streak;
   const streakHit = win ? STREAK_PRIZES.find((s) => s.at === streak) : undefined;
   if (streakHit) prize = addPrize(prize, streakHit.prize);
+  const week = duelWeek(nowMs);
+  const ww = p.weekWins.week === week ? p.weekWins : { week, wins: 0, paid: [] as number[] };
+  const weekWinsNow = ww.wins + (win ? 1 : 0);
+  const newPaid = [...ww.paid];
+  for (const g of WEEKLY_WIN_GOALS)
+    if (weekWinsNow >= g.wins && !newPaid.includes(g.wins)) {
+      newPaid.push(g.wins);
+      prize = addPrize(prize, g.prize);
+    }
   const bestTrophies = Math.max(p.bestTrophies, trophies);
   const reached = rankFor(bestTrophies).index;
   const newRanks: number[] = [];
@@ -476,6 +522,7 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
       firstWinDay: firstWin ? day : p.firstWinDay,
       rankPaidUpTo: Math.max(p.rankPaidUpTo, reached),
       missions: { ...missions, progress },
+      weekWins: { week, wins: weekWinsNow, paid: newPaid },
     },
     prize,
     trophyChange: trophies - p.trophies,
@@ -488,17 +535,62 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
 }
 
 /** Claims a finished mission's coins. */
-export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): DuelProfile | null {
+export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { profile: DuelProfile; gems: number } | null {
   const day = Math.floor(nowMs / 86_400_000);
-  const m = duelMissionsFor(day).find((x) => x.id === id);
+  const all = duelMissionsFor(day);
+  const m = all.find((x) => x.id === id);
   if (!m || p.missions.day !== day || p.missions.claimed.includes(id) || (p.missions.progress[id] ?? 0) < m.target) return null;
-  return { ...p, coins: p.coins + m.coins, missions: { ...p.missions, claimed: [...p.missions.claimed, id] } };
+  const claimed = [...p.missions.claimed, id];
+  const bonus = !p.missions.bonusPaid && all.every((x) => claimed.includes(x.id));
+  return {
+    profile: { ...p, coins: p.coins + m.coins, missions: { ...p.missions, claimed, bonusPaid: p.missions.bonusPaid || bonus } },
+    gems: bonus ? MISSIONS_ALL_DONE_PRIZE.gems : 0,
+  };
+}
+
+// ── weekend tournament ─────────────────────────────────────────────────
+/**
+ * TORNEIO DE FIM DE SEMANA — Saturday and Sunday (UTC), one run per
+ * weekend: three matches in a row against an ever stronger AI, with your
+ * own deck. Lose one and the run is over until next weekend. Win all three
+ * for the biggest Duel prize and the Champion banner, which can't be bought.
+ * Trophies don't move.
+ */
+export const TOURNEY_ROUNDS: readonly { ai: number; prize: DuelPrize }[] = [
+  { ai: 0.75, prize: P({ coins: 60 }) },
+  { ai: 0.88, prize: P({ coins: 120, gems: 25 }) },
+  { ai: 0.97, prize: P({ coins: 250, gems: 100 }) },
+];
+export const TOURNEY_BANNER = "BANNER_CHAMPION";
+
+/** The weekend number when it's Saturday or Sunday (UTC), else null. */
+export function tourneyWeekend(nowMs: number): number | null {
+  const dow = new Date(nowMs).getUTCDay();
+  return dow === 6 || dow === 0 ? duelWeek(nowMs + (dow === 0 ? 0 : 86_400_000)) : null;
+}
+
+export function tourneyState(p: DuelProfile, nowMs: number): DuelProfile["tourney"] | null {
+  const wk = tourneyWeekend(nowMs);
+  if (wk === null) return null;
+  return p.tourney.weekend === wk ? p.tourney : { weekend: wk, round: 0, out: false, won: false };
+}
+
+/** Records a tournament match. */
+export function applyTourneyResult(p: DuelProfile, outcome: DuelOutcome, nowMs: number): { profile: DuelProfile; prize: DuelPrize; finished: boolean } | null {
+  const t = tourneyState(p, nowMs);
+  if (!t || t.out || t.won) return null;
+  if (outcome !== "WIN") return { profile: { ...p, tourney: { ...t, out: true } }, prize: NO_PRIZE, finished: true };
+  const prize = TOURNEY_ROUNDS[t.round]!.prize;
+  const round = t.round + 1;
+  const won = round >= TOURNEY_ROUNDS.length;
+  const owned = won && !p.owned.includes(TOURNEY_BANNER) ? [...p.owned, TOURNEY_BANNER] : p.owned;
+  return { profile: { ...p, coins: p.coins + prize.coins, owned, tourney: { ...t, round, won } }, prize, finished: won };
 }
 
 /** Buys from the Duel shop. Materials come back as a prize for the account; cosmetics are owned (and worn) at once. */
 export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { profile: DuelProfile; prize: DuelPrize } | null {
   const item = getShopItem(id);
-  if (!item || p.coins < item.price) return null;
+  if (!item || item.earnedOnly || p.coins < item.price) return null;
   const week = duelWeek(nowMs);
   if (item.weekly && p.shopWeek === week) return null;
   if (item.cosmetic && p.owned.includes(id)) return null;
@@ -523,6 +615,8 @@ export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { pr
  */
 /** Duel Coins for beating the Weekly Challenge (once a week). */
 export const WEEKLY_CHALLENGE_COINS = 150;
+/** Free Gems for beating the Weekly Challenge — they work in the whole game. */
+export const WEEKLY_CHALLENGE_GEMS = 100;
 export const WEEKLY_CHALLENGE_AI = 0.95;
 
 export interface WeeklyChallenge {

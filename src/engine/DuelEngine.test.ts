@@ -82,8 +82,9 @@ describe("Duel profile", () => {
     expect(applyDuelResult(p, stats("LOSS"), day).profile.streak).toBe(0);
   });
 
-  it("the Duel only pays Duel Coins — no Gems, Shards or Forge materials reach the Season", async () => {
+  it("the Duel pays Duel Coins and Free Gems — never Gem Shards or Forge materials", async () => {
     const { DUEL_SHOP, STREAK_PRIZES: streaks } = await import("@/config/duel");
+    // Free Gems are fine (they work in the whole game); Forge materials and Gem Shards never come from the Duel
     const onlyCoins = (pr: { shards: number; splinters: number; rare: number; epic: number; legendary: number }) => pr.shards + pr.splinters + pr.rare + pr.epic + pr.legendary === 0;
     for (let i = 0; i < RANK_STEPS.length; i++) expect(onlyCoins(rankPrize(i))).toBe(true);
     for (const s2 of streaks) expect(onlyCoins(s2.prize)).toBe(true);
@@ -104,12 +105,46 @@ describe("Duel profile", () => {
     const ms = duelMissionsFor(1000);
     expect(ms).toHaveLength(3);
     for (let i = 0; i < 20; i++) p = applyDuelResult(p, { outcome: "WIN", myCastle: 20, foeCastle: 0, sends: 5, deck: ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "S_SHIELDS"] }, day).profile;
+    let gems = 0;
     for (const m of ms) {
       const c = claimDuelMission(p, m.id, day)!;
-      expect(c.coins).toBe(p.coins + m.coins);
-      p = c;
+      expect(c.profile.coins).toBe(p.coins + m.coins);
+      gems += c.gems;
+      p = c.profile;
       expect(claimDuelMission(p, m.id, day)).toBeNull();
     }
+    expect(gems).toBe(10); // all three done: Free Gems bonus, once
+  });
+
+  it("weekly wins pay Free Gems once per goal, and the Weekend Tournament crowns a champion", async () => {
+    const { WEEKLY_WIN_GOALS, applyTourneyResult, tourneyState, TOURNEY_ROUNDS, TOURNEY_BANNER } = await import("@/config/duel");
+    let p = createDuelProfile();
+    let gems = 0;
+    for (let i = 0; i < 25; i++) {
+      const r = applyDuelResult(p, stats("WIN"), day);
+      gems += r.prize.gems;
+      p = r.profile;
+    }
+    expect(p.weekWins.paid).toEqual([10, 25]);
+    expect(gems).toBeGreaterThanOrEqual(WEEKLY_WIN_GOALS[0]!.prize.gems + WEEKLY_WIN_GOALS[1]!.prize.gems);
+    // a Saturday and a Wednesday
+    const sat = Date.UTC(2026, 10, 14, 12);
+    const wed = Date.UTC(2026, 10, 11, 12);
+    expect(tourneyState(p, wed)).toBeNull();
+    let q = createDuelProfile();
+    let tg = 0;
+    for (let i = 0; i < TOURNEY_ROUNDS.length; i++) {
+      const r = applyTourneyResult(q, "WIN", sat)!;
+      tg += r.prize.gems;
+      q = r.profile;
+    }
+    expect(q.tourney.won).toBe(true);
+    expect(q.owned).toContain(TOURNEY_BANNER);
+    expect(tg).toBe(125);
+    expect(applyTourneyResult(q, "WIN", sat)).toBeNull(); // one run per weekend
+    const lost = applyTourneyResult(createDuelProfile(), "LOSS", sat)!;
+    expect(lost.profile.tourney.out).toBe(true);
+    expect(buyDuelShopItem({ ...createDuelProfile(), coins: 99999 }, TOURNEY_BANNER, sat)).toBeNull(); // never sold
   });
 
   it("validates decks", () => {
