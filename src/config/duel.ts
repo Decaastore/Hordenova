@@ -144,10 +144,12 @@ export interface DuelProfile {
   deck: DuelCardId[];
   rewardDay: number;
   rewardedToday: number;
+  /** Week whose Weekly Challenge was beaten (-1 none). */
+  weeklyWonWeek: number;
 }
 
 export function createDuelProfile(): DuelProfile {
-  return { trophies: 0, bestTrophies: 0, wins: 0, losses: 0, deck: [...DEFAULT_DECK], rewardDay: -1, rewardedToday: 0 };
+  return { trophies: 0, bestTrophies: 0, wins: 0, losses: 0, deck: [...DEFAULT_DECK], rewardDay: -1, rewardedToday: 0, weeklyWonWeek: -1 };
 }
 
 const int = (v: unknown, d = 0) => (typeof v === "number" && Number.isFinite(v) ? Math.max(0, Math.floor(v)) : d);
@@ -164,6 +166,7 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
     deck: sanitizeDeck(r.deck),
     rewardDay: typeof r.rewardDay === "number" ? Math.floor(r.rewardDay) : -1,
     rewardedToday: int(r.rewardedToday),
+    weeklyWonWeek: typeof r.weeklyWonWeek === "number" ? Math.floor(r.weeklyWonWeek) : -1,
   };
 }
 
@@ -190,4 +193,41 @@ export function applyDuelResult(p: DuelProfile, outcome: DuelOutcome, nowMs: num
     },
     shards: paid ? DUEL_WIN_SHARDS : 0,
   };
+}
+
+// ── weekly challenge ────────────────────────────────────────────────────
+/**
+ * DESAFIO SEMANAL — one fixed match a week, the same for everyone: the same
+ * seed, your deck and the opponent's deck are set, and the opponent plays at
+ * full skill. Beat it once in the week for its reward. Trophies don't move.
+ */
+export const WEEKLY_CHALLENGE_SHARDS = 3;
+export const WEEKLY_CHALLENGE_AI = 0.95;
+
+export interface WeeklyChallenge {
+  week: number;
+  seed: number;
+  myDeck: DuelCardId[];
+  foeDeck: DuelCardId[];
+}
+
+/** Week number (Monday-based, UTC). */
+export function duelWeek(nowMs: number): number {
+  return Math.floor((nowMs - Date.UTC(1970, 0, 5)) / (7 * 86_400_000));
+}
+
+export function weeklyChallenge(week: number): WeeklyChallenge {
+  const towers = DUEL_CARDS.filter((c) => c.kind === "TOWER").map((c) => c.id);
+  const sends = DUEL_CARDS.filter((c) => c.kind === "SEND").map((c) => c.id);
+  const pick = (list: DuelCardId[], n: number, salt: number) => {
+    const l = [...list];
+    let s = (week * 2654435761 + salt) >>> 0 || 1;
+    const out: DuelCardId[] = [];
+    while (out.length < n) {
+      s = (s * 16807) % 2147483647;
+      out.push(l.splice(s % l.length, 1)[0]!);
+    }
+    return out;
+  };
+  return { week, seed: week * 7919 + 13, myDeck: [...pick(towers, 3, 1), ...pick(sends, 5, 2)], foeDeck: [...pick(towers, 4, 3), ...pick(sends, 4, 4)] };
 }

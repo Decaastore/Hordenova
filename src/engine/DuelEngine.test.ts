@@ -71,3 +71,25 @@ describe("Duel profile", () => {
     expect(sanitizeDeck(["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "T_IRONWOOD"])).toEqual([...DEFAULT_DECK]);
   });
 });
+
+describe("weekly challenge and season rule", () => {
+  it("the weekly challenge is the same for everyone that week, with valid decks", async () => {
+    const { weeklyChallenge, isValidDeck: valid } = await import("@/config/duel");
+    const a = weeklyChallenge(2900);
+    expect(a).toEqual(weeklyChallenge(2900));
+    expect(valid(a.myDeck)).toBe(true);
+    expect(valid(a.foeDeck)).toBe(true);
+    expect(weeklyChallenge(2901).seed).not.toBe(a.seed);
+  });
+
+  it("every Season rule pairs an upside with a downside", async () => {
+    const { SEASON_RULES, getSeasonRule } = await import("@/config/seasonRules");
+    for (const r of SEASON_RULES) {
+      const up = [r.killGoldPct > 0, r.castleHpPct > 0, r.rangePct > 0, r.critPct > 0, r.attackSpeedPct > 0].some(Boolean);
+      const down = [r.enemySpeedPct > 0, r.enemyHpPct > 0, r.rangePct < 0, r.attackSpeedPct < 0].some(Boolean);
+      expect(up && down).toBe(true);
+    }
+    expect(getSeasonRule(1).id).toBe(SEASON_RULES[0]!.id);
+    expect(getSeasonRule(1 + SEASON_RULES.length).id).toBe(SEASON_RULES[0]!.id);
+  });
+});

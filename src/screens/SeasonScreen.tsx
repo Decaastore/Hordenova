@@ -4,6 +4,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
 import { depthOfWave, romanDepth } from "@/config/eternal";
 import { arenaFor } from "@/config/duel";
+import { getSeasonRule } from "@/config/seasonRules";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
@@ -89,6 +90,10 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel }: 
             <div>
               <p className="pg-kicker">{t("season.kicker", { number: status.seasonNumber })}</p>
               <h1 className="pg-h1">{theme}</h1>
+              <p className="sr-rule" data-testid="season-rule">
+                <strong>{t("seasonRule.label")}: {t(`seasonRule.${getSeasonRule(status.seasonNumber).id}.name` as TranslationKey)}</strong>
+                <span>{t(`seasonRule.${getSeasonRule(status.seasonNumber).id}.desc` as TranslationKey)}</span>
+              </p>
               <div className="pg-progress">
                 <div className="pg-progress-track">
                   <div className="pg-progress-fill" style={{ width: `${(progress * 100).toFixed(1)}%` }} />
@@ -322,6 +327,9 @@ const ETERNAL_CSS = `
 .et-figs dd { margin: 2px 0 0; font-family: var(--display); font-size: 22px; color: #e3cdff; }
 .et-actions { display: grid; gap: 8px; justify-items: center; text-align: center; max-width: 260px; }
 .et-actions small { color: var(--ash); font-size: 12px; line-height: 1.4; }
+.sr-rule { display: grid; gap: 2px; margin: 6px 0 14px; padding: 8px 12px; border-left: 3px solid var(--gold-hi); background: rgba(0,0,0,0.3); border-radius: 0 8px 8px 0; max-width: 60ch; font-size: 14px; }
+.sr-rule strong { color: var(--gold-hi); }
+.sr-rule span { color: #d9cdb6; }
 .du-card { border-color: rgba(224,100,75,0.45); background: linear-gradient(110deg, rgba(224,100,75,0.13), rgba(24,18,12,0.6) 60%); }
 .du-kicker { color: #ff9a85 !important; }
 @media (max-width: 720px) { .et-card { grid-template-columns: 1fr; } .et-actions { justify-items: stretch; max-width: none; } }

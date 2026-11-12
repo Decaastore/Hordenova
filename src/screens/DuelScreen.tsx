@@ -19,6 +19,10 @@ import {
   MAX_DUEL_TOWER_LEVEL,
   TROPHIES_LOSS,
   TROPHIES_WIN,
+  duelWeek,
+  WEEKLY_CHALLENGE_AI,
+  WEEKLY_CHALLENGE_SHARDS,
+  weeklyChallenge,
   type DuelCardId,
   type DuelOutcome,
 } from "@/config/duel";
@@ -247,6 +251,10 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const [deck, setDeck] = useState<DuelCardId[]>(() => [...save.duel.deck]);
   const [match, setMatch] = useState<DuelEngine | null>(null);
   const [result, setResult] = useState<{ outcome: DuelOutcome; trophies: number; shards: number } | null>(null);
+  const [challenge, setChallenge] = useState(false);
+  const week = duelWeek(Date.now());
+  const weekly = useMemo(() => weeklyChallenge(week), [week]);
+  const weeklyDone = save.duel.weeklyWonWeek === week;
   const arena = arenaFor(save.duel.trophies);
   const nextArena = DUEL_ARENAS.find((a) => a.minTrophies > save.duel.trophies);
   const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
@@ -261,11 +269,26 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const next = updateSave({ duel: { ...save.duel, deck } });
     setSave(next);
     setResult(null);
+    setChallenge(false);
     setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], arena.ai, next.equippedTowerSkinByType));
+  };
+
+  const startWeekly = () => {
+    setResult(null);
+    setChallenge(true);
+    setMatch(new DuelEngine(weekly.seed, [weekly.myDeck, weekly.foeDeck], WEEKLY_CHALLENGE_AI, save.equippedTowerSkinByType));
   };
 
   const finish = (outcome: DuelOutcome) => {
     const cur = loadSave();
+    if (challenge) {
+      const paid = outcome === "WIN" && cur.duel.weeklyWonWeek !== week;
+      if (paid) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source: "duel_weekly", amount: WEEKLY_CHALLENGE_SHARDS });
+      const next = updateSave({ duel: { ...cur.duel, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek }, gemShards: cur.gemShards + (paid ? WEEKLY_CHALLENGE_SHARDS : 0) });
+      setSave(next);
+      setResult({ outcome, trophies: 0, shards: paid ? WEEKLY_CHALLENGE_SHARDS : 0 });
+      return;
+    }
     const { profile, shards } = applyDuelResult(cur.duel, outcome, Date.now());
     if (shards > 0) appendLedgerEvent({ eventType: "GEM_SHARDS_EARNED", fromOwner: null, toOwner: cur.playerId, source: "duel_win", amount: shards });
     const next = updateSave({ duel: profile, gemShards: cur.gemShards + shards });
@@ -273,7 +296,18 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setResult({ outcome, trophies: profile.trophies - cur.duel.trophies, shards });
   };
 
-  if (match) return <DuelMatch engine={match} arenaId={arena.id} biome={arena.biome} result={result} onFinish={finish} onAgain={start} onLobby={() => setMatch(null)} />;
+  if (match)
+    return (
+      <DuelMatch
+        engine={match}
+        arenaId={challenge ? "ARENA_ABYSS" : arena.id}
+        biome={challenge ? "ABYSS" : arena.biome}
+        result={result}
+        onFinish={finish}
+        onAgain={challenge ? startWeekly : start}
+        onLobby={() => setMatch(null)}
+      />
+    );
 
   return (
     <div className="pg-root">
@@ -309,6 +343,21 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
             </div>
             <button className="pg-btn" disabled={!deckOk} onClick={start} data-testid="duel-start">
               {t("duel.play")}
+            </button>
+          </section>
+          <section className="du-weekly" data-testid="duel-weekly">
+            <div>
+              <h2 className="pg-h2">{t("duel.weeklyTitle")}</h2>
+              <p className="pg-sub">{t("duel.weeklyLead", { shards: WEEKLY_CHALLENGE_SHARDS })}</p>
+              <div className="du-weekly-decks">
+                <span>{t("duel.weeklyYours")}</span>
+                {weekly.myDeck.map((id) => (
+                  <CardFace key={id} id={id} small />
+                ))}
+              </div>
+            </div>
+            <button className={weeklyDone ? "pg-btn-ghost" : "pg-btn"} onClick={startWeekly} data-testid="duel-weekly-start">
+              {weeklyDone ? t("duel.weeklyDone") : t("duel.weeklyPlay")}
             </button>
           </section>
           <section className="du-deck">
@@ -553,6 +602,9 @@ const LOBBY_CSS = `
 .du-play > div { max-width: 70ch; display: grid; gap: 6px; }
 .du-play .pg-sub { margin: 0; }
 .du-deck { padding: 32px 0 96px; }
+.du-weekly { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; margin-top: 28px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(180,124,255,0.45); background: linear-gradient(100deg, rgba(180,124,255,0.12), rgba(24,18,12,0.6) 60%); }
+.du-weekly .pg-sub { margin: 4px 0 0; max-width: 60ch; }
+.du-weekly-decks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--ash); }
 .du-count { font-size: 14px; color: var(--ash); }
 .du-count.is-bad { color: #ff9a85; }
 .du-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }

@@ -147,6 +147,7 @@ import { adaptAfterWave, createHordeAdaptation, emptyShares, strongestResistance
 import { advanceRebuild, builtBuildings, createCityState, cityGoldShare, CITY_FIRES_PER_BOSS_BREACH, CITY_FIRES_PER_LEAKED_WAVE, igniteBuildings, type CityBuildingId, type CityState } from "@/config/city";
 import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
+import { getSeasonRule, type SeasonRule } from "@/config/seasonRules";
 import {
   addEssences,
   BOSS_SPLINTERS,
@@ -593,6 +594,8 @@ export class GameEngine {
   private expeditions: ExpeditionState = createExpeditionState();
   private momentOffers: MomentOfferState = createMomentOfferState();
   private vip: VipState = createVipState();
+  /** REGRA DA SEASON — this Season's rule, or null in the Eternal castle (config/seasonRules.ts). */
+  private seasonRule: SeasonRule | null = null;
   private lastEternalEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null = null;
   private bestiaryKills: BestiaryKills = {};
   private achievements: AchievementId[] = [];
@@ -775,7 +778,8 @@ export class GameEngine {
     this.seasonPass = save.seasonPass ?? freshPassState(seasonClock.getCurrentSeasonWindow().seasonNumber);
     this.bossSiege = save.bossSiege;
     this.bossRecords = save.bossRecords;
-    this.maxBaseHp = RUN_START.baseHp + this.castleHpBonus;
+    this.seasonRule = this.isEternal ? null : getSeasonRule(seasonClock.getCurrentSeasonWindow().seasonNumber);
+    this.maxBaseHp = Math.round((RUN_START.baseHp + this.castleHpBonus) * (1 + (this.seasonRule?.castleHpPct ?? 0) / 100));
     this.wave = createWaveManagerState();
     this.resetAttemptState();
     this.wave.currentWave = save.currentWave;
@@ -2302,6 +2306,22 @@ export class GameEngine {
     this.persist();
   }
 
+  /** REGRA DA SEASON — the Season's rule on a fresh enemy (life, speed, gold). */
+  private applySeasonRuleToSpawn(enemy: EnemyInstance): void {
+    const r = this.seasonRule;
+    if (!r) return;
+    if (r.enemyHpPct) {
+      enemy.maxHp = Math.round(enemy.maxHp * (1 + r.enemyHpPct / 100));
+      enemy.hp = enemy.maxHp;
+    }
+    if (r.enemySpeedPct) enemy.baseSpeed *= 1 + r.enemySpeedPct / 100;
+    if (r.killGoldPct) enemy.goldReward = Math.round(enemy.goldReward * (1 + r.killGoldPct / 100));
+  }
+
+  getSeasonRule(): SeasonRule | null {
+    return this.seasonRule;
+  }
+
   private applyRiftToSpawn(enemy: EnemyInstance): void {
     const moat = talentBonus(this.talents).enemySlowPct;
     if (moat > 0) enemy.baseSpeed *= 1 - moat / 100;
@@ -2611,7 +2631,8 @@ export class GameEngine {
     const byId = new Map(this.inventory.map((item) => [item.instanceId, item]));
     const tb = talentBonus(this.talents);
     const lastStand = this.maxBaseHp > 0 && this.baseHp > 0 && this.baseHp / this.maxBaseHp < LAST_STAND_HP_FRACTION ? tb.lastStandDamagePct : 0;
-    const hasTalents = tb.damagePct + tb.attackSpeedPct + tb.bossDamagePct + tb.critChancePct + tb.rangePct + lastStand > 0;
+    const sr = this.seasonRule;
+    const hasTalents = tb.damagePct + tb.attackSpeedPct + tb.bossDamagePct + tb.critChancePct + tb.rangePct + lastStand > 0 || !!sr && (sr.critPct !== 0 || sr.rangePct !== 0 || sr.attackSpeedPct !== 0);
     for (const tower of this.towers) {
       const items = tower.equippedItemInstanceIds.map((id) => (id ? byId.get(id) : undefined)).filter((x): x is ItemInstance => !!x);
       if (items.length === 0 && !hasTalents) {
@@ -2621,10 +2642,10 @@ export class GameEngine {
       const b = itemBonusFrom(items);
       tower.itemBonus = {
         damagePct: b.damagePct + tb.damagePct + lastStand,
-        attackSpeedPct: b.attackSpeedPct + tb.attackSpeedPct,
+        attackSpeedPct: b.attackSpeedPct + tb.attackSpeedPct + (sr?.attackSpeedPct ?? 0),
         bossDamagePct: b.bossDamagePct + tb.bossDamagePct,
-        critChancePct: b.critChancePct + tb.critChancePct,
-        rangePct: b.rangePct + tb.rangePct,
+        critChancePct: b.critChancePct + tb.critChancePct + (sr?.critPct ?? 0),
+        rangePct: b.rangePct + tb.rangePct + (sr?.rangePct ?? 0),
       };
     }
   }
@@ -2707,6 +2728,7 @@ export class GameEngine {
         const spawned = createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave, waveHpFactor(this.wave.currentWave));
         spawned.goldReward = Math.round(spawned.goldReward * waveGoldFactor(this.wave.currentWave));
         this.applyRiftToSpawn(spawned);
+        this.applySeasonRuleToSpawn(spawned);
         this.enemies.push(spawned);
         this.maybeDiscover(enemyTypeToSpawn);
       }
@@ -3148,6 +3170,7 @@ export class GameEngine {
     this.eliteSpawnedForWave = this.wave.currentWave;
     const elite = createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER, waveHpFactor(this.wave.currentWave));
     elite.goldReward = Math.round(elite.goldReward * waveGoldFactor(this.wave.currentWave));
+    this.applySeasonRuleToSpawn(elite);
     this.enemies.push(elite);
   }
 

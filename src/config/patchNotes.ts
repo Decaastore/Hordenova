@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v106",
+    dateIso: "2026-11-11",
+    category: "SYSTEMS",
+    title: {
+      en: "A Rule for Every Season, and the Weekly Duel Challenge",
+      ptBR: "Uma Regra por Season e o Desafio Semanal do Duelo",
+    },
+    description: {
+      en: "Every Season now has its own rule, the same for everyone, so each Season plays a little differently. The Duel also has a Weekly Challenge: one fixed match a week, the same for all players.",
+      ptBR: "Cada Season agora tem a sua própria regra, igual para todos, para cada Season jogar um pouco diferente. O Duelo também ganhou o Desafio da Semana: uma partida fixa por semana, igual para todos os jogadores.",
+    },
+    highlights: [
+      {
+        en: "Six rules take turns, each with an upside and a downside: Swift Horde, Stone Walls, Gold Rush, Sharp Eyes, Long Reach and Brutal Horde. This Season's rule is Long Reach: towers reach 6% farther but attack 4% slower.",
+        ptBR: "Seis regras se revezam, cada uma com um lado bom e um ruim: Horda Veloz, Muralhas de Pedra, Febre do Ouro, Olhos Afiados, Longo Alcance e Horda Brutal. A regra desta Season é Longo Alcance: as torres alcançam 6% mais longe, mas atacam 4% mais devagar.",
+      },
+      {
+        en: "The rule shows at the top of the Season page and applies to the Season castle only, never to the Eternal castle or the Duel.",
+        ptBR: "A regra aparece no topo da página da Season e vale só para o castelo da Season, nunca para o Eterno nem para o Duelo.",
+      },
+      {
+        en: "Weekly Challenge: the same start and the same decks for everyone, against the AI at full skill. Win it once in the week for 3 Gem Shards; trophies don't move.",
+        ptBR: "Desafio da Semana: o mesmo começo e os mesmos decks para todos, contra a IA no nível máximo. Vença uma vez na semana e ganhe 3 fragmentos de gema; os troféus não mudam.",
+      },
+    ],
+  },
+  {
     id: "v105",
     dateIso: "2026-11-11",
     category: "CONTENT",
