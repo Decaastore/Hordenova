@@ -5,7 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getDropTable } from "@/config/dropTables";
 import { getItemHistory } from "@/engine/EconomyLedger";
-import type { ItemInstance } from "@/entities/Item";
+import { isPassItem, type ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
 import { DropTableView } from "./DropTableView";
 import { ItemGlyph } from "./ItemGlyph";
@@ -97,7 +97,16 @@ export function ItemDetailsModal({ item, onClose, gemShards, onReroll }: ItemDet
         </Section>
 
         <Section label={t("inventory.tradable")}>
-          <div style={mutedLineStyle}>{item.tradable ? t("inventory.tradable") : t("inventory.soulbound")}</div>
+          {isPassItem(item) ? (
+            <>
+              <div style={{ ...mutedLineStyle, color: "#ffd36b", fontWeight: 700 }} data-testid="item-pass-only">
+                {t("inventory.passOnly")}
+              </div>
+              <div style={mutedLineStyle}>{t("inventory.passOnlyHint")}</div>
+            </>
+          ) : (
+            <div style={mutedLineStyle}>{item.tradable ? t("inventory.tradable") : t("inventory.soulbound")}</div>
+          )}
         </Section>
 
         <Section label={t("inventory.acquiredAt")}>

@@ -21,7 +21,7 @@ import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery"
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
 import { DEFAULT_UNLOCKED_ITEM_SLOTS, getItemSlotUnlockCost, TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import type { ItemInstance } from "./Item";
+import { isPassItem, type ItemInstance } from "./Item";
 import type { Vector2 } from "@/utils/geometry";
 
 export interface TowerInstance {
@@ -589,10 +589,12 @@ export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinI
 export function canEquipItem(
   tower: TowerInstance,
   slotIndex: number,
-  item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade" | "pendingAuction">,
+  item: Pick<ItemInstance, "itemDefinitionId" | "pendingTrade" | "pendingAuction"> & { source?: ItemInstance["source"] },
   alreadyEquippedElsewhere: boolean,
 ): boolean {
   if (slotIndex < 0 || slotIndex >= TOWER_ITEM_SLOT_COUNT) return false;
+  // Season Pass items are Fusion material only — never equipped (entities/Item.ts isPassItem)
+  if (isPassItem(item)) return false;
   if (!tower.unlockedItemSlots[slotIndex]) return false;
   if (alreadyEquippedElsewhere) return false;
   if (item.pendingTrade || item.pendingAuction) return false;

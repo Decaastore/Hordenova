@@ -71,3 +71,34 @@ describe("Season Pass", () => {
     expect(getPassView().level).toBe(PASS_LEVELS);
   });
 });
+
+describe("Season Pass items are Fusion material only", () => {
+  it("can't be equipped, but fusing them gives a normal item that can be sold and traded", async () => {
+    const { vi } = await import("vitest");
+    const { createItemInstance } = await import("@/entities/Item");
+    const { canEquipItem, createTowerInstance } = await import("@/entities/Tower");
+    const { rewardItemDefinitionId } = await import("./RewardGrant");
+    const defId = rewardItemDefinitionId("UNCOMMON")!;
+    const owner = loadSave().playerId;
+    const passItems = [0, 1, 2].map((i) => {
+      const it = createItemInstance(defId, owner, { type: "SEASON_PASS", refId: `free:${5 + i * 10}` });
+      it.tradable = false;
+      return it;
+    });
+    const tower = createTowerInstance("t", "IRONWOOD", { x: 0, y: 0 }, 10);
+    tower.unlockedItemSlots = [true, true, true];
+    expect(canEquipItem(tower, 0, passItems[0]!, false)).toBe(false);
+
+    updateSave({ inventory: passItems, overflowInventory: [] });
+    const engine = new GameEngine();
+    engine.startRun();
+    const spy = vi.spyOn(Math, "random").mockReturnValue(0);
+    const out = engine.attemptFusion(passItems.map((i) => i.instanceId));
+    spy.mockRestore();
+    expect(out.status).toBe("SUCCESS");
+    const result = loadSave().inventory.find((i) => i.source.type === "FUSION")!;
+    expect(result).toBeTruthy();
+    expect(result.tradable).toBe(getItemDefinition(result.itemDefinitionId)!.tradable);
+    expect(canEquipItem(tower, 0, result, false)).toBe(true);
+  });
+});

@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v123",
+    dateIso: "2026-11-12",
+    category: "ITEMS",
+    title: {
+      en: "Season Pass items are now Fusion material",
+      ptBR: "Itens do Passe agora são material de Fusão",
+    },
+    description: {
+      en: "Items from the Season Pass can't be equipped, sold or traded anymore: they exist to be fused. When a Fusion with them works, the item that comes out is a normal item, free to equip, sell on the Marketplace and trade.",
+      ptBR: "Os itens do Passe da Season não podem mais ser equipados, vendidos ou trocados: eles existem para a Fusão. Quando a fusão com eles dá certo, o item que sai é um item normal, livre para equipar, vender no Mercado e trocar.",
+    },
+    highlights: [
+      {
+        en: "Pass items show \"Pass item: Fusion only\" in their details, and the tower's equip list tells you to use them in Fusion.",
+        ptBR: "Os itens do Passe mostram \"Item do Passe: só serve para Fusão\" nos detalhes, e a lista de equipar da torre avisa para usá-los na Fusão.",
+      },
+      {
+        en: "Store items are unchanged: they stay on your account, can be equipped and fused, and don't go to the Marketplace.",
+        ptBR: "Os itens da Loja continuam iguais: ficam na sua conta, podem ser equipados e fundidos, e não vão para o Mercado.",
+      },
+    ],
+  },
+  {
     id: "v122",
     dateIso: "2026-11-12",
     category: "BOSSES",
