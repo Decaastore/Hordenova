@@ -218,16 +218,16 @@ export function addPrize(a: DuelPrize, b: DuelPrize): DuelPrize {
 }
 
 export const MATCH_COINS: Record<DuelOutcome, number> = { WIN: 12, LOSS: 4, DRAW: 6 };
-export const FIRST_WIN_PRIZE = P({ coins: 40, gems: 5 });
+export const FIRST_WIN_PRIZE = P({ coins: 40, gems: 2 });
 
 /** Ranked wins in a week (Monday UTC) that pay Free Gems, once each per week. */
 export const WEEKLY_WIN_GOALS: readonly { wins: number; prize: DuelPrize }[] = [
-  { wins: 10, prize: P({ coins: 60, gems: 20 }) },
-  { wins: 25, prize: P({ coins: 120, gems: 40 }) },
-  { wins: 50, prize: P({ coins: 250, gems: 80 }) },
+  { wins: 10, prize: P({ coins: 60, gems: 5 }) },
+  { wins: 25, prize: P({ coins: 120, gems: 10 }) },
+  { wins: 50, prize: P({ coins: 250, gems: 20 }) },
 ];
 /** Finishing all three daily missions adds this. */
-export const MISSIONS_ALL_DONE_PRIZE = P({ gems: 10 });
+export const MISSIONS_ALL_DONE_PRIZE = P({ gems: 3 });
 export const STREAK_PRIZES: readonly { at: number; prize: DuelPrize }[] = [
   { at: 3, prize: P({ coins: 30 }) },
   { at: 5, prize: P({ coins: 60 }) },
@@ -241,12 +241,12 @@ export function rankPrize(index: number): DuelPrize {
   if (step.division !== 1) return P({ coins: 80 });
   const byLeague: Record<LeagueId, [number, number]> = {
     BRONZE: [0, 0],
-    SILVER: [250, 25],
-    GOLD: [400, 50],
-    PLATINUM: [600, 100],
-    DIAMOND: [900, 150],
-    MASTER: [1500, 250],
-    LEGEND: [3000, 500],
+    SILVER: [250, 5],
+    GOLD: [400, 10],
+    PLATINUM: [600, 20],
+    DIAMOND: [900, 30],
+    MASTER: [1500, 50],
+    LEGEND: [3000, 100],
   };
   const [coins, gems] = byLeague[step.league];
   return P({ coins, gems });
@@ -558,8 +558,8 @@ export function claimDuelMission(p: DuelProfile, id: string, nowMs: number): { p
  */
 export const TOURNEY_ROUNDS: readonly { ai: number; prize: DuelPrize }[] = [
   { ai: 0.75, prize: P({ coins: 60 }) },
-  { ai: 0.88, prize: P({ coins: 120, gems: 25 }) },
-  { ai: 0.97, prize: P({ coins: 250, gems: 100 }) },
+  { ai: 0.88, prize: P({ coins: 120, gems: 5 }) },
+  { ai: 0.97, prize: P({ coins: 250, gems: 20 }) },
 ];
 export const TOURNEY_BANNER = "BANNER_CHAMPION";
 
@@ -616,7 +616,7 @@ export function buyDuelShopItem(p: DuelProfile, id: string, nowMs: number): { pr
 /** Duel Coins for beating the Weekly Challenge (once a week). */
 export const WEEKLY_CHALLENGE_COINS = 150;
 /** Free Gems for beating the Weekly Challenge — they work in the whole game. */
-export const WEEKLY_CHALLENGE_GEMS = 100;
+export const WEEKLY_CHALLENGE_GEMS = 20;
 export const WEEKLY_CHALLENGE_AI = 0.95;
 
 export interface WeeklyChallenge {

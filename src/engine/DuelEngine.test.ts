@@ -113,7 +113,7 @@ describe("Duel profile", () => {
       p = c.profile;
       expect(claimDuelMission(p, m.id, day)).toBeNull();
     }
-    expect(gems).toBe(10); // all three done: Free Gems bonus, once
+    expect(gems).toBe(3); // all three done: Free Gems bonus, once
   });
 
   it("weekly wins pay Free Gems once per goal, and the Weekend Tournament crowns a champion", async () => {
@@ -140,7 +140,7 @@ describe("Duel profile", () => {
     }
     expect(q.tourney.won).toBe(true);
     expect(q.owned).toContain(TOURNEY_BANNER);
-    expect(tg).toBe(125);
+    expect(tg).toBe(25);
     expect(applyTourneyResult(q, "WIN", sat)).toBeNull(); // one run per weekend
     const lost = applyTourneyResult(createDuelProfile(), "LOSS", sat)!;
     expect(lost.profile.tourney.out).toBe(true);

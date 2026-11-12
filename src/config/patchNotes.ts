@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v116",
+    dateIso: "2026-11-12",
+    category: "BALANCE",
+    title: {
+      en: "Duel: smaller Free Gem prizes",
+      ptBR: "Duelo: prêmios menores de Gemas grátis",
+    },
+    description: {
+      en: "The Free Gems the Duel pays were too high and came down, so Gems keep their value. Duel Coins stay the same.",
+      ptBR: "As Gemas grátis que o Duelo paga estavam altas demais e foram reduzidas, para as Gemas manterem o valor. As Moedas de Duelo continuam iguais.",
+    },
+    highlights: [
+      {
+        en: "Weekly Challenge: 20 Free Gems (was 100). Weekend Tournament: 5 in round 2 and 20 in round 3 (was 25 and 100).",
+        ptBR: "Desafio da Semana: 20 Gemas grátis (eram 100). Torneio de Fim de Semana: 5 na rodada 2 e 20 na rodada 3 (eram 25 e 100).",
+      },
+      {
+        en: "Wins this week: 5, 10 and 20 Gems for 10, 25 and 50 wins (was 20, 40 and 80).",
+        ptBR: "Vitórias da semana: 5, 10 e 20 Gemas por 10, 25 e 50 vitórias (eram 20, 40 e 80).",
+      },
+      {
+        en: "League prizes: Silver 5, Gold 10, Platinum 20, Diamond 30, Master 50 and Legend 100 Gems. First win of the day: 2 Gems. All three daily missions: 3 Gems.",
+        ptBR: "Prêmios de liga: Prata 5, Ouro 10, Platina 20, Diamante 30, Mestre 50 e Lenda 100 Gemas. Primeira vitória do dia: 2 Gemas. As três missões do dia: 3 Gemas.",
+      },
+    ],
+  },
+  {
     id: "v115",
     dateIso: "2026-11-12",
     category: "CONTENT",
