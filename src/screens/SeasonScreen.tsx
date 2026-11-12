@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
+import { ColossusAlert } from "@/ui/ColossusPromo";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
@@ -85,6 +86,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
   return (
     <div className="pg-root">
       <style>{PAGE_CSS + ETERNAL_CSS}</style>
+      {onPlayColossus && <ColossusAlert onOpen={onPlayColossus} />}
       <TopNav active="SEASON" onNavigate={onNavigate} onPlay={onPlay} />
       <div className="pg-scroll">
         <header className="pg-hero">

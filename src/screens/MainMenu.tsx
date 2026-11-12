@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ColossusAlert, ColossusHeroCard } from "@/ui/ColossusPromo";
 import { BrandLogo } from "@/ui/BrandLogo";
 import "@fontsource/cormorant-garamond/600.css";
 import "@fontsource/cormorant-garamond/700.css";
@@ -24,6 +25,8 @@ export const TRANSITION_DURATION_MS = 1500;
 interface MainMenuProps {
   onStart: () => void;
   onNavigate: (view: NavView) => void;
+  /** CHEFE GLOBAL — opens the Serpent of the Eclipse. */
+  onPlayColossus?: () => void;
 }
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
@@ -38,7 +41,7 @@ const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
  * entry points and a footer. Clicking Play pushes the camera into the
  * castle gate before `onStart` fires.
  */
-export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
+export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps) {
   const save = useMemo(() => loadSave(), []);
   const { t, language } = useLanguage();
   const status = useMemo(() => getAscensionStatus(), []);
@@ -76,6 +79,7 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
   return (
     <div className="hn-home">
       <style>{HOME_CSS}</style>
+      {onPlayColossus && <ColossusAlert onOpen={onPlayColossus} />}
 
       <section className={`hn-hero${entering ? " is-entering" : ""}`}>
         <HomeDiorama sceneIndex={sceneIndex} entering={entering} />
@@ -131,6 +135,12 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
           </dl>
         </div>
 
+        {onPlayColossus && (
+          <div className="hn-boss">
+            <ColossusHeroCard onOpen={onPlayColossus} />
+          </div>
+        )}
+
         <div className="hn-scene">
           <div className="hn-scene-phase">{t("menu.scenePhase", { number: phaseNumber })}</div>
           <div className="hn-scene-name">{t(`phases.${phase.i18nKey}.name` as TranslationKey)}</div>
@@ -156,6 +166,11 @@ export function MainMenu({ onStart, onNavigate }: MainMenuProps) {
       </section>
 
       <main className="hn-body">
+        {onPlayColossus && (
+          <section className="hn-boss-m">
+            <ColossusHeroCard onOpen={onPlayColossus} compact />
+          </section>
+        )}
         <section className="hn-section" ref={towersRef}>
           <header className="hn-section-head">
             <h2>{t("menu.towersTitle")}</h2>
@@ -354,6 +369,10 @@ const HOME_CSS = `
   left: clamp(20px, 6vw, 96px); bottom: clamp(48px, 11vh, 120px);
   width: min(720px, calc(100% - 40px));
 }
+.hn-boss { position: absolute; z-index: 3; right: clamp(20px, 4vw, 64px); top: clamp(84px, 12vh, 120px); }
+.hn-hero.is-entering .hn-boss { opacity: 0; pointer-events: none; }
+.hn-boss-m { display: none; }
+@media (max-width: 1000px), (max-height: 760px) { .hn-boss { display: none; } .hn-boss-m { display: block; padding: 28px 0 0; } }
 .hn-season-pill {
   display: inline-flex; align-items: center; flex-wrap: wrap; gap: 4px 10px;
   padding: 7px 14px 7px 12px; margin-bottom: 22px;

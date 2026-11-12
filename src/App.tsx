@@ -109,7 +109,7 @@ export default function App() {
       ) : view === "MARKETPLACE" ? (
         <MarketplaceScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : (
-        <MainMenu onStart={() => setView("SEASON")} onNavigate={navigate} />
+        <MainMenu onStart={() => setView("SEASON")} onNavigate={navigate} onPlayColossus={() => setView("COLOSSUS")} />
       )}
     </LanguageProvider>
   );

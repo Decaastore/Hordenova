@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v122",
+    dateIso: "2026-11-12",
+    category: "BOSSES",
+    title: {
+      en: "The Global Boss now shows up on Home",
+      ptBR: "O Chefe Global agora aparece na página inicial",
+    },
+    description: {
+      en: "The Serpent of the Eclipse is hard to miss now: a glowing live card on Home and a pop-up when something happens that week.",
+      ptBR: "A Serpente do Eclipse agora é difícil de passar batido: um card brilhante ao vivo na página inicial e um aviso quando algo acontece na semana.",
+    },
+    highlights: [
+      {
+        en: "Home has a \"Global Boss live\" card with the Serpent moving, its life left, when it leaves, your attempts today and a button straight into the raid.",
+        ptBR: "A página inicial tem um card \"Chefe Global ao vivo\" com a Serpente se mexendo, a vida que resta, quando ela vai embora, suas tentativas de hoje e um botão direto para o raide.",
+      },
+      {
+        en: "A pop-up on Home and the Season page announces it once per moment of the week: when a new Serpent arrives, in its last 24 hours (if you still have attempts), and when the community brings it down and you have Gems to claim.",
+        ptBR: "Um aviso na página inicial e na Season anuncia uma vez por momento da semana: quando uma nova Serpente chega, nas últimas 24 horas (se você ainda tiver tentativas) e quando a comunidade derruba e você tem Gemas para pegar.",
+      },
+    ],
+  },
+  {
     id: "v121",
     dateIso: "2026-11-12",
     category: "BALANCE",
