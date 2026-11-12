@@ -274,7 +274,7 @@ export interface HudSnapshot {
     contractsReady: number;
   };
   /** EXPEDIÇÕES E FORJA — trips and forge ready to collect, and trips under way. */
-  expeditions: { ready: number; away: number; forging: boolean; splinters: number };
+  expeditions: { ready: number; away: number; forging: boolean; splinters: number; forgeReady: boolean };
   /** OFERTAS DE MOMENTO — the offer on screen, if any. */
   momentOffer: { id: string; expiresAt: number } | null;
   /** CONQUISTAS — the latest achievement unlocked (seq bumps) and the title worn. */
@@ -381,6 +381,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.expeditions.ready === b.expeditions.ready &&
     a.expeditions.away === b.expeditions.away &&
     a.expeditions.forging === b.expeditions.forging &&
+    a.expeditions.forgeReady === b.expeditions.forgeReady &&
     a.expeditions.splinters === b.expeditions.splinters &&
     a.momentOffer?.id === b.momentOffer?.id &&
     a.momentOffer?.expiresAt === b.momentOffer?.expiresAt &&
@@ -2580,7 +2581,7 @@ export class GameEngine {
 
   /** Trips and forge that are ready to collect (HUD badge). */
   private expeditionsReady(nowMs: number): number {
-    return this.expeditions.active.filter((e) => nowMs >= e.endsAt).length + (this.expeditions.forging && nowMs >= this.expeditions.forging.endsAt ? 1 : 0);
+    return this.expeditions.active.filter((e) => nowMs >= e.endsAt).length;
   }
 
   /** Depth and wave-milestone rewards of the Eternal record — paid automatically when reached. */
@@ -3564,7 +3565,7 @@ export class GameEngine {
         lastEvent: this.lastEternalEvent,
         contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
       },
-      expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters },
+      expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters, forgeReady: !!this.expeditions.forging && Date.now() >= this.expeditions.forging.endsAt },
       momentOffer: this.momentOffers.active && this.momentOffers.active.expiresAt > Date.now() ? this.momentOffers.active : null,
     };
 

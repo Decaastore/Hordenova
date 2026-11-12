@@ -150,6 +150,8 @@ export interface DuelSnapshot {
   towers: readonly DTower[];
   shots: readonly Shot[];
   breaches: readonly { side: Side; at: number; dmg: number }[];
+  /** Creatures that fell in the last moment (for death puffs). */
+  deaths: readonly { x: number; y: number; at: number; big: boolean }[];
   doubleMana: boolean;
 }
 
@@ -163,6 +165,7 @@ export class DuelEngine {
   private towers: DTower[] = [];
   private shots: Shot[] = [];
   private breaches: { side: Side; at: number; dmg: number }[] = [];
+  private deaths: { x: number; y: number; at: number; big: boolean }[] = [];
   private ai: { skill: number; nextThinkAt: number } | null;
   over = false;
   outcome: DuelOutcome | null = null;
@@ -315,7 +318,9 @@ export class DuelEngine {
       }
       this.shots.push(shot);
     }
+    for (const u of this.units) if (u.hp <= 0 && u.dist < PATH_LEN) this.deaths.push({ x: u.inst.position.x, y: u.inst.position.y, at: this.t, big: u.card.breach >= 3 });
     this.units = this.units.filter((u) => u.hp > 0);
+    this.deaths = this.deaths.filter((d) => this.t - d.at < 900);
     this.shots = this.shots.filter((s) => this.t - s.at < 400);
     this.breaches = this.breaches.filter((b) => this.t - b.at < 1200);
 
@@ -393,6 +398,7 @@ export class DuelEngine {
       towers: this.towers,
       shots: this.shots,
       breaches: this.breaches,
+      deaths: this.deaths,
       doubleMana: this.t >= DUEL_DOUBLE_MANA_FROM_MS,
     };
   }

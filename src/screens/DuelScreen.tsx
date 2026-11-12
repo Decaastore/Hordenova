@@ -3,7 +3,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
 import { appendLedgerEvent } from "@/engine/EconomyLedger";
-import { CASTLE_AT, DuelEngine, LANE_H, LANE_SLOTS, LANE_W, lanePath, slotPos, type DuelSnapshot, type Side } from "@/engine/DuelEngine";
+import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot } from "@/engine/DuelEngine";
 import {
   applyDuelResult,
   arenaFor,
@@ -16,7 +16,6 @@ import {
   DUEL_WIN_SHARDS,
   getDuelCard,
   isValidDeck,
-  MAX_DUEL_TOWER_LEVEL,
   TROPHIES_LOSS,
   TROPHIES_WIN,
   duelWeek,
@@ -26,186 +25,37 @@ import {
   type DuelCardId,
   type DuelOutcome,
 } from "@/config/duel";
-import { drawEnemy, drawEnemyHpBar, drawTower } from "@/rendering/EntityRenderer";
+import { drawEnemy } from "@/rendering/EntityRenderer";
+import { drawDuelFrame, DUEL_H, DUEL_W } from "@/rendering/duelRenderer";
 import { ensureEnemySpritesLoading, setSpriteBiome } from "@/rendering/enemySprites";
 import { createEnemyInstance } from "@/entities/Enemy";
 import type { EnemyType } from "@/config/enemyStats";
-import { getCastleSprite } from "@/rendering/castleSprites";
 import { TowerPortrait } from "@/ui/TowerPortrait";
 import { PAGE_CSS } from "@/ui/pageChrome";
 
-const W = LANE_W * 2;
-const H = LANE_H;
-const SHOT_COLOR: Record<string, string> = { IRONWOOD: "255,224,150", INFERNO: "255,120,40", FROSTBORN: "140,220,255", STORMCALLER: "190,140,255" };
-const ARENA_TINT: Record<string, [string, string]> = {
-  ARENA_FOREST: ["#1f2a17", "#11170c"],
-  ARENA_VOLCANO: ["#2e1a12", "#170c08"],
-  ARENA_TUNDRA: ["#1c2632", "#0e141c"],
-  ARENA_ABYSS: ["#211a2e", "#0f0b17"],
-};
-
-const groundCache = new Map<string, HTMLImageElement>();
-function groundImage(biome: string): HTMLImageElement | null {
-  const key = biome.toLowerCase();
-  let img = groundCache.get(key);
-  if (!img) {
-    img = new Image();
-    img.src = `${(import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/")}sprites/ground/${key}.webp`;
-    groundCache.set(key, img);
-  }
-  return img.complete && img.naturalWidth > 0 ? img : null;
-}
-
-function drawArena(ctx: CanvasRenderingContext2D, snap: DuelSnapshot, arenaId: string, biome: string, timeMs: number, pickingSlot: boolean, hoverSlot: number | null): void {
-  const [c1, c2] = ARENA_TINT[arenaId] ?? ARENA_TINT.ARENA_FOREST!;
-  for (const side of [0, 1] as Side[]) {
-    const x0 = side * LANE_W;
-    const g = ctx.createLinearGradient(x0, 0, x0, H);
-    g.addColorStop(0, c2);
-    g.addColorStop(0.5, c1);
-    g.addColorStop(1, c2);
-    ctx.fillStyle = g;
-    ctx.fillRect(x0, 0, LANE_W, H);
-    const ground = groundImage(biome);
-    if (ground) {
-      ctx.save();
-      ctx.globalAlpha = 0.55;
-      ctx.drawImage(ground, side * 700, 300, 1100, 1100 * (H / LANE_W), x0, 0, LANE_W, H);
-      ctx.restore();
-    }
-    // speckle
-    ctx.fillStyle = "rgba(255,255,255,0.025)";
-    for (let i = 0; i < 160; i++) {
-      const x = x0 + ((i * 97 + side * 31) % LANE_W);
-      const y = (i * 53) % H;
-      ctx.fillRect(x, y, 2, 2);
-    }
-    // road
-    const path = lanePath(side);
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
-    for (const [w, col] of [
-      [58, "rgba(0,0,0,0.35)"],
-      [50, "#4a3a28"],
-      [40, "#6a5236"],
-    ] as const) {
-      ctx.strokeStyle = col;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      path.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-      ctx.stroke();
-    }
-    // slots
-    LANE_SLOTS.forEach((_, i) => {
-      const p = slotPos(side, i);
-      const taken = snap.towers.some((t) => t.side === side && t.slot === i);
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
-      ctx.beginPath();
-      ctx.ellipse(p.x, p.y + 6, 26, 11, 0, 0, Math.PI * 2);
-      ctx.fill();
-      if (!taken) {
-        ctx.strokeStyle = side === 0 && pickingSlot ? `rgba(255,220,140,${hoverSlot === i ? 0.95 : 0.55 + 0.25 * Math.sin(timeMs / 250)})` : "rgba(200,180,140,0.25)";
-        ctx.lineWidth = side === 0 && pickingSlot ? 2.5 : 1.5;
-        ctx.beginPath();
-        ctx.ellipse(p.x, p.y + 6, 24, 10, 0, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    });
-    // castle
-    const img = getCastleSprite(biome, 2);
-    const cx = CASTLE_AT.x + x0;
-    const hit = snap.breaches.some((b) => b.side === side && snap.timeMs - b.at < 400);
-    if (img) {
-      const size = 170;
-      ctx.save();
-      if (hit) ctx.filter = "brightness(1.8) saturate(0.4)";
-      ctx.drawImage(img, cx - size / 2, CASTLE_AT.y - size * 0.62, size, size);
-      ctx.restore();
-    } else {
-      ctx.fillStyle = "#555";
-      ctx.fillRect(cx - 40, CASTLE_AT.y - 50, 80, 60);
-    }
-  }
-  // divider
-  const dg = ctx.createLinearGradient(LANE_W - 6, 0, LANE_W + 6, 0);
-  dg.addColorStop(0, "rgba(0,0,0,0)");
-  dg.addColorStop(0.5, "rgba(255,200,120,0.55)");
-  dg.addColorStop(1, "rgba(0,0,0,0)");
-  ctx.fillStyle = dg;
-  ctx.fillRect(LANE_W - 6, 0, 12, H);
-}
-
-function drawDuel(ctx: CanvasRenderingContext2D, snap: DuelSnapshot, arenaId: string, biome: string, timeMs: number, pickingSlot: boolean, hoverSlot: number | null): void {
-  drawArena(ctx, snap, arenaId, biome, timeMs, pickingSlot, hoverSlot);
-  // towers and units sorted by y for depth
-  const items: { y: number; draw: () => void }[] = [];
-  for (const t of snap.towers) {
-    items.push({
-      y: t.inst.position.y,
-      draw: () => {
-        const { x, y } = t.inst.position;
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.scale(1.55, 1.55);
-        ctx.translate(-x, -y);
-        drawTower(ctx, t.inst, false, timeMs, snap.timeMs - t.lastShotAt);
-        ctx.restore();
-        // level pips
-        for (let k = 0; k < MAX_DUEL_TOWER_LEVEL; k++) {
-          ctx.fillStyle = k < t.level ? "#ffd56a" : "rgba(0,0,0,0.5)";
-          ctx.beginPath();
-          ctx.arc(t.inst.position.x - 12 + k * 12, t.inst.position.y + 30, 4, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      },
-    });
-  }
-  for (const u of snap.units) {
-    if (u.dist < 0) continue;
-    items.push({
-      y: u.inst.position.y,
-      draw: () => {
-        drawEnemy(ctx, u.inst, timeMs, Infinity, 1.45, undefined, u.angle, 0);
-        drawEnemyHpBar(ctx, u.inst);
-      },
-    });
-  }
-  items.sort((a, b) => a.y - b.y).forEach((i) => i.draw());
-  // shots
-  ctx.save();
-  ctx.globalCompositeOperation = "lighter";
-  for (const s of snap.shots) {
-    const age = (snap.timeMs - s.at) / 400;
-    const col = SHOT_COLOR[s.type] ?? "255,255,255";
-    ctx.strokeStyle = `rgba(${col},${0.9 * (1 - age)})`;
-    ctx.lineWidth = s.type === "STORMCALLER" ? 2.5 : 3;
-    ctx.beginPath();
-    ctx.moveTo(s.from.x, s.from.y - 26);
-    ctx.lineTo(s.to.x, s.to.y - 8);
-    for (const h of s.hops ?? []) ctx.lineTo(h.x, h.y - 8);
-    ctx.stroke();
-    ctx.fillStyle = `rgba(${col},${0.7 * (1 - age)})`;
-    ctx.beginPath();
-    ctx.arc(s.to.x, s.to.y - 8, s.type === "INFERNO" ? 22 * (0.5 + age) : 7, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-}
+const W = DUEL_W;
+const H = DUEL_H;
 
 function CardFace({ id, small, dim }: { id: DuelCardId; small?: boolean; dim?: boolean }) {
   const { t } = useLanguage();
   const card = getDuelCard(id)!;
+  const size = small ? 46 : 70;
   return (
-    <div style={{ opacity: dim ? 0.45 : 1, display: "grid", justifyItems: "center", gap: 2 }}>
-      <div style={{ position: "relative", width: small ? 52 : 74, height: small ? 52 : 74, display: "grid", placeItems: "center" }}>
+    <div className={`dc-face is-${card.kind}${small ? " is-small" : ""}${dim ? " is-dim" : ""}`}>
+      <div className="dc-art">
         {card.kind === "TOWER" ? (
-          <TowerPortrait type={card.tower} level={21} width={small ? 52 : 74} height={small ? 52 : 74} zoom={1.7} baseY={0.74} />
+          <TowerPortrait type={card.tower} level={21} width={size} height={size} zoom={1.7} baseY={0.74} />
         ) : (
-          <EnemyPortrait type={card.enemy} size={small ? 52 : 74} />
+          <EnemyPortrait type={card.enemy} size={size} />
         )}
-        <span style={costBadge}>{card.cost}</span>
       </div>
-      {!small && <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: "center", lineHeight: 1.15 }}>{t(`duel.card.${id}.name` as TranslationKey)}</span>}
+      <span className="dc-cost">{card.cost}</span>
+      {!small && (
+        <>
+          <span className="dc-kind">{t(card.kind === "TOWER" ? "duel.kindTower" : "duel.kindSend")}</span>
+          <span className="dc-name">{t(`duel.card.${id}.name` as TranslationKey)}</span>
+        </>
+      )}
     </div>
   );
 }
@@ -250,6 +100,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const [save, setSave] = useState<SaveData>(() => loadSave());
   const [deck, setDeck] = useState<DuelCardId[]>(() => [...save.duel.deck]);
   const [match, setMatch] = useState<DuelEngine | null>(null);
+  /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
+  const [matchNo, setMatchNo] = useState(0);
   const [result, setResult] = useState<{ outcome: DuelOutcome; trophies: number; shards: number } | null>(null);
   const [challenge, setChallenge] = useState(false);
   const week = duelWeek(Date.now());
@@ -270,12 +122,14 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setSave(next);
     setResult(null);
     setChallenge(false);
+    setMatchNo((n) => n + 1);
     setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck(arena.id)], arena.ai, next.equippedTowerSkinByType));
   };
 
   const startWeekly = () => {
     setResult(null);
     setChallenge(true);
+    setMatchNo((n) => n + 1);
     setMatch(new DuelEngine(weekly.seed, [weekly.myDeck, weekly.foeDeck], WEEKLY_CHALLENGE_AI, save.equippedTowerSkinByType));
   };
 
@@ -299,6 +153,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   if (match)
     return (
       <DuelMatch
+        key={matchNo}
         engine={match}
         arenaId={challenge ? "ARENA_ABYSS" : arena.id}
         biome={challenge ? "ABYSS" : arena.biome}
@@ -311,7 +166,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   return (
     <div className="pg-root">
-      <style>{PAGE_CSS + LOBBY_CSS}</style>
+      <style>{PAGE_CSS + LOBBY_CSS + MATCH_CSS}</style>
       <div className="pg-scroll">
         <header className="pg-hero">
           <div className="pg-hero-inner">
@@ -415,11 +270,12 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
 
   useEffect(() => {
     setSpriteBiome(biome);
+    if (import.meta.env.DEV) (window as unknown as { __hordenovaDuel?: DuelEngine }).__hordenovaDuel = engine;
     let raf = 0;
     let last = performance.now();
     let acc = 0;
     const loop = (now: number) => {
-      acc += Math.min(250, now - last);
+      acc += Math.min(1000, now - last);
       last = now;
       if (acc >= 50) {
         const steps = Math.floor(acc / 50) * 50;
@@ -438,7 +294,7 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
           cv.height = Math.round(h * dpr);
         }
         ctx.setTransform((cv.width / W), 0, 0, cv.height / H, 0, 0);
-        drawDuel(ctx, s, arenaId, biome, now, !!pickedRef.current && getDuelCard(pickedRef.current)?.kind === "TOWER", hoverRef.current);
+        drawDuelFrame(ctx, s, arenaId, biome, now, !!pickedRef.current && getDuelCard(pickedRef.current)?.kind === "TOWER", hoverRef.current);
       }
       setSnap(s);
       if (s.over && !finishedRef.current) {
@@ -494,16 +350,24 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
       <style>{MATCH_CSS}</style>
       <div className="dm-top">
         <div className="dm-side">
-          <strong>{t("duel.you")}</strong>
-          <CastleBar hp={me.castle} />
+          <span className="dm-crest is-you" aria-hidden="true">⚔</span>
+          <div>
+            <strong>{t("duel.you")}</strong>
+            <CastleBar hp={me.castle} />
+          </div>
         </div>
-        <div className={`dm-clock${snap.doubleMana ? " is-double" : ""}`}>
-          {clock}
+        <div className={`dm-clock${snap.doubleMana ? " is-double" : ""}`} style={{ ["--p" as string]: `${(snap.timeMs / DUEL_LENGTH_MS) * 360}deg` }}>
+          <div className="dm-clock-face">
+            <span>{clock}</span>
+          </div>
           {snap.doubleMana && <small>{t("duel.doubleMana")}</small>}
         </div>
         <div className="dm-side is-foe">
-          <strong>{t("duel.foe")}</strong>
-          <CastleBar hp={foe.castle} />
+          <div>
+            <strong>{t("duel.foe")}</strong>
+            <CastleBar hp={foe.castle} foe />
+          </div>
+          <span className="dm-crest is-foe" aria-hidden="true">☠</span>
         </div>
       </div>
       <div className="dm-stage">
@@ -566,31 +430,20 @@ function DuelMatch({ engine, arenaId, biome, result, onFinish, onAgain, onLobby 
   );
 }
 
-function CastleBar({ hp }: { hp: number }) {
-  const pct = Math.max(0, hp) / 20;
+function CastleBar({ hp, foe }: { hp: number; foe?: boolean }) {
+  const left = Math.max(0, hp);
   return (
-    <div className="dm-hp">
-      <div style={{ width: `${pct * 100}%`, background: pct > 0.5 ? "#7fd36a" : pct > 0.25 ? "#e8c06a" : "#e0644b" }} />
-      <span>{Math.max(0, hp)}</span>
+    <div className={`dm-hp${foe ? " is-foe" : ""}`} aria-label={String(left)}>
+      <div className="dm-hp-segs">
+        {Array.from({ length: 20 }, (_, i) => (
+          <i key={i} className={i < left ? (left > 10 ? "ok" : left > 5 ? "mid" : "low") : ""} />
+        ))}
+      </div>
+      <span>{left} / 20</span>
     </div>
   );
 }
 
-const costBadge: CSSProperties = {
-  position: "absolute",
-  left: -4,
-  top: -4,
-  width: 22,
-  height: 22,
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  background: "radial-gradient(circle at 35% 35%, #d38bff, #6a2ab0)",
-  border: "1.5px solid #f0d6ff",
-  color: "#fff",
-  fontWeight: 800,
-  fontSize: 12,
-};
 const matchRoot: CSSProperties = { position: "fixed", inset: 0, display: "grid", gridTemplateRows: "auto 1fr auto", background: "#0d0a07", color: "#efe4cf" };
 
 const LOBBY_CSS = `
@@ -615,39 +468,65 @@ const LOBBY_CSS = `
 `;
 
 const MATCH_CSS = `
-.dm-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 18px; border-bottom: 1px solid rgba(232,176,75,0.25); background: linear-gradient(180deg, #1c150e, #120d08); }
-.dm-side { display: grid; gap: 4px; font-size: 14px; }
-.dm-side.is-foe { justify-items: end; text-align: right; }
-.dm-hp { position: relative; width: min(260px, 100%); height: 14px; border-radius: 7px; background: rgba(0,0,0,0.5); overflow: hidden; border: 1px solid rgba(255,255,255,0.12); }
-.dm-hp div { height: 100%; transition: width 0.2s; }
-.dm-hp span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10.5px; font-weight: 800; color: #fff; text-shadow: 0 1px 2px #000; }
-.dm-side.is-foe .dm-hp div { margin-left: auto; }
-.dm-clock { font-family: Georgia, serif; font-size: 28px; font-weight: 700; color: #f1dcae; text-align: center; font-variant-numeric: tabular-nums; display: grid; }
-.dm-clock.is-double { color: #d8a8ff; }
-.dm-clock small { font-family: system-ui, sans-serif; font-size: 11px; font-weight: 700; }
-.dm-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 8px; }
-.dm-canvas { width: min(100%, calc((100vh - 230px) * ${W / H})); aspect-ratio: ${W} / ${H}; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.6); }
-.dm-hint { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); padding: 6px 14px; border-radius: 20px; background: rgba(0,0,0,0.7); color: #ffd56a; font-weight: 700; font-size: 13px; pointer-events: none; }
-.dm-result { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; background: rgba(8,6,4,0.72); }
-.dm-result h2 { margin: 0; font-family: Georgia, serif; font-size: 54px; }
-.dm-result h2.is-WIN { color: #ffd56a; }
+.dm-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; padding: 10px 22px; background: linear-gradient(180deg, #2a1f14, #140e09); border-bottom: 2px solid #5a4226; box-shadow: 0 2px 0 rgba(255,214,140,0.12) inset, 0 6px 18px rgba(0,0,0,0.5); }
+.dm-side { display: flex; align-items: center; gap: 12px; font-size: 15px; }
+.dm-side strong { font-family: Georgia, serif; font-size: 17px; color: #f4e2bb; letter-spacing: 0.02em; }
+.dm-side.is-foe { justify-content: flex-end; text-align: right; }
+.dm-crest { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; border: 2px solid #c9a050; box-shadow: 0 0 0 3px rgba(0,0,0,0.5), 0 0 16px rgba(255,200,110,0.25); }
+.dm-crest.is-you { background: radial-gradient(circle at 35% 30%, #3a6aa8, #13284a); }
+.dm-crest.is-foe { background: radial-gradient(circle at 35% 30%, #a83a3a, #4a1313); }
+.dm-hp { display: grid; gap: 3px; margin-top: 4px; }
+.dm-hp-segs { display: flex; gap: 2px; }
+.dm-hp.is-foe .dm-hp-segs { flex-direction: row-reverse; }
+.dm-hp-segs i { width: 11px; height: 12px; border-radius: 2px; background: rgba(255,255,255,0.07); box-shadow: inset 0 -2px 0 rgba(0,0,0,0.35); }
+.dm-hp-segs i.ok { background: linear-gradient(180deg, #9be37a, #3f8a2a); }
+.dm-hp-segs i.mid { background: linear-gradient(180deg, #f0cf6a, #a87a1a); }
+.dm-hp-segs i.low { background: linear-gradient(180deg, #ff7a5a, #a82a1a); animation: dmBlink 0.8s infinite alternate; }
+@keyframes dmBlink { to { filter: brightness(1.5); } }
+.dm-hp span { font-size: 11px; font-weight: 700; color: #b8a888; }
+.dm-clock { display: grid; justify-items: center; gap: 3px; }
+.dm-clock-face { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(#e8b04b var(--p), rgba(255,255,255,0.08) 0); padding: 4px; box-shadow: 0 0 0 2px #5a4226, 0 4px 14px rgba(0,0,0,0.6); }
+.dm-clock-face span { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 40% 30%, #2e2216, #120c07); font-family: Georgia, serif; font-size: 21px; font-weight: 700; color: #f8e6c0; font-variant-numeric: tabular-nums; }
+.dm-clock.is-double .dm-clock-face { background: conic-gradient(#c58bff var(--p), rgba(255,255,255,0.08) 0); box-shadow: 0 0 0 2px #7a4ab0, 0 0 22px rgba(197,139,255,0.5); }
+.dm-clock small { font-size: 11px; font-weight: 800; color: #d8a8ff; text-transform: none; }
+.dm-stage { position: relative; display: grid; place-items: center; min-height: 0; padding: 10px; background: radial-gradient(ellipse at center, #1c140c, #080604 75%); }
+.dm-canvas { width: min(100%, calc((100vh - 270px) * ${W / H})); aspect-ratio: ${W} / ${H}; border-radius: 6px; border: 3px solid #4a3620; box-shadow: 0 0 0 1px #8a6a3a, 0 14px 40px rgba(0,0,0,0.75); }
+.dm-hint { position: absolute; top: 22px; left: 50%; transform: translateX(-50%); padding: 7px 16px; border-radius: 20px; background: rgba(0,0,0,0.75); border: 1px solid #8a6a3a; color: #ffd56a; font-weight: 700; font-size: 13px; pointer-events: none; }
+.dm-result { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 8px; background: radial-gradient(ellipse at center, rgba(20,14,8,0.7), rgba(4,3,2,0.9)); animation: dmIn 0.4s ease-out; }
+@keyframes dmIn { from { opacity: 0; transform: scale(1.04); } }
+.dm-result h2 { margin: 0; font-family: Georgia, serif; font-size: 64px; letter-spacing: 0.02em; text-shadow: 0 4px 24px rgba(0,0,0,0.8); }
+.dm-result h2.is-WIN { color: #ffd56a; text-shadow: 0 0 30px rgba(255,200,80,0.5); }
 .dm-result h2.is-LOSS { color: #e0644b; }
 .dm-result h2.is-DRAW { color: #cfc4b0; }
-.dm-result p { margin: 0; font-size: 16px; }
-.dm-result-actions { display: flex; gap: 10px; margin-top: 12px; }
-.dm-hand { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 10px 16px 14px; border-top: 1px solid rgba(232,176,75,0.25); background: linear-gradient(0deg, #1c150e, #120d08); flex-wrap: wrap; }
-.dm-mana { display: grid; justify-items: center; gap: 4px; font-weight: 800; color: #e3b8ff; font-size: 20px; }
+.dm-result p { margin: 0; font-size: 17px; }
+.dm-result-actions { display: flex; gap: 10px; margin-top: 14px; }
+.dm-hand { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 12px 16px 14px; background: linear-gradient(0deg, #1e160e, #2a1f14); border-top: 2px solid #5a4226; flex-wrap: wrap; }
+.dm-mana { display: grid; justify-items: center; gap: 5px; }
+.dm-mana > span { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; font-weight: 800; font-size: 20px; color: #fff; background: radial-gradient(circle at 35% 30%, #d38bff, #5a1a9a); border: 2px solid #f0d6ff; box-shadow: 0 0 16px rgba(197,139,255,0.5); }
 .dm-mana-bar { display: flex; gap: 3px; }
-.dm-mana-bar i { width: 13px; height: 18px; border-radius: 3px; background: rgba(255,255,255,0.08); }
-.dm-mana-bar i.on { background: linear-gradient(180deg, #d38bff, #7a2ad0); }
+.dm-mana-bar i { width: 14px; height: 10px; border-radius: 3px; background: rgba(255,255,255,0.08); }
+.dm-mana-bar i.on { background: linear-gradient(180deg, #e0a8ff, #7a2ad0); box-shadow: 0 0 6px rgba(197,139,255,0.6); }
 .dm-cards { display: flex; gap: 10px; align-items: flex-end; }
-.dm-card { width: 102px; padding: 10px 6px 8px; border-radius: 12px; border: 1px solid rgba(232,176,75,0.35); background: linear-gradient(180deg, #2a2016, #18120c); color: #efe4cf; cursor: pointer; transition: transform 0.12s; }
-.dm-card:not(:disabled):hover { transform: translateY(-4px); }
-.dm-card.is-picked { border-color: #ffd56a; box-shadow: 0 0 0 2px rgba(255,213,106,0.5); transform: translateY(-6px); }
+.dm-card { padding: 0; border: none; background: none; cursor: pointer; transition: transform 0.12s; }
+.dm-card:not(:disabled):hover { transform: translateY(-6px); }
+.dm-card.is-picked { transform: translateY(-10px); }
+.dm-card.is-picked .dc-face { box-shadow: 0 0 0 2px #ffd56a, 0 0 22px rgba(255,213,106,0.6); }
 .dm-card:disabled { cursor: default; }
-.dm-next { display: grid; justify-items: center; gap: 2px; font-size: 11px; color: #a89a84; padding-left: 6px; }
-.dm-btn { padding: 9px 18px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
+.dm-card:focus-visible { outline: 2px solid #ffd56a; outline-offset: 3px; border-radius: 12px; }
+.dc-face { position: relative; width: 104px; display: grid; justify-items: center; gap: 2px; padding: 8px 6px 8px; border-radius: 12px; border: 2px solid #8a6a3a; background: linear-gradient(180deg, #3a2a1a, #1a120a); box-shadow: inset 0 1px 0 rgba(255,230,180,0.15), 0 6px 14px rgba(0,0,0,0.5); color: #f4e6c8; }
+.dc-face.is-TOWER { border-color: #6a8ac0; background: linear-gradient(180deg, #24324a, #10161f); }
+.dc-face.is-SEND { border-color: #b0603a; background: linear-gradient(180deg, #4a2418, #1e0e08); }
+.dc-face.is-dim { filter: grayscale(0.8) brightness(0.6); }
+.dc-face.is-small { width: auto; padding: 4px; border-width: 1px; }
+.dc-art { display: grid; place-items: center; border-radius: 8px; background: radial-gradient(circle at 50% 60%, rgba(255,255,255,0.1), rgba(0,0,0,0.3)); }
+.dc-cost { position: absolute; left: -8px; top: -8px; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 35% 30%, #d38bff, #5a1a9a); border: 2px solid #f0d6ff; font-weight: 800; font-size: 13px; color: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.6); }
+.dc-face.is-small .dc-cost { width: 20px; height: 20px; font-size: 11px; left: -6px; top: -6px; }
+.dc-kind { font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; color: #b8c8e8; }
+.dc-face.is-SEND .dc-kind { color: #ffb08a; }
+.dc-name { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.15; }
+.dm-next { display: grid; justify-items: center; gap: 3px; font-size: 11px; color: #a89a84; padding-left: 6px; }
+.dm-btn { padding: 10px 20px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
 .dm-btn.is-ghost { background: rgba(0,0,0,0.3); border-color: rgba(232,192,106,0.5); color: #efe4cf; }
 .dm-quit { font-size: 12px; padding: 6px 12px; }
-@media (max-width: 720px) { .dm-card { width: 78px; } .dm-clock { font-size: 22px; } }
+@media (max-width: 720px) { .dc-face { width: 80px; } .dm-crest { display: none; } .dm-hp-segs i { width: 6px; } }
 `;

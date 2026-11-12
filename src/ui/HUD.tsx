@@ -35,9 +35,11 @@ interface HUDProps {
   onToggleEternal?: () => void;
   /** EXPEDIÇÕES E FORJA — opens the Expeditions and Forge panel. */
   onToggleExpeditions?: () => void;
+  /** FORJA — opens the Forge panel (its own button so players see it exists). */
+  onToggleForge?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal, onToggleExpeditions }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal, onToggleExpeditions, onToggleForge }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -171,6 +173,13 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <span aria-hidden="true" className="hh-talent-glyph">⚑</span>
               <span className="hh-btn-txt">{t("expeditions.button")}</span>
               {hud.expeditions.ready > 0 && <span className="hh-badge">{hud.expeditions.ready}</span>}
+            </button>
+          )}
+          {onToggleForge && (
+            <button onClick={onToggleForge} className="hh-btn" data-testid="forge-button" title={t("expeditions.forgeTooltip")}>
+              <span aria-hidden="true" className="hh-talent-glyph">⚒</span>
+              <span className="hh-btn-txt">{t("expeditions.forgeButton")}</span>
+              {hud.expeditions.forgeReady && <span className="hh-badge">1</span>}
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (

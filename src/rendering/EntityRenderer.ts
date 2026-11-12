@@ -284,6 +284,8 @@ export function drawTower(
   selected: boolean,
   timeMs: number,
   attackFlashMs = Infinity,
+  /** DUELO draws its own level pips — no level badge or mana bar there. */
+  bodyOnly = false,
 ): void {
   const stats = getTowerStats(tower);
   // Tower Skin architecture (Progression 2.0 spec section 10/11): a skin
@@ -342,6 +344,8 @@ export function drawTower(
     ctx.stroke();
     ctx.restore();
   }
+
+  if (bodyOnly) return;
 
   // Small, unobtrusive level badge — the main "it got stronger" signal is
   // the scale/glow growth above; this just gives an exact number on demand.

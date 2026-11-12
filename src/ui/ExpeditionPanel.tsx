@@ -21,6 +21,8 @@ import {
 } from "@/config/expeditions";
 
 interface ExpeditionPanelProps {
+  /** Which panel: the Expeditions or the Forge — each has its own button in the HUD. */
+  view: "trips" | "forge";
   state: ExpeditionState;
   /** Groups usable now (owned, plus one while VIP). */
   groupsNow: number;
@@ -52,7 +54,7 @@ function fmtLeft(ms: number): string {
 export function ExpeditionPanel(p: ExpeditionPanelProps) {
   const { t, language } = useLanguage();
   const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
-  const [tab, setTab] = useState<"trips" | "forge">("trips");
+  const tab = p.view;
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -88,18 +90,11 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
   };
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("expeditions.title")} data-testid="expedition-panel">
+    <div style={panelStyle} role="dialog" aria-label={t(tab === "forge" ? "expeditions.tabForge" : "expeditions.tabTrips")} data-testid={tab === "forge" ? "forge-panel" : "expedition-panel"}>
       <button onClick={p.onClose} style={closeStyle} aria-label={t("bestiary.close")}>
         ×
       </button>
-      <div style={titleStyle}>{t("expeditions.title")}</div>
-      <div role="tablist" style={tabsStyle}>
-        {(["trips", "forge"] as const).map((id) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{ ...tabStyle, ...(tab === id ? tabOnStyle : null) }}>
-            {t(id === "trips" ? "expeditions.tabTrips" : "expeditions.tabForge")}
-          </button>
-        ))}
-      </div>
+      <div style={titleStyle}>{t(tab === "forge" ? "expeditions.tabForge" : "expeditions.tabTrips")}</div>
 
       {tab === "trips" && (
         <>
@@ -274,9 +269,6 @@ const panelStyle: CSSProperties = {
 const closeStyle: CSSProperties = { position: "absolute", top: 8, right: 10, background: "transparent", border: "none", color: PALETTE.uiTextDim, fontSize: 18, cursor: "pointer" };
 const titleStyle: CSSProperties = { fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700, color: "#f1dcae" };
 const subStyle: CSSProperties = { fontSize: 11, color: PALETTE.uiTextDim, marginTop: 8, lineHeight: 1.45 };
-const tabsStyle: CSSProperties = { display: "flex", gap: 4, marginTop: 10, borderBottom: "1px solid rgba(232,192,106,0.3)" };
-const tabStyle: CSSProperties = { padding: "6px 8px", background: "none", border: "none", borderBottom: "2px solid transparent", color: PALETTE.uiTextDim, fontWeight: 700, fontSize: 11.5, cursor: "pointer", marginBottom: -1 };
-const tabOnStyle: CSSProperties = { color: "#f1dcae", borderBottomColor: GOLD };
 const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(232,192,106,0.22)", background: "rgba(0,0,0,0.22)" };
 const btnStyle: CSSProperties = { padding: "6px 10px", borderRadius: 7, border: `1px solid ${GOLD}`, background: "linear-gradient(180deg, #9a6a24, #6a4512)", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" };
 const ghostBtn: CSSProperties = { padding: "5px 8px", borderRadius: 7, border: "1px solid rgba(232,192,106,0.5)", background: "rgba(0,0,0,0.3)", color: PALETTE.uiText, fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" };

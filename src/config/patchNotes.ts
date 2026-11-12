@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v107",
+    dateIso: "2026-11-12",
+    category: "FIXES",
+    title: {
+      en: "Duel: no more freeze after a match, and a new look",
+      ptBR: "Duelo: não trava mais depois da partida e ganhou visual novo",
+    },
+    description: {
+      en: "Starting a second Duel after one ended could leave the match stuck at the end with no result screen. That's fixed. The Duel board and its cards were also redrawn, and the Forge now has its own button in the game.",
+      ptBR: "Começar um segundo Duelo depois de um que terminou podia deixar a partida travada no fim, sem a tela de resultado. Isso foi corrigido. O tabuleiro e as cartas do Duelo foram redesenhados, e a Forja agora tem o próprio botão no jogo.",
+    },
+    highlights: [
+      {
+        en: "Every match now ends with its result screen, however many you play in a row. A slow frame no longer makes the match run in slow motion.",
+        ptBR: "Toda partida agora termina com a tela de resultado, não importa quantas você jogue seguidas. Um quadro lento não deixa mais a partida em câmera lenta.",
+      },
+      {
+        en: "New board: a paved road with stones, stone platforms for towers, a portal where creatures come in, a stone wall with torches between the lanes, flying shots, death puffs and castle hits that shake the castle.",
+        ptBR: "Tabuleiro novo: estrada calçada com pedras, plataformas de pedra para as torres, um portal de onde as criaturas saem, uma muralha com tochas entre as estradas, tiros que voam, fumaça quando uma criatura morre e o castelo tremendo quando é atingido.",
+      },
+      {
+        en: "New top bar with castle life in 20 segments and a ring clock; new card frames, blue for towers and red for creatures; bigger creatures.",
+        ptBR: "Barra de cima nova, com a vida do castelo em 20 partes e um relógio em anel; molduras de carta novas, azuis para torres e vermelhas para criaturas; criaturas maiores.",
+      },
+      {
+        en: "The Forge has its own FORGE button next to EXPEDITIONS, with a marker when the item is ready.",
+        ptBR: "A Forja tem o próprio botão FORJA ao lado de EXPEDIÇÕES, com um aviso quando o item fica pronto.",
+      },
+    ],
+  },
+  {
     id: "v106",
     dateIso: "2026-11-11",
     category: "SYSTEMS",

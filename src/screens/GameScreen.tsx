@@ -121,7 +121,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
   const [talentsOpen, setTalentsOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [eternalOpen, setEternalOpen] = useState(false);
-  const [expeditionsOpen, setExpeditionsOpen] = useState(false);
+  const [expeditionsOpen, setExpeditionsOpen] = useState<null | "trips" | "forge">(null);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
   // CLIPE DA VITÓRIA — records each main-boss fight in the browser; on the
@@ -457,7 +457,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => !open)} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => (open === "trips" ? null : "trips"))} onToggleForge={() => setExpeditionsOpen((open) => (open === "forge" ? null : "forge"))} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -708,6 +708,8 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
         )}
         {expeditionsOpen && (
           <ExpeditionPanel
+            key={expeditionsOpen}
+            view={expeditionsOpen}
             state={engine.getExpeditionState()}
             groupsNow={engine.scoutGroups()}
             record={engine.getExpeditionRecord()}
@@ -720,7 +722,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
             onForge={(id) => engine.startForge(id)}
             onCollectForge={() => engine.collectForge()}
             onRushForge={(c) => engine.rushForge(c)}
-            onClose={() => setExpeditionsOpen(false)}
+            onClose={() => setExpeditionsOpen(null)}
           />
         )}
         {eternalOpen && hud.eternal.active && (
