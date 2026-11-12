@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v105",
+    dateIso: "2026-11-11",
+    category: "CONTENT",
+    title: {
+      en: "New Mode — Duel (1 vs 1)",
+      ptBR: "Novo Modo: Duelo (1 contra 1)",
+    },
+    description: {
+      en: "A new 3-minute mode, opened from the Season page. You and the opponent each have a road and a castle. Tower cards build on your road and creature cards send a group down theirs. Break their castle, or have more castle left when time runs out. For now the opponent is the AI.",
+      ptBR: "Um modo novo, de partidas de 3 minutos, que abre pela página da Season. Você e o oponente têm cada um uma estrada e um castelo. Cartas de torre constroem na sua estrada e cartas de criatura mandam um grupo para a estrada dele. Derrube o castelo dele, ou tenha mais castelo quando o tempo acabar. Por enquanto o oponente é a IA.",
+    },
+    highlights: [
+      {
+        en: "10 cards: the 4 towers and 6 creature groups. Build a deck of 8 with at least 2 towers and 2 creatures; you hold 4 cards, and each one you play goes to the back of the deck.",
+        ptBR: "10 cartas: as 4 torres e 6 grupos de criaturas. Monte um deck de 8 com pelo menos 2 torres e 2 criaturas; você fica com 4 na mão, e cada carta jogada volta para o fim do deck.",
+      },
+      {
+        en: "Mana starts at 5, fills 1 every 2 seconds, and twice as fast in the last minute. Playing the same tower card on the same tower raises its level, up to 3. Creatures sent later come stronger, so matches don't stall.",
+        ptBR: "A mana começa em 5, enche 1 a cada 2 segundos, e o dobro no último minuto. Jogar a mesma carta de torre em cima da mesma torre sobe o nível dela, até 3. Criaturas mandadas mais tarde chegam mais fortes, então a partida não trava.",
+      },
+      {
+        en: "Trophies: +30 for a win, −20 for a loss, never below your arena's floor. 4 arenas (Ancient Forest, Volcanic Wastes, Frozen Tundra and Abyss), each with a smarter AI.",
+        ptBR: "Troféus: +30 por vitória e −20 por derrota, sem nunca cair abaixo do piso da sua arena. São 4 arenas (Floresta Antiga, Ermos Vulcânicos, Tundra Congelada e Abismo), cada uma com uma IA mais esperta.",
+      },
+      {
+        en: "Fair by design: the same cards and numbers for everyone. Your tower skins show up in the Duel, but nothing bought changes it. A win gives 1 Gem Shard, up to 5 a day.",
+        ptBR: "Justo por regra: as mesmas cartas e números para todos. Suas skins de torre aparecem no Duelo, mas nada comprado muda o jogo. Uma vitória dá 1 fragmento de gema, até 5 por dia.",
+      },
+    ],
+  },
+  {
     id: "v104",
     dateIso: "2026-11-11",
     category: "TOWERS",

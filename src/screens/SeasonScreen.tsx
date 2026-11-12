@@ -3,6 +3,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
 import { depthOfWave, romanDepth } from "@/config/eternal";
+import { arenaFor } from "@/config/duel";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { getPhaseForWave } from "@/config/phaseConfig";
@@ -21,6 +22,8 @@ interface SeasonScreenProps {
   onPlay: () => void;
   /** MODO ETERNO — opens the Eternal castle. */
   onPlayEternal?: () => void;
+  /** DUELO — opens the Duel lobby. */
+  onPlayDuel?: () => void;
 }
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
@@ -43,7 +46,7 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
  * the top five will earn. No backend yet, so nothing about other players
  * is ever invented (same stance as RankingScreen.tsx).
  */
-export function SeasonScreen({ onNavigate, onPlay, onPlayEternal }: SeasonScreenProps) {
+export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
@@ -162,6 +165,38 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal }: SeasonScreen
                   {eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start")}
                 </button>
                 <small>{t("eternal.mergeNote")}</small>
+              </div>
+            </section>
+          )}
+
+          {onPlayDuel && (
+            <section className="et-card du-card" data-testid="duel-card">
+              <div className="et-text">
+                <p className="et-kicker du-kicker">{t("duel.kicker")}</p>
+                <h2 className="pg-h2">{t("duel.title")}</h2>
+                <p className="pg-sub">{t("duel.lead")}</p>
+                <dl className="et-figs">
+                  <div>
+                    <dt>{t("duel.trophies")}</dt>
+                    <dd>{save.duel.trophies.toLocaleString(locale)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("duel.arena")}</dt>
+                    <dd>{t(`duel.arenas.${arenaFor(save.duel.trophies).id}` as TranslationKey)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t("duel.record")}</dt>
+                    <dd>
+                      {save.duel.wins}–{save.duel.losses}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+              <div className="et-actions">
+                <button className="pg-btn" onClick={onPlayDuel} data-testid="play-duel">
+                  {t("duel.open")}
+                </button>
+                <small>{t("duel.fairNote")}</small>
               </div>
             </section>
           )}
@@ -287,5 +322,7 @@ const ETERNAL_CSS = `
 .et-figs dd { margin: 2px 0 0; font-family: var(--display); font-size: 22px; color: #e3cdff; }
 .et-actions { display: grid; gap: 8px; justify-items: center; text-align: center; max-width: 260px; }
 .et-actions small { color: var(--ash); font-size: 12px; line-height: 1.4; }
+.du-card { border-color: rgba(224,100,75,0.45); background: linear-gradient(110deg, rgba(224,100,75,0.13), rgba(24,18,12,0.6) 60%); }
+.du-kicker { color: #ff9a85 !important; }
 @media (max-width: 720px) { .et-card { grid-template-columns: 1fr; } .et-actions { justify-items: stretch; max-width: none; } }
 `;

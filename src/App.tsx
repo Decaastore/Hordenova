@@ -1,3 +1,4 @@
+import { DuelScreen } from "./screens/DuelScreen";
 import { useEffect, useState } from "react";
 import { MainMenu } from "./screens/MainMenu";
 import { GameScreen, type GameMode } from "./screens/GameScreen";
@@ -13,7 +14,7 @@ import { LanguageProvider } from "./i18n/LanguageContext";
 import { audioManager } from "./audio/AudioManager";
 import type { NavView } from "./ui/TopNav";
 
-type View = NavView | "GAME";
+type View = NavView | "GAME" | "DUEL";
 
 // SFX/music settings are restored onto AudioManager in main.tsx, before
 // this component (or anything under it) ever renders — see that file's
@@ -80,13 +81,15 @@ export default function App() {
     <LanguageProvider>
       {view === "GAME" ? (
         <GameScreen key={mode} mode={mode} onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
+      ) : view === "DUEL" ? (
+        <DuelScreen onExit={() => setView("SEASON")} />
       ) : view === "SEASON" ? (
         // CORREÇÃO DE REQUISITOS (SEASON COMPETITIVA) — the ONLY "JOGAR"
         // that goes straight into gameplay: the player is already looking
         // at the current Season (name/theme/timer/best/ranking) before this
         // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
         // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
-        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={playEternal} />
+        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={playEternal} onPlayDuel={() => setView("DUEL")} />
       ) : view === "RANKING" ? (
         <RankingScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "WIKI" ? (

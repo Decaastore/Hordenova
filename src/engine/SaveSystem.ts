@@ -1,3 +1,4 @@
+import { createDuelProfile, sanitizeDuelProfile, type DuelProfile } from "@/config/duel";
 import { createDailyShopState, createMomentOfferState, createVipState, sanitizeDailyShopState, sanitizeMomentOfferState, sanitizeVipState, type DailyShopState, type MomentOfferState, type VipState } from "@/config/shopOffers";
 import { createExpeditionState, sanitizeExpeditionState, type ExpeditionState } from "@/config/expeditions";
 import { createEternalState, sanitizeEternalState, type EternalState } from "@/config/eternal";
@@ -277,6 +278,8 @@ export interface SaveData {
   vip: VipState;
   /** EVOLUÇÃO DE SKIN — Premium skins this account has evolved (animated). Account-level, permanent. */
   evolvedSkinIds: string[];
+  /** DUELO — trophies, record, deck and today's rewarded wins (config/duel.ts). Account-level. */
+  duel: DuelProfile;
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -393,6 +396,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   momentOffers: createMomentOfferState(),
   vip: createVipState(),
   evolvedSkinIds: [],
+  duel: createDuelProfile(),
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -941,6 +945,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       dailyShop: sanitizeDailyShopState(parsed.dailyShop),
       momentOffers: sanitizeMomentOfferState(parsed.momentOffers),
       vip: sanitizeVipState(parsed.vip),
+      duel: sanitizeDuelProfile(parsed.duel),
       evolvedSkinIds: Array.isArray(parsed.evolvedSkinIds) ? [...new Set((parsed.evolvedSkinIds as unknown[]).filter((x): x is string => typeof x === "string"))] : [],
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same
