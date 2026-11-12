@@ -70,6 +70,25 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v112",
+    dateIso: "2026-11-12",
+    category: "INTERFACE",
+    title: {
+      en: "Duel: realistic ground and road",
+      ptBR: "Duelo: chão e estrada realistas",
+    },
+    description: {
+      en: "The four Duel arenas now have their own pre-rendered ground, made the same way as the main game's maps: a worn dirt road that bends at the corners, real lighting and shadows, a wood around the lanes and the arena's own stones, cracks and crystals.",
+      ptBR: "As quatro arenas do Duelo agora têm chão pré-renderizado próprio, feito do mesmo jeito que os mapas do jogo principal: estrada de terra batida que faz curva nos cantos, luz e sombra de verdade, mata em volta das estradas e as pedras, rachaduras e cristais de cada arena.",
+    },
+    highlights: [
+      {
+        en: "Creatures follow the new curved road exactly.",
+        ptBR: "As criaturas seguem exatamente a nova estrada com curvas.",
+      },
+    ],
+  },
+  {
     id: "v111",
     dateIso: "2026-11-12",
     category: "INTERFACE",

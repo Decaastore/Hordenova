@@ -37,7 +37,7 @@ export interface Pt {
 /** One lane, in its own 640x660 space; side 1 is drawn shifted right by LANE_W. */
 export const LANE_W = 640;
 export const LANE_H = 660;
-const LANE_PATH: readonly Pt[] = [
+const LANE_CORNERS: readonly Pt[] = [
   { x: 320, y: 40 },
   { x: 320, y: 105 },
   { x: 110, y: 105 },
@@ -49,6 +49,31 @@ const LANE_PATH: readonly Pt[] = [
   { x: 320, y: 535 },
   { x: 320, y: 610 },
 ];
+/** Rounds every corner of a polyline with an arc of `radius` (the road bends instead of turning on a point). */
+export function roundCorners(pts: readonly Pt[], radius: number, steps = 7): Pt[] {
+  const out: Pt[] = [pts[0]!];
+  for (let i = 1; i < pts.length - 1; i++) {
+    const a = pts[i - 1]!;
+    const b = pts[i]!;
+    const c = pts[i + 1]!;
+    const la = Math.hypot(b.x - a.x, b.y - a.y);
+    const lc = Math.hypot(c.x - b.x, c.y - b.y);
+    const r = Math.min(radius, la / 2, lc / 2);
+    const p0 = { x: b.x + ((a.x - b.x) / la) * r, y: b.y + ((a.y - b.y) / la) * r };
+    const p2 = { x: b.x + ((c.x - b.x) / lc) * r, y: b.y + ((c.y - b.y) / lc) * r };
+    for (let k = 0; k <= steps; k++) {
+      const t = k / steps;
+      // quadratic Bézier through the corner — a smooth bend
+      out.push({ x: (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * b.x + t * t * p2.x, y: (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * b.y + t * t * p2.y });
+    }
+  }
+  out.push(pts[pts.length - 1]!);
+  return out;
+}
+
+/** The road every creature walks — the same points the Duel ground was baked with. */
+const LANE_PATH: readonly Pt[] = roundCorners(LANE_CORNERS, 42);
+
 export const LANE_SLOTS: readonly Pt[] = [
   { x: 225, y: 180 },
   { x: 425, y: 180 },

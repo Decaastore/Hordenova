@@ -43,6 +43,19 @@ const SHOT: Record<string, { rgb: string; speed: number }> = {
 };
 
 // ── cached images ───────────────────────────────────────────────────────
+const duelGroundCache = new Map<string, HTMLImageElement>();
+/** The Duel arena's baked ground (public/sprites/duel/<biome>.webp), once loaded. */
+export function duelGround(biome: string): HTMLImageElement | null {
+  const key = biome.toLowerCase();
+  let img = duelGroundCache.get(key);
+  if (!img) {
+    img = new Image();
+    img.src = `${(import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/")}sprites/duel/${key}.webp`;
+    duelGroundCache.set(key, img);
+  }
+  return img.complete && img.naturalWidth > 0 ? img : null;
+}
+
 const groundCache = new Map<string, HTMLImageElement>();
 function groundImage(biome: string): HTMLImageElement | null {
   const key = biome.toLowerCase();
@@ -63,7 +76,8 @@ function groundImage(biome: string): HTMLImageElement | null {
  */
 const boardCache = new Map<string, HTMLCanvasElement>();
 function board(arenaId: string, biomeId: string): HTMLCanvasElement | null {
-  const key = `${arenaId}:${biomeId}`;
+  const baked = duelGround(biomeId);
+  const key = `${arenaId}:${biomeId}:${baked ? "baked" : "drawn"}`;
   const hit = boardCache.get(key);
   if (hit) return hit;
   const biome = getBiome(biomeId);
@@ -71,6 +85,21 @@ function board(arenaId: string, biomeId: string): HTMLCanvasElement | null {
   cv.width = DUEL_W;
   cv.height = DUEL_H;
   const ctx = cv.getContext("2d")!;
+  // the arena's baked ground (same 3D-lit terrain, road, platforms and portal rim as the main game's maps)
+  if (baked) {
+    for (const side of [0, 1] as Side[]) ctx.drawImage(baked, side * LANE_W, 0, LANE_W, DUEL_H);
+    for (const side of [0, 1] as Side[]) {
+      const x0 = side * LANE_W;
+      const v = ctx.createRadialGradient(x0 + LANE_W / 2, DUEL_H * 0.55, 200, x0 + LANE_W / 2, DUEL_H * 0.55, 560);
+      v.addColorStop(0, "rgba(0,0,0,0)");
+      v.addColorStop(1, "rgba(0,0,0,0.35)");
+      ctx.fillStyle = v;
+      ctx.fillRect(x0, 0, LANE_W, DUEL_H);
+    }
+    drawWall(ctx);
+    boardCache.set(key, cv);
+    return cv;
+  }
   drawBackground(ctx, biome, { x0: 0, y0: 0, x1: DUEL_W, y1: DUEL_H });
   const ground = groundImage(biomeId);
   if (ground) {
@@ -466,11 +495,12 @@ export function drawDuelFrame(
   for (const side of [0, 1] as Side[]) {
     const biomeDef = getBiome(biome);
     const emerging = snap.units.filter((u) => u.side === side && u.dist >= 0 && u.dist < 6).map((u) => `${u.id}`);
-    drawRiftPortal(ctx, lanePath(side)[0]!, biomeDef, timeMs, emerging, false);
+    const baked = !!duelGround(biome);
+    drawRiftPortal(ctx, lanePath(side)[0]!, biomeDef, timeMs, emerging, baked);
     LANE_SLOTS.forEach((_, i) => {
       const taken = snap.towers.some((t) => t.side === side && t.slot === i);
       const hl = side === 0 && pickingSlot && !taken;
-      drawSlot(ctx, { id: `d${side}-${i}`, position: slotPos(side, i) } as unknown as TowerSlotDefinition, i, taken, hl, biomeDef, timeMs);
+      drawSlot(ctx, { id: `d${side}-${i}`, position: slotPos(side, i) } as unknown as TowerSlotDefinition, i, taken, hl, biomeDef, timeMs, baked);
       if (side === 0 && pickingSlot && hoverSlot === i) drawPlinth(ctx, slotPos(side, i), false, 1);
     });
   }
