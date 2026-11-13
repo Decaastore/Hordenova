@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v132",
+    dateIso: "2026-11-13",
+    category: "CONTENT",
+    title: {
+      en: "Duel: a new event every day",
+      ptBR: "Duelo: um evento novo todo dia",
+    },
+    description: {
+      en: "The Duel lobby has an Event of the day that changes at 00:00 UTC. Events don't move trophies, and the first event win of the day pays 40 Duel Coins.",
+      ptBR: "O lobby do Duelo tem um Evento do dia que muda às 00:00 UTC. Eventos não mexem nos troféus, e a primeira vitória em evento do dia paga 40 Moedas de Duelo.",
+    },
+    highlights: [
+      {
+        en: "Double Mana: mana fills twice as fast the whole match.",
+        ptBR: "Mana Dupla: a mana enche duas vezes mais rápido a partida toda.",
+      },
+      {
+        en: "Draft: build your deck on the spot by picking 1 of 3 cards, eight times.",
+        ptBR: "Draft: monte o deck na hora escolhendo 1 de 3 cartas, oito vezes.",
+      },
+      {
+        en: "Mirror: the opponent plays your exact deck. Random Decks: both sides get a random deck.",
+        ptBR: "Espelho: o adversário joga com o seu deck exato. Decks Aleatórios: os dois lados recebem um deck aleatório.",
+      },
+      {
+        en: "Event matches show up in your match history with their replay too.",
+        ptBR: "As partidas de evento também aparecem no histórico, com replay.",
+      },
+    ],
+  },
+  {
     id: "v131",
     dateIso: "2026-11-13",
     category: "SYSTEMS",

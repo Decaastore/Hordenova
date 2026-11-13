@@ -5,6 +5,7 @@ import { loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
 import { appendLedgerEvent } from "@/engine/EconomyLedger";
 import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot, type Pt } from "@/engine/DuelEngine";
 import { drawSpellIcon } from "@/rendering/duelSpells";
+import { formatDurationShort } from "@/utils/formatDuration";
 import {
   applyDuelResult,
   arenaFor,
@@ -55,6 +56,12 @@ import {
   pushHistory,
   type DuelHistoryEntry,
   type DuelMode,
+  applyEventResult,
+  draftOptions,
+  duelEventFor,
+  EVENT_WIN_COINS,
+  randomDeck,
+  type DuelEventId,
   type DuelShopItem,
   type KillFxId,
   type DuelCardId,
@@ -302,7 +309,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
   const [matchNo, setMatchNo] = useState(0);
   const [result, setResult] = useState<MatchResult | null>(null);
-  const [mode, setMode] = useState<"ranked" | "weekly" | "tourney">("ranked");
+  const [mode, setMode] = useState<"ranked" | "weekly" | "tourney" | "event">("ranked");
+  /** DRAFT in progress: the cards picked so far (null when not drafting). */
+  const [draft, setDraft] = useState<{ seed: number; picked: DuelCardId[] } | null>(null);
   const challenge = mode === "weekly";
   const [notice, setNotice] = useState<string | null>(null);
   const now = Date.now();
@@ -389,18 +398,54 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     myCastle: Math.max(0, snap.players[0]!.castle),
     foeCastle: Math.max(0, snap.players[1]!.castle),
     trophyChange,
-    arenaId: m !== "RANKED" ? "ARENA_ABYSS" : arena.id,
-    biome: m !== "RANKED" ? "ABYSS" : arena.biome,
+    arenaId: m === "RANKED" || m === "EVENT" ? arena.id : "ARENA_ABYSS",
+    biome: m === "RANKED" || m === "EVENT" ? arena.biome : "ABYSS",
     v: DUEL_RULES_VERSION,
     seed: match!.seed,
     decks: [[...match!.decks[0]], [...match!.decks[1]]],
     ai: match!.aiSkill ?? 0,
+    ...(m === "EVENT" ? { event: todayEvent, ...(match!.rules.doubleMana ? { doubleMana: true } : {}) } : {}),
     plays: match!.log.filter((p) => p.side === 0).map((p) => ({ t: p.t, card: p.card, ...(p.slot !== undefined ? { slot: p.slot } : {}), ...(p.at ? { at: { ...p.at } } : {}) })),
   });
+
+  const todayEvent: DuelEventId = duelEventFor(day);
+  /** Starts today's event match (DRAFT starts from the finished draft's deck). */
+  const startEvent = (draftedDeck?: DuelCardId[]) => {
+    const seed = (Date.now() & 0x7fffffff) | 1;
+    const cur = loadSave();
+    const ev = duelEventFor(Math.floor(Date.now() / 86_400_000));
+    if (ev === "DRAFT" && !draftedDeck) {
+      setDraft({ seed, picked: [] });
+      return;
+    }
+    const mine = ev === "DRAFT" ? draftedDeck! : ev === "RANDOM" ? randomDeck(seed) : [...cur.duel.deck];
+    const theirs = ev === "MIRROR" ? [...cur.duel.deck] : ev === "DOUBLE_MANA" ? aiDeck(arena.id) : randomDeck(seed + 7919);
+    setDraft(null);
+    setResult(null);
+    setMode("event");
+    setMatchNo((n) => n + 1);
+    setDuelLooks(duelSkinLooks(cur.duel), duelKillFx(cur.duel));
+    setMatch(new DuelEngine(seed, [mine, theirs], duelAiSkill(cur.duel.trophies), cur.equippedTowerSkinByType, ev === "DOUBLE_MANA" ? { doubleMana: true } : {}));
+  };
+
+  const pickDraft = (id: DuelCardId) => {
+    if (!draft) return;
+    const picked = [...draft.picked, id];
+    if (picked.length >= DECK_SIZE) startEvent(picked);
+    else setDraft({ ...draft, picked });
+  };
 
   const finish = (snap: DuelSnapshot) => {
     const outcome = snap.outcome!;
     const cur = loadSave();
+    if (mode === "event") {
+      const r = applyEventResult(cur.duel, outcome, Date.now());
+      const prize = { ...NO_PRIZE, coins: r.coins };
+      const next = updateSave({ duel: { ...r.profile, history: pushHistory(r.profile.history, historyEntry(snap, "EVENT", 0)) } });
+      setSave(next);
+      setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null });
+      return;
+    }
     if (mode === "tourney") {
       const r = applyTourneyResult(cur.duel, outcome, Date.now());
       const prize = r?.prize ?? NO_PRIZE;
@@ -454,19 +499,53 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 
   if (replay) return <DuelReplay entry={replay} onBack={() => setReplay(null)} />;
 
+  if (draft) {
+    const options = draftOptions(draft.seed, draft.picked);
+    return (
+      <div className="pg-root">
+        <style>{PAGE_CSS + LOBBY_CSS + MATCH_CSS}</style>
+        <div className="pg-scroll">
+          <div className="pg-wrap du-draft" data-testid="duel-draft">
+            <h2 className="pg-h2">{t("duel.draftTitle", { n: draft.picked.length + 1, max: DECK_SIZE })}</h2>
+            <div className="du-draft-opts">
+              {options.map((id) => (
+                <button key={id} className="du-cardbtn is-on du-draft-opt" onClick={() => pickDraft(id)} data-testid={`draft-${id}`}>
+                  <CardFace id={id} />
+                  <span className="du-desc">{t(`duel.card.${id}.desc` as TranslationKey)}</span>
+                </button>
+              ))}
+            </div>
+            <p className="pg-sub">{t("duel.draftDeck")}</p>
+            <div className="du-draft-deck">
+              {draft.picked.map((id) => (
+                <CardFace key={id} id={id} small />
+              ))}
+              {Array.from({ length: DECK_SIZE - draft.picked.length }, (_, i) => (
+                <span key={i} className="du-draft-empty" aria-hidden="true" />
+              ))}
+            </div>
+            <button className="pg-btn-ghost" onClick={() => setDraft(null)}>
+              {t("duel.draftCancel")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (match)
     return (
       <DuelMatch
         key={matchNo}
         engine={match}
-        arenaId={mode !== "ranked" ? "ARENA_ABYSS" : arena.id}
-        biome={mode !== "ranked" ? "ABYSS" : arena.biome}
+        arenaId={mode === "ranked" || mode === "event" ? arena.id : "ARENA_ABYSS"}
+        biome={mode === "ranked" || mode === "event" ? arena.biome : "ABYSS"}
         banner={banner}
         frame={frame}
         result={result}
         rankName={rankName}
         onFinish={finish}
-        onAgain={mode === "weekly" ? startWeekly : mode === "tourney" ? startTourney : start}
+        onAgain={mode === "weekly" ? startWeekly : mode === "tourney" ? startTourney : mode === "event" ? () => startEvent() : start}
         onLobby={() => setMatch(null)}
       />
     );
@@ -517,6 +596,23 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
             </button>
           </section>
           {notice && <p className="du-notice">{notice}</p>}
+
+          <section className={`du-event is-${todayEvent}`} data-testid="duel-event">
+            <div>
+              <small className="du-event-kicker">
+                {t("duel.eventTitle")} · {t("duel.eventEndsIn", { time: formatDurationShort((day + 1) * 86_400_000 - now) })}
+              </small>
+              <h2 className="pg-h2">{t(`duel.event.${todayEvent}.name` as TranslationKey)}</h2>
+              <p className="pg-sub">{t(`duel.event.${todayEvent}.desc` as TranslationKey)}</p>
+              <p className="pg-sub">{t("duel.eventLead", { n: EVENT_WIN_COINS })}</p>
+              <p className="pg-sub du-pz">
+                <MaterialIcon kind="DUEL_COINS" size={18} /> {duel.eventWinDay === day ? t("duel.eventPrizeDone") : t("duel.eventPrizeOpen", { n: EVENT_WIN_COINS })}
+              </p>
+            </div>
+            <button className="pg-btn" disabled={(todayEvent === "MIRROR" || todayEvent === "DOUBLE_MANA") && !isValidDeck(duel.deck)} onClick={() => startEvent()} data-testid="duel-event-start">
+              {t("duel.eventPlay")}
+            </button>
+          </section>
 
           <section className="du-block" data-testid="duel-missions">
             <h2 className="pg-h2">{t("duel.missionsTitle")}</h2>
@@ -750,6 +846,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                     </span>
                     <span className="du-hmeta">
                       {t(`duel.historyMode.${h.mode}` as TranslationKey)}
+                      {h.event && ` · ${t(`duel.event.${h.event}.name` as TranslationKey)}`}
                       {h.mode === "RANKED" && <b className={h.trophyChange > 0 ? "is-up" : h.trophyChange < 0 ? "is-down" : ""}> {(h.trophyChange > 0 ? "+" : "") + h.trophyChange} 🏆</b>}
                     </span>
                     <span className="du-hdate">{new Date(h.at).toLocaleString(language === "ptBR" ? "pt-BR" : "en-US", { dateStyle: "short", timeStyle: "short" })}</span>
@@ -1227,7 +1324,7 @@ function DuelReplay({ entry, onBack }: { entry: DuelHistoryEntry; onBack: () => 
 
   useEffect(() => {
     setSpriteBiome(entry.biome);
-    const engine = new DuelEngine(entry.seed, [entry.decks[0], entry.decks[1]], entry.ai);
+    const engine = new DuelEngine(entry.seed, [entry.decks[0], entry.decks[1]], entry.ai, {}, entry.doubleMana ? { doubleMana: true } : {});
     let next = 0;
     let raf = 0;
     let last = performance.now();
@@ -1418,6 +1515,20 @@ const LOBBY_CSS = `
 .du-weekly-decks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--ash); }
 .du-count { font-size: 14px; color: var(--ash); }
 .du-count.is-bad { color: #ff9a85; }
+.du-event { display: flex; flex-wrap: wrap; gap: 16px 32px; align-items: center; justify-content: space-between; margin-top: 28px; padding: 20px 22px; border-radius: 12px; border: 1px solid rgba(160,120,255,0.5); background: linear-gradient(110deg, rgba(110,70,200,0.22), rgba(24,18,12,0.6) 60%); }
+.du-event.is-DOUBLE_MANA { border-color: rgba(197,139,255,0.6); }
+.du-event.is-DRAFT { border-color: rgba(120,200,255,0.55); background: linear-gradient(110deg, rgba(60,140,210,0.22), rgba(24,18,12,0.6) 60%); }
+.du-event.is-MIRROR { border-color: rgba(220,220,240,0.5); background: linear-gradient(110deg, rgba(170,170,200,0.2), rgba(24,18,12,0.6) 60%); }
+.du-event.is-RANDOM { border-color: rgba(255,160,90,0.55); background: linear-gradient(110deg, rgba(220,120,50,0.22), rgba(24,18,12,0.6) 60%); }
+.du-event > div { max-width: 70ch; display: grid; gap: 6px; }
+.du-event .pg-sub { margin: 0; }
+.du-event .pg-h2 { margin: 0; }
+.du-event-kicker { font-size: 12.5px; color: #d8c6ff; font-weight: 700; }
+.du-draft { padding-top: 40px; padding-bottom: 40px; display: grid; gap: 16px; justify-items: start; }
+.du-draft-opts { display: flex; flex-wrap: wrap; gap: 16px; }
+.du-draft-opt { width: 190px; }
+.du-draft-deck { display: flex; flex-wrap: wrap; gap: 8px; }
+.du-draft-empty { width: 64px; height: 84px; border-radius: 10px; border: 1px dashed var(--line); }
 .du-slots { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 2px; }
 .du-slot { padding: 8px 16px; border-radius: 9px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--ash); font-weight: 700; cursor: pointer; }
 .du-slot.is-on { border-color: rgba(232,176,75,0.8); color: var(--gold-hi); background: linear-gradient(180deg, rgba(232,176,75,0.16), rgba(24,18,12,0.6)); }

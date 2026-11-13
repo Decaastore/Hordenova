@@ -447,6 +447,82 @@ export interface DuelProfile {
   mastery: Partial<Record<DuelCardId, { wins: number; claimed: number }>>;
   /** HISTÓRICO — the last matches, newest first, with what's needed to replay them. */
   history: DuelHistoryEntry[];
+  /** UTC day the daily event's win prize was paid (-1 never). */
+  eventWinDay: number;
+}
+
+// ── daily event modes ──────────────────────────────────────────────────
+/**
+ * EVENTO DO DIA — a different way to play every day (like Clash's party
+ * modes). No trophies; the first win of the day pays a few Duel Coins.
+ *   DOUBLE_MANA: mana fills twice as fast all match.
+ *   DRAFT: build your deck by picking 1 of 3 cards, 8 times.
+ *   MIRROR: the opponent plays your exact deck.
+ *   RANDOM: both sides get a random deck.
+ */
+export type DuelEventId = "DOUBLE_MANA" | "DRAFT" | "MIRROR" | "RANDOM";
+export const DUEL_EVENTS: readonly DuelEventId[] = ["DOUBLE_MANA", "DRAFT", "MIRROR", "RANDOM"];
+export const EVENT_WIN_COINS = 40;
+
+export function duelEventFor(day: number): DuelEventId {
+  return DUEL_EVENTS[((day % DUEL_EVENTS.length) + DUEL_EVENTS.length) % DUEL_EVENTS.length]!;
+}
+
+function lcg(seed: number): () => number {
+  let s = (seed * 2654435761 + 17) >>> 0 || 1;
+  return () => {
+    s = (s * 16807) % 2147483647;
+    return (s - 1) / 2147483646;
+  };
+}
+
+/** A random but valid deck (2–4 towers, 2–4 creatures, the rest anything). */
+export function randomDeck(seed: number): DuelCardId[] {
+  const r = lcg(seed);
+  const take = (from: DuelCardId[], n: number, into: DuelCardId[]) => {
+    const pool = from.filter((id) => !into.includes(id));
+    for (let i = 0; i < n && pool.length; i++) into.push(pool.splice(Math.floor(r() * pool.length), 1)[0]!);
+  };
+  const ids = DUEL_CARDS.map((c) => c.id);
+  const towers = DUEL_CARDS.filter((c) => c.kind === "TOWER").map((c) => c.id);
+  const sends = DUEL_CARDS.filter((c) => c.kind === "SEND").map((c) => c.id);
+  const out: DuelCardId[] = [];
+  take(towers, 2, out);
+  take(sends, 2, out);
+  while (out.length < DECK_SIZE) {
+    const kindCount = (k: DuelCard["kind"]) => out.filter((id) => getDuelCard(id)!.kind === k).length;
+    take(
+      ids.filter((id) => {
+        const k = getDuelCard(id)!.kind;
+        return k === "SPELL" || kindCount(k) < 4;
+      }),
+      1,
+      out,
+    );
+  }
+  return out;
+}
+
+/** DRAFT: the 3 cards offered in a round, given what's already picked. Late rounds only offer what the deck still needs to be valid. */
+export function draftOptions(seed: number, picked: readonly DuelCardId[]): DuelCardId[] {
+  const r = lcg(seed * 31 + picked.length * 977 + 5);
+  const left = DECK_SIZE - picked.length;
+  const has = (k: DuelCard["kind"]) => picked.filter((id) => getDuelCard(id)!.kind === k).length;
+  const needT = Math.max(0, 2 - has("TOWER"));
+  const needS = Math.max(0, 2 - has("SEND"));
+  let pool = DUEL_CARDS.filter((c) => !picked.includes(c.id));
+  if (needT + needS >= left) pool = pool.filter((c) => (needT > 0 && c.kind === "TOWER") || (needS > 0 && c.kind === "SEND"));
+  const ids = pool.map((c) => c.id);
+  const out: DuelCardId[] = [];
+  while (out.length < 3 && ids.length) out.push(ids.splice(Math.floor(r() * ids.length), 1)[0]!);
+  return out;
+}
+
+/** Pays the first event win of the day. */
+export function applyEventResult(p: DuelProfile, outcome: DuelOutcome, nowMs: number): { profile: DuelProfile; coins: number } {
+  const day = Math.floor(nowMs / 86_400_000);
+  if (outcome !== "WIN" || p.eventWinDay === day) return { profile: p, coins: 0 };
+  return { profile: { ...p, coins: p.coins + EVENT_WIN_COINS, eventWinDay: day }, coins: EVENT_WIN_COINS };
 }
 
 // ── saved decks ─────────────────────────────────────────────────────────
@@ -507,7 +583,7 @@ export function claimMastery(p: DuelProfile, id: DuelCardId): { profile: DuelPro
 export const DUEL_RULES_VERSION = 2;
 export const HISTORY_MAX = 10;
 
-export type DuelMode = "RANKED" | "TOURNEY" | "WEEKLY";
+export type DuelMode = "RANKED" | "TOURNEY" | "WEEKLY" | "EVENT";
 
 export interface DuelHistoryEntry {
   at: number;
@@ -524,6 +600,9 @@ export interface DuelHistoryEntry {
   decks: [DuelCardId[], DuelCardId[]];
   ai: number;
   plays: { t: number; card: DuelCardId; slot?: number; at?: { x: number; y: number } }[];
+  /** EVENT matches: which event and its rule changes. */
+  event?: DuelEventId;
+  doubleMana?: boolean;
 }
 
 export function pushHistory(list: readonly DuelHistoryEntry[], e: DuelHistoryEntry): DuelHistoryEntry[] {
@@ -541,7 +620,7 @@ function sanitizeHistory(raw: unknown): DuelHistoryEntry[] {
     if (!x || typeof x !== "object") continue;
     const e = x as Record<string, unknown>;
     const outcome = e.outcome === "WIN" || e.outcome === "LOSS" || e.outcome === "DRAW" ? e.outcome : null;
-    const mode = e.mode === "RANKED" || e.mode === "TOURNEY" || e.mode === "WEEKLY" ? e.mode : null;
+    const mode = e.mode === "RANKED" || e.mode === "TOURNEY" || e.mode === "WEEKLY" || e.mode === "EVENT" ? e.mode : null;
     const decks = Array.isArray(e.decks) && e.decks.length === 2 ? (e.decks as unknown[]).map(sanitizeDeckSlot) : null;
     if (!outcome || !mode || !decks || decks.some((d) => d.length !== DECK_SIZE)) continue;
     const plays = Array.isArray(e.plays)
@@ -574,6 +653,8 @@ function sanitizeHistory(raw: unknown): DuelHistoryEntry[] {
       decks: [decks[0]!, decks[1]!],
       ai: typeof e.ai === "number" ? Math.max(0, Math.min(1, e.ai)) : 0,
       plays,
+      ...(typeof e.event === "string" && (DUEL_EVENTS as readonly string[]).includes(e.event) ? { event: e.event as DuelEventId } : {}),
+      ...(e.doubleMana === true ? { doubleMana: true } : {}),
     });
     if (out.length >= HISTORY_MAX) break;
   }
@@ -606,6 +687,7 @@ export function createDuelProfile(): DuelProfile {
     activeDeck: 0,
     mastery: {},
     history: [],
+    eventWinDay: -1,
   };
 }
 
@@ -672,6 +754,7 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
       return out;
     })(),
     history: sanitizeHistory(r.history),
+    eventWinDay: intOr(r.eventWinDay, -1),
   };
 }
 

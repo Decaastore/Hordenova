@@ -197,6 +197,12 @@ export interface DuelPlay {
   at?: Pt;
 }
 
+/** Rule changes for event modes. */
+export interface DuelRules {
+  /** MANA DUPLA: mana fills twice as fast for the whole match. */
+  doubleMana?: boolean;
+}
+
 /** METEOR falls for this long before it lands. */
 export const METEOR_FALL_MS = 550;
 
@@ -222,6 +228,8 @@ export class DuelEngine {
   /** The decks and AI skill it started with (replays). */
   readonly decks: [DuelCardId[], DuelCardId[]];
   readonly aiSkill: number | null;
+  /** Event-mode rule changes (replays need them too). */
+  readonly rules: DuelRules;
   private r: () => number;
   private t = 0;
   private uid = 1;
@@ -241,8 +249,9 @@ export class DuelEngine {
   private skinBySide: [Partial<Record<TowerType, string>>, Partial<Record<TowerType, string>>];
 
   /** `aiSkill` 0..1 makes side 1 an AI; null leaves both sides to `play`. */
-  constructor(seed: number, decks: [readonly DuelCardId[], readonly DuelCardId[]], aiSkill: number | null, skins: Partial<Record<TowerType, string>> = {}) {
+  constructor(seed: number, decks: [readonly DuelCardId[], readonly DuelCardId[]], aiSkill: number | null, skins: Partial<Record<TowerType, string>> = {}, rules: DuelRules = {}) {
     this.seed = seed;
+    this.rules = { ...rules };
     this.decks = [[...decks[0]], [...decks[1]]];
     this.aiSkill = aiSkill;
     this.r = rng(seed);
@@ -361,7 +370,7 @@ export class DuelEngine {
   private tick(): void {
     const dt = DUEL_TICK_MS;
     this.t += dt;
-    const every = this.overtime ? DUEL_OVERTIME_MANA_EVERY_MS : this.t >= DUEL_DOUBLE_MANA_FROM_MS ? DUEL_MANA_EVERY_MS / 2 : DUEL_MANA_EVERY_MS;
+    const every = this.overtime ? DUEL_OVERTIME_MANA_EVERY_MS : this.rules.doubleMana || this.t >= DUEL_DOUBLE_MANA_FROM_MS ? DUEL_MANA_EVERY_MS / 2 : DUEL_MANA_EVERY_MS;
     for (const p of this.players) {
       p.manaAcc += dt;
       while (p.manaAcc >= every) {
@@ -573,7 +582,7 @@ export class DuelEngine {
       shots: this.shots,
       breaches: this.breaches,
       deaths: this.deaths,
-      doubleMana: this.t >= DUEL_DOUBLE_MANA_FROM_MS,
+      doubleMana: !!this.rules.doubleMana || this.t >= DUEL_DOUBLE_MANA_FROM_MS,
       overtime: this.overtime,
       spells: this.spellFx,
     };

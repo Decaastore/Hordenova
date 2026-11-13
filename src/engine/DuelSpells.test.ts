@@ -159,3 +159,47 @@ describe("Duel history, decks and mastery", () => {
     expect(canReplay({ ...h[0]!, v: DUEL_RULES_VERSION - 1 })).toBe(false);
   });
 });
+
+describe("Duel daily events", () => {
+  it("rotates one event a day through all four", async () => {
+    const { duelEventFor, DUEL_EVENTS } = await import("@/config/duel");
+    const seen = new Set([0, 1, 2, 3].map((d) => duelEventFor(20_000 + d)));
+    expect(seen.size).toBe(DUEL_EVENTS.length);
+    expect(duelEventFor(20_000)).toBe(duelEventFor(20_004));
+  });
+
+  it("random decks and every draft are always valid", async () => {
+    const { randomDeck, draftOptions, isValidDeck, DECK_SIZE } = await import("@/config/duel");
+    for (let seed = 1; seed < 300; seed++) {
+      expect(isValidDeck(randomDeck(seed))).toBe(true);
+      // a stubborn drafter who always takes spells first, then the first option
+      const picked: DuelCardId[] = [];
+      while (picked.length < DECK_SIZE) {
+        const opts = draftOptions(seed, picked);
+        expect(opts.length).toBeGreaterThan(0);
+        expect(new Set(opts).size).toBe(opts.length);
+        picked.push(opts.find((id) => id.startsWith("X_")) ?? opts[0]!);
+      }
+      expect(isValidDeck(picked)).toBe(true);
+    }
+  });
+
+  it("Double Mana fills mana twice as fast from the start, and the first event win of the day pays once", async () => {
+    const { applyEventResult, createDuelProfile, EVENT_WIN_COINS } = await import("@/config/duel");
+    const normal = new DuelEngine(3, [SEND_DECK, SEND_DECK], null);
+    const dbl = new DuelEngine(3, [SEND_DECK, SEND_DECK], null, {}, { doubleMana: true });
+    // spend down, then compare refill
+    for (const e of [normal, dbl]) for (const c of e.snapshot().players[0]!.hand) e.play(0, c);
+    const m0 = [normal.snapshot().players[0]!.mana, dbl.snapshot().players[0]!.mana];
+    normal.advance(4000);
+    dbl.advance(4000);
+    expect(normal.snapshot().players[0]!.mana - m0[0]!).toBe(2);
+    expect(dbl.snapshot().players[0]!.mana - m0[1]!).toBe(4);
+    const day = 20_000 * 86_400_000;
+    const a = applyEventResult(createDuelProfile(), "WIN", day);
+    expect(a.coins).toBe(EVENT_WIN_COINS);
+    expect(applyEventResult(a.profile, "WIN", day + 1000).coins).toBe(0);
+    expect(applyEventResult(a.profile, "WIN", day + 86_400_000).coins).toBe(EVENT_WIN_COINS);
+    expect(applyEventResult(createDuelProfile(), "LOSS", day).coins).toBe(0);
+  });
+});
