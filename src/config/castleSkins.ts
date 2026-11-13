@@ -34,11 +34,25 @@ export interface CastleSkinPaletteOverride {
   rockDark?: string;
 }
 
+export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER";
+export type CastleSkinAura = "EMBER" | "FROST" | "SOLAR" | "VERDANT" | "VOID" | "BANNERS";
+
 export interface CastleSkinDefinition {
   id: string;
   /** i18n key: castleSkins.<id>.name / .description */
   i18nKey: string;
   paletteOverride: CastleSkinPaletteOverride;
+  /** How it is earned. Only ROULETTE skins can come from the roulette; STORE skins are bought. */
+  source: CastleSkinSource;
+  /** SKINS DE CASTELO — the realistic castle sprite recolored with this hue ("color" blend), at this strength 0..1. */
+  tint: string;
+  tintStrength: number;
+  /** Window/torch glow color. */
+  glow: string;
+  /** The skin's living effect around the castle (rendering/castleSkinFx.ts). */
+  aura: CastleSkinAura;
+  /** STORE skins only: Gems (free or purchased). */
+  priceGems?: number;
 }
 
 /** FASE 6 — the Prestige P100 reward's id (config/prestige.ts's PRESTIGE_MILESTONE_REWARDS, "prestigeCastleSkin"). Granted directly into SaveData.unlockedCastleSkinIds by GameEngine.grantEarnedPrestigeMilestoneRewards, the exact same idiom the Roulette CASTLE_SKIN outcome already uses — never sold, never spun for. */
@@ -50,13 +64,33 @@ export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
     id: "OBSIDIAN_BASTION",
     i18nKey: "OBSIDIAN_BASTION",
     paletteOverride: { rock: "#2e2734", rockDark: "#130f18" },
+    source: "ROULETTE",
+    tint: "#2a2036",
+    tintStrength: 0.75,
+    glow: "#ff8a3a",
+    aura: "EMBER",
   },
   {
     id: PRESTIGE_CASTLE_SKIN_ID,
     i18nKey: PRESTIGE_CASTLE_SKIN_ID,
     paletteOverride: { rock: "#4a3f14", rockDark: "#1c1808" },
+    source: "PRESTIGE",
+    tint: "#c9a23a",
+    tintStrength: 0.7,
+    glow: "#ffe08a",
+    aura: "SOLAR",
   },
+  // SKINS DE CASTELO — sold in the Store (cosmetic only, never HP/damage/resistance)
+  { id: "FROST_CITADEL", i18nKey: "FROST_CITADEL", paletteOverride: { rock: "#9fc3d8", rockDark: "#3d5b70" }, source: "STORE", tint: "#7fc4ff", tintStrength: 0.7, glow: "#bfe8ff", aura: "FROST", priceGems: 600 },
+  { id: "INFERNAL_KEEP", i18nKey: "INFERNAL_KEEP", paletteOverride: { rock: "#5a2018", rockDark: "#240a06" }, source: "STORE", tint: "#c0301a", tintStrength: 0.65, glow: "#ff6a2a", aura: "EMBER", priceGems: 600 },
+  { id: "SOLAR_SANCTUM", i18nKey: "SOLAR_SANCTUM", paletteOverride: { rock: "#e8dcc0", rockDark: "#8a7a52" }, source: "STORE", tint: "#ffe2a0", tintStrength: 0.55, glow: "#fff0c0", aura: "SOLAR", priceGems: 900 },
+  { id: "VERDANT_HOLD", i18nKey: "VERDANT_HOLD", paletteOverride: { rock: "#4d6a3a", rockDark: "#1f2e16" }, source: "STORE", tint: "#5f9a3a", tintStrength: 0.6, glow: "#d8ff9a", aura: "VERDANT", priceGems: 450 },
+  // earned, never sold
+  { id: "VOID_SPIRE", i18nKey: "VOID_SPIRE", paletteOverride: { rock: "#3a2a5a", rockDark: "#140c24" }, source: "COLLECTION", tint: "#7a4ad8", tintStrength: 0.72, glow: "#c79bff", aura: "VOID" },
+  { id: "RECRUIT_KEEP", i18nKey: "RECRUIT_KEEP", paletteOverride: { rock: "#8a6a44", rockDark: "#3a2a16" }, source: "BEGINNER", tint: "#c08a4a", tintStrength: 0.45, glow: "#ffcf8a", aura: "BANNERS" },
 ];
+
+export const STORE_CASTLE_SKINS = CASTLE_SKINS.filter((s) => s.source === "STORE");
 
 const CASTLE_SKINS_BY_ID = new Map(CASTLE_SKINS.map((s) => [s.id, s]));
 

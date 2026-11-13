@@ -1,4 +1,6 @@
 import { SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
+import { CASTLE_SKINS } from "@/config/castleSkins";
+import { CastleSkinPreview } from "@/ui/CastleSkinPreview";
 import { useMemo, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -10,7 +12,7 @@ import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
-import { buyDailyOffer, buySkinEvolution, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
+import { buyCastleSkin, castleSkinPrice, equipCastleSkin, buyDailyOffer, buySkinEvolution, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
 import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_PRICE_BRL, vipGiftAvailable, type DailyOffer, type MomentOffer } from "@/config/shopOffers";
 import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
 import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
@@ -116,6 +118,18 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
       setSave(result.save);
       setNotice(t("store.evolved", { name: t(`towerSkins.${skin.id}.name` as TranslationKey) }));
     } else if (result.reason === "INSUFFICIENT_GEMS") setNotice(t(currency === "FREE" ? "store.notEnoughFree" : "store.notEnoughPurchased"));
+  };
+
+  const onBuyCastle = (id: string, currency: GemCurrency) => {
+    const result = buyCastleSkin(id, currency);
+    if (result.ok) {
+      setSave(result.save);
+      setNotice(t("store.castleBought", { name: t(`castleSkins.${id}.name` as TranslationKey) }));
+    } else if (result.reason === "INSUFFICIENT_GEMS") setNotice(t(currency === "FREE" ? "store.notEnoughFree" : "store.notEnoughPurchased"));
+  };
+  const onEquipCastle = (id: string | null) => {
+    const result = equipCastleSkin(id);
+    if (result.ok) setSave(result.save);
   };
 
   const onEquip = (skin: TowerSkinDefinition, equip: boolean) => {
@@ -226,6 +240,49 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
               </button>
             </p>
           )}
+
+          <section className="st-section" data-testid="castle-skins">
+            <div className="pg-head">
+              <h2 className="pg-h2">{t("store.castleTitle")}</h2>
+            </div>
+            <p className="pg-sub">{t("store.castleSub")}</p>
+            <div className="st-castles">
+              <article className={`st-castle${save.equippedCastleSkinId === null ? " is-on" : ""}`}>
+                <CastleSkinPreview skinId={null} />
+                <h3>{t("store.castleDefault")}</h3>
+                <p className="st-castle-how">{t("store.castleDefaultHow")}</p>
+                <button className="st-pay" disabled={save.equippedCastleSkinId === null} onClick={() => onEquipCastle(null)}>
+                  {save.equippedCastleSkinId === null ? t("store.castleOn") : t("store.castleWear")}
+                </button>
+              </article>
+              {CASTLE_SKINS.map((c) => {
+                const owned = save.unlockedCastleSkinIds.includes(c.id);
+                const on = save.equippedCastleSkinId === c.id;
+                const price = castleSkinPrice(c.id);
+                return (
+                  <article key={c.id} className={`st-castle${on ? " is-on" : ""}`} data-testid={`castle-${c.id}`}>
+                    <CastleSkinPreview skinId={c.id} />
+                    <h3>{t(`castleSkins.${c.i18nKey}.name` as TranslationKey)}</h3>
+                    <p className="st-castle-how">{owned ? t("store.owned") : t(`store.castleHow.${c.source}` as TranslationKey)}</p>
+                    {owned ? (
+                      <button className="st-pay" disabled={on} onClick={() => onEquipCastle(c.id)}>
+                        {on ? t("store.castleOn") : t("store.castleWear")}
+                      </button>
+                    ) : price ? (
+                      <div className="st-actions">
+                        <button className="st-pay" disabled={save.freeGems < price.free} onClick={() => onBuyCastle(c.id, "FREE")}>
+                          {price.free} 🔒
+                        </button>
+                        <button className="st-pay is-gem" disabled={save.purchasedGems < price.purchased} onClick={() => onBuyCastle(c.id, "PURCHASED")}>
+                          {price.purchased} 💎
+                        </button>
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })}
+            </div>
+          </section>
 
           <section className="st-section">
             <div className="pg-head">
@@ -391,6 +448,11 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 }
 
 const STORE_CSS = `
+.st-castles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
+.st-castle { display: grid; justify-items: center; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); text-align: center; }
+.st-castle.is-on { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(232,176,75,0.4); }
+.st-castle h3 { margin: 0; font-family: var(--display); font-size: 17px; color: var(--bone); }
+.st-castle-how { margin: 0; font-size: 12.5px; color: var(--ash); min-height: 2.6em; }
 .st-evolve { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 .st-evolve-label { width: 100%; font-size: 12.5px; color: #e3cdff; font-weight: 700; }
 .st-evolved { font-size: 12.5px; font-weight: 700; color: #e3cdff; }

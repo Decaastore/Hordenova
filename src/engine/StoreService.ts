@@ -2,7 +2,8 @@ import { loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { getCurrentDayIndex } from "./DailyClock";
 import { canEvolveSkin, getTowerSkinDefinition, getTowerSkinDualPrice, SKIN_EVOLUTION_PRICE, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
-import { gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
+import { dualGemPrice, gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
+import { getCastleSkinDefinition } from "@/config/castleSkins";
 import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
 import { canPayWithRealMoney } from "@/config/ageGate";
 import type { TowerType } from "@/config/towerStats";
@@ -179,4 +180,36 @@ export function buySkinEvolution(skinId: string, currency: GemCurrency): StoreRe
     evolvedSkinIds: [...save.evolvedSkinIds, skinId],
   });
   return { ok: true, save: next };
+}
+
+// ── SKINS DE CASTELO ────────────────────────────────────────────────────
+/** A Store castle skin's price: its Purchased-Gems price, 1.5x in Free Gems. */
+export function castleSkinPrice(id: string) {
+  const def = getCastleSkinDefinition(id);
+  return def?.source === "STORE" && def.priceGems ? dualGemPrice(def.priceGems) : null;
+}
+
+export function buyCastleSkin(id: string, currency: GemCurrency): StoreResult {
+  const save = loadSave();
+  const price = castleSkinPrice(id);
+  if (!price) return { ok: false, reason: "UNKNOWN" };
+  if (save.unlockedCastleSkinIds.includes(id)) return { ok: false, reason: "OWNED" };
+  const cost = gemPriceForCurrency(price, currency);
+  const balance = currency === "FREE" ? save.freeGems : save.purchasedGems;
+  if (balance < cost) return { ok: false, reason: "INSUFFICIENT_GEMS" };
+  appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: `castle_skin:${id}`, amount: cost, currency });
+  const next = updateSave({
+    ...(currency === "FREE" ? { freeGems: save.freeGems - cost } : { purchasedGems: save.purchasedGems - cost }),
+    unlockedCastleSkinIds: [...save.unlockedCastleSkinIds, id],
+    // a fresh purchase goes straight onto the castle
+    equippedCastleSkinId: id,
+  });
+  return { ok: true, save: next };
+}
+
+/** Puts an owned castle skin on the fortress (or null for the biome's own look). */
+export function equipCastleSkin(id: string | null): StoreResult {
+  const save = loadSave();
+  if (id !== null && !save.unlockedCastleSkinIds.includes(id)) return { ok: false, reason: "NOT_OWNED" };
+  return { ok: true, save: updateSave({ equippedCastleSkinId: id }) };
 }

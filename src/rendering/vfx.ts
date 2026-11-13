@@ -584,6 +584,24 @@ export class VfxManager {
     });
   }
 
+  /** MORTES COM IMPACTO — "COMBO x3" over a cluster that died together (rendering/deathImpact.ts). */
+  spawnComboText(position: Vector2, count: number): void {
+    const big = count >= 5;
+    this.pushRing({ x: position.x, y: position.y + 18, color: big ? "#ff6a3a" : "#ffd36b", remainingMs: 420, totalMs: 420, maxRadius: big ? 46 : 32 });
+    this.pushFloatingText({
+      x: position.x,
+      y: position.y,
+      text: `COMBO \u00d7${count}${big ? "!" : ""}`,
+      color: big ? "#ff8a5a" : "#ffd36b",
+      remainingMs: 1100,
+      totalMs: 1100,
+      amount: 0,
+      kind: "OTHER",
+      isCrit: big,
+      fontSizePx: big ? 20 : 16,
+    });
+  }
+
   /** MAESTRIA — golden double ring plus the new level, so a Mastery purchase is impossible to miss. */
   spawnMasteryBurst(position: Vector2, level: number): void {
     this.pushRing({ x: position.x, y: position.y, color: "#ffd36b", remainingMs: 520, totalMs: 520, maxRadius: 34 });

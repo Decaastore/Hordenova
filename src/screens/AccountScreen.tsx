@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { CollectionsSection, DailyLoginSection } from "@/ui/RewardsPanels";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -208,6 +209,9 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
               </div>
             </div>
           </section>
+
+          <DailyLoginSection />
+          <CollectionsSection />
 
           <section className="ac-block ac-last">
             <h2 className="pg-h2">{t("account.ledgerTitle")}</h2>

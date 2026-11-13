@@ -70,6 +70,79 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v128",
+    dateIso: "2026-11-13",
+    category: "SYSTEMS",
+    title: {
+      en: "Rewards: 7-day login, First Steps and Collections",
+      ptBR: "Recompensas: login de 7 dias, Primeiros Passos e Coleções",
+    },
+    description: {
+      en: "Three new ways to be rewarded for playing: a daily login track, a beginner checklist and albums of everything you collect.",
+      ptBR: "Três jeitos novos de ganhar por jogar: uma trilha de login diário, uma lista de passos para quem está começando e álbuns de tudo que você junta.",
+    },
+    highlights: [
+      {
+        en: "7-day login: one reward per day you open the game (Shards, Gold, Splinters, Essences, and 2 Free Gems on day 7). Missing a day resets nothing. It pops up on Home and lives on the Account page.",
+        ptBR: "Login de 7 dias: uma recompensa por dia que você abre o jogo (Fragmentos, Ouro, Estilhaços, Essências e 2 Gemas grátis no dia 7). Perder um dia não zera nada. Aparece na página inicial e fica na página da Conta.",
+      },
+      {
+        en: "First Steps: 10 steps on the Season page that walk you through the game, from clearing wave 5 to facing the Global Boss. Each pays a prize, and finishing all of them gives the Recruit's Keep castle and 2 Free Gems.",
+        ptBR: "Primeiros Passos: 10 passos na página da Season que apresentam o jogo, de vencer a onda 5 até enfrentar o Chefe Global. Cada um dá um prêmio, e terminar todos dá o castelo Fortim do Recruta e 2 Gemas grátis.",
+      },
+      {
+        en: "Collections on the Account page: albums for items of every rarity, each tower's skins, castles and the Bestiary, with a prize at each milestone. The full Bestiary gives the Void Spire castle.",
+        ptBR: "Coleções na página da Conta: álbuns de itens de cada raridade, das skins de cada torre, dos castelos e do Bestiário, com prêmio a cada marco. O Bestiário completo dá o castelo Torre do Vazio.",
+      },
+    ],
+  },
+  {
+    id: "v127",
+    dateIso: "2026-11-13",
+    category: "CASTLE",
+    title: {
+      en: "Castle skins",
+      ptBR: "Skins de castelo",
+    },
+    description: {
+      en: "Your castle can now wear a skin: new stone colour, window light and a living effect around it. Purely visual, in both the Season and the Eternal castle.",
+      ptBR: "Seu castelo agora pode usar uma skin: cor nova na pedra, luz nas janelas e um efeito vivo em volta. Puramente visual, na Season e no Eterno.",
+    },
+    highlights: [
+      {
+        en: "In the Store: Frost Citadel (falling snow), Infernal Keep (rising sparks), Solar Sanctum (sun rays) and Verdant Hold (fireflies), bought with Free or Purchased Gems.",
+        ptBR: "Na Loja: Cidadela de Gelo (neve caindo), Fortaleza Infernal (fagulhas subindo), Santuário Solar (raios de sol) e Bastião Verdejante (vaga-lumes), com Gemas grátis ou compradas.",
+      },
+      {
+        en: "Earned only: Void Spire (full Bestiary album) and Recruit's Keep (First Steps). The Obsidian Bastion and the Eternal Bastion now show on the realistic castle too.",
+        ptBR: "Só conquistando: Torre do Vazio (álbum do Bestiário completo) e Fortim do Recruta (Primeiros Passos). O Bastião de Obsidiana e o Bastião Eterno agora também aparecem no castelo realista.",
+      },
+    ],
+  },
+  {
+    id: "v126",
+    dateIso: "2026-11-13",
+    category: "CONTENT",
+    title: {
+      en: "Kills hit harder",
+      ptBR: "Mortes com mais impacto",
+    },
+    description: {
+      en: "Every kill now feels like a blow landing: the body flashes, is thrown back and falls, a soul wisp rises and a scorch mark stays on the ground for a few seconds.",
+      ptBR: "Cada morte agora parece um golpe acertando: o corpo pisca, é jogado para trás e cai, uma alma sobe e uma marca queimada fica no chão por alguns segundos.",
+    },
+    highlights: [
+      {
+        en: "Elites shake the screen a little when they die, mini-bosses more.",
+        ptBR: "Elites tremem um pouco a tela quando morrem, mini-chefes tremem mais.",
+      },
+      {
+        en: "Killing 3 or more at once shows a COMBO callout (×5 and up also shakes the screen).",
+        ptBR: "Matar 3 ou mais de uma vez mostra um COMBO na tela (×5 ou mais também treme a tela).",
+      },
+    ],
+  },
+  {
     id: "v125",
     dateIso: "2026-11-13",
     category: "BALANCE",

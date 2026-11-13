@@ -1,5 +1,8 @@
 import { createDuelProfile, sanitizeDuelProfile, type DuelProfile } from "@/config/duel";
 import { createColossusProfile, sanitizeColossusProfile, type ColossusProfile } from "@/config/colossus";
+import { createDailyLogin, sanitizeDailyLogin, type DailyLoginState } from "@/config/dailyLogin";
+import { createBeginnerState, sanitizeBeginnerState, type BeginnerState } from "@/config/beginnerMissions";
+import { sanitizeCollectionsState, type CollectionsState } from "@/config/collections";
 import { createDailyShopState, createMomentOfferState, createVipState, sanitizeDailyShopState, sanitizeMomentOfferState, sanitizeVipState, type DailyShopState, type MomentOfferState, type VipState } from "@/config/shopOffers";
 import { createExpeditionState, sanitizeExpeditionState, type ExpeditionState } from "@/config/expeditions";
 import { createEternalState, sanitizeEternalState, type EternalState } from "@/config/eternal";
@@ -283,6 +286,16 @@ export interface SaveData {
   duel: DuelProfile;
   /** CHEFE GLOBAL — attempts, weekly Eclipse Marks and the Eclipse cosmetics (config/colossus.ts). Account-level. */
   colossus: ColossusProfile;
+  /** LOGIN DE 7 DIAS (config/dailyLogin.ts). */
+  dailyLogin: DailyLoginState;
+  /** PRIMEIROS PASSOS (config/beginnerMissions.ts). */
+  beginner: BeginnerState;
+  /** COLEÇÕES — album milestones already paid (config/collections.ts). */
+  collections: CollectionsState;
+  /** Every item kind this account has ever held — feeds the Arsenal album. */
+  discoveredItemIds: string[];
+  /** SKINS DE CASTELO — the castle skin shown on the fortress (one of unlockedCastleSkinIds), or null for the biome's own. */
+  equippedCastleSkinId: string | null;
   /** COMPRAS SÓ PARA MAIORES — set only by a payment provider / age service through the server (config/ageGate.ts). Permanent. */
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
@@ -401,6 +414,11 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   evolvedSkinIds: [],
   duel: createDuelProfile(),
   colossus: createColossusProfile(),
+  dailyLogin: createDailyLogin(),
+  beginner: createBeginnerState(),
+  collections: { claimed: [] },
+  discoveredItemIds: [],
+  equippedCastleSkinId: null,
   bestiaryKills: {},
   achievements: [],
   equippedTitle: null,
@@ -951,6 +969,11 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       vip: sanitizeVipState(parsed.vip),
       duel: sanitizeDuelProfile(parsed.duel),
       colossus: sanitizeColossusProfile(parsed.colossus),
+      dailyLogin: sanitizeDailyLogin(parsed.dailyLogin),
+      beginner: sanitizeBeginnerState(parsed.beginner),
+      collections: sanitizeCollectionsState(parsed.collections),
+      discoveredItemIds: Array.isArray(parsed.discoveredItemIds) ? [...new Set((parsed.discoveredItemIds as unknown[]).filter((x): x is string => typeof x === "string"))] : [],
+      equippedCastleSkinId: typeof parsed.equippedCastleSkinId === "string" ? parsed.equippedCastleSkinId : null,
       evolvedSkinIds: Array.isArray(parsed.evolvedSkinIds) ? [...new Set((parsed.evolvedSkinIds as unknown[]).filter((x): x is string => typeof x === "string"))] : [],
       talents: sanitizeTalentRanks(parsed.talents, typeof parsed.seasonBestWave === "number" ? parsed.seasonBestWave : 0),
       // MARKETPLACE / LEILÃO (save v18 -> v19) — brand new field, same

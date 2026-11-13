@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { DailyLoginModal } from "@/ui/RewardsPanels";
+import { canClaimLogin } from "@/config/dailyLogin";
+import { setActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { ColossusAlert, ColossusHeroCard } from "@/ui/ColossusPromo";
 import { BrandLogo } from "@/ui/BrandLogo";
 import "@fontsource/cormorant-garamond/600.css";
@@ -48,6 +51,10 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
   const skinsOwned = useMemo(() => countOwnedSkins(buildProfileFromSave(save, "")), [save]);
   const [entering, setEntering] = useState(false);
   const [sceneIndex, setSceneIndex] = useState(0);
+  // LOGIN DE 7 DIAS — today's reward pops up first; the Global Boss alert waits for it
+  const [loginOpen, setLoginOpen] = useState(() => canClaimLogin(save.dailyLogin, Date.now()));
+  // SKINS DE CASTELO — the Home castle wears the equipped skin too
+  setActiveCastleSkin(save.equippedCastleSkinId && save.unlockedCastleSkinIds.includes(save.equippedCastleSkinId) ? save.equippedCastleSkinId : null);
   const towersRef = useRef<HTMLElement>(null);
 
   // Scene rotation; picking a scene by hand restarts the timer.
@@ -79,7 +86,8 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
   return (
     <div className="hn-home">
       <style>{HOME_CSS}</style>
-      {onPlayColossus && <ColossusAlert onOpen={onPlayColossus} />}
+      {loginOpen && <DailyLoginModal onClosed={() => setLoginOpen(false)} />}
+      {onPlayColossus && !loginOpen && <ColossusAlert onOpen={onPlayColossus} />}
 
       <section className={`hn-hero${entering ? " is-entering" : ""}`}>
         <HomeDiorama sceneIndex={sceneIndex} entering={entering} />

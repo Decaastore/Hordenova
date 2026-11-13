@@ -1,3 +1,4 @@
+import { deathImpact } from "./deathImpact";
 import { activeKillFx, drawKillFx } from "./duelLooks";
 import { LootFx } from "./lootFx";
 import type { ProjectileInstance } from "@/entities/Projectile";
@@ -155,7 +156,7 @@ interface DeathAnimation {
   tipSign: number;
 }
 
-const DEATH_ANIM_MS_REGULAR = 420;
+const DEATH_ANIM_MS_REGULAR = 620;
 const DEATH_ANIM_MS_MINIBOSS = 620;
 const DEATH_ANIM_MS_BOSS = 900;
 // CREATURE PRESENTATION PASS spec section 8 — raised from 6: a real
@@ -532,6 +533,7 @@ export function CanvasRenderer({
       }
       headingState = nextHeadingState;
 
+      deathImpact.drawGround(ctx, timestamp);
       for (const enemy of snapshot.enemies) {
         const hitFlashMs = timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity);
         // CHEFE MAIOR — "Void Colossus" identity: the main boss's body/aura
@@ -599,9 +601,16 @@ export function CanvasRenderer({
       for (const anim of deathAnimations) {
         const progress = Math.min(1, (timestamp - anim.startTimestamp) / anim.totalMs);
         const eased = 1 - Math.pow(1 - progress, 2);
+        // MORTES COM IMPACTO — the body is thrown back off its own heading
+        // with a small hop, and only fades in the second half, so the kill
+        // reads as a blow landing rather than a sprite disappearing.
+        const back = anim.enemy.boss ? 0 : 16 * eased;
+        const dir = anim.enemy.direction;
+        const dl = Math.hypot(dir.x, dir.y) || 1;
+        const hop = anim.enemy.boss ? 0 : Math.sin(Math.min(1, progress * 2.2) * Math.PI) * 7;
         ctx.save();
-        ctx.globalAlpha = 1 - progress;
-        ctx.translate(anim.enemy.position.x, anim.enemy.position.y);
+        ctx.globalAlpha = progress < 0.45 ? 1 : 1 - (progress - 0.45) / 0.55;
+        ctx.translate(anim.enemy.position.x - (dir.x / dl) * back, anim.enemy.position.y - (dir.y / dl) * back - hop);
         if (anim.enemy.boss) {
           // Heavy creatures sink/settle in place rather than comically
           // tipping over — a squash toward the ground plus a slight fade.
@@ -611,11 +620,14 @@ export function CanvasRenderer({
           ctx.scale(1, 1 - eased * 0.35);
         }
         ctx.translate(-anim.enemy.position.x, -anim.enemy.position.y);
-        drawEnemy(ctx, anim.enemy, anim.freezeTimeMs, Infinity, anim.scale, anim.bossColor);
+        // a white flash on the killing blow (drawEnemy's own hit-flash, held for the first instant)
+        drawEnemy(ctx, anim.enemy, anim.freezeTimeMs, progress < 0.18 ? 0 : Infinity, anim.scale, anim.bossColor);
         ctx.restore();
         const fx = activeKillFx();
         if (fx) drawKillFx(ctx, fx, anim.enemy.position.x, anim.enemy.position.y, progress, anim.startTimestamp % 997, !!anim.enemy.boss);
       }
+
+      deathImpact.drawAir(ctx, timestamp);
 
       // LUZ E CICLO DO DIA (rendering/ambientLight.ts) — dusk dims the map a
       // little and every light source cuts its pool out of the dark; sun
@@ -848,6 +860,9 @@ export function detectVfxEvents(
       // recolored per enemy, scaled up by weight class for mini-bosses/bosses.
       const profile = prev.lastSeen ? getEnemyVfxProfile(prev.lastSeen) : getCreatureVfxProfile(prev.type);
       vfx.spawnCreatureDeath(prev.position, profile.family, profile.weight, prev.direction);
+      // MORTES COM IMPACTO — scorch mark, soul wisp, shake and combo callout (rendering/deathImpact.ts)
+      const ls = prev.lastSeen;
+      deathImpact.onKill(prev.position, ls?.boss ? (ls.boss.isMainBoss ? "BOSS" : "MINIBOSS") : ls?.elite ? "ELITE" : "REGULAR", timestamp, vfx);
       // FASE 3 — death-collapse (spec section 11): reuses the enemy's own
       // last-seen-alive instance (frozen mid-body-pose) under a collapse
       // transform CanvasRenderer's draw loop applies — see DeathAnimation's

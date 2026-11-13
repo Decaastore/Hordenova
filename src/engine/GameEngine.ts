@@ -149,6 +149,7 @@ import type { EnemyAudioTier, GameAudioEvent } from "./AudioEvents";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import { setDuelLooks } from "@/rendering/duelLooks";
 import { setEclipseAura } from "@/rendering/eclipseAura";
+import { setActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { duelKillFx, duelSkinLooks } from "@/config/duel";
 import { getSeasonRule, type SeasonRule } from "@/config/seasonRules";
 import {
@@ -646,6 +647,8 @@ export class GameEngine {
   // never got the chance to claim, not just losing a toast.
   private castleHpBonus = 0;
   private unlockedCastleSkinIds: string[] = [];
+  /** COLEÇÕES — every item kind ever held (Arsenal album). */
+  private discoveredItemIds = new Set<string>();
   private pendingRouletteResults: RouletteResult[] = [];
   private pendingRouletteSpinWaves: number[] = [];
 
@@ -729,6 +732,9 @@ export class GameEngine {
     setDuelLooks(this.isEternal ? duelSkinLooks(save.duel) : null, this.isEternal ? duelKillFx(save.duel) : null);
     // CHEFE GLOBAL — the Eclipse looks show in both castles
     setEclipseAura(save.colossus.equipped);
+    // SKINS DE CASTELO — the equipped castle skin, if this account owns it
+    setActiveCastleSkin(save.equippedCastleSkinId && save.unlockedCastleSkinIds.includes(save.equippedCastleSkinId) ? save.equippedCastleSkinId : null);
+    this.discoveredItemIds = new Set(save.discoveredItemIds);
     this.bestiaryKills = { ...save.bestiaryKills };
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
@@ -3136,7 +3142,7 @@ export class GameEngine {
       // Grant the first real skin this save doesn't already own; if every
       // real Castle Skin is already unlocked, the 1%-rarity roll falls back
       // to Gems rather than doing nothing (spec section 48).
-      const unowned = CASTLE_SKINS.find((s) => !this.unlockedCastleSkinIds.includes(s.id));
+      const unowned = CASTLE_SKINS.find((s) => s.source === "ROULETTE" && !this.unlockedCastleSkinIds.includes(s.id));
       if (unowned) {
         castleSkinId = unowned.id;
         this.unlockedCastleSkinIds = [...this.unlockedCastleSkinIds, unowned.id];
@@ -3457,6 +3463,12 @@ export class GameEngine {
     this.notify();
   }
 
+  private trackDiscoveredItems(): string[] {
+    for (const it of this.inventory) this.discoveredItemIds.add(it.itemDefinitionId);
+    for (const it of this.overflowInventory) this.discoveredItemIds.add(it.itemDefinitionId);
+    return [...this.discoveredItemIds];
+  }
+
   private persist(): void {
     updateSave(
       {
@@ -3468,6 +3480,7 @@ export class GameEngine {
         towerLoadout: [...this.towers.map((t) => this.loadoutEntryOf(t)), ...this.deployBench.map((t) => ({ ...this.loadoutEntryOf(t), slotId: "" }))],
         discoveredEnemyTypes: [...this.discoveredEnemyTypes],
         inventory: this.inventory,
+        discoveredItemIds: this.trackDiscoveredItems(),
         playerId: this.playerId,
         bossesDefeatedTotal: this.bossesDefeatedTotal,
         miniBossesDefeatedTotal: this.miniBossesDefeatedTotal,

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
 import { ColossusAlert } from "@/ui/ColossusPromo";
+import { BeginnerSection } from "@/ui/RewardsPanels";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
@@ -126,6 +127,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
         </header>
 
         <div className="pg-wrap">
+          <BeginnerSection />
           <dl className="pg-figures">
             <div>
               <dt>{t("season.bestPhase")}</dt>

@@ -1,4 +1,5 @@
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
+import { drawCastleSkinAura, getActiveCastleSkin, NO_CASTLE_SKIN, tintedCastle } from "./castleSkinFx";
 import { distance, getPointAtDistance, type Vector2 } from "@/utils/geometry";
 import { drawRiftPortal, PORTAL_PATH_DISTANCE } from "./riftPortal";
 import { drawEmbers, drawFire, drawSmokeColumn, n01 } from "./fireFx";
@@ -1105,6 +1106,8 @@ export function drawFortress(
   /** MUNDO 3D — FASE 3: true while a 3D castle body is rendered in its place — skips every wall/tower/gate draw call below, but `drawFortressDamageOverlay` (called unconditionally further down, in this same translate+scale space) still runs, so the HP-tier damage read never silently disappears. Defaults to false — every existing caller unaffected. */
   skipBody = false,
 ): FortressAnchors {
+  // SKINS DE CASTELO — an explicit skin wins, else the equipped one (rendering/castleSkinFx.ts)
+  skin = skin === NO_CASTLE_SKIN ? null : (skin ?? getActiveCastleSkin());
   const p = { ...biome.palette, ...skin?.paletteOverride };
   ctx.save();
   ctx.translate(position.x, position.y);
@@ -1117,7 +1120,8 @@ export function drawFortress(
   const castleTier = getCastleHpTier(hpPercent);
   const castleImage = skipBody ? undefined : getCastleSprite(biome.id, castleTier);
   if (castleImage) {
-    drawRealisticCastle(ctx, castleImage, castleTier, biome, p.accentGlow, timeMs, windIntensity, hpPercent);
+    drawRealisticCastle(ctx, castleImage, castleTier, biome, p.accentGlow, timeMs, windIntensity, hpPercent, skin);
+    if (skin) drawCastleSkinAura(ctx, skin, castleTier, timeMs);
     ctx.restore();
     return {
       torches: [castleAnchor("keepWindow", castleTier), castleAnchor("torchL", castleTier), castleAnchor("torchR", castleTier), castleAnchor("core", castleTier)],
@@ -1402,6 +1406,7 @@ function drawRealisticCastle(
   timeMs: number,
   windIntensity: number,
   hpPercent: number,
+  skin: CastleSkinDefinition | null = null,
 ): void {
   const o = castleSpriteOrigin();
   // Ground shadow so the mound sits on the terrain.
@@ -1409,7 +1414,7 @@ function drawRealisticCastle(
   ctx.beginPath();
   ctx.ellipse(0, 16, 70, 17, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.drawImage(image, o.x, o.y, CASTLE_SPRITE_SIZE, CASTLE_SPRITE_SIZE);
+  ctx.drawImage((skin && tintedCastle(image, skin)) || image, o.x, o.y, CASTLE_SPRITE_SIZE, CASTLE_SPRITE_SIZE);
 
   const A = (name: string) => castleAnchor(name, tier);
   const damage = Math.max(0, 1 - hpPercent);
