@@ -440,6 +440,144 @@ export interface DuelProfile {
   killFx: string | null;
   /** Week whose Weekly Challenge was beaten (-1 none). */
   weeklyWonWeek: number;
+  /** DECKS SALVOS — three deck slots (a slot may be unfinished); `deck` is the active slot once valid. */
+  decks: DuelCardId[][];
+  activeDeck: number;
+  /** MESTRIA — wins per card (the card was in the deck) and how many mastery levels were paid. */
+  mastery: Partial<Record<DuelCardId, { wins: number; claimed: number }>>;
+  /** HISTÓRICO — the last matches, newest first, with what's needed to replay them. */
+  history: DuelHistoryEntry[];
+}
+
+// ── saved decks ─────────────────────────────────────────────────────────
+export const DECK_SLOTS = 3;
+
+/** A deck slot as saved: up to 8 different known cards (may be unfinished). */
+export function sanitizeDeckSlot(raw: unknown): DuelCardId[] {
+  if (!Array.isArray(raw)) return [];
+  return [...new Set(raw.filter((x): x is DuelCardId => typeof x === "string" && !!getDuelCard(x)))].slice(0, DECK_SIZE);
+}
+
+// ── card mastery ────────────────────────────────────────────────────────
+/**
+ * MESTRIA DE CARTAS — win with a card in your deck to raise its mastery.
+ * Each level pays Duel Coins once and shows a badge on the card. It never
+ * makes the card stronger: every player's cards are the same.
+ */
+export const MASTERY_LEVELS: readonly { wins: number; coins: number }[] = [
+  { wins: 3, coins: 20 },
+  { wins: 10, coins: 40 },
+  { wins: 25, coins: 80 },
+  { wins: 50, coins: 150 },
+  { wins: 100, coins: 250 },
+];
+
+export function cardMasteryLevel(wins: number): number {
+  return MASTERY_LEVELS.filter((l) => wins >= l.wins).length;
+}
+
+/** Counts a win for every card in the deck. */
+export function addMasteryWin(p: DuelProfile, deck: readonly DuelCardId[]): DuelProfile {
+  const mastery = { ...p.mastery };
+  for (const id of new Set(deck)) {
+    const m = mastery[id] ?? { wins: 0, claimed: 0 };
+    mastery[id] = { ...m, wins: m.wins + 1 };
+  }
+  return { ...p, mastery };
+}
+
+/** Mastery levels reached but not paid yet, for one card. */
+export function masteryClaimable(p: DuelProfile, id: DuelCardId): number {
+  const m = p.mastery[id];
+  return m ? Math.max(0, cardMasteryLevel(m.wins) - m.claimed) : 0;
+}
+
+/** Pays every reached-but-unpaid mastery level of a card. */
+export function claimMastery(p: DuelProfile, id: DuelCardId): { profile: DuelProfile; coins: number } | null {
+  const m = p.mastery[id];
+  if (!m || masteryClaimable(p, id) === 0) return null;
+  const level = cardMasteryLevel(m.wins);
+  let coins = 0;
+  for (let i = m.claimed; i < level; i++) coins += MASTERY_LEVELS[i]!.coins;
+  return { profile: { ...p, coins: p.coins + coins, mastery: { ...p.mastery, [id]: { wins: m.wins, claimed: level } } }, coins };
+}
+
+// ── match history and replays ──────────────────────────────────────────
+/** Bumped whenever match rules change, so old replays (which would play out differently) are shown without a replay. */
+export const DUEL_RULES_VERSION = 2;
+export const HISTORY_MAX = 10;
+
+export type DuelMode = "RANKED" | "TOURNEY" | "WEEKLY";
+
+export interface DuelHistoryEntry {
+  at: number;
+  mode: DuelMode;
+  outcome: DuelOutcome;
+  myCastle: number;
+  foeCastle: number;
+  trophyChange: number;
+  arenaId: string;
+  biome: string;
+  /** Replay data: rules version, seed, both decks, the AI's skill and your plays. */
+  v: number;
+  seed: number;
+  decks: [DuelCardId[], DuelCardId[]];
+  ai: number;
+  plays: { t: number; card: DuelCardId; slot?: number; at?: { x: number; y: number } }[];
+}
+
+export function pushHistory(list: readonly DuelHistoryEntry[], e: DuelHistoryEntry): DuelHistoryEntry[] {
+  return [e, ...list].slice(0, HISTORY_MAX);
+}
+
+export function canReplay(e: DuelHistoryEntry): boolean {
+  return e.v === DUEL_RULES_VERSION;
+}
+
+function sanitizeHistory(raw: unknown): DuelHistoryEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DuelHistoryEntry[] = [];
+  for (const x of raw) {
+    if (!x || typeof x !== "object") continue;
+    const e = x as Record<string, unknown>;
+    const outcome = e.outcome === "WIN" || e.outcome === "LOSS" || e.outcome === "DRAW" ? e.outcome : null;
+    const mode = e.mode === "RANKED" || e.mode === "TOURNEY" || e.mode === "WEEKLY" ? e.mode : null;
+    const decks = Array.isArray(e.decks) && e.decks.length === 2 ? (e.decks as unknown[]).map(sanitizeDeckSlot) : null;
+    if (!outcome || !mode || !decks || decks.some((d) => d.length !== DECK_SIZE)) continue;
+    const plays = Array.isArray(e.plays)
+      ? (e.plays as unknown[]).flatMap((q) => {
+          if (!q || typeof q !== "object") return [];
+          const r = q as Record<string, unknown>;
+          if (typeof r.t !== "number" || typeof r.card !== "string" || !getDuelCard(r.card)) return [];
+          const at = r.at && typeof r.at === "object" ? (r.at as { x: unknown; y: unknown }) : null;
+          return [
+            {
+              t: r.t,
+              card: r.card as DuelCardId,
+              ...(typeof r.slot === "number" ? { slot: r.slot } : {}),
+              ...(at && typeof at.x === "number" && typeof at.y === "number" ? { at: { x: at.x, y: at.y } } : {}),
+            },
+          ];
+        })
+      : [];
+    out.push({
+      at: typeof e.at === "number" ? e.at : 0,
+      mode,
+      outcome,
+      myCastle: intOr(e.myCastle, 0),
+      foeCastle: intOr(e.foeCastle, 0),
+      trophyChange: intOr(e.trophyChange, 0),
+      arenaId: typeof e.arenaId === "string" ? e.arenaId : "ARENA_FOREST",
+      biome: typeof e.biome === "string" ? e.biome : "ANCIENT_FOREST",
+      v: intOr(e.v, 0),
+      seed: intOr(e.seed, 1),
+      decks: [decks[0]!, decks[1]!],
+      ai: typeof e.ai === "number" ? Math.max(0, Math.min(1, e.ai)) : 0,
+      plays,
+    });
+    if (out.length >= HISTORY_MAX) break;
+  }
+  return out;
 }
 
 export function createDuelProfile(): DuelProfile {
@@ -464,6 +602,10 @@ export function createDuelProfile(): DuelProfile {
     weekWins: { week: -1, wins: 0, paid: [] },
     tourney: { weekend: -1, round: 0, out: false, won: false },
     weeklyWonWeek: -1,
+    decks: [[...DEFAULT_DECK], [], []],
+    activeDeck: 0,
+    mastery: {},
+    history: [],
   };
 }
 
@@ -510,6 +652,26 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
       return { weekend: intOr(w.weekend, -1), round: Math.min(TOURNEY_ROUNDS.length, int(w.round)), out: w.out === true, won: w.won === true };
     })(),
     weeklyWonWeek: intOr(r.weeklyWonWeek, -1),
+    decks: (() => {
+      const raw = Array.isArray(r.decks) ? (r.decks as unknown[]) : [];
+      const slots = Array.from({ length: DECK_SLOTS }, (_, i) => sanitizeDeckSlot(raw[i]));
+      // older saves had one deck: it becomes slot 1
+      if (!Array.isArray(r.decks)) slots[0] = sanitizeDeck(r.deck);
+      return slots;
+    })(),
+    activeDeck: Math.min(DECK_SLOTS - 1, int(r.activeDeck)),
+    mastery: (() => {
+      const out: Partial<Record<DuelCardId, { wins: number; claimed: number }>> = {};
+      if (r.mastery && typeof r.mastery === "object")
+        for (const [k, v] of Object.entries(r.mastery as Record<string, unknown>)) {
+          if (!getDuelCard(k) || !v || typeof v !== "object") continue;
+          const m = v as Record<string, unknown>;
+          const wins = int(m.wins);
+          out[k as DuelCardId] = { wins, claimed: Math.min(cardMasteryLevel(wins), int(m.claimed)) };
+        }
+      return out;
+    })(),
+    history: sanitizeHistory(r.history),
   };
 }
 
@@ -569,9 +731,10 @@ export function applyDuelResult(p: DuelProfile, st: DuelMatchStats, nowMs: numbe
   const missions = p.missions.day === day ? p.missions : { day, progress: {}, claimed: [] };
   const progress = { ...missions.progress };
   for (const m of duelMissionsFor(day)) progress[m.id] = Math.min(m.target, (progress[m.id] ?? 0) + missionStep(m, st));
+  const base = win ? addMasteryWin(p, st.deck) : p;
   return {
     profile: {
-      ...p,
+      ...base,
       trophies,
       bestTrophies,
       wins: p.wins + (win ? 1 : 0),

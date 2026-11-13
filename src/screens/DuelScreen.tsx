@@ -43,6 +43,18 @@ import {
   duelKillFx,
   duelSkinLooks,
   toggleDuelCosmetic,
+  addMasteryWin,
+  canReplay,
+  cardMasteryLevel,
+  claimMastery,
+  deckAverageCost,
+  DECK_SLOTS,
+  DUEL_RULES_VERSION,
+  MASTERY_LEVELS,
+  masteryClaimable,
+  pushHistory,
+  type DuelHistoryEntry,
+  type DuelMode,
   type DuelShopItem,
   type KillFxId,
   type DuelCardId,
@@ -284,7 +296,8 @@ interface DuelScreenProps {
 export function DuelScreen({ onExit }: DuelScreenProps) {
   const { t, language } = useLanguage();
   const [save, setSave] = useState<SaveData>(() => loadSave());
-  const [deck, setDeck] = useState<DuelCardId[]>(() => [...save.duel.deck]);
+  const [deck, setDeck] = useState<DuelCardId[]>(() => [...(save.duel.decks[save.duel.activeDeck] ?? save.duel.deck)]);
+  const [replay, setReplay] = useState<DuelHistoryEntry | null>(null);
   const [match, setMatch] = useState<DuelEngine | null>(null);
   /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
   const [matchNo, setMatchNo] = useState(0);
@@ -308,8 +321,32 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const banner = duel.banner ? getShopItem(duel.banner)?.cosmetic ?? null : null;
   const frame = duel.frame ? getShopItem(duel.frame)?.cosmetic ?? null : null;
 
+  /** Saves the deck being edited into its slot (and as the active deck once it's complete). */
+  const saveDeck = (d: DuelCardId[], slot = loadSave().duel.activeDeck) => {
+    const cur = loadSave().duel;
+    const decks = cur.decks.map((x, i) => (i === slot ? [...d] : x));
+    setSave(updateSave({ duel: { ...cur, decks, activeDeck: slot, ...(isValidDeck(d) ? { deck: [...d] } : {}) } }));
+  };
+
   const toggleCard = (id: DuelCardId) => {
-    setDeck((d) => (d.includes(id) ? d.filter((x) => x !== id) : d.length < DECK_SIZE ? [...d, id] : d));
+    const d = deck.includes(id) ? deck.filter((x) => x !== id) : deck.length < DECK_SIZE ? [...deck, id] : deck;
+    if (d === deck) return;
+    setDeck(d);
+    saveDeck(d);
+  };
+
+  const pickSlot = (slot: number) => {
+    const d = [...(loadSave().duel.decks[slot] ?? [])];
+    setDeck(d);
+    saveDeck(d, slot);
+  };
+
+  const collectMastery = (id: DuelCardId) => {
+    const cur = loadSave();
+    const r = claimMastery(cur.duel, id);
+    if (!r) return;
+    setSave(updateSave({ duel: r.profile }));
+    setNotice(`+${t("duel.prize.coins", { n: r.coins })}`);
   };
 
   const start = () => {
@@ -344,13 +381,33 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     setMatch(new DuelEngine((Date.now() & 0x7fffffff) | 1, [deck, aiDeck("ARENA_ABYSS")], TOURNEY_ROUNDS[tNow.round]!.ai, next.equippedTowerSkinByType));
   };
 
+  /** The history line for the match that just ended (with what's needed to replay it). */
+  const historyEntry = (snap: DuelSnapshot, m: DuelMode, trophyChange: number): DuelHistoryEntry => ({
+    at: Date.now(),
+    mode: m,
+    outcome: snap.outcome!,
+    myCastle: Math.max(0, snap.players[0]!.castle),
+    foeCastle: Math.max(0, snap.players[1]!.castle),
+    trophyChange,
+    arenaId: m !== "RANKED" ? "ARENA_ABYSS" : arena.id,
+    biome: m !== "RANKED" ? "ABYSS" : arena.biome,
+    v: DUEL_RULES_VERSION,
+    seed: match!.seed,
+    decks: [[...match!.decks[0]], [...match!.decks[1]]],
+    ai: match!.aiSkill ?? 0,
+    plays: match!.log.filter((p) => p.side === 0).map((p) => ({ t: p.t, card: p.card, ...(p.slot !== undefined ? { slot: p.slot } : {}), ...(p.at ? { at: { ...p.at } } : {}) })),
+  });
+
   const finish = (snap: DuelSnapshot) => {
     const outcome = snap.outcome!;
     const cur = loadSave();
     if (mode === "tourney") {
       const r = applyTourneyResult(cur.duel, outcome, Date.now());
       const prize = r?.prize ?? NO_PRIZE;
-      const next = updateSave({ ...grantPrize(cur, { ...prize, coins: 0 }, "duel_tourney"), duel: r?.profile ?? cur.duel });
+      let duelAfter = r?.profile ?? cur.duel;
+      if (outcome === "WIN") duelAfter = addMasteryWin(duelAfter, match!.decks[0]);
+      duelAfter = { ...duelAfter, history: pushHistory(duelAfter.history, historyEntry(snap, "TOURNEY", 0)) };
+      const next = updateSave({ ...grantPrize(cur, { ...prize, coins: 0 }, "duel_tourney"), duel: duelAfter });
       setSave(next);
       setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null, tourneyRound: r && outcome === "WIN" ? r.profile.tourney.round : null, tourneyWon: !!r?.profile.tourney.won });
       return;
@@ -358,13 +415,16 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     if (challenge) {
       const paid = outcome === "WIN" && cur.duel.weeklyWonWeek !== week;
       const prize = paid ? { ...NO_PRIZE, coins: WEEKLY_CHALLENGE_COINS, gems: WEEKLY_CHALLENGE_GEMS } : NO_PRIZE;
-      const next = updateSave({ ...grantPrize(cur, { ...prize, coins: 0 }, "duel_weekly"), duel: { ...cur.duel, coins: cur.duel.coins + prize.coins, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek } });
+      const next = updateSave({
+        ...grantPrize(cur, { ...prize, coins: 0 }, "duel_weekly"),
+        duel: { ...cur.duel, coins: cur.duel.coins + prize.coins, weeklyWonWeek: paid ? week : cur.duel.weeklyWonWeek, history: pushHistory(cur.duel.history, historyEntry(snap, "WEEKLY", 0)) },
+      });
       setSave(next);
       setResult({ outcome, weekly: true, trophyChange: 0, prize, rankBefore: null, rankAfter: null, firstWin: false, streakBonus: null });
       return;
     }
     const r = applyDuelResult(cur.duel, { outcome, myCastle: snap.players[0]!.castle, foeCastle: snap.players[1]!.castle, sends: snap.players[0]!.sends, deck: cur.duel.deck }, Date.now());
-    const next = updateSave({ ...grantPrize(cur, r.prize, "duel_match"), duel: r.profile });
+    const next = updateSave({ ...grantPrize(cur, r.prize, "duel_match"), duel: { ...r.profile, history: pushHistory(r.profile.history, historyEntry(snap, "RANKED", r.trophyChange)) } });
     setSave(next);
     setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus, unlocked: r.unlocked });
   };
@@ -391,6 +451,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     if (p) setSave(updateSave({ duel: p }));
   };
 
+
+  if (replay) return <DuelReplay entry={replay} onBack={() => setReplay(null)} />;
 
   if (match)
     return (
@@ -673,17 +735,98 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
             ))}
           </section>
 
+          <section className="du-block" data-testid="duel-history">
+            <h2 className="pg-h2">{t("duel.historyTitle")}</h2>
+            <p className="pg-sub">{t("duel.historyLead")}</p>
+            {duel.history.length === 0 ? (
+              <p className="pg-sub">{t("duel.historyEmpty")}</p>
+            ) : (
+              <ul className="du-history">
+                {duel.history.map((h, i) => (
+                  <li key={`${h.at}-${i}`} className={`du-hrow is-${h.outcome}`}>
+                    <span className="du-hres">{t(h.outcome === "WIN" ? "duel.win" : h.outcome === "LOSS" ? "duel.loss" : "duel.draw")}</span>
+                    <span className="du-hscore">
+                      {h.myCastle} – {h.foeCastle}
+                    </span>
+                    <span className="du-hmeta">
+                      {t(`duel.historyMode.${h.mode}` as TranslationKey)}
+                      {h.mode === "RANKED" && <b className={h.trophyChange > 0 ? "is-up" : h.trophyChange < 0 ? "is-down" : ""}> {(h.trophyChange > 0 ? "+" : "") + h.trophyChange} 🏆</b>}
+                    </span>
+                    <span className="du-hdate">{new Date(h.at).toLocaleString(language === "ptBR" ? "pt-BR" : "en-US", { dateStyle: "short", timeStyle: "short" })}</span>
+                    {canReplay(h) ? (
+                      <button className="pg-btn-ghost du-hbtn" onClick={() => setReplay(h)} data-testid={`history-replay-${i}`}>
+                        ▶ {t("duel.historyReplay")}
+                      </button>
+                    ) : (
+                      <small className="du-hold">{t("duel.historyOld")}</small>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="du-block" data-testid="duel-mastery">
+            <h2 className="pg-h2">{t("duel.masteryTitle")}</h2>
+            <p className="pg-sub">{t("duel.masteryLead")}</p>
+            <div className="du-mastery">
+              {DUEL_CARDS.map((c) => {
+                const m = duel.mastery[c.id] ?? { wins: 0, claimed: 0 };
+                const level = cardMasteryLevel(m.wins);
+                const nextL = MASTERY_LEVELS[level];
+                const prev = level > 0 ? MASTERY_LEVELS[level - 1]!.wins : 0;
+                const claimable = masteryClaimable(duel, c.id);
+                const coins = MASTERY_LEVELS.slice(m.claimed, level).reduce((s2, l) => s2 + l.coins, 0);
+                return (
+                  <div key={c.id} className="du-mcard" data-testid={`mastery-${c.id}`}>
+                    <CardFace id={c.id} small />
+                    <div>
+                      <strong>
+                        {t(`duel.card.${c.id}.name` as TranslationKey)} <MasteryStars level={level} />
+                      </strong>
+                      <small>{nextL ? t("duel.masteryProgress", { wins: m.wins, need: nextL.wins }) : t("duel.masteryMax", { wins: m.wins })}</small>
+                      <div className="du-mbar">
+                        <div style={{ width: `${nextL ? ((m.wins - prev) / (nextL.wins - prev)) * 100 : 100}%` }} />
+                      </div>
+                    </div>
+                    {claimable > 0 && (
+                      <button className="pg-btn du-mclaim" onClick={() => collectMastery(c.id)} data-testid={`mastery-claim-${c.id}`}>
+                        {t("duel.masteryClaim", { n: coins })}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <section className="du-deck">
             <div className="pg-head">
               <h2 className="pg-h2">{t("duel.deck")}</h2>
               <span className={deckOk ? "du-count" : "du-count is-bad"}>{t("duel.deckCount", { n: deck.length })}</span>
             </div>
+            <div className="du-slots" role="tablist">
+              {Array.from({ length: DECK_SLOTS }, (_, i) => (
+                <button key={i} role="tab" aria-selected={duel.activeDeck === i} className={`du-slot${duel.activeDeck === i ? " is-on" : ""}`} onClick={() => pickSlot(i)} data-testid={`deck-slot-${i}`}>
+                  {t("duel.deckSlot", { n: i + 1 })}
+                </button>
+              ))}
+              <span className="du-avg" data-testid="deck-avg">
+                {t("duel.avgCost", { n: deckAverageCost(deck).toLocaleString(language === "ptBR" ? "pt-BR" : "en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) })}
+              </span>
+            </div>
             <p className="pg-sub">{deckOk ? t("duel.deckHint") : t("duel.deckInvalid")}</p>
             <div className="du-cards">
               {DUEL_CARDS.map((c) => {
                 const on = deck.includes(c.id);
+                const lvl = cardMasteryLevel(duel.mastery[c.id]?.wins ?? 0);
                 return (
                   <button key={c.id} className={`du-cardbtn${on ? " is-on" : ""}`} onClick={() => toggleCard(c.id)} aria-pressed={on} data-testid={`deck-${c.id}`}>
+                    {lvl > 0 && (
+                      <span className="du-mbadge" title={t("duel.masteryBadge", { n: lvl })}>
+                        <MasteryStars level={lvl} />
+                      </span>
+                    )}
                     <CardFace id={c.id} dim={!on} />
                     <span className="du-desc">{t(`duel.card.${c.id}.desc` as TranslationKey)}</span>
                   </button>
@@ -1060,6 +1203,134 @@ function EmoteButton() {
   );
 }
 
+function MasteryStars({ level }: { level: number }) {
+  if (level <= 0) return null;
+  return (
+    <span className={`du-stars is-l${level}`} aria-label={`${level}`}>
+      {"★".repeat(level)}
+    </span>
+  );
+}
+
+/** REPLAY — plays a past match again from its seed and your plays (the AI decides the same way). */
+function DuelReplay({ entry, onBack }: { entry: DuelHistoryEntry; onBack: () => void }) {
+  const { t } = useLanguage();
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [run, setRun] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
+  const [snap, setSnap] = useState<DuelSnapshot | null>(null);
+
+  useEffect(() => {
+    setSpriteBiome(entry.biome);
+    const engine = new DuelEngine(entry.seed, [entry.decks[0], entry.decks[1]], entry.ai);
+    let next = 0;
+    let raf = 0;
+    let last = performance.now();
+    let acc = 0;
+    const loop = (now: number) => {
+      if (!pausedRef.current) acc += Math.min(1000, now - last) * speedRef.current;
+      last = now;
+      while (acc >= 50 && !engine.over) {
+        acc -= 50;
+        engine.advance(50);
+        while (next < entry.plays.length && entry.plays[next]!.t <= engine.timeMs) {
+          const p = entry.plays[next++]!;
+          engine.play(0, p.card, p.slot, p.at);
+        }
+      }
+      const s = engine.snapshot();
+      const cv = canvasRef.current;
+      const ctx = cv?.getContext("2d");
+      if (cv && ctx) {
+        const dpr = window.devicePixelRatio || 1;
+        const w = cv.clientWidth;
+        if (cv.width !== Math.round(w * dpr)) {
+          cv.width = Math.round(w * dpr);
+          cv.height = Math.round(((w * H) / W) * dpr);
+        }
+        ctx.setTransform(cv.width / W, 0, 0, cv.height / H, 0, 0);
+        drawDuelFrame(ctx, s, entry.arenaId, entry.biome, now, false, null, null);
+      }
+      setSnap(s);
+      if (!s.over) raf = requestAnimationFrame(loop);
+    };
+    // plays made at time 0 (before the first tick)
+    while (next < entry.plays.length && entry.plays[next]!.t <= 0) {
+      const p = entry.plays[next++]!;
+      engine.play(0, p.card, p.slot, p.at);
+    }
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [entry, run]);
+
+  const me = snap?.players[0];
+  const foe = snap?.players[1];
+  const tm = snap?.timeMs ?? 0;
+  const left = snap?.overtime ? Math.max(0, DUEL_LENGTH_MS + DUEL_OVERTIME_MS - tm) : Math.max(0, DUEL_LENGTH_MS - tm);
+  const clock = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
+  return (
+    <div style={matchRoot} data-testid="duel-replay">
+      <style>{MATCH_CSS}</style>
+      <div className="dm-top">
+        <div className="dm-side">
+          <span className="dm-crest is-you" aria-hidden="true">⚔</span>
+          <div>
+            <strong>{t("duel.you")}</strong>
+            <CastleBar hp={me?.castle ?? 20} />
+          </div>
+        </div>
+        <div className={`dm-clock${snap?.overtime ? " is-overtime" : snap?.doubleMana ? " is-double" : ""}`} style={{ ["--p" as string]: `${(snap?.overtime ? (tm - DUEL_LENGTH_MS) / DUEL_OVERTIME_MS : tm / DUEL_LENGTH_MS) * 360}deg` }}>
+          <div className="dm-clock-face">
+            <span>{clock}</span>
+          </div>
+          <small>{t("duel.replayTitle")}</small>
+        </div>
+        <div className="dm-side is-foe">
+          <div>
+            <strong>{t("duel.foe")}</strong>
+            <CastleBar hp={foe?.castle ?? 20} foe />
+          </div>
+          <span className="dm-crest is-foe" aria-hidden="true">☠</span>
+        </div>
+      </div>
+      <div className="dm-stage">
+        <canvas ref={canvasRef} className="dm-canvas" data-testid="replay-canvas" />
+        {snap?.over && (
+          <div className="dm-result" role="dialog">
+            <h2 className={`is-${snap.outcome}`}>{t(snap.outcome === "WIN" ? "duel.win" : snap.outcome === "LOSS" ? "duel.loss" : "duel.draw")}</h2>
+            <div className="dm-result-actions">
+              <button className="dm-btn" onClick={() => setRun((n) => n + 1)}>
+                {t("duel.replayRestart")}
+              </button>
+              <button className="dm-btn is-ghost" onClick={onBack}>
+                {t("duel.replayBack")}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="dm-hand dm-replaybar">
+        <button className="dm-btn" onClick={() => setPaused((p) => !p)} data-testid="replay-pause">
+          {paused ? `▶ ${t("duel.replayPlay")}` : `⏸ ${t("duel.replayPause")}`}
+        </button>
+        {[1, 2, 4].map((n) => (
+          <button key={n} className={`dm-btn${speed === n ? "" : " is-ghost"}`} onClick={() => setSpeed(n)} aria-pressed={speed === n} data-testid={`replay-speed-${n}`}>
+            {t("duel.replaySpeed", { n })}
+          </button>
+        ))}
+        <button className="dm-btn is-ghost" onClick={onBack}>
+          {t("duel.replayBack")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function CastleBar({ hp, foe }: { hp: number; foe?: boolean }) {
   const left = Math.max(0, hp);
   return (
@@ -1147,6 +1418,35 @@ const LOBBY_CSS = `
 .du-weekly-decks { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--ash); }
 .du-count { font-size: 14px; color: var(--ash); }
 .du-count.is-bad { color: #ff9a85; }
+.du-slots { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 2px; }
+.du-slot { padding: 8px 16px; border-radius: 9px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--ash); font-weight: 700; cursor: pointer; }
+.du-slot.is-on { border-color: rgba(232,176,75,0.8); color: var(--gold-hi); background: linear-gradient(180deg, rgba(232,176,75,0.16), rgba(24,18,12,0.6)); }
+.du-slot:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
+.du-avg { margin-left: auto; font-size: 14px; color: #c9a6ff; font-weight: 700; }
+.du-cardbtn { position: relative; }
+.du-mbadge { position: absolute; top: 6px; right: 8px; z-index: 1; }
+.du-stars { font-size: 12px; letter-spacing: 1px; color: #ffd56a; text-shadow: 0 0 6px rgba(255,200,80,0.6); white-space: nowrap; }
+.du-stars.is-l5 { color: #ffb0ff; text-shadow: 0 0 8px rgba(255,140,255,0.8); }
+.du-mastery { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; margin-top: 14px; }
+.du-mcard { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); }
+.du-mcard > div { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.du-mcard strong { font-size: 14px; color: var(--bone); }
+.du-mcard small { font-size: 12px; color: var(--ash); }
+.du-mclaim { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
+.du-history { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; max-width: 860px; }
+.du-hrow { display: grid; grid-template-columns: 96px 70px 1fr auto auto; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); border-left-width: 4px; background: rgba(24,18,12,0.55); font-size: 13.5px; }
+.du-hrow.is-WIN { border-left-color: #6fd36f; }
+.du-hrow.is-LOSS { border-left-color: #ff7a6a; }
+.du-hrow.is-DRAW { border-left-color: #c9b48a; }
+.du-hres { font-weight: 800; color: var(--bone); }
+.du-hscore { font-family: var(--display); font-size: 18px; color: var(--gold-hi); font-variant-numeric: tabular-nums; }
+.du-hmeta { color: var(--ash); }
+.du-hmeta b.is-up { color: #8fe08f; }
+.du-hmeta b.is-down { color: #ff9a85; }
+.du-hdate { color: var(--ash-2); font-size: 12.5px; white-space: nowrap; }
+.du-hbtn { padding: 6px 12px; font-size: 13px; white-space: nowrap; }
+.du-hold { color: var(--ash-2); font-size: 12px; }
+@media (max-width: 640px) { .du-hrow { grid-template-columns: 1fr auto; } .du-hdate, .du-hmeta { grid-column: 1 / -1; } }
 .du-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
 .du-cardbtn { display: grid; justify-items: center; gap: 6px; padding: 14px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--bone); cursor: pointer; }
 .du-cardbtn.is-on { border-color: rgba(232,176,75,0.7); background: linear-gradient(180deg, rgba(232,176,75,0.14), rgba(24,18,12,0.6)); }
@@ -1222,6 +1522,7 @@ const MATCH_CSS = `
 .dm-btn { padding: 10px 20px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
 .dm-btn.is-ghost { background: rgba(0,0,0,0.3); border-color: rgba(232,192,106,0.5); color: #efe4cf; }
 .dm-quit { font-size: 12px; padding: 6px 12px; }
+.dm-replaybar { gap: 10px; }
 .dm-clock.is-overtime .dm-clock-face { background: conic-gradient(#ff5a4a var(--p), rgba(255,255,255,0.08) 0); box-shadow: 0 0 0 2px #a8281c, 0 0 26px rgba(255,90,74,0.6); animation: dmOt 0.9s ease-in-out infinite alternate; }
 .dm-clock.is-overtime small { color: #ff9a8a; }
 @keyframes dmOt { from { transform: scale(1); } to { transform: scale(1.06); } }

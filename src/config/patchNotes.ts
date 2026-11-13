@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v131",
+    dateIso: "2026-11-13",
+    category: "SYSTEMS",
+    title: {
+      en: "Duel: match history with replays, saved decks and card mastery",
+      ptBR: "Duelo: histórico com replay, decks salvos e mestria de cartas",
+    },
+    description: {
+      en: "The Duel lobby now keeps your last matches with a replay of each one, holds three decks, and rewards you for winning with each card.",
+      ptBR: "O lobby do Duelo agora guarda suas últimas partidas com o replay de cada uma, tem três decks e recompensa as vitórias com cada carta.",
+    },
+    highlights: [
+      {
+        en: "Match history: your last 10 matches (ranked, tournament and Weekly Challenge) with the score and trophies. Watch any of them again at 1x, 2x or 4x speed.",
+        ptBR: "Histórico: suas últimas 10 partidas (ranqueada, torneio e Desafio Semanal) com o placar e os troféus. Assista qualquer uma de novo em velocidade 1x, 2x ou 4x.",
+      },
+      {
+        en: "Three deck slots, saved as you edit, and the deck's average mana cost.",
+        ptBR: "Três espaços de deck, salvos enquanto você monta, e o custo médio de mana do deck.",
+      },
+      {
+        en: "Card mastery: every ranked or tournament win counts for each card in your deck. Five levels per card (3, 10, 25, 50 and 100 wins) pay Duel Coins once and add stars to the card. Mastery never makes a card stronger.",
+        ptBR: "Mestria de cartas: cada vitória ranqueada ou de torneio conta para cada carta do seu deck. Cinco níveis por carta (3, 10, 25, 50 e 100 vitórias) pagam Moedas de Duelo uma vez e põem estrelas na carta. A mestria nunca deixa a carta mais forte.",
+      },
+    ],
+  },
+  {
     id: "v130",
     dateIso: "2026-11-13",
     category: "CONTENT",

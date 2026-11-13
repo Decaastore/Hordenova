@@ -219,6 +219,9 @@ export interface DuelSnapshot {
 
 export class DuelEngine {
   readonly seed: number;
+  /** The decks and AI skill it started with (replays). */
+  readonly decks: [DuelCardId[], DuelCardId[]];
+  readonly aiSkill: number | null;
   private r: () => number;
   private t = 0;
   private uid = 1;
@@ -240,6 +243,8 @@ export class DuelEngine {
   /** `aiSkill` 0..1 makes side 1 an AI; null leaves both sides to `play`. */
   constructor(seed: number, decks: [readonly DuelCardId[], readonly DuelCardId[]], aiSkill: number | null, skins: Partial<Record<TowerType, string>> = {}) {
     this.seed = seed;
+    this.decks = [[...decks[0]], [...decks[1]]];
+    this.aiSkill = aiSkill;
     this.r = rng(seed);
     this.players = [this.newPlayer(decks[0]), this.newPlayer(decks[1])];
     this.ai = aiSkill === null ? null : { skill: Math.max(0, Math.min(1, aiSkill)), nextThinkAt: 3000 };

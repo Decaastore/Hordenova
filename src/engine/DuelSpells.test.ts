@@ -120,3 +120,42 @@ describe("Duel spells", () => {
   });
 
 });
+
+describe("Duel history, decks and mastery", () => {
+  it("mastery counts wins per card, pays each level once, and never changes cards", async () => {
+    const { addMasteryWin, claimMastery, createDuelProfile, masteryClaimable, MASTERY_LEVELS, DUEL_CARDS } = await import("@/config/duel");
+    const before = JSON.stringify(DUEL_CARDS);
+    let p = createDuelProfile();
+    for (let i = 0; i < 10; i++) p = addMasteryWin(p, SPELL_DECK);
+    expect(p.mastery.X_METEOR!.wins).toBe(10);
+    expect(masteryClaimable(p, "X_METEOR")).toBe(2);
+    const r = claimMastery(p, "X_METEOR")!;
+    expect(r.coins).toBe(MASTERY_LEVELS[0]!.coins + MASTERY_LEVELS[1]!.coins);
+    expect(claimMastery(r.profile, "X_METEOR")).toBeNull();
+    expect(claimMastery(r.profile, "T_FROSTBORN")).toBeNull(); // not in the deck
+    expect(JSON.stringify(DUEL_CARDS)).toBe(before);
+  });
+
+  it("ranked wins raise mastery; losses don't", async () => {
+    const { applyDuelResult, createDuelProfile } = await import("@/config/duel");
+    const p = createDuelProfile();
+    const st = (outcome: "WIN" | "LOSS") => ({ outcome, myCastle: 20, foeCastle: 0, sends: 3, deck: SPELL_DECK });
+    expect(applyDuelResult(p, st("WIN"), 0).profile.mastery.X_RAGE?.wins).toBe(1);
+    expect(applyDuelResult(p, st("LOSS"), 0).profile.mastery.X_RAGE).toBeUndefined();
+  });
+
+  it("old saves keep their deck in slot 1; history keeps the last 10 and survives a reload", async () => {
+    const { sanitizeDuelProfile, pushHistory, createDuelProfile, DUEL_RULES_VERSION, HISTORY_MAX, canReplay } = await import("@/config/duel");
+    const old = sanitizeDuelProfile({ deck: SPELL_DECK });
+    expect(old.decks[0]).toEqual(SPELL_DECK);
+    expect(old.decks[1]).toEqual([]);
+    let h = createDuelProfile().history;
+    const e = (i: number) => ({ at: i, mode: "RANKED" as const, outcome: "WIN" as const, myCastle: 20, foeCastle: 3, trophyChange: 30, arenaId: "ARENA_FOREST", biome: "ANCIENT_FOREST", v: DUEL_RULES_VERSION, seed: 5, decks: [SPELL_DECK, SEND_DECK] as [DuelCardId[], DuelCardId[]], ai: 0.5, plays: [{ t: 100, card: "X_METEOR" as DuelCardId, at: { x: 10, y: 20 } }] });
+    for (let i = 0; i < 14; i++) h = pushHistory(h, e(i));
+    expect(h).toHaveLength(HISTORY_MAX);
+    expect(h[0]!.at).toBe(13);
+    const back = sanitizeDuelProfile(JSON.parse(JSON.stringify({ ...createDuelProfile(), history: h })));
+    expect(back.history).toEqual(h);
+    expect(canReplay({ ...h[0]!, v: DUEL_RULES_VERSION - 1 })).toBe(false);
+  });
+});
