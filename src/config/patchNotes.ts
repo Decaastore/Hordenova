@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v136",
+    dateIso: "2026-11-13",
+    category: "INTERFACE",
+    title: {
+      en: "One pop-up at a time",
+      ptBR: "Um pop-up de cada vez",
+    },
+    description: {
+      en: "Pop-ups no longer pile up on top of each other.",
+      ptBR: "Os pop-ups não aparecem mais um em cima do outro.",
+    },
+    highlights: [
+      {
+        en: "Home and Season show at most one pop-up per visit: the daily reward comes first, and the Global Boss alert waits for your next visit (except in the Serpent's last 24 hours).",
+        ptBR: "Home e Season mostram no máximo um pop-up por visita: a recompensa diária vem primeiro, e o aviso do Boss Global espera a próxima visita (menos nas últimas 24 horas da Serpente).",
+      },
+      {
+        en: "New players aren't greeted by the Global Boss alert before they've played a wave.",
+        ptBR: "Quem acabou de chegar não recebe o aviso do Boss Global antes de jogar uma onda.",
+      },
+      {
+        en: "In a match, the Roulette prompt waits while a tutorial card is on screen instead of covering it.",
+        ptBR: "Na partida, o aviso da Roleta espera enquanto um cartão do tutorial está na tela, em vez de ficar por cima dele.",
+      },
+    ],
+  },
+  {
     id: "v135",
     dateIso: "2026-11-13",
     category: "INTERFACE",

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { notePopupShown } from "./popupGate";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
@@ -106,7 +107,11 @@ export function DailyLoginSection() {
 export function DailyLoginModal({ onClosed }: { onClosed?: () => void }) {
   const { t } = useLanguage();
   const [save, setSave] = useState<SaveData>(() => loadSave());
-  const [open, setOpen] = useState(() => canClaimLogin(loadSave().dailyLogin, Date.now()));
+  const [open, setOpen] = useState(() => {
+    const due = canClaimLogin(loadSave().dailyLogin, Date.now());
+    if (due) notePopupShown();
+    return due;
+  });
   const [got, setGot] = useState(false);
   const close = () => {
     setOpen(false);

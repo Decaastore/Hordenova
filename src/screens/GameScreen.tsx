@@ -542,7 +542,8 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
           <RouletteBanner result={hud.pendingRouletteResult} onAcknowledge={acknowledgeRouletteResult} />
         )}
         {/* AUDITORIA E CORREÇÃO GERAL spec sections 2-3, 11 — shown whenever a milestone is unlocked but not yet spun (persists across F5). Hidden while a just-resolved result is still being revealed, so the two never overlap in the same bottom-center slot; a second pending wave (e.g. Offline Defense crossing both 20 and 30) shows here again the instant the current reveal is acknowledged. */}
-        {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && hud.phase !== "OFFLINE_RETURN" && (
+        {/* …and it waits while a tutorial card holds that same bottom-centre spot */}
+        {hud.pendingRouletteSpinWave !== null && !hud.pendingRouletteResult && hud.phase !== "OFFLINE_RETURN" && !tutorialCard && (
           <RoulettePendingPrompt wave={hud.pendingRouletteSpinWave} onSpin={() => engine.spinPendingRoulette()} />
         )}
 

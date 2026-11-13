@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { notePopupShown, popupShownThisVisit } from "./popupGate";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave } from "@/engine/SaveSystem";
@@ -141,7 +142,13 @@ export function ColossusAlert({ onOpen }: { onOpen: () => void }) {
     const due = dueColossusAlert({ week: st.week, timeLeft: st.timeLeft, defeated: st.world.defeated, prize: !!st.prize, attempts: st.attempts }, readSeen());
     // a short beat after the page opens, so it lands as an event
     if (!due) return;
-    const id = window.setTimeout(() => setKind(due), 900);
+    // brand-new players meet the game first; and only one pop-up per visit, except the Serpent's last 24 hours
+    if (due === "arrive" && loadSave().bestWave === 0) return;
+    const id = window.setTimeout(() => {
+      if (due !== "last" && popupShownThisVisit()) return;
+      notePopupShown();
+      setKind(due);
+    }, 900);
     return () => window.clearTimeout(id);
   }, [st.week]);
   // Escape closes it, like "later"
