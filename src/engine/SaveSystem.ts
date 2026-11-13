@@ -1017,6 +1017,25 @@ export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
   }
 }
 
+type SaveWrittenListener = (storageKey: string) => void;
+const saveWrittenListeners = new Set<SaveWrittenListener>();
+
+/** Called after any save key is written to this device (the cloud sync uses it to schedule an upload). Returns an unsubscribe. */
+export function onSaveWritten(listener: SaveWrittenListener): () => void {
+  saveWrittenListeners.add(listener);
+  return () => saveWrittenListeners.delete(listener);
+}
+
+function notifySaveWritten(storageKey: string): void {
+  for (const l of saveWrittenListeners) {
+    try {
+      l(storageKey);
+    } catch {
+      // a listener failing never breaks saving
+    }
+  }
+}
+
 export function writeSave(data: SaveData, storageKey: string = SAVE_STORAGE_KEY): void {
   if (!isStorageAvailable()) return;
   if (storageKey === ETERNAL_STORAGE_KEY) {
@@ -1025,6 +1044,7 @@ export function writeSave(data: SaveData, storageKey: string = SAVE_STORAGE_KEY)
   }
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(data));
+    notifySaveWritten(storageKey);
   } catch {
     // Storage unavailable/full — progress simply won't persist this session.
   }
@@ -1141,6 +1161,7 @@ export function writeEternalCastle(castle: CastleFields): void {
   if (!isStorageAvailable()) return;
   try {
     window.localStorage.setItem(ETERNAL_STORAGE_KEY, JSON.stringify(castle));
+    notifySaveWritten(ETERNAL_STORAGE_KEY);
   } catch {
     /* storage full — the castle simply won't persist this session */
   }

@@ -2,6 +2,7 @@ import { AccountScreen } from "./screens/AccountScreen";
 import { DuelScreen } from "./screens/DuelScreen";
 import { ColossusScreen } from "./screens/ColossusScreen";
 import { useEffect, useState } from "react";
+import { startCloud } from "@/net/cloud";
 import { MainMenu } from "./screens/MainMenu";
 import { GameScreen, type GameMode } from "./screens/GameScreen";
 import { syncSeasonIfNeeded } from "./engine/AscensionManager";
@@ -58,6 +59,9 @@ export default function App() {
   //      navigation back to one), while entering actual GAME stops it
   //      (gameplay gets its own future track per spec section 24, and
   //      today simply has none — see GameScreen.tsx's SFX-only audio use).
+  // CONTA ONLINE — restores a remembered session; does nothing while the server isn't configured
+  useEffect(() => startCloud(), []);
+
   useEffect(() => {
     const startMusic = () => {
       audioManager.unlock();

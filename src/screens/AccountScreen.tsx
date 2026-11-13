@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { CollectionsSection, DailyLoginSection } from "@/ui/RewardsPanels";
+import { CloudAccountSection } from "@/ui/CloudAccountSection";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -96,6 +97,8 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
           </div>
         </header>
         <div className="pg-wrap">
+          <CloudAccountSection />
+
           <section className="ac-block">
             <h2 className="pg-h2">{t("account.walletTitle")}</h2>
             <p className="pg-sub">{t("account.walletLead")}</p>
