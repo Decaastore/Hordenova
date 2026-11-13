@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { ColossusAudio } from "@/audio/arenaAudio";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
@@ -403,6 +404,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
   const countdownRef = useRef<number | null>(null);
   const fxRef = useRef<ColossusFxLayer | null>(null);
 
+  const soundRef = useRef<ColossusAudio | null>(null);
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
@@ -429,6 +431,8 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
       if (s) {
         if (!fxRef.current) fxRef.current = new ColossusFxLayer();
         fxRef.current.sync(s, towersRef.current, frameDt);
+        if (!soundRef.current) soundRef.current = new ColossusAudio();
+        soundRef.current.update(s);
       }
       const cv = canvasRef.current;
       const ctx = cv?.getContext("2d");

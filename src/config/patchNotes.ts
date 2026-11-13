@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v133",
+    dateIso: "2026-11-13",
+    category: "INTERFACE",
+    title: {
+      en: "Sound in the Duel and the Global Boss, and a Duel that fits on phones",
+      ptBR: "Som no Duelo e no Boss Global, e Duelo que cabe no celular",
+    },
+    description: {
+      en: "The Duel and the Global Boss were silent. Now they use the game's sounds, and the Duel match screen fits on a phone.",
+      ptBR: "O Duelo e o Boss Global eram mudos. Agora usam os sons do jogo, e a tela da partida do Duelo cabe no celular.",
+    },
+    highlights: [
+      {
+        en: "Duel: tower shots, creature deaths, castle hits, builds and upgrades, each spell, double mana, overtime and the result. Your side sounds louder than the opponent's, and emotes pop.",
+        ptBR: "Duelo: tiros das torres, mortes de criaturas, golpes no castelo, construções e melhorias, cada feitiço, mana em dobro, prorrogação e o resultado. O seu lado soa mais alto que o do adversário, e os emotes fazem barulho.",
+      },
+      {
+        en: "Global Boss: the Serpent's arrival and each phase, your shots and crits, Star Strikes, falling stars, its shield and the end of the raid. Other players' shots play softly.",
+        ptBR: "Boss Global: a chegada da Serpente e cada fase, seus tiros e críticos, o Golpe Estelar, as estrelas caindo, o escudo e o fim do ataque. Os tiros dos outros jogadores tocam baixinho.",
+      },
+      {
+        en: "On phones, the Duel board, both castle bars and your whole hand now fit on screen, and long card names no longer spill out.",
+        ptBR: "No celular, o tabuleiro do Duelo, as duas barras de castelo e a mão inteira agora cabem na tela, e nomes longos de carta não vazam mais.",
+      },
+    ],
+  },
+  {
     id: "v132",
     dateIso: "2026-11-13",
     category: "CONTENT",

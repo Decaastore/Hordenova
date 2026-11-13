@@ -6,6 +6,8 @@ import { appendLedgerEvent } from "@/engine/EconomyLedger";
 import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot, type Pt } from "@/engine/DuelEngine";
 import { drawSpellIcon } from "@/rendering/duelSpells";
 import { formatDurationShort } from "@/utils/formatDuration";
+import { DuelAudio } from "@/audio/arenaAudio";
+import { audioManager } from "@/audio/AudioManager";
 import {
   applyDuelResult,
   arenaFor,
@@ -976,6 +978,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
   useEffect(() => {
     setSpriteBiome(biome);
     if (import.meta.env.DEV) (window as unknown as { __hordenovaDuel?: DuelEngine }).__hordenovaDuel = engine;
+    const sound = new DuelAudio();
     let raf = 0;
     let last = performance.now();
     let acc = 0;
@@ -988,6 +991,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
         acc -= steps;
       }
       const s = engine.snapshot();
+      sound.update(s);
       const cv = canvasRef.current;
       const ctx = cv?.getContext("2d");
       if (cv && ctx) {
@@ -1207,6 +1211,7 @@ function EmoteLayer({ snap }: { snap: DuelSnapshot }) {
     const on = (e: Event) => {
       const { side, id } = (e as CustomEvent<{ side: 0 | 1; id: EmoteId }>).detail;
       if (side === 1 && mutedRef.current) return;
+      audioManager.play("loot_common", { volume: side === 0 ? 0.5 : 0.35, pitch: side === 0 ? 1.1 : 0.9 });
       const key = Date.now() + Math.random();
       setBubbles((b) => [...b.filter((x) => x.side !== side), { side, id, key }]);
       window.setTimeout(() => setBubbles((b) => b.filter((x) => x.key !== key)), EMOTE_SHOW_MS);
@@ -1325,6 +1330,7 @@ function DuelReplay({ entry, onBack }: { entry: DuelHistoryEntry; onBack: () => 
   useEffect(() => {
     setSpriteBiome(entry.biome);
     const engine = new DuelEngine(entry.seed, [entry.decks[0], entry.decks[1]], entry.ai, {}, entry.doubleMana ? { doubleMana: true } : {});
+    const sound = new DuelAudio();
     let next = 0;
     let raf = 0;
     let last = performance.now();
@@ -1341,6 +1347,7 @@ function DuelReplay({ entry, onBack }: { entry: DuelHistoryEntry; onBack: () => 
         }
       }
       const s = engine.snapshot();
+      sound.update(s);
       const cv = canvasRef.current;
       const ctx = cv?.getContext("2d");
       if (cv && ctx) {
@@ -1442,7 +1449,7 @@ function CastleBar({ hp, foe }: { hp: number; foe?: boolean }) {
   );
 }
 
-const matchRoot: CSSProperties = { position: "fixed", inset: 0, display: "grid", gridTemplateRows: "auto 1fr auto", background: "#0d0a07", color: "#efe4cf" };
+const matchRoot: CSSProperties = { position: "fixed", inset: 0, display: "grid", gridTemplateRows: "auto 1fr auto", gridTemplateColumns: "minmax(0, 1fr)", background: "#0d0a07", color: "#efe4cf" };
 
 const LOBBY_CSS = `
 .rk-badge { display: inline-grid; place-items: center; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); flex: none; }
@@ -1541,6 +1548,7 @@ const LOBBY_CSS = `
 .du-mastery { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 10px; margin-top: 14px; }
 .du-mcard { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); }
 .du-mcard > div { flex: 1; min-width: 0; display: grid; gap: 5px; }
+.du-mcard > .dc-face, .du-mcard .dc-face.is-small { flex: none; width: 60px; }
 .du-mcard strong { font-size: 14px; color: var(--bone); }
 .du-mcard small { font-size: 12px; color: var(--ash); }
 .du-mclaim { padding: 7px 12px; font-size: 13px; white-space: nowrap; }
@@ -1628,7 +1636,7 @@ const MATCH_CSS = `
 .dc-face.is-small .dc-cost { width: 20px; height: 20px; font-size: 11px; left: -6px; top: -6px; }
 .dc-kind { font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; color: #b8c8e8; }
 .dc-face.is-SEND .dc-kind { color: #ffb08a; }
-.dc-name { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.15; }
+.dc-name { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.15; max-width: 100%; overflow-wrap: anywhere; }
 .dm-next { display: grid; justify-items: center; gap: 3px; font-size: 11px; color: #a89a84; padding-left: 6px; }
 .dm-btn { padding: 10px 20px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
 .dm-btn.is-ghost { background: rgba(0,0,0,0.3); border-color: rgba(232,192,106,0.5); color: #efe4cf; }
@@ -1655,4 +1663,27 @@ const MATCH_CSS = `
 .dm-emote-menu button:disabled { opacity: 0.45; cursor: default; }
 .dm-emote-menu button:hover:not(:disabled) { border-color: #e8b04b; }
 @media (max-width: 720px) { .dc-face { width: 80px; } .dm-crest { display: none; } .dm-hp-segs i { width: 6px; } }
+@media (max-width: 520px) {
+  .dm-top { gap: 8px; padding: 6px 10px; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); }
+  .dm-side { min-width: 0; font-size: 12px; }
+  .dm-side > div { min-width: 0; flex: 1; }
+  .dm-side strong { font-size: 13px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .dm-hp-segs i { flex: 1 1 0; width: auto; min-width: 2px; height: 9px; }
+  .dm-clock-face { width: 56px; height: 56px; }
+  .dm-clock-face span { font-size: 16px; }
+  .dm-stage { padding: 6px; }
+  .dm-hand { gap: 8px 10px; padding: 8px 6px 10px; }
+  .dm-mana > span { width: 34px; height: 34px; font-size: 16px; }
+  .dm-mana-bar i { width: 10px; height: 8px; }
+  .dm-cards { gap: 6px; }
+  .dc-face { width: 68px; padding: 6px 3px; }
+  .dc-face canvas { width: 54px !important; height: 54px !important; }
+  .dc-face.is-small canvas { width: 36px !important; height: 36px !important; }
+  .dc-name { font-size: 10.5px; }
+  .dc-kind { font-size: 8.5px; }
+  .dc-cost { width: 22px; height: 22px; font-size: 12px; left: -6px; top: -6px; }
+  .dm-next { padding-left: 0; }
+  .dm-emote { font-size: 13px; padding: 6px 10px; }
+  .dm-emote-ico { font-size: 18px; }
+}
 `;
