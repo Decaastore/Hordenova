@@ -21,7 +21,10 @@ export type DuelCardId =
   | "S_BRUTE"
   | "S_SWARM"
   | "S_SHIELDS"
-  | "S_IRONCLAD";
+  | "S_IRONCLAD"
+  | "X_METEOR"
+  | "X_FREEZE"
+  | "X_RAGE";
 
 export interface DuelTowerCard {
   id: DuelCardId;
@@ -56,7 +59,29 @@ export interface DuelSendCard {
   armor?: number;
 }
 
-export type DuelCard = DuelTowerCard | DuelSendCard;
+/**
+ * FEITIÇOS — one-shot effects. METEOR and FREEZE are aimed at a spot on your
+ * own road (they hit the creatures coming at you); RAGE is instant and speeds
+ * up all your towers for a while.
+ */
+export interface DuelSpellCard {
+  id: DuelCardId;
+  kind: "SPELL";
+  cost: number;
+  effect: "METEOR" | "FREEZE" | "RAGE";
+  /** Needs a spot on your road. */
+  aimed: boolean;
+  /** METEOR / FREEZE: radius of the area. */
+  radius?: number;
+  /** METEOR: damage, grows with the match like creature life does. */
+  damage?: number;
+  /** FREEZE / RAGE: how long it lasts. */
+  durationMs?: number;
+  /** RAGE: extra attack speed (0.6 = +60%). */
+  boost?: number;
+}
+
+export type DuelCard = DuelTowerCard | DuelSendCard | DuelSpellCard;
 
 export const DUEL_CARDS: readonly DuelCard[] = [
   { id: "T_IRONWOOD", kind: "TOWER", cost: 3, tower: "IRONWOOD", damage: [34, 52, 78], rate: 1.1, range: 150 },
@@ -69,6 +94,9 @@ export const DUEL_CARDS: readonly DuelCard[] = [
   { id: "S_SWARM", kind: "SEND", cost: 5, enemy: "SWARMLING", count: 10, hp: 38, speed: 58, breach: 1 },
   { id: "S_SHIELDS", kind: "SEND", cost: 4, enemy: "SHIELDBEARER", count: 2, hp: 210, speed: 40, breach: 2, armor: 0.35 },
   { id: "S_IRONCLAD", kind: "SEND", cost: 6, enemy: "IRONCLAD", count: 1, hp: 900, speed: 30, breach: 5, armor: 0.25 },
+  { id: "X_METEOR", kind: "SPELL", cost: 4, effect: "METEOR", aimed: true, radius: 75, damage: 170 },
+  { id: "X_FREEZE", kind: "SPELL", cost: 3, effect: "FREEZE", aimed: true, radius: 90, durationMs: 2500 },
+  { id: "X_RAGE", kind: "SPELL", cost: 3, effect: "RAGE", aimed: false, durationMs: 6000, boost: 0.6 },
 ];
 
 export function getDuelCard(id: string): DuelCard | null {
@@ -83,13 +111,19 @@ export function sanitizeDeck(raw: unknown): DuelCardId[] {
   if (!Array.isArray(raw)) return [...DEFAULT_DECK];
   const ids = [...new Set(raw.filter((x): x is DuelCardId => typeof x === "string" && !!getDuelCard(x)))];
   const towers = ids.filter((id) => getDuelCard(id)!.kind === "TOWER").length;
-  const sends = ids.length - towers;
+  const sends = ids.filter((id) => getDuelCard(id)!.kind === "SEND").length;
   return ids.length === DECK_SIZE && towers >= 2 && sends >= 2 ? ids : [...DEFAULT_DECK];
 }
 
-/** A deck needs 8 different cards with at least 2 towers and 2 creatures. */
+/** A deck needs 8 different cards with at least 2 towers and 2 creatures (spells are optional). */
 export function isValidDeck(ids: readonly string[]): boolean {
   return sanitizeDeck(ids).join() === [...new Set(ids)].join() && ids.length === DECK_SIZE;
+}
+
+/** Average mana cost of a deck (shown in the deck builder, like Clash's average elixir). */
+export function deckAverageCost(ids: readonly string[]): number {
+  const cards = ids.map((id) => getDuelCard(id)).filter((c): c is DuelCard => !!c);
+  return cards.length ? cards.reduce((s, c) => s + c.cost, 0) / cards.length : 0;
 }
 
 // ── match rules ─────────────────────────────────────────────────────────
@@ -102,6 +136,13 @@ export const DUEL_MAX_MANA = 10;
 export const DUEL_MANA_EVERY_MS = 2000;
 export const DUEL_CASTLE_HP = 20;
 export const MAX_DUEL_TOWER_LEVEL = 3;
+/**
+ * PRORROGAÇÃO — tied castles when time runs out: one more minute with triple
+ * mana, and the first castle to take damage loses (sudden death). Still tied
+ * after that, it's a draw.
+ */
+export const DUEL_OVERTIME_MS = 60_000;
+export const DUEL_OVERTIME_MANA_EVERY_MS = DUEL_MANA_EVERY_MS / 3;
 /** Sent creatures gain this much of their life per minute of match. */
 export const DUEL_HP_GROWTH_PER_MIN = 1.5;
 

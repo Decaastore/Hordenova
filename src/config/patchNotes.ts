@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v130",
+    dateIso: "2026-11-13",
+    category: "CONTENT",
+    title: {
+      en: "Duel: spells, overtime and emotes",
+      ptBR: "Duelo: feitiços, prorrogação e emotes",
+    },
+    description: {
+      en: "The Duel gets a new kind of card, spells, plus overtime when castles are tied and emotes to talk to your opponent during the match.",
+      ptBR: "O Duelo ganha um novo tipo de carta, os feitiços, além de prorrogação quando os castelos empatam e emotes para falar com o adversário durante a partida.",
+    },
+    highlights: [
+      {
+        en: "Meteor (4 mana): aim it on your road and it hits every creature in the area, harder later in the match. Freeze (3): creatures in the area stop for 2.5s. Rage (3): your towers fire 60% faster for 6s.",
+        ptBR: "Meteoro (4 de mana): mire na sua estrada e ele acerta todas as criaturas da área, mais forte no fim da partida. Congelar (3): as criaturas da área param por 2,5s. Fúria (3): suas torres atiram 60% mais rápido por 6s.",
+      },
+      {
+        en: "Spells are optional in a deck (it still needs 2 towers and 2 creatures), and the AI uses them too from the Volcanic Wastes on.",
+        ptBR: "Feitiços são opcionais no deck (ele ainda precisa de 2 torres e 2 criaturas), e a IA também usa a partir dos Ermos Vulcânicos.",
+      },
+      {
+        en: "Overtime: tied castles at 3:00 play one more minute with triple mana, and the first castle hit loses. Still tied after that, it's a draw.",
+        ptBR: "Prorrogação: castelos empatados em 3:00 jogam mais 1 minuto com mana tripla, e o primeiro castelo atingido perde. Se ainda empatar, é empate.",
+      },
+      {
+        en: "Emotes: six reactions from the 💬 button. The AI answers back sometimes, and you can mute it.",
+        ptBR: "Emotes: seis reações no botão 💬. A IA às vezes responde, e dá para silenciar ela.",
+      },
+    ],
+  },
+  {
     id: "v129",
     dateIso: "2026-11-13",
     category: "CASTLE",

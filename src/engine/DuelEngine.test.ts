@@ -39,9 +39,12 @@ describe("Duel match", () => {
     expect(e.snapshot().players[0]!.mana).toBeLessThan(5 + 1);
   });
 
-  it("time running out decides by castle left", () => {
+  it("tied castles when time runs out go to overtime, and a full overtime with no hit is a draw", () => {
     const e = new DuelEngine(3, [decks[0], decks[1]], null);
     e.advance(181_000);
+    expect(e.over).toBe(false);
+    expect(e.snapshot().overtime).toBe(true);
+    e.advance(60_000);
     expect(e.over).toBe(true);
     expect(e.outcome).toBe("DRAW");
   });

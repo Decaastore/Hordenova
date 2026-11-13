@@ -3,7 +3,8 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
 import { appendLedgerEvent } from "@/engine/EconomyLedger";
-import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot } from "@/engine/DuelEngine";
+import { DuelEngine, LANE_SLOTS, slotPos, type DuelSnapshot, type Pt } from "@/engine/DuelEngine";
+import { drawSpellIcon } from "@/rendering/duelSpells";
 import {
   applyDuelResult,
   arenaFor,
@@ -12,6 +13,7 @@ import {
   DECK_SIZE,
   DUEL_CARDS,
   DUEL_LENGTH_MS,
+  DUEL_OVERTIME_MS,
   DUEL_MAX_MANA,
   DUEL_SHOP,
   duelAiSkill,
@@ -71,6 +73,8 @@ function CardFace({ id, small, dim }: { id: DuelCardId; small?: boolean; dim?: b
       <div className="dc-art">
         {card.kind === "TOWER" ? (
           <TowerPortrait type={card.tower} level={21} width={size} height={size} zoom={1.7} baseY={0.74} />
+        ) : card.kind === "SPELL" ? (
+          <SpellPortrait effect={card.effect} size={size} />
         ) : (
           <EnemyPortrait type={card.enemy} size={size} />
         )}
@@ -78,12 +82,35 @@ function CardFace({ id, small, dim }: { id: DuelCardId; small?: boolean; dim?: b
       <span className="dc-cost">{card.cost}</span>
       {!small && (
         <>
-          <span className="dc-kind">{t(card.kind === "TOWER" ? "duel.kindTower" : "duel.kindSend")}</span>
+          <span className="dc-kind">{t(card.kind === "TOWER" ? "duel.kindTower" : card.kind === "SPELL" ? "duel.kindSpell" : "duel.kindSend")}</span>
           <span className="dc-name">{t(`duel.card.${id}.name` as TranslationKey)}</span>
         </>
       )}
     </div>
   );
+}
+
+/** A spell's card art, drawn live. */
+function SpellPortrait({ effect, size }: { effect: "METEOR" | "FREEZE" | "RAGE"; size: number }) {
+  const ref = useRef<HTMLCanvasElement | null>(null);
+  useEffect(() => {
+    const draw = () => {
+      const cv = ref.current;
+      const ctx = cv?.getContext("2d");
+      if (!cv || !ctx) return;
+      const dpr = window.devicePixelRatio || 1;
+      if (cv.width !== size * dpr) {
+        cv.width = size * dpr;
+        cv.height = size * dpr;
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawSpellIcon(ctx, effect, size, performance.now());
+    };
+    draw();
+    const id = window.setInterval(draw, 60);
+    return () => window.clearInterval(id);
+  }, [effect, size]);
+  return <canvas ref={ref} style={{ width: size, height: size }} aria-hidden="true" />;
 }
 
 /** A creature drawn with the game's own sprite, gently animated. */
@@ -673,8 +700,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
 /** The AI's deck per arena — always valid, a little meaner in higher arenas. */
 function aiDeck(arenaId: string): DuelCardId[] {
   if (arenaId === "ARENA_FOREST") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "S_SHIELDS"];
-  if (arenaId === "ARENA_VOLCANO") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_SWARM", "S_BRUTE", "S_SHIELDS"];
-  return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "S_IRONCLAD"];
+  if (arenaId === "ARENA_VOLCANO") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_SWARM", "S_BRUTE", "X_RAGE"];
+  if (arenaId === "ARENA_TUNDRA") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "X_FREEZE"];
+  return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "S_IRONCLAD", "X_METEOR"];
 }
 
 interface DuelMatchProps {
@@ -696,6 +724,9 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
   const [snap, setSnap] = useState<DuelSnapshot>(() => engine.snapshot());
   const [picked, setPicked] = useState<DuelCardId | null>(null);
   const [hover, setHover] = useState<number | null>(null);
+  const [aimPt, setAimPt] = useState<Pt | null>(null);
+  const aimRef = useRef(aimPt);
+  aimRef.current = aimPt;
   const pickedRef = useRef(picked);
   pickedRef.current = picked;
   const hoverRef = useRef(hover);
@@ -728,7 +759,10 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
           cv.height = Math.round(h * dpr);
         }
         ctx.setTransform((cv.width / W), 0, 0, cv.height / H, 0, 0);
-        drawDuelFrame(ctx, s, arenaId, biome, now, !!pickedRef.current && getDuelCard(pickedRef.current)?.kind === "TOWER", hoverRef.current, banner);
+        const pc = pickedRef.current ? getDuelCard(pickedRef.current) : null;
+        const ap = aimRef.current;
+        const aim = pc?.kind === "SPELL" && pc.aimed && ap ? { x: ap.x, y: ap.y, radius: pc.radius ?? 60, ok: DuelEngine.onOwnLane(0, ap) } : null;
+        drawDuelFrame(ctx, s, arenaId, biome, now, pc?.kind === "TOWER", hoverRef.current, banner, aim);
       }
       setSnap(s);
       if (s.over && !finishedRef.current) {
@@ -743,7 +777,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
 
   const me = snap.players[0]!;
   const foe = snap.players[1]!;
-  const left = Math.max(0, DUEL_LENGTH_MS - snap.timeMs);
+  const left = snap.overtime ? Math.max(0, DUEL_LENGTH_MS + DUEL_OVERTIME_MS - snap.timeMs) : Math.max(0, DUEL_LENGTH_MS - snap.timeMs);
   const clock = `${Math.floor(left / 60000)}:${String(Math.floor((left % 60000) / 1000)).padStart(2, "0")}`;
 
   const slotAt = (ev: React.MouseEvent<HTMLCanvasElement>): number | null => {
@@ -763,9 +797,21 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
     return best;
   };
 
+  const boardPt = (ev: React.MouseEvent<HTMLCanvasElement>): Pt => {
+    const r = ev.currentTarget.getBoundingClientRect();
+    return { x: ((ev.clientX - r.left) / r.width) * W, y: ((ev.clientY - r.top) / r.height) * H };
+  };
+
   const onCanvasClick = (ev: React.MouseEvent<HTMLCanvasElement>) => {
     if (!picked) return;
     const card = getDuelCard(picked);
+    if (card?.kind === "SPELL" && card.aimed) {
+      if (engine.play(0, picked, undefined, boardPt(ev))) {
+        setPicked(null);
+        setAimPt(null);
+      }
+      return;
+    }
     if (card?.kind !== "TOWER") return;
     const slot = slotAt(ev);
     if (slot !== null && engine.play(0, picked, slot)) setPicked(null);
@@ -773,7 +819,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
 
   const onCard = (id: DuelCardId) => {
     const card = getDuelCard(id)!;
-    if (card.kind === "SEND") {
+    if (card.kind === "SEND" || (card.kind === "SPELL" && !card.aimed)) {
       engine.play(0, id);
       setPicked(null);
     } else setPicked((p) => (p === id ? null : id));
@@ -790,11 +836,15 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
             <CastleBar hp={me.castle} />
           </div>
         </div>
-        <div className={`dm-clock${snap.doubleMana ? " is-double" : ""}`} style={{ ["--p" as string]: `${(snap.timeMs / DUEL_LENGTH_MS) * 360}deg` }}>
+        <div
+          className={`dm-clock${snap.overtime ? " is-overtime" : snap.doubleMana ? " is-double" : ""}`}
+          style={{ ["--p" as string]: `${(snap.overtime ? (snap.timeMs - DUEL_LENGTH_MS) / DUEL_OVERTIME_MS : snap.timeMs / DUEL_LENGTH_MS) * 360}deg` }}
+          data-testid="duel-clock"
+        >
           <div className="dm-clock-face">
             <span>{clock}</span>
           </div>
-          {snap.doubleMana && <small>{t("duel.doubleMana")}</small>}
+          {snap.overtime ? <small>{t("duel.overtime")}</small> : snap.doubleMana && <small>{t("duel.doubleMana")}</small>}
         </div>
         <div className="dm-side is-foe">
           <div>
@@ -810,10 +860,17 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
           className="dm-canvas"
           style={{ cursor: picked ? "pointer" : "default" }}
           onClick={onCanvasClick}
-          onMouseMove={(e) => setHover(picked ? slotAt(e) : null)}
+          onMouseMove={(e) => {
+            setHover(picked ? slotAt(e) : null);
+            setAimPt(picked && getDuelCard(picked)?.kind === "SPELL" ? boardPt(e) : null);
+          }}
+          onMouseLeave={() => setAimPt(null)}
           data-testid="duel-canvas"
         />
         {picked && getDuelCard(picked)?.kind === "TOWER" && <div className="dm-hint">{t("duel.pickSlot")}</div>}
+        {picked && getDuelCard(picked)?.kind === "SPELL" && <div className="dm-hint">{t("duel.pickSpot")}</div>}
+        {!picked && snap.overtime && !snap.over && <div className="dm-hint is-ot">{t("duel.overtimeHint")}</div>}
+        <EmoteLayer snap={snap} />
         {result && (
           <div className="dm-result" role="dialog" data-testid="duel-result">
             <h2 className={`is-${result.outcome}`}>{t(result.outcome === "WIN" ? "duel.win" : result.outcome === "LOSS" ? "duel.loss" : "duel.draw")}</h2>
@@ -871,12 +928,134 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
             <CardFace id={me.next} small />
           </div>
         </div>
+        <EmoteButton />
         {!snap.over && (
           <button className="dm-btn is-ghost dm-quit" onClick={() => engine.surrender()}>
             {t("duel.surrender")}
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── EMOTES ────────────────────────────────────────────────────────────
+const EMOTES = ["GG", "WOW", "HAHA", "ANGRY", "THANKS", "OOPS"] as const;
+type EmoteId = (typeof EMOTES)[number];
+const EMOTE_ICON: Record<EmoteId, string> = { GG: "🤝", WOW: "😮", HAHA: "😂", ANGRY: "😡", THANKS: "👍", OOPS: "😅" };
+const EMOTE_SHOW_MS = 2200;
+const EMOTE_COOLDOWN_MS = 3000;
+
+/** A tiny bus so the hand's emote button and the board's bubbles talk without prop threading. */
+const emoteBus = new EventTarget();
+function say(side: 0 | 1, id: EmoteId) {
+  emoteBus.dispatchEvent(new CustomEvent("emote", { detail: { side, id } }));
+}
+
+/** Speech bubbles over each castle, and the AI's replies (it reacts to hits, your emotes and the result). Not part of the match itself. */
+function EmoteLayer({ snap }: { snap: DuelSnapshot }) {
+  const { t } = useLanguage();
+  const [bubbles, setBubbles] = useState<{ side: 0 | 1; id: EmoteId; key: number }[]>([]);
+  const [muted, setMuted] = useState(false);
+  const mutedRef = useRef(muted);
+  mutedRef.current = muted;
+  const lastFoeEmote = useRef(0);
+  const seenBreach = useRef(new Set<string>());
+  const endSaid = useRef(false);
+
+  useEffect(() => {
+    const on = (e: Event) => {
+      const { side, id } = (e as CustomEvent<{ side: 0 | 1; id: EmoteId }>).detail;
+      if (side === 1 && mutedRef.current) return;
+      const key = Date.now() + Math.random();
+      setBubbles((b) => [...b.filter((x) => x.side !== side), { side, id, key }]);
+      window.setTimeout(() => setBubbles((b) => b.filter((x) => x.key !== key)), EMOTE_SHOW_MS);
+      // the AI sometimes answers you
+      if (side === 0 && Math.random() < 0.45) {
+        const reply: EmoteId = id === "GG" ? "GG" : id === "HAHA" ? (Math.random() < 0.5 ? "ANGRY" : "HAHA") : id === "ANGRY" ? "HAHA" : id === "THANKS" ? "THANKS" : "WOW";
+        window.setTimeout(() => foeSay(reply), 900 + Math.random() * 900);
+      }
+    };
+    emoteBus.addEventListener("emote", on);
+    return () => emoteBus.removeEventListener("emote", on);
+  }, []);
+
+  function foeSay(id: EmoteId) {
+    const now = Date.now();
+    if (now - lastFoeEmote.current < 4000) return;
+    lastFoeEmote.current = now;
+    say(1, id);
+  }
+
+  // react to castle hits and to the end of the match
+  useEffect(() => {
+    for (const b of snap.breaches) {
+      const k = `${b.side}:${b.at}`;
+      if (seenBreach.current.has(k)) continue;
+      seenBreach.current.add(k);
+      if (b.side === 0 && Math.random() < 0.3) foeSay("HAHA");
+      else if (b.side === 1 && Math.random() < 0.25) foeSay(Math.random() < 0.5 ? "ANGRY" : "OOPS");
+    }
+    if (snap.over && !endSaid.current) {
+      endSaid.current = true;
+      lastFoeEmote.current = 0;
+      if (Math.random() < 0.75) foeSay(snap.outcome === "WIN" ? "GG" : snap.outcome === "LOSS" ? "HAHA" : "WOW");
+    }
+  });
+
+  return (
+    <>
+      {bubbles.map((b) => (
+        <div key={b.key} className={`dm-emote is-side${b.side}`} role="status" data-testid={`emote-${b.side}`}>
+          <span className="dm-emote-ico" aria-hidden="true">
+            {EMOTE_ICON[b.id]}
+          </span>
+          <span>{t(`duel.emote.${b.id}` as TranslationKey)}</span>
+        </div>
+      ))}
+      <button className={`dm-mute${muted ? " is-on" : ""}`} onClick={() => setMuted((m) => !m)} aria-pressed={muted} title={muted ? "🔇" : "🔈"}>
+        {muted ? "🔇" : "🔈"}
+      </button>
+    </>
+  );
+}
+
+function EmoteButton() {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const [coolUntil, setCoolUntil] = useState(0);
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (coolUntil <= Date.now()) return;
+    const id = window.setTimeout(() => force((n) => n + 1), coolUntil - Date.now() + 20);
+    return () => window.clearTimeout(id);
+  }, [coolUntil]);
+  const cooling = coolUntil > Date.now();
+  return (
+    <div className="dm-emotes">
+      <button className="dm-btn is-ghost dm-emote-btn" onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-label={t("duel.emotes")} data-testid="emote-open">
+        💬
+      </button>
+      {open && (
+        <div className="dm-emote-menu" role="menu">
+          {EMOTES.map((id) => (
+            <button
+              key={id}
+              role="menuitem"
+              disabled={cooling}
+              onClick={() => {
+                say(0, id);
+                setCoolUntil(Date.now() + EMOTE_COOLDOWN_MS);
+                setOpen(false);
+              }}
+              data-testid={`emote-${id}`}
+            >
+              <span aria-hidden="true">{EMOTE_ICON[id]}</span>
+              {t(`duel.emote.${id}` as TranslationKey)}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1043,5 +1222,25 @@ const MATCH_CSS = `
 .dm-btn { padding: 10px 20px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
 .dm-btn.is-ghost { background: rgba(0,0,0,0.3); border-color: rgba(232,192,106,0.5); color: #efe4cf; }
 .dm-quit { font-size: 12px; padding: 6px 12px; }
+.dm-clock.is-overtime .dm-clock-face { background: conic-gradient(#ff5a4a var(--p), rgba(255,255,255,0.08) 0); box-shadow: 0 0 0 2px #a8281c, 0 0 26px rgba(255,90,74,0.6); animation: dmOt 0.9s ease-in-out infinite alternate; }
+.dm-clock.is-overtime small { color: #ff9a8a; }
+@keyframes dmOt { from { transform: scale(1); } to { transform: scale(1.06); } }
+@media (prefers-reduced-motion: reduce) { .dm-clock.is-overtime .dm-clock-face { animation: none; } }
+.dm-hint.is-ot { color: #ffb0a4; border-color: #a8281c; }
+.dm-emote { position: absolute; bottom: 20%; display: flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 16px; background: #fff7e6; color: #2b1906; font-weight: 800; font-size: 15px; box-shadow: 0 6px 18px rgba(0,0,0,0.45); transform: translateX(-50%); animation: dmPop 0.22s ease-out; pointer-events: none; white-space: nowrap; }
+.dm-emote::after { content: ""; position: absolute; bottom: -8px; left: 50%; margin-left: -8px; border: 8px solid transparent; border-top-color: #fff7e6; border-bottom: 0; }
+.dm-emote.is-side0 { left: 25%; }
+.dm-emote.is-side1 { left: 75%; background: #ffe6e1; }
+.dm-emote.is-side1::after { border-top-color: #ffe6e1; }
+.dm-emote-ico { font-size: 24px; }
+@keyframes dmPop { from { transform: translateX(-50%) scale(0.6); opacity: 0; } to { transform: translateX(-50%) scale(1); opacity: 1; } }
+.dm-mute { position: absolute; top: 16px; right: 18px; width: 34px; height: 34px; border-radius: 50%; border: 1px solid #8a6a3a; background: rgba(0,0,0,0.6); cursor: pointer; font-size: 15px; }
+.dm-emotes { position: relative; }
+.dm-emote-btn { font-size: 18px; padding: 6px 12px; }
+.dm-emote-menu { position: absolute; bottom: calc(100% + 8px); right: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; border-radius: 12px; background: #1c140c; border: 1px solid #8a6a3a; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 5; }
+.dm-emote-menu button { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; border: 1px solid #4a3620; background: #2a1f14; color: #f3e6cc; font-weight: 700; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.dm-emote-menu button span { font-size: 18px; }
+.dm-emote-menu button:disabled { opacity: 0.45; cursor: default; }
+.dm-emote-menu button:hover:not(:disabled) { border-color: #e8b04b; }
 @media (max-width: 720px) { .dc-face { width: 80px; } .dm-crest { display: none; } .dm-hp-segs i { width: 6px; } }
 `;

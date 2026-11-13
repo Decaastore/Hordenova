@@ -8,6 +8,8 @@ import {
   DUEL_START_MANA,
   DUEL_TICK_MS,
   DUEL_HP_GROWTH_PER_MIN,
+  DUEL_OVERTIME_MANA_EVERY_MS,
+  DUEL_OVERTIME_MS,
   getDuelCard,
   HAND_SIZE,
   MAX_DUEL_TOWER_LEVEL,
@@ -15,6 +17,7 @@ import {
   type DuelCardId,
   type DuelOutcome,
   type DuelSendCard,
+  type DuelSpellCard,
   type DuelTowerCard,
 } from "@/config/duel";
 import { createEnemyInstance, type EnemyInstance } from "@/entities/Enemy";
@@ -132,6 +135,8 @@ interface Unit {
   dist: number;
   hp: number;
   slowUntil: number;
+  /** FREEZE: stands still until then. */
+  frozenUntil: number;
   inst: EnemyInstance;
   angle: number;
   turnRate: number;
@@ -166,13 +171,40 @@ interface Player {
   next: DuelCardId;
   plays: number;
   sends: number;
+  /** RAGE: towers fire faster until then. */
+  rageUntil: number;
+  spells: number;
 }
+
+/** A spell on the board, for the renderer (and the METEOR's delayed impact). */
+export interface SpellFx {
+  side: Side;
+  effect: DuelSpellCard["effect"];
+  at: Pt;
+  radius: number;
+  castAt: number;
+  /** METEOR lands (and hurts) at this time. */
+  landAt: number;
+  durationMs: number;
+}
+
+/** One card played — enough to replay a match from its seed. */
+export interface DuelPlay {
+  t: number;
+  side: Side;
+  card: DuelCardId;
+  slot?: number;
+  at?: Pt;
+}
+
+/** METEOR falls for this long before it lands. */
+export const METEOR_FALL_MS = 550;
 
 export interface DuelSnapshot {
   timeMs: number;
   over: boolean;
   outcome: DuelOutcome | null;
-  players: readonly { mana: number; castle: number; hand: readonly DuelCardId[]; next: DuelCardId; sends: number }[];
+  players: readonly { mana: number; castle: number; hand: readonly DuelCardId[]; next: DuelCardId; sends: number; spells: number; raging: boolean }[];
   units: readonly Unit[];
   towers: readonly DTower[];
   shots: readonly Shot[];
@@ -180,6 +212,9 @@ export interface DuelSnapshot {
   /** Creatures that fell in the last moment (for death puffs). */
   deaths: readonly { x: number; y: number; at: number; big: boolean }[];
   doubleMana: boolean;
+  /** PRORROGAÇÃO: tied at the end, triple mana and the next castle hit decides. */
+  overtime: boolean;
+  spells: readonly SpellFx[];
 }
 
 export class DuelEngine {
@@ -194,6 +229,10 @@ export class DuelEngine {
   private breaches: { side: Side; at: number; dmg: number }[] = [];
   private deaths: { x: number; y: number; at: number; big: boolean }[] = [];
   private ai: { skill: number; nextThinkAt: number } | null;
+  private spellFx: SpellFx[] = [];
+  private overtime = false;
+  /** Every card played, in order (replays). */
+  readonly log: DuelPlay[] = [];
   over = false;
   outcome: DuelOutcome | null = null;
   private skinBySide: [Partial<Record<TowerType, string>>, Partial<Record<TowerType, string>>];
@@ -213,15 +252,20 @@ export class DuelEngine {
       const j = Math.floor(this.r() * (i + 1));
       [cards[i], cards[j]] = [cards[j]!, cards[i]!];
     }
-    return { mana: DUEL_START_MANA, manaAcc: 0, castle: DUEL_CASTLE_HP, hand: cards.slice(0, HAND_SIZE), queue: cards.slice(HAND_SIZE + 1), next: cards[HAND_SIZE]!, plays: 0, sends: 0 };
+    return { mana: DUEL_START_MANA, manaAcc: 0, castle: DUEL_CASTLE_HP, hand: cards.slice(0, HAND_SIZE), queue: cards.slice(HAND_SIZE + 1), next: cards[HAND_SIZE]!, plays: 0, sends: 0, rageUntil: 0, spells: 0 };
   }
 
   get timeMs(): number {
     return this.t;
   }
 
-  /** Can `side` play hand card `cardId` (on `slot` for a tower) right now? */
-  canPlay(side: Side, cardId: DuelCardId, slot?: number): boolean {
+  /** Is `at` on `side`'s own half of the board (where its aimed spells go)? */
+  static onOwnLane(side: Side, at: Pt): boolean {
+    return at.x >= side * LANE_W + 20 && at.x <= (side + 1) * LANE_W - 20 && at.y >= 20 && at.y <= LANE_H - 20;
+  }
+
+  /** Can `side` play hand card `cardId` (on `slot` for a tower, at `at` for an aimed spell) right now? */
+  canPlay(side: Side, cardId: DuelCardId, slot?: number, at?: Pt): boolean {
     if (this.over) return false;
     const p = this.players[side];
     const card = getDuelCard(cardId);
@@ -231,12 +275,13 @@ export class DuelEngine {
       const there = this.towers.find((t) => t.side === side && t.slot === slot);
       if (there && (there.card.id !== card.id || there.level >= MAX_DUEL_TOWER_LEVEL)) return false;
     }
+    if (card.kind === "SPELL" && card.aimed && (!at || !DuelEngine.onOwnLane(side, at))) return false;
     return true;
   }
 
   /** Plays a card: a tower card builds (or levels up the same tower) on your road; a creature card sends its group down the other road. */
-  play(side: Side, cardId: DuelCardId, slot?: number): boolean {
-    if (!this.canPlay(side, cardId, slot)) return false;
+  play(side: Side, cardId: DuelCardId, slot?: number, at?: Pt): boolean {
+    if (!this.canPlay(side, cardId, slot, at)) return false;
     const p = this.players[side];
     const card = getDuelCard(cardId)!;
     p.mana -= card.cost;
@@ -245,8 +290,12 @@ export class DuelEngine {
     p.hand = p.hand.map((c) => (c === cardId ? p.next : c));
     p.queue.push(cardId);
     p.next = p.queue.shift()!;
+    this.log.push({ t: this.t, side, card: cardId, ...(card.kind === "TOWER" ? { slot } : {}), ...(card.kind === "SPELL" && card.aimed && at ? { at: { x: at.x, y: at.y } } : {}) });
     if (card.kind === "TOWER") this.buildTower(side, card, slot!);
-    else {
+    else if (card.kind === "SPELL") {
+      p.spells += 1;
+      this.cast(side, card, at);
+    } else {
       p.sends += 1;
       this.send((1 - side) as Side, card);
     }
@@ -265,6 +314,28 @@ export class DuelEngine {
     this.towers.push({ side, slot, card, level: 1, cooldown: 400, inst, lastShotAt: -1e9 });
   }
 
+  private cast(side: Side, card: DuelSpellCard, at?: Pt): void {
+    const p = this.players[side];
+    if (card.effect === "RAGE") {
+      p.rageUntil = this.t + (card.durationMs ?? 0);
+      const c = { x: CASTLE_AT.x + side * LANE_W, y: CASTLE_AT.y };
+      this.spellFx.push({ side, effect: "RAGE", at: c, radius: 0, castAt: this.t, landAt: this.t, durationMs: card.durationMs ?? 0 });
+      return;
+    }
+    const pt = { x: at!.x, y: at!.y };
+    const radius = card.radius ?? 0;
+    if (card.effect === "FREEZE") {
+      for (const u of this.units) if (u.side === side && u.dist >= 0 && Math.hypot(u.inst.position.x - pt.x, u.inst.position.y - pt.y) <= radius) u.frozenUntil = this.t + (card.durationMs ?? 0);
+      this.spellFx.push({ side, effect: "FREEZE", at: pt, radius, castAt: this.t, landAt: this.t, durationMs: card.durationMs ?? 0 });
+      return;
+    }
+    // METEOR: falls, then hits everything in the area
+    this.spellFx.push({ side, effect: "METEOR", at: pt, radius, castAt: this.t, landAt: this.t + METEOR_FALL_MS, durationMs: 0 });
+    this.pendingMeteors.push({ side, at: pt, radius, landAt: this.t + METEOR_FALL_MS, damage: (card.damage ?? 0) * duelHpScale(this.t) });
+  }
+
+  private pendingMeteors: { side: Side; at: Pt; radius: number; landAt: number; damage: number }[] = [];
+
   private send(side: Side, card: DuelSendCard): void {
     const hp = Math.round(card.hp * duelHpScale(this.t));
     for (let i = 0; i < card.count; i++) {
@@ -272,7 +343,7 @@ export class DuelEngine {
       inst.id = `du${this.uid}`;
       inst.maxHp = hp;
       inst.hp = hp;
-      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, slowUntil: 0, inst, angle: Math.PI / 2, turnRate: 0 });
+      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, slowUntil: 0, frozenUntil: 0, inst, angle: Math.PI / 2, turnRate: 0 });
     }
   }
 
@@ -285,7 +356,7 @@ export class DuelEngine {
   private tick(): void {
     const dt = DUEL_TICK_MS;
     this.t += dt;
-    const every = this.t >= DUEL_DOUBLE_MANA_FROM_MS ? DUEL_MANA_EVERY_MS / 2 : DUEL_MANA_EVERY_MS;
+    const every = this.overtime ? DUEL_OVERTIME_MANA_EVERY_MS : this.t >= DUEL_DOUBLE_MANA_FROM_MS ? DUEL_MANA_EVERY_MS / 2 : DUEL_MANA_EVERY_MS;
     for (const p of this.players) {
       p.manaAcc += dt;
       while (p.manaAcc >= every) {
@@ -296,7 +367,18 @@ export class DuelEngine {
     if (this.ai && this.t >= this.ai.nextThinkAt) this.thinkAi();
 
     // move
+    // meteors landing
+    for (const m of this.pendingMeteors) {
+      if (m.landAt > this.t) continue;
+      for (const u of this.units) if (u.side === m.side && u.hp > 0 && u.dist >= 0 && Math.hypot(u.inst.position.x - m.at.x, u.inst.position.y - m.at.y) <= m.radius) this.hit(u, m.damage);
+    }
+    this.pendingMeteors = this.pendingMeteors.filter((m) => m.landAt > this.t);
+
     for (const u of this.units) {
+      if (this.t < u.frozenUntil) {
+        u.inst.hp = u.hp;
+        continue;
+      }
       const slow = this.t < u.slowUntil ? 0.6 : 1;
       u.dist += (u.card.speed * slow * dt) / 1000;
       const { p, angle } = pointAt(u.side, u.dist);
@@ -332,7 +414,7 @@ export class DuelEngine {
         .sort((a, b) => b.dist - a.dist);
       const target = inRange[0];
       if (!target) continue;
-      tw.cooldown = 1000 / tw.card.rate;
+      tw.cooldown = 1000 / (tw.card.rate * (this.t < this.players[tw.side].rageUntil ? 1.6 : 1));
       tw.lastShotAt = this.t;
       tw.inst.cooldownRemainingMs = 0;
       const dmg = tw.card.damage[tw.level - 1]!;
@@ -364,11 +446,19 @@ export class DuelEngine {
     this.deaths = this.deaths.filter((d) => this.t - d.at < 900);
     this.shots = this.shots.filter((s) => this.t - s.at < 400);
     this.breaches = this.breaches.filter((b) => this.t - b.at < 1200);
+    this.spellFx = this.spellFx.filter((f) => this.t - f.landAt < Math.max(900, f.durationMs));
 
     // end
     const [a, b] = this.players;
     if (a.castle <= 0 || b.castle <= 0) this.finish(a.castle <= 0 && b.castle <= 0 ? "DRAW" : a.castle <= 0 ? "LOSS" : "WIN");
-    else if (this.t >= DUEL_LENGTH_MS) this.finish(a.castle > b.castle ? "WIN" : a.castle < b.castle ? "LOSS" : "DRAW");
+    else if (this.overtime) {
+      // sudden death: the first castle hit decides
+      if (a.castle !== b.castle) this.finish(a.castle > b.castle ? "WIN" : "LOSS");
+      else if (this.t >= DUEL_LENGTH_MS + DUEL_OVERTIME_MS) this.finish("DRAW");
+    } else if (this.t >= DUEL_LENGTH_MS) {
+      if (a.castle !== b.castle) this.finish(a.castle > b.castle ? "WIN" : "LOSS");
+      else this.overtime = true;
+    }
   }
 
   private hit(u: Unit, dmg: number): void {
@@ -396,6 +486,12 @@ export class DuelEngine {
     const threat = this.units.filter((u) => u.side === 1).reduce((s, u) => s + u.hp, 0);
     const myTowers = this.towers.filter((t) => t.side === 1);
     const power = myTowers.reduce((s, t) => s + t.card.damage[t.level - 1]! * t.card.rate, 0);
+    // spells first, when they pay off
+    for (const c of hand) {
+      if (c.kind !== "SPELL") continue;
+      if (this.r() > 0.25 + ai.skill * 0.75) continue;
+      if (this.aiSpell(c, threat, power, myTowers.length)) return;
+    }
     const towerCards = hand.filter((c): c is DuelTowerCard => c.kind === "TOWER");
     const sendCards = hand.filter((c): c is DuelSendCard => c.kind === "SEND");
     const needDefense = myTowers.length < 2 || threat > power * (6 + ai.skill * 4);
@@ -417,7 +513,39 @@ export class DuelEngine {
     if (towerCards.length && myTowers.length < 6 && me.mana >= 7) this.aiPlay(towerCards[0]!);
   }
 
+  /** Casts a spell if the board makes it worth it. */
+  private aiSpell(card: DuelSpellCard, threat: number, power: number, towers: number): boolean {
+    const mine = this.units.filter((u) => u.side === 1 && u.dist >= 0 && u.hp > 0);
+    if (card.effect === "RAGE") {
+      if (towers >= 2 && threat > power * 4 && this.t >= this.players[1].rageUntil) return this.play(1, card.id);
+      return false;
+    }
+    if (!mine.length) return false;
+    const r = card.radius ?? 0;
+    let best: Unit | null = null;
+    let bestScore = 0;
+    for (const u of mine) {
+      let score = 0;
+      for (const v of mine) if (Math.hypot(u.inst.position.x - v.inst.position.x, u.inst.position.y - v.inst.position.y) <= r * 0.8) score += card.effect === "FREEZE" ? v.card.breach * (v.dist / PATH_LEN) : Math.min(v.hp, (card.damage ?? 0) * duelHpScale(this.t));
+      if (score > bestScore) {
+        bestScore = score;
+        best = u;
+      }
+    }
+    if (!best) return false;
+    const worth = card.effect === "FREEZE" ? bestScore >= 2.2 : bestScore >= 220 * duelHpScale(this.t);
+    if (!worth) return false;
+    // aim a little ahead of the group (it keeps walking while the meteor falls)
+    const ahead = card.effect === "METEOR" ? pointAt(1, best.dist + (best.card.speed * METEOR_FALL_MS) / 1000).p : best.inst.position;
+    return this.play(1, card.id, undefined, { x: ahead.x, y: ahead.y });
+  }
+
   private aiPlay(card: DuelCard): void {
+    if (card.kind === "SPELL") {
+      const threat = this.units.filter((u) => u.side === 1).reduce((s, u) => s + u.hp, 0);
+      this.aiSpell(card, threat, 0, this.towers.filter((t) => t.side === 1).length);
+      return;
+    }
     if (card.kind === "SEND") {
       this.play(1, card.id);
       return;
@@ -434,13 +562,15 @@ export class DuelEngine {
       timeMs: this.t,
       over: this.over,
       outcome: this.outcome,
-      players: this.players.map((p) => ({ mana: p.mana, castle: p.castle, hand: [...p.hand], next: p.next, sends: p.sends })),
+      players: this.players.map((p) => ({ mana: p.mana, castle: p.castle, hand: [...p.hand], next: p.next, sends: p.sends, spells: p.spells, raging: this.t < p.rageUntil })),
       units: this.units,
       towers: this.towers,
       shots: this.shots,
       breaches: this.breaches,
       deaths: this.deaths,
       doubleMana: this.t >= DUEL_DOUBLE_MANA_FROM_MS,
+      overtime: this.overtime,
+      spells: this.spellFx,
     };
   }
 

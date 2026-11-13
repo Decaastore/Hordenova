@@ -4,6 +4,7 @@ import { drawRiftPortal } from "./riftPortal";
 import { getBiome } from "./biomes";
 import type { Decoration, DecorationKind } from "./mapDecorations";
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
+import { drawFrozenOverlay, drawRageAura, drawSpellAir, drawSpellGround } from "./duelSpells";
 import { CASTLE_AT, LANE_H, LANE_SLOTS, LANE_W, lanePath, slotPos, type DuelSnapshot, type Pt, type Side } from "@/engine/DuelEngine";
 import { MAX_DUEL_TOWER_LEVEL } from "@/config/duel";
 import { drawEnemy, drawEnemyHpBar, drawTower } from "./EntityRenderer";
@@ -484,6 +485,8 @@ export function drawDuelFrame(
   hoverSlot: number | null,
   /** The player's Duel banner (Duel shop cosmetic), flown over their castle. */
   banner: { color: string; color2: string } | null = null,
+  /** Aiming a spell: where it would land (null when not aiming or off your road). */
+  aim: { x: number; y: number; radius: number; ok: boolean } | null = null,
 ): void {
   const look = LOOK[arenaId] ?? LOOK.ARENA_FOREST!;
   const b = board(arenaId, biome);
@@ -505,6 +508,20 @@ export function drawDuelFrame(
     });
   }
   drawTorches(ctx, timeMs);
+  drawSpellGround(ctx, snap);
+  if (aim) {
+    ctx.save();
+    ctx.fillStyle = aim.ok ? "rgba(255,230,160,0.16)" : "rgba(255,60,60,0.12)";
+    ctx.strokeStyle = aim.ok ? "rgba(255,230,160,0.9)" : "rgba(255,90,90,0.8)";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.lineDashOffset = -timeMs / 40;
+    ctx.beginPath();
+    ctx.ellipse(aim.x, aim.y, aim.radius, aim.radius * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // depth-sorted towers, units and castles
   const items: { y: number; draw: () => void }[] = [];
@@ -521,6 +538,7 @@ export function drawDuelFrame(
       y: t.inst.position.y,
       draw: () => {
         const { x, y } = t.inst.position;
+        if (snap.players[t.side]?.raging) drawRageAura(ctx, x, y, timeMs);
         ctx.save();
         ctx.translate(x, y);
         ctx.scale(1.6, 1.6);
@@ -556,6 +574,7 @@ export function drawDuelFrame(
       y: u.inst.position.y,
       draw: () => {
         drawEnemy(ctx, u.inst, timeMs, Infinity, 2, undefined, u.angle, 0);
+        if (u.frozenUntil > snap.timeMs) drawFrozenOverlay(ctx, u.inst.position.x, u.inst.position.y, u.card.breach >= 3 ? 34 : 20, u.frozenUntil - snap.timeMs);
         drawEnemyHpBar(ctx, u.inst);
       },
     });
@@ -563,5 +582,6 @@ export function drawDuelFrame(
   items.sort((a, b2) => a.y - b2.y).forEach((i) => i.draw());
   drawDeaths(ctx, snap);
   drawShots(ctx, snap);
+  drawSpellAir(ctx, snap);
   drawMotes(ctx, look, timeMs);
 }
