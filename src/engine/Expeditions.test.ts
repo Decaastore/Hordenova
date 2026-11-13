@@ -5,6 +5,7 @@ import {
   BASE_SCOUT_GROUPS,
   createExpeditionState,
   expeditionPrize,
+  rollExpeditionPrize,
   expeditionRegions,
   FORGE_RECIPES,
   rushPrice,
@@ -22,10 +23,29 @@ describe("expeditions config", () => {
     expect(expeditionPrize(1, 24).gold).toBeGreaterThan(expeditionPrize(1, 8).gold);
   });
 
-  it("keeps the top essences for the deepest, longest trips", () => {
-    for (const h of [1, 4, 8] as const) for (const t of [1, 2, 3, 4]) expect(expeditionPrize(t, h).essences.LEGENDARY + expeditionPrize(t, h).essences.MYTHIC).toBe(0);
-    expect(expeditionPrize(3, 24).essences.MYTHIC).toBe(0);
-    expect(expeditionPrize(4, 24).essences.MYTHIC).toBe(1);
+  it("keeps the top essences for the deepest, longest trips — Legendary and Mythic only as a chance", () => {
+    for (const h of [1, 4, 8, 24] as const) for (const t of [1, 2, 3, 4]) expect(expeditionPrize(t, h).essences.LEGENDARY + expeditionPrize(t, h).essences.MYTHIC).toBe(0);
+    for (const h of [1, 4, 8] as const) for (const t of [1, 2, 3, 4]) expect(expeditionPrize(t, h).chances.LEGENDARY + expeditionPrize(t, h).chances.MYTHIC).toBe(0);
+    expect(expeditionPrize(2, 24).chances.LEGENDARY).toBe(0);
+    expect(expeditionPrize(3, 24).chances.MYTHIC).toBe(0);
+    expect(expeditionPrize(4, 24).chances.MYTHIC).toBeGreaterThan(0);
+    expect(rollExpeditionPrize(expeditionPrize(4, 24), () => 0).essences).toMatchObject({ LEGENDARY: 1, MYTHIC: 1 });
+    expect(rollExpeditionPrize(expeditionPrize(4, 24), () => 0.99).essences).toMatchObject({ LEGENDARY: 0, MYTHIC: 0 });
+  });
+
+  it("from Epic up the Forge is hard but never impossible (deepest tier, 2 groups, one 24h trip each per day)", () => {
+    const day = expeditionPrize(4, 24);
+    const perDay = (r: "EPIC" | "LEGENDARY" | "MYTHIC") => 2 * (r === "EPIC" ? day.essences.EPIC : day.chances[r]);
+    const daysFor = (id: string) => {
+      const rec = FORGE_RECIPES.find((x) => x.itemId === id)!;
+      return Math.max(...(["EPIC", "LEGENDARY", "MYTHIC"] as const).filter((r) => rec.essences[r] > 0).map((r) => rec.essences[r] / perDay(r)));
+    };
+    expect(daysFor("hollow_sigil")).toBeGreaterThanOrEqual(4); // Epic: about a week
+    expect(daysFor("hollow_sigil")).toBeLessThanOrEqual(10);
+    expect(daysFor("wardens_eye")).toBeGreaterThanOrEqual(20); // Legendary: about a month
+    expect(daysFor("wardens_eye")).toBeLessThanOrEqual(40);
+    expect(daysFor("crown_of_the_hollow_king")).toBeGreaterThanOrEqual(50); // Mythic: about two months
+    expect(daysFor("crown_of_the_hollow_king")).toBeLessThanOrEqual(90);
   });
 
   it("rush costs 5 to 60 Gems by time left", () => {

@@ -58,27 +58,46 @@ export interface ExpeditionPrize {
   gold: number;
   shards: number;
   splinters: number;
+  /** Paid for sure. */
   essences: Essences;
+  /** Chance (0..1) of ONE extra Essence of that rarity, rolled when the trip is collected. */
+  chances: { LEGENDARY: number; MYTHIC: number };
 }
 
-/** The exact prize of a trip — shown before it leaves, paid as shown. */
+const NO_CHANCE = { LEGENDARY: 0, MYTHIC: 0 };
+
+/** The prize of a trip — shown before it leaves: the sure part, plus the Legendary/Mythic chances rolled on collect. */
 export function expeditionPrize(tier: number, hours: ExpeditionHours): ExpeditionPrize {
   const t = Math.max(1, Math.min(4, Math.floor(tier)));
+  // RARITY CURVE (owner's call): from Epic up, Essences must be HARD to get
+  // but never impossible. Epic only from the deeper regions, Legendary and
+  // Mythic only as a CHANCE on a full-day trip to the deepest ones.
+  // At the deepest tier with 2 groups on 24h trips: ~6 Epic a day, a
+  // Legendary every ~2 days, a Mythic every ~10 days.
   switch (hours) {
     case 1:
-      return { gold: 60 * t, shards: 0, splinters: 2 * t, essences: { ...NO_ESSENCES } };
+      return { gold: 60 * t, shards: 0, splinters: 2 * t, essences: { ...NO_ESSENCES }, chances: { ...NO_CHANCE } };
     case 4:
-      return { gold: 200 * t, shards: 1, splinters: 6 * t, essences: { ...NO_ESSENCES, RARE: t } };
+      return { gold: 200 * t, shards: 1, splinters: 6 * t, essences: { ...NO_ESSENCES, RARE: t }, chances: { ...NO_CHANCE } };
     case 8:
-      return { gold: 360 * t, shards: 2, splinters: 11 * t, essences: { ...NO_ESSENCES, RARE: 2 * t, EPIC: t - 1 } };
+      return { gold: 360 * t, shards: 2, splinters: 11 * t, essences: { ...NO_ESSENCES, RARE: 2 * t, EPIC: t >= 3 ? 1 : 0 }, chances: { ...NO_CHANCE } };
     case 24:
       return {
         gold: 900 * t,
         shards: 5,
         splinters: 30 * t,
-        essences: { RARE: 5 * t, EPIC: 2 * t, LEGENDARY: t >= 3 ? t - 2 : 0, MYTHIC: t >= 4 ? 1 : 0 },
+        essences: { ...NO_ESSENCES, RARE: 4 * t, EPIC: Math.max(0, t - 1) },
+        chances: { LEGENDARY: t >= 4 ? 0.25 : t >= 3 ? 0.12 : 0, MYTHIC: t >= 4 ? 0.05 : 0 },
       };
   }
+}
+
+/** The prize actually paid: the sure part plus the chance rolls. */
+export function rollExpeditionPrize(prize: ExpeditionPrize, rng: () => number = Math.random): ExpeditionPrize {
+  const essences = { ...prize.essences };
+  if (prize.chances.LEGENDARY > 0 && rng() < prize.chances.LEGENDARY) essences.LEGENDARY += 1;
+  if (prize.chances.MYTHIC > 0 && rng() < prize.chances.MYTHIC) essences.MYTHIC += 1;
+  return { ...prize, essences };
 }
 
 // ── scout groups ────────────────────────────────────────────────────────
@@ -111,9 +130,10 @@ export interface ForgeRecipe {
 export const FORGE_RECIPES: readonly ForgeRecipe[] = [
   { itemId: "mosswood_charm", splinters: 20, essences: { ...NO_ESSENCES }, hours: 4 },
   { itemId: "ancient_core", splinters: 40, essences: { ...NO_ESSENCES, RARE: 6 }, hours: 8 },
-  { itemId: "hollow_sigil", splinters: 120, essences: { ...NO_ESSENCES, RARE: 15, EPIC: 10 }, hours: 24 },
-  { itemId: "wardens_eye", splinters: 300, essences: { ...NO_ESSENCES, EPIC: 25, LEGENDARY: 12 }, hours: 48 },
-  { itemId: "crown_of_the_hollow_king", splinters: 800, essences: { ...NO_ESSENCES, LEGENDARY: 40, MYTHIC: 20 }, hours: 96 },
+  // Epic and up: about a week, about a month and about two months of deep, full-day trips
+  { itemId: "hollow_sigil", splinters: 150, essences: { ...NO_ESSENCES, RARE: 20, EPIC: 30 }, hours: 24 },
+  { itemId: "wardens_eye", splinters: 400, essences: { ...NO_ESSENCES, EPIC: 40, LEGENDARY: 12 }, hours: 48 },
+  { itemId: "crown_of_the_hollow_king", splinters: 1000, essences: { ...NO_ESSENCES, LEGENDARY: 30, MYTHIC: 6 }, hours: 96 },
 ];
 
 export function getRecipe(itemId: string): ForgeRecipe | null {

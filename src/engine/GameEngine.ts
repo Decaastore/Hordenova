@@ -158,6 +158,7 @@ import {
   createExpeditionState,
   EXTRA_GROUP_PRICE,
   expeditionPrize,
+  rollExpeditionPrize,
   expeditionRegions,
   getRecipe,
   MAX_SCOUT_GROUPS,
@@ -2497,7 +2498,7 @@ export class GameEngine {
     const exp = this.expeditions.active[i];
     const region = exp ? expeditionRegions()[exp.regionIndex] : undefined;
     if (!exp || !region) return null;
-    const prize = expeditionPrize(region.tier, exp.hours);
+    const prize = rollExpeditionPrize(expeditionPrize(region.tier, exp.hours));
     this.gold += prize.gold;
     this.addGemShards(prize.shards, "expedition");
     this.expeditions = { ...this.expeditions, active: this.expeditions.active.filter((_, k) => k !== i) };

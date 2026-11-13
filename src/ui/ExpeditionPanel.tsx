@@ -73,7 +73,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
   const chips = (list: [MaterialKind, number | string, string][]) => (
     <span style={chipsRow}>
       {list.map(([k, n, label]) => (
-        <span key={k} style={chipStyleI} title={label}>
+        <span key={`${k}-${label}`} style={chipStyleI} title={label}>
           <MaterialIcon kind={k} size={15} title={label} /> {n}
         </span>
       ))}
@@ -85,6 +85,13 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
       ...(pr.shards > 0 ? ([["SHARDS", pr.shards, t("expeditions.shards", { n: pr.shards })]] as [MaterialKind, number, string][]) : []),
       ["SPLINTERS", pr.splinters, t("expeditions.splinters", { n: pr.splinters })],
       ...ESSENCE_RARITIES.filter((r) => pr.essences[r] > 0).map((r) => [r, pr.essences[r], t(`expeditions.essenceName.${r}` as TranslationKey)] as [MaterialKind, number, string]),
+      // Legendary/Mythic only ever come as a chance, shown as a percentage
+      ...(["LEGENDARY", "MYTHIC"] as const)
+        .filter((r) => pr.chances[r] > 0)
+        .map((r) => {
+          const pct = Math.round(pr.chances[r] * 100);
+          return [r, `${pct}%`, t("expeditions.chance", { name: t(`expeditions.essenceName.${r}` as TranslationKey), pct })] as [MaterialKind, string, string];
+        }),
     ]);
 
   const rushButtons = (msLeft: number, onRush: (c: GemCurrency) => void) => {

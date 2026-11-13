@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v125",
+    dateIso: "2026-11-13",
+    category: "BALANCE",
+    title: {
+      en: "Forge: Epic and up is now much harder to get",
+      ptBR: "Forja: do Épico para cima ficou bem mais difícil",
+    },
+    description: {
+      en: "Epic, Legendary and Mythic Essences are now rare on expeditions, and the top Forge items cost more. Hard, but always possible: about a week of deep trips for the Epic item, about a month for the Legendary and about two months for the Mythic.",
+      ptBR: "As Essências Épica, Lendária e Mítica agora são raras nas expedições, e os itens de cima da Forja custam mais. Difícil, mas sempre possível: cerca de uma semana de viagens fundas pelo item Épico, um mês pelo Lendário e dois meses pelo Mítico.",
+    },
+    highlights: [
+      {
+        en: "Epic Essence: only from 24h trips from the 2nd depth on (up to 3 per trip) or 8h trips in the deepest regions (1).",
+        ptBR: "Essência Épica: só em viagens de 24h a partir da 2ª profundidade (até 3 por viagem) ou de 8h nas regiões mais fundas (1).",
+      },
+      {
+        en: "Legendary and Mythic Essence are never guaranteed anymore: a 24h trip to the deepest regions has a 12–25% chance of a Legendary and a 5% chance of a Mythic, shown before you send it and rolled when you collect.",
+        ptBR: "Essência Lendária e Mítica não vêm mais garantidas: uma viagem de 24h às regiões mais fundas tem 12% a 25% de chance de uma Lendária e 5% de uma Mítica, mostradas antes de enviar e sorteadas na hora de coletar.",
+      },
+      {
+        en: "New Forge costs: Hollow Sigil 150 Splinters, 20 Rare, 30 Epic. Warden's Eye 400 Splinters, 40 Epic, 12 Legendary. Crown of the Hollow King 1000 Splinters, 30 Legendary, 6 Mythic.",
+        ptBR: "Novos custos da Forja: Sigilo Oco 150 Estilhaços, 20 Raras, 30 Épicas. Olho do Guardião 400 Estilhaços, 40 Épicas, 12 Lendárias. Coroa do Rei Oco 1000 Estilhaços, 30 Lendárias, 6 Míticas.",
+      },
+    ],
+  },
+  {
     id: "v124",
     dateIso: "2026-11-12",
     category: "ITEMS",
