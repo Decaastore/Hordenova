@@ -656,6 +656,17 @@ export const en = {
     pass: "Pass",
     passReady: "{n} Pass reward(s) to claim",
   },
+  modes: {
+    title: "Game modes",
+    seasonKicker: "Main mode · Season {n}",
+    seasonPitch: "Defend your castle wave after wave across the regions. It starts over every Season, and your best wave is your ranking.",
+    eternalPitch: "A castle that never resets: depths every 100 waves, weekly contracts and the Eternal Merchant.",
+    duelPitch: "One against one in 3 minutes: cards, mana, spells and trophies.",
+    colossusPitch: "This week's world boss: one life for everyone, rooms of 12, one tower each.",
+    record: "Your record",
+    ends: "Season ends in",
+    live: "Live now",
+  },
   menu: {
     subtitle: "Build. Upgrade. Survive.",
     description: "A dark fantasy frontier under siege. Raise towers, master the horde, and push back the dark for one more wave.",

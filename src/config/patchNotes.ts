@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v137",
+    dateIso: "2026-11-13",
+    category: "INTERFACE",
+    title: {
+      en: "New game mode picker",
+      ptBR: "Nova vitrine de modos de jogo",
+    },
+    description: {
+      en: "The Season page now opens with an illustrated card for each way to play, instead of text boxes further down the page.",
+      ptBR: "A página da Season agora abre com um cartão ilustrado para cada jeito de jogar, em vez de caixas de texto mais abaixo na página.",
+    },
+    highlights: [
+      {
+        en: "A big Season card with this Season's castle and land, then Eternal Mode, Duel and the Global Boss, each with its own art and colour.",
+        ptBR: "Um cartão grande da Season com o castelo e a terra desta Season, e depois Modo Eterno, Duelo e Boss Global, cada um com arte e cor próprias.",
+      },
+      {
+        en: "Each card shows two live figures (your record, rank, the Serpent's life, attempts left) and a play button; clicking the art plays too.",
+        ptBR: "Cada cartão mostra dois números ao vivo (seu recorde, patente, vida da Serpente, tentativas que restam) e um botão de jogar; clicar na arte também entra no modo.",
+      },
+      {
+        en: "The Global Boss card shows the Serpent moving live, with a \"Live now\" badge.",
+        ptBR: "O cartão do Boss Global mostra a Serpente se mexendo ao vivo, com o selo \"Ao vivo\".",
+      },
+    ],
+  },
+  {
     id: "v136",
     dateIso: "2026-11-13",
     category: "INTERFACE",

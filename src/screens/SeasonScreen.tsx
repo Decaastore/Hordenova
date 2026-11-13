@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { GameModes, type GameModeCard } from "@/ui/GameModes";
 import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
 import { ColossusAlert } from "@/ui/ColossusPromo";
 import { BeginnerSection } from "@/ui/RewardsPanels";
@@ -42,6 +43,9 @@ const THEME_ART: Record<string, string> = {
   FROZEN_REIGN: "frozen_tundra",
   STORMFALL: "floating_isles",
 };
+
+/** Castle art per theme ground (themes without their own castle use the forest one). */
+const CASTLE_ART: Record<string, string> = { ancient_forest: "ancient_forest", volcanic_wastes: "volcanic_wastes", frozen_tundra: "frozen_tundra", abyss: "abyss" };
 
 const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
 
@@ -87,6 +91,78 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
   const inRun = save.currentWave > 0 && save.towerLoadout.length > 0;
   const bossRecords = save.bossRecords && save.bossRecords.seasonNumber === status.seasonNumber ? Object.entries(save.bossRecords.assaultsByWave).sort((a, b) => Number(a[0]) - Number(b[0])) : [];
 
+  const duelRank = rankFor(save.duel.trophies);
+  const colossusLife = (worldState(save.colossus, Date.now()).fraction * 100).toFixed(1);
+  const modeCards: GameModeCard[] = [
+    {
+      id: "SEASON",
+      kicker: t("modes.seasonKicker", { n: status.seasonNumber }),
+      title: theme,
+      pitch: t("modes.seasonPitch"),
+      figures: [
+        { label: t("modes.record"), value: status.hasParticipated ? score : "—" },
+        { label: t("modes.ends"), value: formatDurationShort(status.timeRemainingMs) },
+      ],
+      cta: inRun ? t("season.continueRun", { wave: save.currentWave }) : t("season.startRun"),
+      onPlay,
+      testId: "play-season",
+      ground: art,
+      castle: CASTLE_ART[art] ?? "ancient_forest",
+    },
+    ...(onPlayEternal
+      ? [
+          {
+            id: "ETERNAL" as const,
+            kicker: t("eternal.kicker"),
+            title: t("eternal.title"),
+            pitch: t("modes.eternalPitch"),
+            figures: [
+              { label: t("eternal.record"), value: eternalCastle && eternalCastle.seasonBestWave > 0 ? t("eternal.waveN", { n: eternalCastle.seasonBestWave }) : "—" },
+              { label: t("eternal.depth"), value: eternalCastle ? romanDepth(depthOfWave(Math.max(1, eternalCastle.currentWave))) : "—" },
+            ],
+            cta: eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start"),
+            onPlay: onPlayEternal,
+            testId: "play-eternal",
+          },
+        ]
+      : []),
+    ...(onPlayDuel
+      ? [
+          {
+            id: "DUEL" as const,
+            kicker: t("duel.kicker"),
+            title: t("duel.title"),
+            pitch: t("modes.duelPitch"),
+            figures: [
+              { label: t("duel.rankLabel"), value: `${t(`duel.league.${duelRank.league}` as TranslationKey)}${duelRank.league === "MASTER" || duelRank.league === "LEGEND" ? "" : ` ${["", "I", "II", "III"][duelRank.division]}`}` },
+              { label: t("duel.trophies"), value: save.duel.trophies.toLocaleString(locale) },
+            ],
+            cta: t("duel.open"),
+            onPlay: onPlayDuel,
+            testId: "play-duel",
+          },
+        ]
+      : []),
+    ...(onPlayColossus
+      ? [
+          {
+            id: "COLOSSUS" as const,
+            kicker: t("colossus.kicker"),
+            title: t("colossus.title"),
+            pitch: t("modes.colossusPitch"),
+            figures: [
+              { label: t("colossus.cardLife"), value: `${colossusLife}%` },
+              { label: t("colossus.cardAttempts"), value: `${attemptsLeft(save.colossus, Date.now())}/${COLOSSUS_ATTEMPTS_PER_DAY}` },
+            ],
+            cta: t("colossus.open"),
+            onPlay: onPlayColossus,
+            testId: "play-colossus",
+            badge: `● ${t("modes.live")}`,
+          },
+        ]
+      : []),
+  ];
+
   return (
     <div className="pg-root">
       <style>{PAGE_CSS + ETERNAL_CSS}</style>
@@ -130,6 +206,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
         </header>
 
         <div className="pg-wrap">
+          <GameModes cards={modeCards} />
           <BeginnerSection />
           <dl className="pg-figures">
             <div>
@@ -153,98 +230,6 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
               <dd>{save.ascensionTop5}</dd>
             </div>
           </dl>
-
-          {onPlayEternal && (
-            <section className="et-card" data-testid="eternal-card">
-              <div className="et-text">
-                <p className="et-kicker">{t("eternal.kicker")}</p>
-                <h2 className="pg-h2">{t("eternal.title")}</h2>
-                <p className="pg-sub">{t("eternal.lead")}</p>
-                <dl className="et-figs">
-                  <div>
-                    <dt>{t("eternal.record")}</dt>
-                    <dd>{eternalCastle && eternalCastle.seasonBestWave > 0 ? t("eternal.waveN", { n: eternalCastle.seasonBestWave }) : "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>{t("eternal.depth")}</dt>
-                    <dd>{eternalCastle ? romanDepth(depthOfWave(Math.max(1, eternalCastle.currentWave))) : "—"}</dd>
-                  </div>
-                  <div>
-                    <dt>{t("eternal.marks")}</dt>
-                    <dd>{save.eternal.marks.toLocaleString(locale)}</dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="et-actions">
-                <button className="pg-btn" onClick={onPlayEternal} data-testid="play-eternal">
-                  {eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start")}
-                </button>
-                <small>{t("eternal.mergeNote")}</small>
-              </div>
-            </section>
-          )}
-
-          {onPlayDuel && (
-            <section className="et-card du-card" data-testid="duel-card">
-              <div className="et-text">
-                <p className="et-kicker du-kicker">{t("duel.kicker")}</p>
-                <h2 className="pg-h2">{t("duel.title")}</h2>
-                <p className="pg-sub">{t("duel.lead")}</p>
-                <dl className="et-figs">
-                  <div>
-                    <dt>{t("duel.trophies")}</dt>
-                    <dd>{save.duel.trophies.toLocaleString(locale)}</dd>
-                  </div>
-                  <div>
-                    <dt>{t("duel.rankLabel")}</dt>
-                    <dd>
-                      {t(`duel.league.${rankFor(save.duel.trophies).league}` as TranslationKey)}
-                      {rankFor(save.duel.trophies).league === "MASTER" || rankFor(save.duel.trophies).league === "LEGEND" ? "" : ` ${["", "I", "II", "III"][rankFor(save.duel.trophies).division]}`}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt>{t("duel.record")}</dt>
-                    <dd>
-                      {save.duel.wins}–{save.duel.losses}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="et-actions">
-                <button className="pg-btn" onClick={onPlayDuel} data-testid="play-duel">
-                  {t("duel.open")}
-                </button>
-                <small>{t("duel.fairNote")}</small>
-              </div>
-            </section>
-          )}
-
-          {onPlayColossus && (
-            <section className="et-card co-card" data-testid="colossus-card">
-              <div className="et-text">
-                <p className="et-kicker co-kicker2">{t("colossus.kicker")}</p>
-                <h2 className="pg-h2">{t("colossus.title")}</h2>
-                <p className="pg-sub">{t("colossus.cardLead")}</p>
-                <dl className="et-figs">
-                  <div>
-                    <dt>{t("colossus.cardLife")}</dt>
-                    <dd>{(worldState(save.colossus, Date.now()).fraction * 100).toFixed(1)}%</dd>
-                  </div>
-                  <div>
-                    <dt>{t("colossus.cardAttempts")}</dt>
-                    <dd>
-                      {attemptsLeft(save.colossus, Date.now())}/{COLOSSUS_ATTEMPTS_PER_DAY}
-                    </dd>
-                  </div>
-                </dl>
-              </div>
-              <div className="et-actions">
-                <button className="pg-btn" onClick={onPlayColossus} data-testid="play-colossus">
-                  {t("colossus.open")}
-                </button>
-              </div>
-            </section>
-          )}
 
           <SeasonPassSection />
 

@@ -657,6 +657,17 @@ export const ptBR: TranslationSchema = {
     pass: "Passe",
     passReady: "{n} recompensa(s) do Passe para resgatar",
   },
+  modes: {
+    title: "Modos de jogo",
+    seasonKicker: "Modo principal · Season {n}",
+    seasonPitch: "Defenda seu castelo onda após onda pelas regiões. Recomeça a cada Season, e sua melhor onda é a sua posição no ranking.",
+    eternalPitch: "Um castelo que nunca zera: profundidades a cada 100 ondas, contratos semanais e o Mercador Eterno.",
+    duelPitch: "Um contra um em 3 minutos: cartas, mana, feitiços e troféus.",
+    colossusPitch: "O chefe mundial da semana: uma vida só para todo mundo, salas de 12, uma torre cada.",
+    record: "Seu recorde",
+    ends: "A Season termina em",
+    live: "Ao vivo",
+  },
   menu: {
     subtitle: "Construa. Evolua. Sobreviva.",
     description: "Uma fronteira de fantasia sombria sob cerco. Erga torres, domine a horda e empurre a escuridão de volta por mais uma onda.",
