@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
@@ -42,6 +42,14 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
     return () => window.removeEventListener(PASS_CHANGED_EVENT, onChange);
   }, []);
   const passClaimable = getPassView().claimable.length;
+  // on narrow screens the links scroll sideways: keep the current page's link in view
+  const linksRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const box = linksRef.current;
+    const cur = box?.querySelector<HTMLElement>(".tn-link.is-active");
+    if (!box || !cur || box.scrollWidth <= box.clientWidth) return;
+    box.scrollLeft = Math.max(0, cur.offsetLeft - box.offsetLeft - (box.clientWidth - cur.offsetWidth) / 2);
+  }, [active]);
 
   const link = (view: NavView, label: string, extra?: { dot?: boolean; dotTitle?: string }) => (
     <button
@@ -62,7 +70,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
       <button className="tn-brand" onClick={() => onNavigate("HOME")} aria-label={t("nav.home")}>
         <BrandLogo height={30} decorative />
       </button>
-      <div className="tn-links">
+      <div className="tn-links" ref={linksRef}>
         {link("SEASON", t("nav.season"))}
         {link("PASS", t("nav.pass"), { dot: passClaimable > 0, dotTitle: t("nav.passReady", { n: passClaimable }) })}
         {link("RANKING", t("nav.ranking"))}
@@ -121,6 +129,8 @@ nav.tn .tn-link {
   color: ${PALETTE.uiTextDim}; transition: color 140ms ease, text-shadow 140ms ease;
 }
 nav.tn .tn-link:hover { color: ${PALETTE.uiAccentBright}; text-shadow: 0 0 12px rgba(255,207,94,0.5); }
+/* touch screens: a tapped link must not stay lit after the page changes */
+@media (hover: none) { nav.tn .tn-link:hover:not(.is-active) { color: ${PALETTE.uiTextDim}; text-shadow: none; } }
 nav.tn .tn-link.is-active { color: ${PALETTE.uiAccentBright}; text-shadow: 0 0 12px rgba(255,207,94,0.45); }
 nav.tn .tn-link.is-active::after { content: ""; position: absolute; left: 50%; bottom: 10px; width: 6px; height: 6px; background: ${PALETTE.uiAccent};
   transform: translateX(-50%) rotate(45deg); box-shadow: 0 0 8px ${PALETTE.uiAccent}; }

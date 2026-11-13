@@ -51,6 +51,13 @@ export const AUCTION_LISTING_FEE_BY_RARITY: Record<Rarity, number> = {
 };
 
 export const AUCTION_DURATION_HOURS = [12, 24, 48, 72] as const;
+
+/**
+ * Trading between players needs the online server (another player has to be
+ * there to buy). Until it exists, unlocking Trading is closed so nobody pays
+ * Gems for a market with no one else in it.
+ */
+export const MARKETPLACE_SERVER_ONLINE = false;
 export type AuctionDurationHours = (typeof AUCTION_DURATION_HOURS)[number];
 
 const HOUR_MS = 60 * 60 * 1000;

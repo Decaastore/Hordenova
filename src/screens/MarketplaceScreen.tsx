@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -172,6 +173,11 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
               {t("marketplace.trade.unlockPrompt", { free: getTradeUnlockPrice().free, purchased: getTradeUnlockPrice().purchased })}
             </p>
             <p style={tradeLockedExplainerStyle}>{t("marketplace.trade.priceHint")}</p>
+            {!MARKETPLACE_SERVER_ONLINE ? (
+              <p style={{ ...tradeLockedExplainerStyle, color: "#ffd56a", fontWeight: 700 }} data-testid="market-offline">
+                {t("marketplace.trade.offline")}
+              </p>
+            ) : (
             <DualGemPriceButtons
               price={getTradeUnlockPrice()}
               freeBalance={save.freeGems}
@@ -181,6 +187,7 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
                 setRefreshTick((n) => n + 1);
               }}
             />
+            )}
           </div>
         ) : (
           <>

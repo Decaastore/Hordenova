@@ -52,6 +52,9 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
  * the top five will earn. No backend yet, so nothing about other players
  * is ever invented (same stance as RankingScreen.tsx).
  */
+/** The tester-only Season reset shows in development, or on the live site with ?testes in the address. */
+const SHOW_TESTING_TOOLS = import.meta.env.DEV || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("testes"));
+
 export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, onPlayColossus }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
@@ -322,7 +325,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
           </div>
 
           {/* Tester-only full season reset, confirm-gated before any save write. */}
-          <details className="pg-danger" style={{ marginBottom: 64 }}>
+          {SHOW_TESTING_TOOLS && <details className="pg-danger" style={{ marginBottom: 64 }}>
             <summary>{t("season.testingTitle")}</summary>
             <p>{t("season.testingReset.confirm")}</p>
             {confirmingReset ? (
@@ -346,7 +349,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
                 {t("season.testingReset.button")}
               </button>
             )}
-          </details>
+          </details>}
         </div>
       </div>
 

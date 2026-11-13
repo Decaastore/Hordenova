@@ -144,6 +144,17 @@ export function ColossusAlert({ onOpen }: { onOpen: () => void }) {
     const id = window.setTimeout(() => setKind(due), 900);
     return () => window.clearTimeout(id);
   }, [st.week]);
+  // Escape closes it, like "later"
+  useEffect(() => {
+    if (!kind) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      markSeen(`w${st.week}:${kind}`);
+      setKind(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [kind, st.week]);
   if (!kind) return null;
   const close = () => {
     markSeen(`w${st.week}:${kind}`);

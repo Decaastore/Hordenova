@@ -538,6 +538,8 @@ const HOME_CSS = `
   .hn-footer { grid-template-columns: 1fr; }
 }
 @media (max-width: 480px) {
+  /* phones: the hero copy fills the screen, so the scene caption would sit on top of it */
+  .hn-scene { display: none; }
   .hn-towers { grid-template-columns: 1fr; }
   .hn-cta-row > button { flex: 1 1 auto; }
 }

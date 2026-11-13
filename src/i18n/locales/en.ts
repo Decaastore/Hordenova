@@ -108,6 +108,7 @@ export const en = {
     loginClaimed: "Come back tomorrow for day {n}",
     loginModalTitle: "Day {n} reward",
     loginModalLead: "Thanks for coming back! Claim today's reward.",
+    loginModalLeadFirst: "Welcome to Horde Nova! Open the game every day for a reward; claim the first one now.",
     loginGot: "Received!",
     close: "Close",
     beginnerTitle: "First steps",
@@ -2066,7 +2067,7 @@ export const en = {
     VERDANT_HOLD: { name: "Verdant Hold", description: "A tree castle: the keep and the side towers are giant trunks with crowns, roots, ivy, flowers and fireflies." },
     VOID_SPIRE: { name: "Void Spire", description: "A void spire: tall dark needles, floating crystals, a purple portal behind and glowing obelisks. Bestiary album reward, never sold." },
     RECRUIT_KEEP: { name: "Recruit's Keep", description: "A wooden fort: palisade, square towers, crates, hay and red banners. First Steps reward, never sold." },
-    OBSIDIAN_BASTION: { name: "Obsidian Bastion", description: "Dark volcanic stone replaces the fortress's usual masonry. Purely cosmetic — never HP, damage, or resistance." },
+    OBSIDIAN_BASTION: { name: "Obsidian Bastion", description: "A squat black-glass bastion with flat battlements, floating obsidian shards, jade runes and a still dark moat. Purely cosmetic — never HP, damage, or resistance." },
     PRESTIGE_ETERNAL_BASTION: { name: "Eternal Bastion", description: "Gilded, radiant stonework exclusive to Prestige 100 — never sold, never spun for. Purely cosmetic — never HP, damage, or resistance." },
   },
   goldSinks: {
@@ -2377,6 +2378,7 @@ export const en = {
       useFree: "USE FREE GEMS",
       usePurchased: "USE PURCHASED GEMS",
       unlockFailed: "Couldn't unlock Trading — please try again.",
+      offline: "Trading between players opens when Horde Nova goes online. Until then Trading can't be unlocked, so no Gems are spent on it.",
       unlockedBadge: "Trading Unlocked",
     },
     tabs: {

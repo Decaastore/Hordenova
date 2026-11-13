@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
@@ -108,18 +108,27 @@ export function DailyLoginModal({ onClosed }: { onClosed?: () => void }) {
   const [save, setSave] = useState<SaveData>(() => loadSave());
   const [open, setOpen] = useState(() => canClaimLogin(loadSave().dailyLogin, Date.now()));
   const [got, setGot] = useState(false);
-  if (!open) return null;
   const close = () => {
     setOpen(false);
     onClosed?.();
   };
+  // Escape closes it (the reward stays waiting on the Account page)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  if (!open) return null;
   const day = got ? (save.dailyLogin.step === 0 ? 7 : save.dailyLogin.step) : save.dailyLogin.step + 1;
   return (
     <div className="rw-overlay" role="dialog" aria-modal="true" data-testid="login-modal">
       <style>{REWARDS_CSS}</style>
       <div className="rw-modal">
         <h2>{t("rewards.loginModalTitle", { n: day })}</h2>
-        <p>{t("rewards.loginModalLead")}</p>
+        <p>{t(save.dailyLogin.lastDay < 0 && !got ? "rewards.loginModalLeadFirst" : "rewards.loginModalLead")}</p>
         <LoginStrip save={save} />
         <div className="rw-modal-actions">
           {!got ? (

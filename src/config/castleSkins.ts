@@ -35,7 +35,7 @@ export interface CastleSkinPaletteOverride {
 }
 
 export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER";
-export type CastleSkinAura = "EMBER" | "FROST" | "SOLAR" | "VERDANT" | "VOID" | "BANNERS";
+export type CastleSkinAura = "EMBER" | "FROST" | "SOLAR" | "VERDANT" | "VOID" | "BANNERS" | "SHARDS";
 
 export interface CastleSkinDefinition {
   id: string;
@@ -65,10 +65,10 @@ export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
     i18nKey: "OBSIDIAN_BASTION",
     paletteOverride: { rock: "#2e2734", rockDark: "#130f18" },
     source: "ROULETTE",
-    tint: "#2a2036",
+    tint: "#1c2a2c",
     tintStrength: 0.75,
-    glow: "#ff8a3a",
-    aura: "EMBER",
+    glow: "#5af0d8",
+    aura: "SHARDS",
   },
   {
     id: PRESTIGE_CASTLE_SKIN_ID,

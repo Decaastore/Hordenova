@@ -70,6 +70,64 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v135",
+    dateIso: "2026-11-13",
+    category: "INTERFACE",
+    title: {
+      en: "Polish pass: Marketplace, pop-ups, phones and first visit",
+      ptBR: "Revisão geral: Mercado, pop-ups, celular e primeira visita",
+    },
+    description: {
+      en: "A round of fixes found by going through every page and playing a Season run from the start.",
+      ptBR: "Uma rodada de correções encontradas percorrendo todas as páginas e jogando uma partida da Season desde o começo.",
+    },
+    highlights: [
+      {
+        en: "Marketplace: Trading can't be unlocked until Horde Nova is online, since there is nobody else to trade with yet, so no Gems get spent on it. The page says so.",
+        ptBR: "Mercado: as Trocas não podem ser desbloqueadas até o Horde Nova estar online, já que ainda não há com quem trocar, então nenhuma Gema é gasta nisso. A página avisa.",
+      },
+      {
+        en: "The daily reward and Global Boss pop-ups now close with Esc, and a brand-new player gets a welcome instead of \"thanks for coming back\".",
+        ptBR: "Os pop-ups da recompensa diária e do Boss Global agora fecham com Esc, e quem joga pela primeira vez recebe boas-vindas em vez de \"obrigado por voltar\".",
+      },
+      {
+        en: "Phones: the top menu scrolls to the page you're on, a tapped link no longer stays lit, and the Home caption no longer covers the Season banner.",
+        ptBR: "Celular: o menu do topo rola até a página em que você está, o link tocado não fica mais aceso, e a legenda da Home não cobre mais o aviso da Season.",
+      },
+      {
+        en: "The Season page's testing tools and the unfinished online-account box are hidden from players.",
+        ptBR: "As ferramentas de teste da página da Season e o quadro da conta online, que ainda não existe, ficaram escondidos dos jogadores.",
+      },
+    ],
+  },
+  {
+    id: "v134",
+    dateIso: "2026-11-13",
+    category: "CASTLE",
+    title: {
+      en: "Obsidian Bastion rebuilt as its own fortress",
+      ptBR: "Bastião de Obsidiana reconstruído como fortaleza própria",
+    },
+    description: {
+      en: "The Obsidian Bastion looked too much like the Infernal Keep. It's now a different building with its own colour.",
+      ptBR: "O Bastião de Obsidiana estava parecido demais com a Fortaleza Infernal. Agora é outra construção, com cor própria.",
+    },
+    highlights: [
+      {
+        en: "A squat black-glass bastion with square towers and flat battlements, instead of tall red spires.",
+        ptBR: "Um bastião baixo de vidro negro, com torres quadradas e ameias planas, em vez de torres altas e vermelhas.",
+      },
+      {
+        en: "Obsidian shards float over the keep and towers, jade runes glow on the walls, black monoliths stand around it and a still dark moat replaces the lava.",
+        ptBR: "Fragmentos de obsidiana flutuam sobre a torre central e as torres, runas de jade brilham nas paredes, monólitos negros cercam o castelo e um fosso escuro e parado substitui a lava.",
+      },
+      {
+        en: "Its living effect is now small black-glass shards drifting up in jade light, instead of embers.",
+        ptBR: "O efeito em volta agora são pequenos fragmentos de vidro negro subindo com luz de jade, em vez de brasas.",
+      },
+    ],
+  },
+  {
     id: "v133",
     dateIso: "2026-11-13",
     category: "INTERFACE",

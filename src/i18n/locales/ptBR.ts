@@ -109,6 +109,7 @@ export const ptBR: TranslationSchema = {
     loginClaimed: "Volte amanhã para o dia {n}",
     loginModalTitle: "Recompensa do dia {n}",
     loginModalLead: "Obrigado por voltar! Pegue sua recompensa de hoje.",
+    loginModalLeadFirst: "Bem-vindo ao Horde Nova! Abra o jogo todo dia para ganhar uma recompensa; pegue a primeira agora.",
     loginGot: "Recebido!",
     close: "Fechar",
     beginnerTitle: "Primeiros passos",
@@ -2067,7 +2068,7 @@ export const ptBR: TranslationSchema = {
     VERDANT_HOLD: { name: "Bastião Verdejante", description: "Um castelo-árvore: a torre principal e as laterais são troncos gigantes com copas, raízes, hera, flores e vaga-lumes." },
     VOID_SPIRE: { name: "Torre do Vazio", description: "Uma torre do vazio: agulhas altas e escuras, cristais flutuando, um portal roxo atrás e obeliscos brilhantes. Prêmio do álbum do Bestiário, nunca vendido." },
     RECRUIT_KEEP: { name: "Fortim do Recruta", description: "Um forte de madeira: paliçada, torres quadradas, caixotes, feno e estandartes vermelhos. Prêmio dos Primeiros Passos, nunca vendido." },
-    OBSIDIAN_BASTION: { name: "Bastião de Obsidiana", description: "Pedra vulcânica escura substitui a alvenaria padrão da fortaleza. Puramente cosmético — nunca altera HP, dano ou resistência." },
+    OBSIDIAN_BASTION: { name: "Bastião de Obsidiana", description: "Um bastião baixo de vidro negro, com ameias planas, fragmentos de obsidiana flutuando, runas de jade e um fosso escuro e parado. Puramente cosmético — nunca altera HP, dano ou resistência." },
     PRESTIGE_ETERNAL_BASTION: { name: "Bastião Eterno", description: "Alvenaria dourada e radiante, exclusiva do Prestígio 100 — nunca vendida, nunca sorteada. Puramente cosmético — nunca altera HP, dano ou resistência." },
   },
   goldSinks: {
@@ -2378,6 +2379,7 @@ export const ptBR: TranslationSchema = {
       useFree: "USAR GEMAS GRÁTIS",
       usePurchased: "USAR GEMAS COMPRADAS",
       unlockFailed: "Não foi possível desbloquear as Trocas — tente novamente.",
+      offline: "As trocas entre jogadores abrem quando o Horde Nova estiver online. Até lá não dá para desbloquear as Trocas, então nenhuma Gema é gasta nisso.",
       unlockedBadge: "Trocas Desbloqueadas",
     },
     tabs: {

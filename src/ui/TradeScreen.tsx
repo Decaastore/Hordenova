@@ -1,4 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
+import { MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -65,15 +66,19 @@ export function TradeScreen() {
             <li key={key}>✓ {t(`trade.unlockChecklist.${key}` as TranslationKey)}</li>
           ))}
         </ul>
-        <DualGemPriceButtons
-          price={price}
-          freeBalance={save.freeGems}
-          purchasedBalance={save.purchasedGems}
-          onPay={(currency) => {
-            unlockTrade(currency);
-            bump();
-          }}
-        />
+        {MARKETPLACE_SERVER_ONLINE ? (
+          <DualGemPriceButtons
+            price={price}
+            freeBalance={save.freeGems}
+            purchasedBalance={save.purchasedGems}
+            onPay={(currency) => {
+              unlockTrade(currency);
+              bump();
+            }}
+          />
+        ) : (
+          <p style={{ color: "#ffd56a", fontWeight: 700, fontSize: 13, margin: "10px 0 0" }}>{t("marketplace.trade.offline")}</p>
+        )}
       </div>
     );
   }

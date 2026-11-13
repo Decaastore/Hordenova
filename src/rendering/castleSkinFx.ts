@@ -135,6 +135,31 @@ export function drawCastleSkinAura(ctx: CanvasRenderingContext2D, skin: CastleSk
         ctx.fill();
         break;
       }
+      case "SHARDS": {
+        // small black-glass shards drifting up around the walls, catching jade light
+        if (i >= 10) break;
+        const y = bottom - ph * (bottom - top + 10);
+        const x = x0 + Math.sin(t * 0.8 + i) * 6;
+        const rot = t * (0.6 + hash(i + 5)) + i;
+        const sz = 2.2 + hash(i + 9) * 2;
+        const a = Math.sin(ph * Math.PI);
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.fillStyle = `rgba(12,16,20,${0.9 * a})`;
+        ctx.strokeStyle = `rgba(110,255,232,${0.85 * a})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(0, -sz * 1.6);
+        ctx.lineTo(sz * 0.7, 0);
+        ctx.lineTo(0, sz * 1.6);
+        ctx.lineTo(-sz * 0.7, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        break;
+      }
       case "BANNERS":
         break;
     }
