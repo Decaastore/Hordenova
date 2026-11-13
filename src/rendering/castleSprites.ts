@@ -1,4 +1,5 @@
 import type { Vector2 } from "@/utils/geometry";
+import { CASTLE_SKIN_ANCHORS } from "./castleSkinMeta";
 
 /**
  * REALISTIC CASTLE — the fortress at the end of the road is a detailed 3D
@@ -72,6 +73,32 @@ export function getCastleSprite(biomeId: string, tier: number): HTMLImageElement
   return images.get(`${dressing}_${Math.min(4, Math.max(1, tier))}`);
 }
 
+// ── SKINS DE CASTELO — each skin is its own rendered building ─────────────
+const skinImages = new Map<string, HTMLImageElement>();
+const skinRequested = new Set<string>();
+
+/** The rendered castle for a skin + tier, or undefined while loading / for a skin without its own render. */
+export function getCastleSkinSprite(skinId: string, tier: number): HTMLImageElement | undefined {
+  if (!CASTLE_SKIN_ANCHORS[skinId]) return undefined;
+  if (!skinRequested.has(skinId) && typeof Image !== "undefined") {
+    skinRequested.add(skinId);
+    for (let t = 1; t <= 4; t++) {
+      const img = new Image();
+      img.decoding = "async";
+      const key = `${skinId}_${t}`;
+      img.onload = () => skinImages.set(key, img);
+      img.src = `${base()}sprites/castle/skin_${skinId.toLowerCase()}_${t}.webp`;
+    }
+  }
+  return skinImages.get(`${skinId}_${Math.min(4, Math.max(1, tier))}`);
+}
+
+let anchorSkin: string | null = null;
+/** While a skin's own render is drawn, its anchor points (banners, windows, torches) come from that render. */
+export function setCastleAnchorSkin(skinId: string | null): void {
+  anchorSkin = skinId && CASTLE_SKIN_ANCHORS[skinId] ? skinId : null;
+}
+
 /** Top-left of the image in fortress-local space. */
 export function castleSpriteOrigin(): Vector2 {
   const b = ANCHORS_INTACT.base!;
@@ -80,7 +107,8 @@ export function castleSpriteOrigin(): Vector2 {
 
 /** An anchor point (banner pole tip, torch, window, gate, crystal...) in fortress-local space. */
 export function castleAnchor(name: string, tier: number): Vector2 {
-  const set = tier >= 3 ? ANCHORS_BROKEN : ANCHORS_INTACT;
+  const skinSet = anchorSkin ? CASTLE_SKIN_ANCHORS[anchorSkin]?.[String(Math.min(4, Math.max(1, tier)))] : undefined;
+  const set = skinSet ?? (tier >= 3 ? ANCHORS_BROKEN : ANCHORS_INTACT);
   const a = set[name] ?? ANCHORS_INTACT[name] ?? [0.5, 0.5];
   const o = castleSpriteOrigin();
   return { x: o.x + a[0] * CASTLE_SPRITE_SIZE, y: o.y + a[1] * CASTLE_SPRITE_SIZE };

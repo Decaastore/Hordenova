@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v129",
+    dateIso: "2026-11-13",
+    category: "CASTLE",
+    title: {
+      en: "Castle skins are now whole new castles",
+      ptBR: "Skins de castelo agora são castelos inteiros novos",
+    },
+    description: {
+      en: "Every castle skin is now its own building instead of a recolour, with its own shapes, materials and details, and its own damage stages as the castle takes hits.",
+      ptBR: "Cada skin de castelo agora é uma construção própria em vez de só mudar a cor, com formas, materiais e detalhes próprios, e com os próprios estágios de dano quando o castelo apanha.",
+    },
+    highlights: [
+      {
+        en: "Frost Citadel is an ice palace with crystal towers; Infernal Keep a volcanic fortress with horned towers and a lava moat; Solar Sanctum a marble temple with golden domes; Verdant Hold a castle of giant trees.",
+        ptBR: "A Cidadela de Gelo é um palácio de gelo com torres de cristal; a Fortaleza Infernal, uma fortaleza vulcânica com torres de chifres e fosso de lava; o Santuário Solar, um templo de mármore com cúpulas douradas; o Bastião Verdejante, um castelo de árvores gigantes.",
+      },
+      {
+        en: "Void Spire has tall dark needles, floating crystals and a portal; Recruit's Keep is a wooden fort with a palisade; the Obsidian and Eternal Bastions got their own buildings too.",
+        ptBR: "A Torre do Vazio tem agulhas escuras, cristais flutuando e um portal; o Fortim do Recruta é um forte de madeira com paliçada; os Bastiões de Obsidiana e Eterno também ganharam construções próprias.",
+      },
+    ],
+  },
+  {
     id: "v128",
     dateIso: "2026-11-13",
     category: "SYSTEMS",

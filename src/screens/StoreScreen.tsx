@@ -248,7 +248,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
             <p className="pg-sub">{t("store.castleSub")}</p>
             <div className="st-castles">
               <article className={`st-castle${save.equippedCastleSkinId === null ? " is-on" : ""}`}>
-                <CastleSkinPreview skinId={null} />
+                <CastleSkinPreview skinId={null} size={180} />
                 <h3>{t("store.castleDefault")}</h3>
                 <p className="st-castle-how">{t("store.castleDefaultHow")}</p>
                 <button className="st-pay" disabled={save.equippedCastleSkinId === null} onClick={() => onEquipCastle(null)}>
@@ -261,7 +261,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                 const price = castleSkinPrice(c.id);
                 return (
                   <article key={c.id} className={`st-castle${on ? " is-on" : ""}`} data-testid={`castle-${c.id}`}>
-                    <CastleSkinPreview skinId={c.id} />
+                    <CastleSkinPreview skinId={c.id} size={180} />
                     <h3>{t(`castleSkins.${c.i18nKey}.name` as TranslationKey)}</h3>
                     <p className="st-castle-how">{owned ? t("store.owned") : t(`store.castleHow.${c.source}` as TranslationKey)}</p>
                     {owned ? (
@@ -448,7 +448,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 }
 
 const STORE_CSS = `
-.st-castles { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 14px; }
+.st-castles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 14px; }
 .st-castle { display: grid; justify-items: center; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); text-align: center; }
 .st-castle.is-on { border-color: var(--gold); box-shadow: 0 0 0 1px rgba(232,176,75,0.4); }
 .st-castle h3 { margin: 0; font-family: var(--display); font-size: 17px; color: var(--bone); }

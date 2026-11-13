@@ -11,7 +11,7 @@ import { PALETTE } from "./theme";
 import { drawEnergyCrack, drawFloatingMotes } from "./lighting";
 import type { AtmosphereKind, BiomeDefinition } from "./biomes";
 import { getMapDecorations, type Decoration, type DecorationKind } from "./mapDecorations";
-import { castleAnchor, castleSpriteOrigin, CASTLE_SPRITE_SIZE, getCastleSprite } from "./castleSprites";
+import { castleAnchor, castleSpriteOrigin, CASTLE_SPRITE_SIZE, getCastleSkinSprite, getCastleSprite, setCastleAnchorSkin } from "./castleSprites";
 
 /**
  * Pure drawing helpers — world-space coordinates in, pixels on screen out
@@ -1119,6 +1119,17 @@ export function drawFortress(
   // loading (or wherever images can't load).
   const castleTier = getCastleHpTier(hpPercent);
   const castleImage = skipBody ? undefined : getCastleSprite(biome.id, castleTier);
+  // SKINS DE CASTELO — a skin with its own rendered building replaces the biome castle outright
+  const skinImage = !skipBody && skin ? getCastleSkinSprite(skin.id, castleTier) : undefined;
+  if (skinImage) {
+    setCastleAnchorSkin(skin!.id);
+    drawRealisticCastle(ctx, skinImage, castleTier, biome, p.accentGlow, timeMs, windIntensity, hpPercent, null);
+    drawCastleSkinAura(ctx, skin!, castleTier, timeMs);
+    const torches = [castleAnchor("keepWindow", castleTier), castleAnchor("torchL", castleTier), castleAnchor("torchR", castleTier), castleAnchor("core", castleTier)];
+    setCastleAnchorSkin(null);
+    ctx.restore();
+    return { torches };
+  }
   if (castleImage) {
     drawRealisticCastle(ctx, castleImage, castleTier, biome, p.accentGlow, timeMs, windIntensity, hpPercent, skin);
     if (skin) drawCastleSkinAura(ctx, skin, castleTier, timeMs);
