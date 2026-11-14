@@ -27,6 +27,8 @@ interface SeasonScreenProps {
   onPlay: () => void;
   /** MODO ETERNO — opens the Eternal castle. */
   onPlayEternal?: () => void;
+  /** Opens the Eternal castle straight on the Eternal Merchant. */
+  onOpenEternalMerchant?: () => void;
   /** DUELO — opens the Duel lobby. */
   onPlayDuel?: () => void;
   /** CHEFE GLOBAL — opens the Serpent of the Eclipse. */
@@ -59,7 +61,7 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
 /** The tester-only Season reset shows in development, or on the live site with ?testes in the address. */
 const SHOW_TESTING_TOOLS = import.meta.env.DEV || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("testes"));
 
-export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, onPlayColossus }: SeasonScreenProps) {
+export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalMerchant, onPlayDuel, onPlayColossus }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
@@ -119,10 +121,12 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onPlayDuel, on
             figures: [
               { label: t("eternal.record"), value: eternalCastle && eternalCastle.seasonBestWave > 0 ? t("eternal.waveN", { n: eternalCastle.seasonBestWave }) : "—" },
               { label: t("eternal.depth"), value: eternalCastle ? romanDepth(depthOfWave(Math.max(1, eternalCastle.currentWave))) : "—" },
+              { label: t("modes.marks"), value: save.eternal.marks.toLocaleString(locale) },
             ],
             cta: eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start"),
             onPlay: onPlayEternal,
             testId: "play-eternal",
+            ...(onOpenEternalMerchant ? { extra: { label: t("modes.merchant"), onClick: onOpenEternalMerchant, testId: "open-eternal-merchant" } } : {}),
           },
         ]
       : []),

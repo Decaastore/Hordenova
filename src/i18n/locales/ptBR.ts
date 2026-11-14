@@ -667,6 +667,8 @@ export const ptBR: TranslationSchema = {
     record: "Seu recorde",
     ends: "A Season termina em",
     live: "Ao vivo",
+    marks: "Marcas Eternas",
+    merchant: "Mercador Eterno",
   },
   menu: {
     subtitle: "Construa. Evolua. Sobreviva.",

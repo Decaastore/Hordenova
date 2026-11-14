@@ -91,9 +91,11 @@ interface GameScreenProps {
   onExitToMenu: () => void;
   /** Leaves the game for the Store page (the HUD's Gem balances). */
   onOpenStore?: () => void;
+  /** Eternal: open the Eternal panel on the Merchant tab right away. */
+  openMerchant?: boolean;
 }
 
-export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameScreenProps) {
+export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMerchant = false }: GameScreenProps) {
   const { engine, hud } = useGameEngine(mode === "ETERNAL" ? ETERNAL_STORAGE_KEY : undefined);
   const tabPresence = useTabPresence(hud);
   useGameAudio(engine);
@@ -120,7 +122,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
   const [riftOpen, setRiftOpen] = useState(false);
   const [talentsOpen, setTalentsOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
-  const [eternalOpen, setEternalOpen] = useState(false);
+  const [eternalOpen, setEternalOpen] = useState(openMerchant);
   const [expeditionsOpen, setExpeditionsOpen] = useState<null | "trips" | "forge">(null);
   const mapAreaRef = useRef<HTMLDivElement>(null);
 
@@ -736,6 +738,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore }: GameS
             onClaim={(id) => engine.claimEternalContract(id)}
             onBuy={(id) => engine.buyFromMerchant(id)}
             onClose={() => setEternalOpen(false)}
+            initialTab={openMerchant ? "merchant" : "contracts"}
           />
         )}
         {bestiaryOpen && (

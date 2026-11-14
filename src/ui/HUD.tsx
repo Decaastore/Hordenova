@@ -183,7 +183,7 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (
-            <button onClick={onToggleEternal} className="hh-btn hh-rift" data-testid="eternal-button" title={t("eternal.tooltip")}>
+            <button onClick={onToggleEternal} className="hh-btn hh-rift hh-eternal-btn" data-testid="eternal-button" title={t("eternal.tooltip")}>
               <span aria-hidden="true" className="hh-rift-glyph">◆</span>
               <span className="hh-btn-txt">{t("eternal.button")}</span>
               {hud.eternal.contractsReady > 0 && <span className="hh-badge is-rift">{hud.eternal.contractsReady}</span>}
@@ -530,7 +530,11 @@ div.hh-brand { cursor: default; }
   .hh-wallet { flex: 0 0 100%; gap: 12px; flex-wrap: wrap; }
   .hh-sub { padding: 5px 12px 6px; }
   .hh-status { font-size: 11.5px; }
-  .hh-controls { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding: 6px 2px 2px; scrollbar-width: none; }
+  .hh-controls { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; padding: 6px 2px 2px; scrollbar-width: none; -webkit-mask-image: linear-gradient(90deg, #000 85%, transparent); mask-image: linear-gradient(90deg, #000 85%, transparent); }
+  /* the row scrolls sideways on phones: in the Eternal castle its own button comes right after the speed */
+  .hh-controls > * { order: 1; }
+  .hh-controls > :first-child { order: -2; }
+  .hh-controls > .hh-eternal-btn { order: -1; }
   .hh-controls::-webkit-scrollbar { display: none; }
   .hh-hide-sm { display: none; }
 }

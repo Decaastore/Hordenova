@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v138",
+    dateIso: "2026-11-13",
+    category: "INTERFACE",
+    title: {
+      en: "The Eternal Merchant is easier to find",
+      ptBR: "Mercador Eterno mais fácil de achar",
+    },
+    description: {
+      en: "The Eternal Merchant was tucked behind a small tab inside the Eternal castle. Now there are clearer ways to reach it.",
+      ptBR: "O Mercador Eterno ficava escondido numa aba pequena dentro do castelo Eterno. Agora dá para chegar nele por caminhos mais claros.",
+    },
+    highlights: [
+      {
+        en: "The Eternal Mode card on the Season page has an \"Eternal Merchant\" button that opens the castle straight on the merchant, and shows your Eternal Marks.",
+        ptBR: "O cartão do Modo Eterno na página da Season tem o botão \"Mercador Eterno\", que abre o castelo direto no mercador, e mostra suas Marcas Eternas.",
+      },
+      {
+        en: "The Eternal panel's three tabs (contracts, milestones, merchant) are now clear buttons side by side.",
+        ptBR: "As três abas do painel Eterno (contratos, marcos, mercador) agora são botões claros, lado a lado.",
+      },
+      {
+        en: "On phones, the ETERNAL button comes right after the speed buttons in the Eternal castle, and the button row fades at the edge to show it scrolls.",
+        ptBR: "No celular, o botão ETERNO vem logo depois dos botões de velocidade no castelo Eterno, e a fileira de botões esmaece na borda para mostrar que rola.",
+      },
+    ],
+  },
+  {
     id: "v137",
     dateIso: "2026-11-13",
     category: "INTERFACE",

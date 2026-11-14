@@ -30,6 +30,8 @@ export interface GameModeCard {
   ground?: string;
   castle?: string;
   badge?: string;
+  /** A second, quieter button under the main one (e.g. the Eternal Merchant). */
+  extra?: { label: string; onClick: () => void; testId: string };
 }
 
 function Art({ card }: { card: GameModeCard }): ReactNode {
@@ -100,9 +102,16 @@ export function GameModes({ cards }: { cards: GameModeCard[] }) {
                   </div>
                 ))}
               </dl>
-              <button className="gm-play" onClick={c.onPlay} data-testid={c.testId}>
-                {c.cta}
-              </button>
+              <div className="gm-actions">
+                <button className="gm-play" onClick={c.onPlay} data-testid={c.testId}>
+                  {c.cta}
+                </button>
+                {c.extra && (
+                  <button className="gm-extra" onClick={c.extra.onClick} data-testid={c.extra.testId}>
+                    {c.extra.label}
+                  </button>
+                )}
+              </div>
             </div>
           </article>
         ))}
@@ -157,6 +166,10 @@ const GM_CSS = `
 .gm-figs dt { font-size: 11.5px; color: var(--ash-2); }
 .gm-figs dd { margin: 0; font-family: var(--display); font-size: 20px; color: #fbefd6; font-variant-numeric: tabular-nums; }
 .gm-play { justify-self: start; margin-top: 4px; padding: 12px 22px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--c1) 80%, #fff); cursor: pointer; font-weight: 800; font-size: 15px; color: #1a0f04 !important; background: linear-gradient(180deg, color-mix(in srgb, var(--c1) 70%, #fff), var(--c1)); box-shadow: 0 0 0 1px rgba(0,0,0,0.3), 0 6px 18px var(--glow); transition: filter 0.15s ease, transform 0.15s ease; }
+.gm-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 4px; }
+.gm-extra { padding: 11px 16px; border-radius: 10px; border: 1px solid var(--c1); background: rgba(0,0,0,0.35); color: #fbefd6 !important; font-weight: 700; font-size: 14px; cursor: pointer; }
+.gm-extra:hover { background: color-mix(in srgb, var(--c1) 22%, rgba(0,0,0,0.35)); }
+.gm-extra:focus-visible { outline: 2px solid #fff3d0; outline-offset: 3px; }
 .gm-play:hover { filter: brightness(1.1); transform: translateY(-1px); }
 .gm-play:focus-visible { outline: 2px solid #fff3d0; outline-offset: 3px; }
 .gm-card.is-SEASON .gm-play { font-size: 17px; padding: 14px 28px; }
@@ -178,6 +191,6 @@ const GM_CSS = `
   .gm-card.is-SEASON .gm-art::after { background: linear-gradient(180deg, transparent 45%, rgba(15,11,7,0.95)); }
   .gm-card.is-SEASON .gm-body { padding: 18px 20px 20px; }
   .gm-card.is-SEASON .gm-title { font-size: 30px; }
-  .gm-play { justify-self: stretch; }
+  .gm-play, .gm-extra { flex: 1 1 100%; }
 }
 `;

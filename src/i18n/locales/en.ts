@@ -666,6 +666,8 @@ export const en = {
     record: "Your record",
     ends: "Season ends in",
     live: "Live now",
+    marks: "Eternal Marks",
+    merchant: "Eternal Merchant",
   },
   menu: {
     subtitle: "Build. Upgrade. Survive.",

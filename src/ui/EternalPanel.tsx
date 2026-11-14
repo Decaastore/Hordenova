@@ -19,6 +19,8 @@ import {
 type Contract = ContractDef & { progress: number; done: boolean; claimed: boolean };
 
 interface EternalPanelProps {
+  /** Which tab opens first (the Season page's "Eternal Merchant" button opens the merchant). */
+  initialTab?: "contracts" | "milestones" | "merchant";
   marks: number;
   record: number;
   currentWave: number;
@@ -32,9 +34,9 @@ interface EternalPanelProps {
 const VIOLET = "#c9a2ff";
 
 /** MODO ETERNO — weekly contracts, record milestones/depths and the Eternal Merchant (config/eternal.ts). */
-export function EternalPanel({ marks, record, currentWave, contracts, milestonesClaimed, onClaim, onBuy, onClose }: EternalPanelProps) {
+export function EternalPanel({ marks, record, currentWave, contracts, milestonesClaimed, onClaim, onBuy, onClose, initialTab = "contracts" }: EternalPanelProps) {
   const { t, language } = useLanguage();
-  const [tab, setTab] = useState<"contracts" | "milestones" | "merchant">("contracts");
+  const [tab, setTab] = useState<"contracts" | "milestones" | "merchant">(initialTab);
   const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
   const nextN = milestonesClaimed + 1;
   const nextMs = milestoneReward(nextN);
@@ -52,7 +54,7 @@ export function EternalPanel({ marks, record, currentWave, contracts, milestones
       </div>
       <div role="tablist" style={tabsStyle}>
         {(["contracts", "milestones", "merchant"] as const).map((id) => (
-          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{ ...tabStyle, ...(tab === id ? tabOnStyle : null) }}>
+          <button key={id} role="tab" aria-selected={tab === id} onClick={() => setTab(id)} style={{ ...tabStyle, ...(tab === id ? tabOnStyle : null) }} data-testid={`eternal-tab-${id}`}>
             {t(id === "contracts" ? "eternal.tabContracts" : id === "milestones" ? "eternal.tabMilestones" : "eternal.tabMerchant")}
           </button>
         ))}
@@ -157,9 +159,9 @@ const panelStyle: CSSProperties = {
 const closeStyle: CSSProperties = { position: "absolute", top: 8, right: 10, background: "transparent", border: "none", color: PALETTE.uiTextDim, fontSize: 18, cursor: "pointer" };
 const titleStyle: CSSProperties = { fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 18, fontWeight: 700, color: "#e3cdff" };
 const subStyle: CSSProperties = { fontSize: 11, color: PALETTE.uiTextDim, marginTop: 8, lineHeight: 1.45 };
-const tabsStyle: CSSProperties = { display: "flex", gap: 4, marginTop: 10, borderBottom: "1px solid rgba(180,124,255,0.3)", flexWrap: "wrap" };
-const tabStyle: CSSProperties = { padding: "6px 8px", background: "none", border: "none", borderBottom: "2px solid transparent", color: PALETTE.uiTextDim, fontWeight: 700, fontSize: 11.5, cursor: "pointer", marginBottom: -1 };
-const tabOnStyle: CSSProperties = { color: "#e3cdff", borderBottomColor: "#b47cff" };
+const tabsStyle: CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 4, marginTop: 10, padding: 3, borderRadius: 9, border: "1px solid rgba(180,124,255,0.35)", background: "rgba(0,0,0,0.3)" };
+const tabStyle: CSSProperties = { padding: "7px 4px", borderRadius: 7, border: "1px solid transparent", background: "none", color: PALETTE.uiTextDim, fontWeight: 700, fontSize: 11.5, lineHeight: 1.2, cursor: "pointer", textAlign: "center" };
+const tabOnStyle: CSSProperties = { color: "#fff", background: "linear-gradient(180deg, #6a3aa8, #432270)", borderColor: "#b47cff" };
 const rowStyle: CSSProperties = { display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 8, border: "1px solid rgba(180,124,255,0.25)", background: "rgba(0,0,0,0.22)" };
 const btnStyle: CSSProperties = { padding: "6px 10px", borderRadius: 7, border: "1px solid #b47cff", background: "linear-gradient(180deg, #6a3aa8, #432270)", color: "#fff", fontWeight: 700, fontSize: 11, cursor: "pointer", whiteSpace: "nowrap" };
 const barTrack: CSSProperties = { height: 4, borderRadius: 2, background: "rgba(255,255,255,0.1)", marginTop: 5, overflow: "hidden" };

@@ -31,9 +31,11 @@ export default function App() {
     setMode("SEASON");
     setView("GAME");
   };
-  const playEternal = () => {
+  const [openMerchant, setOpenMerchant] = useState(false);
+  const playEternal = (merchant = false) => {
     // a Season that ended joins the Eternal castle before that castle is opened
     syncSeasonIfNeeded();
+    setOpenMerchant(merchant);
     setMode("ETERNAL");
     setView("GAME");
   };
@@ -86,7 +88,7 @@ export default function App() {
   return (
     <LanguageProvider>
       {view === "GAME" ? (
-        <GameScreen key={mode} mode={mode} onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
+        <GameScreen key={mode} mode={mode} openMerchant={mode === "ETERNAL" && openMerchant} onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
       ) : view === "DUEL" ? (
         <DuelScreen onExit={() => setView("SEASON")} />
       ) : view === "COLOSSUS" ? (
@@ -97,7 +99,7 @@ export default function App() {
         // at the current Season (name/theme/timer/best/ranking) before this
         // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
         // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
-        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={playEternal} onPlayDuel={() => setView("DUEL")} onPlayColossus={() => setView("COLOSSUS")} />
+        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={() => playEternal()} onOpenEternalMerchant={() => playEternal(true)} onPlayDuel={() => setView("DUEL")} onPlayColossus={() => setView("COLOSSUS")} />
       ) : view === "RANKING" ? (
         <RankingScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "WIKI" ? (
