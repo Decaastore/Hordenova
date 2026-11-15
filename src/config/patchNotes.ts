@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v144",
+    dateIso: "2026-11-15",
+    category: "BALANCE",
+    title: {
+      en: "Store: Forge materials cost more, Epic Essence most of all",
+      ptBR: "Loja: materiais da Forja mais caros, principalmente Essência Épica",
+    },
+    description: {
+      en: "The daily Forge offers were so cheap that buying beat playing. Playing is the main way to forge again, and the Store is a small shortcut.",
+      ptBR: "As ofertas diárias da Forja estavam tão baratas que comprar valia mais que jogar. Jogar volta a ser o caminho principal para forjar, e a Loja é um atalho pequeno.",
+    },
+    highlights: [
+      {
+        en: "Splinters: 1 Purchased Gem each (was 0.75).",
+        ptBR: "Estilhaços: 1 Gema Comprada cada (antes 0,75).",
+      },
+      {
+        en: "Rare Essence: 10 for 80 Purchased Gems (was 50).",
+        ptBR: "Essência Rara: 10 por 80 Gemas Compradas (antes 50).",
+      },
+      {
+        en: "Epic Essence: 2 a day for 160 Purchased Gems (was 3 for 90), now 10 times the price of a Rare Essence.",
+        ptBR: "Essência Épica: 2 por dia por 160 Gemas Compradas (antes 3 por 90), agora 10 vezes o preço de uma Essência Rara.",
+      },
+      {
+        en: "Paying with Free Gems still costs 1.5 times as much.",
+        ptBR: "Pagar com Gemas Grátis continua custando 1,5 vez mais.",
+      },
+    ],
+  },
+  {
     id: "v143",
     dateIso: "2026-11-15",
     category: "INTERFACE",

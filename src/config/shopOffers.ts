@@ -49,6 +49,20 @@ function rng(seed: number): () => number {
 
 export const DAILY_SKIN_DISCOUNT_PCT = 25;
 
+/**
+ * Forge materials in the daily shop, priced per unit in Purchased Gems (Free
+ * Gems cost more, as everywhere). Raised in Nov 2026: Epic Essence was 30 Gems
+ * each (3 a day), which let an Epic Forge item be bought in ~10 days for about
+ * R$37 — far easier than the week of 24h expeditions it's meant to take. Now
+ * Epic is 10x a Rare per unit and only 2 a day, so the shop helps, but playing
+ * stays the main road.
+ */
+export const DAILY_SPLINTER_GEMS = 1;
+export const DAILY_RARE_AMOUNT = 10;
+export const DAILY_RARE_GEMS = 8;
+export const DAILY_EPIC_AMOUNT = 2;
+export const DAILY_EPIC_GEMS = 80;
+
 /** The day's four offers — identical for every player that day. */
 export function dailyOffers(day: number): DailyOffer[] {
   const r = rng(day + 101);
@@ -58,9 +72,9 @@ export function dailyOffers(day: number): DailyOffer[] {
   const splinters = [40, 60, 80][Math.floor(r() * 3)]!;
   return [
     { id: `d${day}-skin`, kind: "SKIN", skinId: skin.id, discountPct: DAILY_SKIN_DISCOUNT_PCT, price: dualGemPrice(discounted) },
-    { id: `d${day}-spl`, kind: "SPLINTERS", splinters, price: dualGemPrice(Math.round(splinters * 0.75)) },
-    { id: `d${day}-rare`, kind: "RARE_ESSENCE", essences: { ...NO_ESSENCES, RARE: 10 }, price: dualGemPrice(50) },
-    { id: `d${day}-epic`, kind: "EPIC_ESSENCE", essences: { ...NO_ESSENCES, EPIC: 3 }, price: dualGemPrice(90) },
+    { id: `d${day}-spl`, kind: "SPLINTERS", splinters, price: dualGemPrice(splinters * DAILY_SPLINTER_GEMS) },
+    { id: `d${day}-rare`, kind: "RARE_ESSENCE", essences: { ...NO_ESSENCES, RARE: DAILY_RARE_AMOUNT }, price: dualGemPrice(DAILY_RARE_AMOUNT * DAILY_RARE_GEMS) },
+    { id: `d${day}-epic`, kind: "EPIC_ESSENCE", essences: { ...NO_ESSENCES, EPIC: DAILY_EPIC_AMOUNT }, price: dualGemPrice(DAILY_EPIC_AMOUNT * DAILY_EPIC_GEMS) },
   ];
 }
 

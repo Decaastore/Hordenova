@@ -16,6 +16,14 @@ describe("daily shop", () => {
 
   it("never sells Legendary or Mythic essences", () => {
     for (let d = 0; d < 60; d++) for (const o of dailyOffers(d)) expect((o.essences?.LEGENDARY ?? 0) + (o.essences?.MYTHIC ?? 0)).toBe(0);
+    // Epic is the scarce one: per unit it costs far more than Rare, and Rare more than Splinters
+    const o = dailyOffers(7);
+    const per = (k: string) => {
+      const x = o.find((y) => y.kind === k)!;
+      return x.price.purchased / (x.splinters ?? x.essences!.RARE + x.essences!.EPIC);
+    };
+    expect(per("EPIC_ESSENCE")).toBeGreaterThanOrEqual(per("RARE_ESSENCE") * 10);
+    expect(per("RARE_ESSENCE")).toBeGreaterThan(per("SPLINTERS"));
   });
 
   it("each offer is bought once a day, paid in Gems, and lands on the account", () => {
