@@ -24,7 +24,10 @@ export type DuelCardId =
   | "S_IRONCLAD"
   | "X_METEOR"
   | "X_FREEZE"
-  | "X_RAGE";
+  | "X_RAGE"
+  | "S_REGEN"
+  | "S_DISABLER"
+  | "X_WARD";
 
 export interface DuelTowerCard {
   id: DuelCardId;
@@ -57,6 +60,10 @@ export interface DuelSendCard {
   breach: number;
   /** Fraction of every hit ignored. */
   armor?: number;
+  /** Heals this fraction of its max life every second. */
+  regen?: number;
+  /** Every `everyMs` it jams the towers within `radius` for `stunMs` (they stop firing). */
+  disrupt?: { radius: number; stunMs: number; everyMs: number };
 }
 
 /**
@@ -68,7 +75,7 @@ export interface DuelSpellCard {
   id: DuelCardId;
   kind: "SPELL";
   cost: number;
-  effect: "METEOR" | "FREEZE" | "RAGE";
+  effect: "METEOR" | "FREEZE" | "RAGE" | "WARD";
   /** Needs a spot on your road. */
   aimed: boolean;
   /** METEOR / FREEZE: radius of the area. */
@@ -77,7 +84,7 @@ export interface DuelSpellCard {
   damage?: number;
   /** FREEZE / RAGE: how long it lasts. */
   durationMs?: number;
-  /** RAGE: extra attack speed (0.6 = +60%). */
+  /** RAGE: extra attack speed (0.6 = +60%). WARD: shield as a fraction of each creature's max life. */
   boost?: number;
 }
 
@@ -94,9 +101,12 @@ export const DUEL_CARDS: readonly DuelCard[] = [
   { id: "S_SWARM", kind: "SEND", cost: 5, enemy: "SWARMLING", count: 10, hp: 38, speed: 58, breach: 1 },
   { id: "S_SHIELDS", kind: "SEND", cost: 4, enemy: "SHIELDBEARER", count: 2, hp: 210, speed: 40, breach: 2, armor: 0.35 },
   { id: "S_IRONCLAD", kind: "SEND", cost: 6, enemy: "IRONCLAD", count: 1, hp: 900, speed: 30, breach: 5, armor: 0.25 },
+  { id: "S_REGEN", kind: "SEND", cost: 4, enemy: "REGENERATOR", count: 2, hp: 230, speed: 40, breach: 2, regen: 0.06 },
+  { id: "S_DISABLER", kind: "SEND", cost: 5, enemy: "DISABLER", count: 1, hp: 360, speed: 44, breach: 3, disrupt: { radius: 120, stunMs: 1600, everyMs: 3500 } },
   { id: "X_METEOR", kind: "SPELL", cost: 4, effect: "METEOR", aimed: true, radius: 75, damage: 170 },
   { id: "X_FREEZE", kind: "SPELL", cost: 3, effect: "FREEZE", aimed: true, radius: 90, durationMs: 2500 },
   { id: "X_RAGE", kind: "SPELL", cost: 3, effect: "RAGE", aimed: false, durationMs: 6000, boost: 0.6 },
+  { id: "X_WARD", kind: "SPELL", cost: 3, effect: "WARD", aimed: false, durationMs: 8000, boost: 0.4 },
 ];
 
 export function getDuelCard(id: string): DuelCard | null {
@@ -161,6 +171,7 @@ export const DUEL_ARENAS: readonly DuelArena[] = [
   { id: "ARENA_VOLCANO", minTrophies: 300, biome: "VOLCANIC_WASTES", ai: 0.45 },
   { id: "ARENA_TUNDRA", minTrophies: 900, biome: "FROZEN_TUNDRA", ai: 0.65 },
   { id: "ARENA_ABYSS", minTrophies: 1500, biome: "ABYSS", ai: 0.85 },
+  { id: "ARENA_CRYSTAL", minTrophies: 2000, biome: "CRYSTAL_SEA", ai: 0.95 },
 ];
 
 export function arenaFor(trophies: number): DuelArena {
@@ -1009,4 +1020,31 @@ export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; w
   if (id === "BANNER_CHAMPION") return { tourney: true };
   if (id === WEEKLY_TOP_UNLOCK) return { weekly: true };
   return {};
+}
+
+
+// ── AI commanders ───────────────────────────────────────────────────────
+/**
+ * COMANDANTES — every arena's AI opponent has a name, a crest and a colour,
+ * shown in the match intro and the top bar. They're openly the AI (the label
+ * always says so); nothing pretends to be another player.
+ */
+export interface DuelCommander {
+  arenaId: string;
+  /** i18n key under duel.commander.<id>.{name,title} */
+  id: "BRAMBLE" | "CINDRA" | "HOARFANG" | "VEXOR" | "LUMEN";
+  crest: string;
+  color: string;
+}
+
+export const DUEL_COMMANDERS: readonly DuelCommander[] = [
+  { arenaId: "ARENA_FOREST", id: "BRAMBLE", crest: "🌿", color: "#6fbf5a" },
+  { arenaId: "ARENA_VOLCANO", id: "CINDRA", crest: "🔥", color: "#ff7a3a" },
+  { arenaId: "ARENA_TUNDRA", id: "HOARFANG", crest: "❄", color: "#8fd8ff" },
+  { arenaId: "ARENA_ABYSS", id: "VEXOR", crest: "☠", color: "#b07aff" },
+  { arenaId: "ARENA_CRYSTAL", id: "LUMEN", crest: "◆", color: "#6ff0e0" },
+];
+
+export function commanderFor(arenaId: string): DuelCommander {
+  return DUEL_COMMANDERS.find((c) => c.arenaId === arenaId) ?? DUEL_COMMANDERS[DUEL_COMMANDERS.length - 2]!;
 }

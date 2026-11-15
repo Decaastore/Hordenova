@@ -70,6 +70,72 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v140",
+    dateIso: "2026-11-14",
+    category: "CONTENT",
+    title: {
+      en: "Duel: 3 new cards, the Crystal Sea arena, AI commanders and match MVP",
+      ptBR: "Duelo: 3 cartas novas, arena Mar de Cristal, comandantes da IA e MVP da partida",
+    },
+    description: {
+      en: "A big Duel update: new ways to attack, a fifth arena for Legends, a proper match intro and a result screen that shows what each of your cards did.",
+      ptBR: "Uma atualização grande do Duelo: novos jeitos de atacar, uma quinta arena para Lendas, uma abertura de partida de verdade e um resultado que mostra o que cada carta sua fez.",
+    },
+    highlights: [
+      {
+        en: "Regenerators (4 mana): two creatures that heal 6% of their life every second, so you have to burst them down.",
+        ptBR: "Regeneradores (4 de mana): duas criaturas que curam 6% da vida por segundo, então é preciso derrubar de uma vez.",
+      },
+      {
+        en: "Disabler (5 mana): every 3.5s it jams the towers near it for 1.6s; jammed towers crackle with violet static.",
+        ptBR: "Desativador (5 de mana): a cada 3,5s trava as torres perto dele por 1,6s; torres travadas soltam faíscas roxas.",
+      },
+      {
+        en: "Rune Ward (3 mana spell): your creatures on the opponent's road get a golden shield worth 40% of their life for 8s.",
+        ptBR: "Égide Rúnica (feitiço de 3 de mana): suas criaturas na estrada do adversário ganham um escudo dourado de 40% da vida por 8s.",
+      },
+      {
+        en: "New arena at 2,000 trophies: the Crystal Sea, against Lumen, the Crystal Tyrant, who plays the new cards.",
+        ptBR: "Arena nova a partir de 2.000 troféus: Mar de Cristal, contra Lumen, o Tirano de Cristal, que joga com as cartas novas.",
+      },
+      {
+        en: "Every arena now has its own AI commander (Bramble, Cindra, Hoarfang, Vexor, Lumen), always labelled as the AI. Matches open with a VS card and a 3-2-1 countdown.",
+        ptBR: "Cada arena agora tem seu comandante da IA (Bramble, Cindra, Hoarfang, Vexor, Lumen), sempre identificado como IA. As partidas abrem com um cartão de VS e uma contagem 3-2-1.",
+      },
+      {
+        en: "The result screen lists your best cards of the match (damage and castle damage) and crowns the MVP.",
+        ptBR: "A tela de resultado lista suas melhores cartas da partida (dano e dano no castelo) e marca o MVP.",
+      },
+    ],
+  },
+  {
+    id: "v139",
+    dateIso: "2026-11-14",
+    category: "INTERFACE",
+    title: {
+      en: "Music for the Duel and the Global Boss",
+      ptBR: "Música própria do Duelo e do Boss Global",
+    },
+    description: {
+      en: "The Duel and the Global Boss now have their own orchestral music instead of the site theme.",
+      ptBR: "O Duelo e o Boss Global agora têm música orquestral própria em vez do tema do site.",
+    },
+    highlights: [
+      {
+        en: "Duel: a fast arena battle theme with drums, a string ostinato and a brass melody.",
+        ptBR: "Duelo: um tema de batalha rápido, com bateria, cordas em ostinato e melodia nos metais.",
+      },
+      {
+        en: "Global Boss: a dark, heavy cue with choir, war drums, bells and the Serpent's own motif.",
+        ptBR: "Boss Global: uma música sombria e pesada, com coral, tambores de guerra, sinos e o tema da própria Serpente.",
+      },
+      {
+        en: "The music changes as you move between Home, the Duel and the Global Boss, and the music button keeps whichever is playing.",
+        ptBR: "A música troca quando você vai da Home para o Duelo ou para o Boss Global, e o botão de música mantém a que está tocando.",
+      },
+    ],
+  },
+  {
     id: "v138",
     dateIso: "2026-11-13",
     category: "INTERFACE",

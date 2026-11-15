@@ -24,3 +24,16 @@ describe("Duel sounds", () => {
     expect(breaches).toBeLessThanOrEqual(40);
   });
 });
+
+describe("Mode music", () => {
+  it("the Duel and the Global Boss ask for their own track, and a bare resume keeps it", async () => {
+    const { audioManager } = await import("./AudioManager");
+    audioManager.playAmbientMusic("duel");
+    audioManager.playAmbientMusic();
+    expect(audioManager.getDesiredTrack()).toBe("duel");
+    audioManager.playAmbientMusic("colossus");
+    expect(audioManager.getDesiredTrack()).toBe("colossus");
+    audioManager.playAmbientMusic("home");
+    expect(audioManager.getDesiredTrack()).toBe("home");
+  });
+});

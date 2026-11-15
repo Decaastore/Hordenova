@@ -81,7 +81,8 @@ export default function App() {
     if (view === "GAME") {
       audioManager.stopMusic();
     } else {
-      audioManager.playAmbientMusic();
+      // the Duel and the Global Boss have their own music; every other screen plays the site theme
+      audioManager.playAmbientMusic(view === "DUEL" ? "duel" : view === "COLOSSUS" ? "colossus" : "home");
     }
   }, [view]);
 

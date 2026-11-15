@@ -4,7 +4,7 @@ import { drawRiftPortal } from "./riftPortal";
 import { getBiome } from "./biomes";
 import type { Decoration, DecorationKind } from "./mapDecorations";
 import type { TowerSlotDefinition } from "@/data/mapWhisperingWoods";
-import { drawFrozenOverlay, drawRageAura, drawSpellAir, drawSpellGround } from "./duelSpells";
+import { drawFrozenOverlay, drawJammed, drawRageAura, drawShieldBubble, drawSpellAir, drawSpellGround } from "./duelSpells";
 import { CASTLE_AT, LANE_H, LANE_SLOTS, LANE_W, lanePath, slotPos, type DuelSnapshot, type Pt, type Side } from "@/engine/DuelEngine";
 import { MAX_DUEL_TOWER_LEVEL } from "@/config/duel";
 import { drawEnemy, drawEnemyHpBar, drawTower } from "./EntityRenderer";
@@ -545,6 +545,7 @@ export function drawDuelFrame(
         ctx.translate(-x, -y);
         drawTower(ctx, t.inst, false, timeMs, snap.timeMs - t.lastShotAt, true);
         ctx.restore();
+        if (t.stunnedUntil > snap.timeMs) drawJammed(ctx, x, y, timeMs);
         for (let k = 0; k < MAX_DUEL_TOWER_LEVEL; k++) {
           const px = x - 14 + k * 14;
           const py = y + 26;
@@ -574,6 +575,7 @@ export function drawDuelFrame(
       y: u.inst.position.y,
       draw: () => {
         drawEnemy(ctx, u.inst, timeMs, Infinity, 2, undefined, u.angle, 0);
+        if (u.shield > 0) drawShieldBubble(ctx, u.inst.position.x, u.inst.position.y, u.card.breach >= 3 ? 34 : 20, timeMs);
         if (u.frozenUntil > snap.timeMs) drawFrozenOverlay(ctx, u.inst.position.x, u.inst.position.y, u.card.breach >= 3 ? 34 : 20, u.frozenUntil - snap.timeMs);
         drawEnemyHpBar(ctx, u.inst);
       },

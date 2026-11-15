@@ -69,6 +69,42 @@ export function drawSpellIcon(ctx: CanvasRenderingContext2D, effect: Effect, siz
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.07, 0, Math.PI * 2);
     ctx.fill();
+  } else if (effect === "WARD") {
+    // a rune-carved golden shield
+    const pulse = 0.85 + 0.15 * Math.sin(t * 3);
+    const glow = ctx.createRadialGradient(c, c, 0, c, c, size * 0.5);
+    glow.addColorStop(0, `rgba(255,214,110,${0.5 * pulse})`);
+    glow.addColorStop(1, "rgba(255,190,60,0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, size, size);
+    const shield = () => {
+      ctx.beginPath();
+      ctx.moveTo(c, size * 0.14);
+      ctx.lineTo(size * 0.78, size * 0.26);
+      ctx.quadraticCurveTo(size * 0.78, size * 0.68, c, size * 0.88);
+      ctx.quadraticCurveTo(size * 0.22, size * 0.68, size * 0.22, size * 0.26);
+      ctx.closePath();
+    };
+    const g = ctx.createLinearGradient(0, size * 0.14, 0, size * 0.88);
+    g.addColorStop(0, "#ffe7a0");
+    g.addColorStop(1, "#b07a1e");
+    ctx.fillStyle = g;
+    shield();
+    ctx.fill();
+    ctx.lineWidth = Math.max(1.5, size * 0.04);
+    ctx.strokeStyle = "#5a3a08";
+    ctx.stroke();
+    // rune
+    ctx.strokeStyle = `rgba(90,58,8,0.9)`;
+    ctx.lineWidth = Math.max(1.5, size * 0.05);
+    ctx.beginPath();
+    ctx.moveTo(c, size * 0.3);
+    ctx.lineTo(c, size * 0.72);
+    ctx.moveTo(c, size * 0.42);
+    ctx.lineTo(c + size * 0.13, size * 0.32);
+    ctx.moveTo(c, size * 0.5);
+    ctx.lineTo(c - size * 0.13, size * 0.4);
+    ctx.stroke();
   } else {
     // RAGE: a roaring red flame over a war-horn swirl
     const pulse = 0.85 + 0.15 * Math.sin(t * 6);
@@ -221,6 +257,30 @@ export function drawSpellAir(ctx: CanvasRenderingContext2D, snap: DuelSnapshot):
           ctx.fill();
         }
       }
+    } else if (f.effect === "WARD" || f.effect === "DISRUPT") {
+      const life = f.effect === "WARD" ? 900 : 600;
+      const p = (now - f.castAt) / life;
+      if (p >= 1) continue;
+      const col = f.effect === "WARD" ? "255,214,110" : "200,120,255";
+      const r0 = f.effect === "WARD" ? 40 + p * 300 : f.radius * (0.3 + 0.7 * p);
+      ctx.strokeStyle = `rgba(${col},${1 - p})`;
+      ctx.lineWidth = 4 * (1 - p) + 1;
+      ctx.beginPath();
+      ctx.ellipse(f.at.x, f.at.y, r0, r0 * 0.62, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      if (f.effect === "DISRUPT") {
+        // crackling static arcs
+        ctx.strokeStyle = `rgba(230,190,255,${1 - p})`;
+        ctx.lineWidth = 1.5;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + f.castAt;
+          ctx.beginPath();
+          ctx.moveTo(f.at.x + Math.cos(a) * 10, f.at.y + Math.sin(a) * 6);
+          ctx.lineTo(f.at.x + Math.cos(a + 0.2) * r0 * 0.5, f.at.y + Math.sin(a - 0.2) * r0 * 0.3);
+          ctx.lineTo(f.at.x + Math.cos(a) * r0, f.at.y + Math.sin(a) * r0 * 0.62);
+          ctx.stroke();
+        }
+      }
     } else if (f.effect === "RAGE") {
       const p = (now - f.castAt) / 700;
       if (p >= 1) continue;
@@ -268,5 +328,36 @@ export function drawRageAura(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.beginPath();
   ctx.ellipse(x, y + 6, 44, 26, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.restore();
+}
+
+/** WARD: a golden bubble around a shielded creature. */
+export function drawShieldBubble(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, timeMs: number): void {
+  const pulse = 0.75 + 0.25 * Math.sin(timeMs / 140);
+  ctx.save();
+  ctx.strokeStyle = `rgba(255,220,120,${0.85 * pulse})`;
+  ctx.fillStyle = `rgba(255,214,110,${0.14 * pulse})`;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(x, y - size * 0.35, size * 0.75, size * 0.85, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** A tower jammed by a Disabler: violet static over it. */
+export function drawJammed(ctx: CanvasRenderingContext2D, x: number, y: number, timeMs: number): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(220,170,255,0.9)";
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    const a = timeMs / 90 + i * 2.1;
+    const r = 16 + 4 * Math.sin(timeMs / 70 + i);
+    ctx.beginPath();
+    ctx.moveTo(x + Math.cos(a) * 6, y - 30 + Math.sin(a) * 4);
+    ctx.lineTo(x + Math.cos(a + 0.5) * r, y - 34 + Math.sin(a + 0.9) * r * 0.5);
+    ctx.lineTo(x + Math.cos(a + 0.9) * r * 1.2, y - 30 + Math.sin(a + 1.3) * r * 0.6);
+    ctx.stroke();
+  }
   ctx.restore();
 }

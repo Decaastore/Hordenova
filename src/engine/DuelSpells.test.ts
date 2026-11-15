@@ -203,3 +203,56 @@ describe("Duel daily events", () => {
     expect(applyEventResult(createDuelProfile(), "LOSS", day).coins).toBe(0);
   });
 });
+
+describe("Duel: Regenerators, Disabler, Rune Ward and match stats", () => {
+  const D2: DuelCardId[] = ["S_REGEN", "S_DISABLER", "X_WARD", "T_IRONWOOD", "T_INFERNO", "S_CRAWLERS", "S_SWARM", "S_BRUTE"];
+  const DEF: DuelCardId[] = ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "X_METEOR", "X_FREEZE"];
+
+  it("Regenerators heal back up when nothing hits them", () => {
+    const e = matchWith([DEF, D2], ["X_METEOR"], ["S_REGEN"]);
+    expect(e.play(1, "S_REGEN")).toBe(true);
+    e.advance(5000);
+    const units = () => e.snapshot().units.filter((u) => u.side === 0 && u.card.id === "S_REGEN");
+    const at = { ...units()[0]!.inst.position };
+    at.y += (40 * METEOR_FALL_MS) / 1000;
+    expect(e.play(0, "X_METEOR", undefined, at)).toBe(true);
+    e.advance(700);
+    const hurt = units().reduce((s, u) => s + u.hp, 0);
+    const max = units().reduce((s, u) => s + u.maxHp, 0);
+    expect(hurt).toBeLessThan(max);
+    e.advance(3000);
+    expect(units().reduce((s, u) => s + u.hp, 0)).toBeGreaterThan(hurt);
+  });
+
+  it("the Disabler jams towers near it so they stop firing for a moment", () => {
+    const e = matchWith([DEF, D2], ["T_IRONWOOD"], ["S_DISABLER"]);
+    expect(e.play(0, "T_IRONWOOD", 0)).toBe(true);
+    e.advance(5000);
+    expect(e.play(1, "S_DISABLER")).toBe(true);
+    let jammed = false;
+    for (let i = 0; i < 400 && !jammed; i++) {
+      e.advance(50);
+      jammed = e.snapshot().towers.some((t) => t.side === 0 && t.stunnedUntil > e.timeMs);
+    }
+    expect(jammed).toBe(true);
+    expect(e.snapshot().spells.some((f) => f.effect === "DISRUPT")).toBe(true);
+    // jammed: no shots from it while the jam lasts
+    const before = e.snapshot().towers.find((t) => t.side === 0)!.lastShotAt;
+    e.advance(1000);
+    expect(e.snapshot().towers.find((t) => t.side === 0)!.lastShotAt).toBe(before);
+  });
+
+  it("Rune Ward shields your creatures on the opponent's road, and stats credit cards", () => {
+    const e = matchWith([D2, DEF], ["S_BRUTE", "X_WARD"], ["T_INFERNO"]);
+    expect(e.play(1, "T_INFERNO", 0)).toBe(true);
+    expect(e.play(0, "S_BRUTE")).toBe(true);
+    e.advance(2000);
+    e.advance(4000);
+    expect(e.play(0, "X_WARD")).toBe(true);
+    const brute = e.snapshot().units.find((u) => u.side === 1 && u.card.id === "S_BRUTE")!;
+    expect(brute.shield).toBeCloseTo(brute.maxHp * 0.4);
+    for (let i = 0; i < 1200 && !e.over && e.snapshot().units.length; i++) e.advance(50);
+    const towerStats = e.matchStats(1).find((r) => r.card === "T_INFERNO");
+    expect(towerStats?.damage ?? 0).toBeGreaterThan(0);
+  });
+});

@@ -55,6 +55,11 @@ interface MusicGraph {
  * The procedural composition below only plays if this file can't load.
  */
 const HOME_THEME_ASSET_URL = "/audio/music/home-theme.mp3";
+/** DUELO: an arena battle cue (E minor, 132 BPM, 32 bars). COLOSSO: the world-boss cue (C minor, 76 BPM, 24 bars). Scored in code and rendered like the home theme. */
+const DUEL_THEME_ASSET_URL = "/audio/music/duel-theme.mp3";
+const DUEL_THEME_LOOP_SECONDS = (32 * 4 * 60) / 132;
+const COLOSSUS_THEME_ASSET_URL = "/audio/music/colossus-theme.mp3";
+const COLOSSUS_THEME_LOOP_SECONDS = (24 * 4 * 60) / 76;
 const HOME_THEME_LOOP_SECONDS = 120;
 
 /**
@@ -69,7 +74,7 @@ const HOME_THEME_LOOP_SECONDS = 120;
  * wiring whatever screen/event should request it — never touching the
  * lifecycle/graph code itself.
  */
-type AmbientTrackId = "home";
+export type AmbientTrackId = "home" | "duel" | "colossus";
 interface AmbientTrackDefinition {
   /** The recorded track (see HOME_THEME_ASSET_URL's doc comment). */
   assetUrl: string;
@@ -350,6 +355,8 @@ const AMBIENT_TRACKS: Record<AmbientTrackId, AmbientTrackDefinition> = {
     loopSeconds: HOME_THEME_LOOP_SECONDS,
     buildProceduralGraph: buildAdventureThemeGraph,
   },
+  duel: { assetUrl: DUEL_THEME_ASSET_URL, loopSeconds: DUEL_THEME_LOOP_SECONDS, buildProceduralGraph: buildAdventureThemeGraph },
+  colossus: { assetUrl: COLOSSUS_THEME_ASSET_URL, loopSeconds: COLOSSUS_THEME_LOOP_SECONDS, buildProceduralGraph: buildAdventureThemeGraph },
 };
 
 /**
@@ -559,11 +566,20 @@ export class AudioManager {
    * vitest/jsdom tests) or a still-blocked context both just result in
    * silence.
    */
-  playAmbientMusic(trackId: AmbientTrackId = "home"): void {
+  /** The track the current screen wants; a bare playAmbientMusic() (a gesture, the music button) resumes this one. */
+  private desiredTrack: AmbientTrackId = "home";
+
+  /** The track the current screen asked for (tests and the music button's label). */
+  getDesiredTrack(): AmbientTrackId {
+    return this.desiredTrack;
+  }
+
+  playAmbientMusic(requested?: AmbientTrackId): void {
+    if (requested) this.desiredTrack = requested;
+    const trackId = this.desiredTrack;
     if (this.musicGraph) {
       if (this.musicGraph.trackId !== trackId) {
-        // Not reachable today (only one track exists) — the seam a future
-        // second track hooks into: swap graphs instead of resuming this one.
+        // Another screen's track (Home → Duel → Global Boss): swap graphs instead of resuming this one.
         this.stopMusic();
       } else {
         // Graph already exists for this same track — this call is a later

@@ -47,6 +47,7 @@ import {
   duelSkinLooks,
   toggleDuelCosmetic,
   addMasteryWin,
+  commanderFor,
   canReplay,
   cardMasteryLevel,
   claimMastery,
@@ -112,7 +113,7 @@ function CardFace({ id, small, dim }: { id: DuelCardId; small?: boolean; dim?: b
 }
 
 /** A spell's card art, drawn live. */
-function SpellPortrait({ effect, size }: { effect: "METEOR" | "FREEZE" | "RAGE"; size: number }) {
+function SpellPortrait({ effect, size }: { effect: "METEOR" | "FREEZE" | "RAGE" | "WARD"; size: number }) {
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     const draw = () => {
@@ -944,7 +945,8 @@ function aiDeck(arenaId: string): DuelCardId[] {
   if (arenaId === "ARENA_FOREST") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_RUNNERS", "S_BRUTE", "S_SHIELDS"];
   if (arenaId === "ARENA_VOLCANO") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_CRAWLERS", "S_SWARM", "S_BRUTE", "X_RAGE"];
   if (arenaId === "ARENA_TUNDRA") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "T_STORMCALLER", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "X_FREEZE"];
-  return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "S_IRONCLAD", "X_METEOR"];
+  if (arenaId === "ARENA_ABYSS") return ["T_IRONWOOD", "T_INFERNO", "T_FROSTBORN", "S_RUNNERS", "S_SWARM", "S_SHIELDS", "S_IRONCLAD", "X_METEOR"];
+  return ["T_IRONWOOD", "T_INFERNO", "T_STORMCALLER", "S_REGEN", "S_DISABLER", "S_SWARM", "X_WARD", "X_METEOR"];
 }
 
 interface DuelMatchProps {
@@ -960,8 +962,18 @@ interface DuelMatchProps {
   onLobby: () => void;
 }
 
+/** The match intro: the VS card, then 3-2-1, then "Fight!" while the match is already running. */
+const INTRO_VS_MS = 1800;
+const INTRO_COUNT_MS = 1200;
+const INTRO_FIGHT_MS = 700;
+
 function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, onFinish, onAgain, onLobby }: DuelMatchProps) {
   const { t } = useLanguage();
+  const commander = commanderFor(arenaId);
+  const foeName = `${t(`duel.commander.${commander.id}.name` as TranslationKey)} · ${t("duel.aiTag")}`;
+  // ms since the match screen opened (drives the intro overlay); the clock only starts after the countdown
+  const [introT, setIntroT] = useState(0);
+  const introRunning = introT < INTRO_VS_MS + INTRO_COUNT_MS;
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [snap, setSnap] = useState<DuelSnapshot>(() => engine.snapshot());
   const [picked, setPicked] = useState<DuelCardId | null>(null);
@@ -982,7 +994,18 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
     let raf = 0;
     let last = performance.now();
     let acc = 0;
+    const opened = performance.now();
+    const holdUntil = opened + INTRO_VS_MS + INTRO_COUNT_MS;
+    let fightSaid = false;
     const loop = (now: number) => {
+      const since = now - opened;
+      if (since < INTRO_VS_MS + INTRO_COUNT_MS + INTRO_FIGHT_MS + 50) setIntroT(since);
+      if (now < holdUntil) {
+        last = now;
+      } else if (!fightSaid) {
+        fightSaid = true;
+        audioManager.play("wave_start", { volume: 0.9 });
+      }
       acc += Math.min(1000, now - last);
       last = now;
       if (acc >= 50) {
@@ -1092,13 +1115,41 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
         </div>
         <div className="dm-side is-foe">
           <div>
-            <strong>{t("duel.foe")}</strong>
+            <strong>{foeName}</strong>
             <CastleBar hp={foe.castle} foe />
           </div>
-          <span className="dm-crest is-foe" aria-hidden="true">☠</span>
+          <span className="dm-crest is-foe" aria-hidden="true" style={{ color: commander.color, borderColor: commander.color }}>
+            {commander.crest}
+          </span>
         </div>
       </div>
       <div className="dm-stage">
+        {introT < INTRO_VS_MS + INTRO_COUNT_MS + INTRO_FIGHT_MS && (
+          <div className="dm-intro" aria-live="polite" data-testid="duel-intro">
+            {introT < INTRO_VS_MS ? (
+              <div className="dm-vs">
+                <div className="dm-vs-side is-you">
+                  <span className="dm-vs-crest">⚔</span>
+                  <strong>{t("duel.you")}</strong>
+                </div>
+                <span className="dm-vs-mark">{t("duel.introVs")}</span>
+                <div className="dm-vs-side is-foe" style={{ ["--cc" as string]: commander.color }}>
+                  <span className="dm-vs-crest">{commander.crest}</span>
+                  <strong>{t(`duel.commander.${commander.id}.name` as TranslationKey)}</strong>
+                  <small>
+                    {t(`duel.commander.${commander.id}.title` as TranslationKey)} · {t("duel.aiTag")}
+                  </small>
+                </div>
+              </div>
+            ) : introT < INTRO_VS_MS + INTRO_COUNT_MS ? (
+              <span key={Math.floor((introT - INTRO_VS_MS) / 400)} className="dm-count">
+                {3 - Math.floor((introT - INTRO_VS_MS) / 400)}
+              </span>
+            ) : (
+              <span className="dm-count is-fight">{t("duel.introFight")}</span>
+            )}
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           className="dm-canvas"
@@ -1137,6 +1188,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
                 <PrizeLine prize={result.prize} />
               </p>
             )}
+            <MatchStats engine={engine} />
             <div className="dm-result-actions">
               <button className="dm-btn" onClick={onAgain}>
                 {t("duel.again")}
@@ -1160,7 +1212,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
         <div className="dm-cards">
           {me.hand.map((id, i) => {
             const card = getDuelCard(id)!;
-            const can = me.mana >= card.cost && !snap.over;
+            const can = me.mana >= card.cost && !snap.over && !introRunning;
             return (
               <button key={`${id}-${i}`} className={`dm-card${picked === id ? " is-picked" : ""}`} disabled={!can} onClick={() => onCard(id)} title={t(`duel.card.${id}.desc` as TranslationKey)} data-testid={`hand-${id}`}>
                 <CardFace id={id} dim={!can} />
@@ -1301,6 +1353,31 @@ function EmoteButton() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** The result screen's "your cards this match": damage and castle damage per card, best one marked MVP. */
+function MatchStats({ engine }: { engine: DuelEngine }) {
+  const { t, language } = useLanguage();
+  const rows = engine.matchStats(0).filter((r) => r.damage > 0 || r.breach > 0).slice(0, 4);
+  if (!rows.length) return null;
+  const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
+  return (
+    <div className="dm-stats" data-testid="duel-stats">
+      <small>{t("duel.statsTitle")}</small>
+      <ul>
+        {rows.map((r, i) => (
+          <li key={r.card} className={i === 0 ? "is-mvp" : undefined}>
+            <CardFace id={r.card} small />
+            <span className="dm-stats-name">
+              {t(`duel.card.${r.card}.name` as TranslationKey)}
+              {i === 0 && <b className="dm-mvp">{t("duel.statsMvp")}</b>}
+            </span>
+            <span className="dm-stats-val">{r.breach > 0 ? t("duel.statsBreach", { n: r.breach }) : t("duel.statsDamage", { n: fmt(r.damage) })}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -1641,6 +1718,31 @@ const MATCH_CSS = `
 .dm-btn { padding: 10px 20px; border-radius: 9px; border: 1px solid #e8c06a; background: linear-gradient(180deg, #b0382a, #741c12); color: #fff; font-weight: 700; cursor: pointer; }
 .dm-btn.is-ghost { background: rgba(0,0,0,0.3); border-color: rgba(232,192,106,0.5); color: #efe4cf; }
 .dm-quit { font-size: 12px; padding: 6px 12px; }
+.dm-intro { position: absolute; inset: 0; z-index: 6; display: grid; place-items: center; pointer-events: none; background: radial-gradient(ellipse at center, rgba(0,0,0,0.55), rgba(0,0,0,0.25) 60%, transparent); }
+.dm-vs { display: flex; align-items: center; gap: clamp(16px, 5vw, 64px); animation: dmVsIn 0.35s ease-out; }
+.dm-vs-side { display: grid; justify-items: center; gap: 6px; padding: 18px 26px; border-radius: 16px; background: rgba(12,9,6,0.85); border: 2px solid #6aa8ff; box-shadow: 0 0 30px rgba(106,168,255,0.45); min-width: 160px; }
+.dm-vs-side.is-foe { border-color: var(--cc); box-shadow: 0 0 30px color-mix(in srgb, var(--cc) 55%, transparent); }
+.dm-vs-side strong { font-family: Georgia, serif; font-size: clamp(20px, 3vw, 30px); color: #fff3d8; }
+.dm-vs-side small { font-size: 13px; color: #d9c7a4; }
+.dm-vs-crest { font-size: clamp(34px, 5vw, 54px); line-height: 1; }
+.dm-vs-mark { font-family: Georgia, serif; font-weight: 900; font-size: clamp(44px, 7vw, 86px); color: #fff3e0; text-shadow: 0 0 18px #ff5a4a, 0 0 40px #ff5a4a, 0 4px 0 #6a1410; transform: rotate(-6deg); }
+.dm-count { font-family: Georgia, serif; font-weight: 900; font-size: clamp(80px, 14vw, 160px); color: #fff3d0; text-shadow: 0 0 30px rgba(255,200,90,0.9), 0 6px 0 #6a4214; animation: dmCount 0.4s ease-out; }
+.dm-count.is-fight { color: #ffdf8a; font-size: clamp(60px, 10vw, 120px); animation: dmCount 0.5s ease-out; }
+@keyframes dmVsIn { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes dmCount { from { transform: scale(1.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dm-vs, .dm-count { animation: none; } }
+@media (max-width: 520px) { .dm-vs { flex-direction: column; gap: 10px; } .dm-vs-side { padding: 10px 16px; min-width: 0; } }
+.dm-stats { width: 100%; max-width: 380px; margin: 4px auto 6px; text-align: left; }
+.dm-stats > small { display: block; font-size: 12px; color: #d9c7a4; margin-bottom: 6px; text-align: center; }
+.dm-stats ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.dm-stats li { display: grid; grid-template-columns: 40px 1fr auto; align-items: center; gap: 10px; padding: 4px 10px 4px 4px; border-radius: 10px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08); }
+.dm-stats li.is-mvp { border-color: #ffd56a; box-shadow: 0 0 14px rgba(255,213,106,0.35); }
+.dm-stats .dc-face.is-small { width: 40px; padding: 2px; }
+.dm-stats .dc-face.is-small canvas { width: 32px !important; height: 32px !important; }
+.dm-stats .dc-face.is-small .dc-name, .dm-stats .dc-face.is-small .dc-kind { display: none; }
+.dm-stats-name { font-weight: 700; font-size: 13.5px; color: #fff3d8; display: flex; gap: 8px; align-items: center; }
+.dm-mvp { font-size: 10.5px; padding: 2px 6px; border-radius: 6px; background: #ffd56a; color: #2b1906; }
+.dm-stats-val { font-size: 12.5px; color: #d9c7a4; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .dm-replaybar { gap: 10px; }
 .dm-clock.is-overtime .dm-clock-face { background: conic-gradient(#ff5a4a var(--p), rgba(255,255,255,0.08) 0); box-shadow: 0 0 0 2px #a8281c, 0 0 26px rgba(255,90,74,0.6); animation: dmOt 0.9s ease-in-out infinite alternate; }
 .dm-clock.is-overtime small { color: #ff9a8a; }

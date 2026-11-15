@@ -137,6 +137,12 @@ interface Unit {
   slowUntil: number;
   /** FREEZE: stands still until then. */
   frozenUntil: number;
+  maxHp: number;
+  /** WARD: absorbs damage until spent or `shieldUntil`. */
+  shield: number;
+  shieldUntil: number;
+  /** DISRUPT: next time it jams nearby towers. */
+  nextDisruptAt: number;
   inst: EnemyInstance;
   angle: number;
   turnRate: number;
@@ -150,6 +156,8 @@ interface DTower {
   cooldown: number;
   inst: TowerInstance;
   lastShotAt: number;
+  /** Jammed by a Disabler: no shots until then. */
+  stunnedUntil: number;
 }
 
 export interface Shot {
@@ -179,7 +187,8 @@ interface Player {
 /** A spell on the board, for the renderer (and the METEOR's delayed impact). */
 export interface SpellFx {
   side: Side;
-  effect: DuelSpellCard["effect"];
+  /** A spell, or DISRUPT (a Disabler's jamming pulse). */
+  effect: DuelSpellCard["effect"] | "DISRUPT";
   at: Pt;
   radius: number;
   castAt: number;
@@ -325,11 +334,23 @@ export class DuelEngine {
     }
     const pos = slotPos(side, slot);
     const inst = createTowerInstance(`d${side}-${slot}`, card.tower, pos, 1, null, 0, this.skinBySide[side][card.tower] ?? null);
-    this.towers.push({ side, slot, card, level: 1, cooldown: 400, inst, lastShotAt: -1e9 });
+    this.towers.push({ side, slot, card, level: 1, cooldown: 400, inst, lastShotAt: -1e9, stunnedUntil: 0 });
   }
 
   private cast(side: Side, card: DuelSpellCard, at?: Pt): void {
     const p = this.players[side];
+    if (card.effect === "WARD") {
+      // shields this side's creatures on the OTHER road (the one they attack)
+      const foe = (1 - side) as Side;
+      for (const u of this.units)
+        if (u.side === foe && u.hp > 0) {
+          u.shield = u.maxHp * (card.boost ?? 0);
+          u.shieldUntil = this.t + (card.durationMs ?? 0);
+        }
+      const c = { x: CASTLE_AT.x + foe * LANE_W, y: CASTLE_AT.y - 200 };
+      this.spellFx.push({ side, effect: "WARD", at: c, radius: 0, castAt: this.t, landAt: this.t, durationMs: card.durationMs ?? 0 });
+      return;
+    }
     if (card.effect === "RAGE") {
       p.rageUntil = this.t + (card.durationMs ?? 0);
       const c = { x: CASTLE_AT.x + side * LANE_W, y: CASTLE_AT.y };
@@ -357,7 +378,7 @@ export class DuelEngine {
       inst.id = `du${this.uid}`;
       inst.maxHp = hp;
       inst.hp = hp;
-      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, slowUntil: 0, frozenUntil: 0, inst, angle: Math.PI / 2, turnRate: 0 });
+      this.units.push({ id: this.uid++, side, card, dist: -i * 26, hp, maxHp: hp, shield: 0, shieldUntil: 0, nextDisruptAt: (card.disrupt?.everyMs ?? 0) / 2, slowUntil: 0, frozenUntil: 0, inst, angle: Math.PI / 2, turnRate: 0 });
     }
   }
 
@@ -384,14 +405,27 @@ export class DuelEngine {
     // meteors landing
     for (const m of this.pendingMeteors) {
       if (m.landAt > this.t) continue;
-      for (const u of this.units) if (u.side === m.side && u.hp > 0 && u.dist >= 0 && Math.hypot(u.inst.position.x - m.at.x, u.inst.position.y - m.at.y) <= m.radius) this.hit(u, m.damage);
+      for (const u of this.units) if (u.side === m.side && u.hp > 0 && u.dist >= 0 && Math.hypot(u.inst.position.x - m.at.x, u.inst.position.y - m.at.y) <= m.radius) this.hit(u, m.damage, m.side, "X_METEOR");
     }
     this.pendingMeteors = this.pendingMeteors.filter((m) => m.landAt > this.t);
 
     for (const u of this.units) {
+      if (u.shield > 0 && this.t >= u.shieldUntil) u.shield = 0;
       if (this.t < u.frozenUntil) {
         u.inst.hp = u.hp;
         continue;
+      }
+      if (u.card.regen && u.hp > 0) u.hp = Math.min(u.maxHp, u.hp + (u.maxHp * u.card.regen * dt) / 1000);
+      if (u.card.disrupt && u.dist >= 0 && this.t >= u.nextDisruptAt) {
+        const d = u.card.disrupt;
+        u.nextDisruptAt = this.t + d.everyMs;
+        let jammed = 0;
+        for (const tw of this.towers)
+          if (tw.side === u.side && Math.hypot(tw.inst.position.x - u.inst.position.x, tw.inst.position.y - u.inst.position.y) <= d.radius) {
+            tw.stunnedUntil = this.t + d.stunMs;
+            jammed++;
+          }
+        if (jammed) this.spellFx.push({ side: (1 - u.side) as Side, effect: "DISRUPT", at: { ...u.inst.position }, radius: d.radius, castAt: this.t, landAt: this.t, durationMs: 600 });
       }
       const slow = this.t < u.slowUntil ? 0.6 : 1;
       u.dist += (u.card.speed * slow * dt) / 1000;
@@ -415,6 +449,7 @@ export class DuelEngine {
     for (const u of this.units) {
       if (u.dist >= PATH_LEN && u.hp > 0) {
         this.players[u.side].castle -= u.card.breach;
+        this.credit((1 - u.side) as Side, u.card.id, 0, u.card.breach);
         this.breaches.push({ side: u.side, at: this.t, dmg: u.card.breach });
         u.hp = 0;
       }
@@ -422,7 +457,7 @@ export class DuelEngine {
     // towers
     for (const tw of this.towers) {
       tw.cooldown -= dt;
-      if (tw.cooldown > 0) continue;
+      if (tw.cooldown > 0 || this.t < tw.stunnedUntil) continue;
       const inRange = this.units
         .filter((u) => u.side === tw.side && u.hp > 0 && u.dist > 0 && Math.hypot(u.inst.position.x - tw.inst.position.x, u.inst.position.y - tw.inst.position.y) <= tw.card.range)
         .sort((a, b) => b.dist - a.dist);
@@ -433,10 +468,10 @@ export class DuelEngine {
       tw.inst.cooldownRemainingMs = 0;
       const dmg = tw.card.damage[tw.level - 1]!;
       const shot: Shot = { side: tw.side, type: tw.card.tower, from: { ...tw.inst.position }, to: { ...target.inst.position }, at: this.t };
-      this.hit(target, dmg);
+      this.hit(target, dmg, tw.side, tw.card.id);
       if (tw.card.slow) target.slowUntil = this.t + 1500;
       if (tw.card.splash) {
-        for (const u of this.units) if (u !== target && u.side === tw.side && u.hp > 0 && Math.hypot(u.inst.position.x - target.inst.position.x, u.inst.position.y - target.inst.position.y) <= tw.card.splash) this.hit(u, dmg * 0.6);
+        for (const u of this.units) if (u !== target && u.side === tw.side && u.hp > 0 && Math.hypot(u.inst.position.x - target.inst.position.x, u.inst.position.y - target.inst.position.y) <= tw.card.splash) this.hit(u, dmg * 0.6, tw.side, tw.card.id);
       }
       if (tw.card.chain) {
         shot.hops = [];
@@ -448,7 +483,7 @@ export class DuelEngine {
             .sort((a, b) => Math.hypot(a.inst.position.x - from.inst.position.x, a.inst.position.y - from.inst.position.y) - Math.hypot(b.inst.position.x - from.inst.position.x, b.inst.position.y - from.inst.position.y))[0];
           if (!nxt || Math.hypot(nxt.inst.position.x - from.inst.position.x, nxt.inst.position.y - from.inst.position.y) > 90) break;
           hitSet.add(nxt.id);
-          this.hit(nxt, dmg * 0.7);
+          this.hit(nxt, dmg * 0.7, tw.side, tw.card.id);
           shot.hops.push({ ...nxt.inst.position });
           from = nxt;
         }
@@ -475,8 +510,30 @@ export class DuelEngine {
     }
   }
 
-  private hit(u: Unit, dmg: number): void {
-    u.hp -= dmg * (1 - (u.card.armor ?? 0));
+  private hit(u: Unit, dmg: number, by: Side, card: DuelCardId): void {
+    let d = dmg * (1 - (u.card.armor ?? 0));
+    if (u.shield > 0) {
+      const absorbed = Math.min(u.shield, d);
+      u.shield -= absorbed;
+      d -= absorbed;
+    }
+    this.credit(by, card, Math.max(0, Math.min(u.hp, d)), 0);
+    u.hp -= d;
+  }
+
+  /** Per-card match stats for the result screen: damage dealt and castle damage done. */
+  private stats: [Map<DuelCardId, { damage: number; breach: number }>, Map<DuelCardId, { damage: number; breach: number }>] = [new Map(), new Map()];
+  private credit(side: Side, card: DuelCardId, damage: number, breach: number): void {
+    const m = this.stats[side];
+    const s = m.get(card) ?? { damage: 0, breach: 0 };
+    s.damage += damage;
+    s.breach += breach;
+    m.set(card, s);
+  }
+
+  /** What each card did this match, for `side`, most useful first (a castle point counts like 120 damage). */
+  matchStats(side: Side): { card: DuelCardId; damage: number; breach: number }[] {
+    return [...this.stats[side].entries()].map(([card, s]) => ({ card, damage: Math.round(s.damage), breach: s.breach })).sort((a, b) => b.damage + b.breach * 120 - (a.damage + a.breach * 120));
   }
 
   /** Gives up the match: a loss. */
@@ -530,6 +587,12 @@ export class DuelEngine {
   /** Casts a spell if the board makes it worth it. */
   private aiSpell(card: DuelSpellCard, threat: number, power: number, towers: number): boolean {
     const mine = this.units.filter((u) => u.side === 1 && u.dist >= 0 && u.hp > 0);
+    if (card.effect === "WARD") {
+      // shield its own push when it's worth it: several creatures already marching on the player's road
+      const pushing = this.units.filter((u) => u.side === 0 && u.dist > 0 && u.hp > 0);
+      const hp = pushing.reduce((s, u) => s + u.hp, 0);
+      return pushing.length >= 2 && hp >= 450 * duelHpScale(this.t) ? this.play(1, card.id) : false;
+    }
     if (card.effect === "RAGE") {
       if (towers >= 2 && threat > power * 4 && this.t >= this.players[1].rageUntil) return this.play(1, card.id);
       return false;

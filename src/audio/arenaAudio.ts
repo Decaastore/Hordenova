@@ -55,6 +55,8 @@ export class DuelAudio {
       if (this.seen.first(`c${f.side}:${f.effect}:${f.castAt}`)) {
         if (f.effect === "FREEZE") this.play("frostborn_freeze", { volume: vol(f.side) });
         else if (f.effect === "RAGE") this.play("boss_enrage", { volume: 0.55 * vol(f.side), pitch: 1.25 });
+        else if (f.effect === "WARD") this.play("loot_rare", { volume: 0.8 * vol(f.side), pitch: 0.85 });
+        else if (f.effect === "DISRUPT") this.play("stormcaller_impact", { volume: 0.7 * vol(f.side), pitch: 0.6 });
         else this.play("inferno_attack", { volume: vol(f.side), pitch: 0.7 });
       }
       if (f.effect === "METEOR" && s.timeMs >= f.landAt && this.seen.first(`m${f.side}:${f.landAt}`)) {
