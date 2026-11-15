@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v143",
+    dateIso: "2026-11-15",
+    category: "INTERFACE",
+    title: {
+      en: "New Duel lobby: every mode up front, everything else in tabs",
+      ptBR: "Novo lobby do Duelo: todos os modos no topo e o resto em abas",
+    },
+    description: {
+      en: "The Duel lobby was one long page. Now the four ways to play sit at the top as big cards, and the rest is one tap away.",
+      ptBR: "O lobby do Duelo era uma página comprida. Agora os quatro jeitos de jogar ficam no topo em cartões grandes, e o resto está a um toque.",
+    },
+    highlights: [
+      {
+        en: "\"Choose your battle\": Ranked, Event of the day, Weekend Tournament and Weekly Challenge, each with its arena art, colour, status (first win, rounds won, this week's prize) and its own play button.",
+        ptBR: "\"Escolha sua batalha\": Ranqueada, Evento do dia, Torneio de Fim de Semana e Desafio Semanal, cada um com a arte da arena, cor própria, situação (primeira vitória, rodadas vencidas, prêmio da semana) e botão de jogar.",
+      },
+      {
+        en: "Tabs below them: Deck, Missions, Rewards, Mastery, History and Shop. The bar stays pinned while you scroll, remembers the last tab, and shows a red count when missions or mastery levels are ready to collect.",
+        ptBR: "Abas logo abaixo: Deck, Missões, Recompensas, Mestria, Histórico e Loja. A barra fica fixa ao rolar, lembra a última aba aberta e mostra um número vermelho quando há missões ou níveis de mestria para pegar.",
+      },
+      {
+        en: "On phones the mode cards turn into compact rows so all four fit quickly.",
+        ptBR: "No celular os cartões de modo viram fileiras compactas para os quatro caberem rápido.",
+      },
+    ],
+  },
+  {
     id: "v142",
     dateIso: "2026-11-14",
     category: "SYSTEMS",

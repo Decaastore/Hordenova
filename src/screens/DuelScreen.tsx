@@ -314,6 +314,22 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const [save, setSave] = useState<SaveData>(() => loadSave());
   const [deck, setDeck] = useState<DuelCardId[]>(() => [...(save.duel.decks[save.duel.activeDeck] ?? save.duel.deck)]);
   const [replay, setReplay] = useState<DuelHistoryEntry | null>(null);
+  const [tab, setTab] = useState<DuelTab>(() => {
+    try {
+      const v = window.localStorage.getItem(TAB_KEY) as DuelTab | null;
+      return v && (DUEL_TABS as readonly string[]).includes(v) ? v : "deck";
+    } catch {
+      return "deck";
+    }
+  });
+  const pickTab = (id: DuelTab) => {
+    setTab(id);
+    try {
+      window.localStorage.setItem(TAB_KEY, id);
+    } catch {
+      // a remembered tab is only a convenience
+    }
+  };
   const [match, setMatch] = useState<DuelEngine | null>(null);
   /** Bumped every new match so the match view starts fresh (its end-of-match latch included). */
   const [matchNo, setMatchNo] = useState(0);
@@ -335,6 +351,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const deckOk = isValidDeck(deck) && deckOwned(duel, deck);
   const missions = duelMissionsFor(day);
   const mState = duel.missions.day === day ? duel.missions : { day, progress: {} as Record<string, number>, claimed: [] as string[] };
+  const missionsReady = missions.filter((m) => (mState.progress[m.id] ?? 0) >= m.target && !mState.claimed.includes(m.id)).length;
+  const masteryReady = DUEL_CARDS.filter((c) => masteryClaimable(duel, c.id) > 0).length;
   const rankName = (r: DuelRank) => `${t(`duel.league.${r.league}` as TranslationKey)}${r.league === "MASTER" || r.league === "LEGEND" ? "" : " " + ROMAN[r.division]}`;
   const banner = duel.banner ? getShopItem(duel.banner)?.cosmetic ?? null : null;
   const frame = duel.frame ? getShopItem(duel.frame)?.cosmetic ?? null : null;
@@ -591,39 +609,87 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
           </div>
         </header>
         <div className="pg-wrap">
-          <section className="du-play">
-            <div>
-              <p className="pg-sub">{t("duel.rankedRules")}</p>
-              <p className="pg-sub">
-                {duel.firstWinDay === day ? t("duel.firstWinDone") : t("duel.firstWinOpen")} <PrizeLine prize={FIRST_WIN_PRIZE} />
-              </p>
-              <p className="pg-sub du-pz">
-                <MaterialIcon kind="DUEL_COINS" size={18} /> {t("duel.coinsBalance", { n: fmt(duel.coins) })}
-              </p>
-            </div>
-            <button className="pg-btn" disabled={!deckOk} onClick={start} data-testid="duel-start">
-              {t("duel.playRanked")}
-            </button>
-          </section>
+          <DuelModesGrid
+            cards={[
+              {
+                id: "RANKED",
+                kicker: t("duel.modeRankedKicker"),
+                title: t("duel.modeRanked"),
+                pitch: t("duel.rankedRules"),
+                art: `${arena.biome.toLowerCase()}`,
+                status: duel.firstWinDay === day ? t("duel.firstWinDone") : t("duel.firstWinOpen"),
+                prize: duel.firstWinDay === day ? null : FIRST_WIN_PRIZE,
+                cta: t("duel.playRanked"),
+                disabled: !deckOk,
+                onPlay: start,
+                testId: "duel-start",
+                hot: true,
+              },
+              {
+                id: "EVENT",
+                kicker: `${t("duel.eventTitle")} · ${t("duel.eventEndsIn", { time: formatDurationShort((day + 1) * 86_400_000 - now) })}`,
+                title: t(`duel.event.${todayEvent}.name` as TranslationKey),
+                pitch: t(`duel.event.${todayEvent}.desc` as TranslationKey),
+                art: "crystal_sea",
+                status: duel.eventWinDay === day ? t("duel.eventPrizeDone") : t("duel.eventPrizeOpen", { n: EVENT_WIN_COINS }),
+                prize: null,
+                cta: t("duel.eventPlay"),
+                disabled: (todayEvent === "MIRROR" || todayEvent === "DOUBLE_MANA") && !isValidDeck(duel.deck),
+                onPlay: () => startEvent(),
+                testId: "duel-event-start",
+                badge: t("duel.modeNew"),
+              },
+              {
+                id: "TOURNEY",
+                kicker: t("duel.modeTourneyKicker"),
+                title: t("duel.tourneyTitle"),
+                pitch: t("duel.tourneyLead"),
+                art: "abyss",
+                status:
+                  tourney === null
+                    ? t("duel.tourneyClosed")
+                    : tourney.won
+                      ? t("duel.tourneyWon")
+                      : tourney.out
+                        ? t("duel.tourneyOut")
+                        : t("duel.modeTourneyRound", { n: tourney.round + 1, max: TOURNEY_ROUNDS.length }),
+                prize: TOURNEY_ROUNDS[TOURNEY_ROUNDS.length - 1]!.prize,
+                prizeLabel: t("duel.modeTopPrize"),
+                cta: tourney && !tourney.won && !tourney.out ? t("duel.tourneyPlay", { n: tourney.round + 1 }) : t("duel.modeUnavailable"),
+                disabled: !deckOk || !tourney || tourney.won || tourney.out,
+                onPlay: startTourney,
+                testId: "duel-tourney-start",
+                rounds: TOURNEY_ROUNDS.map((_, i) => (tourney && tourney.round > i ? "done" : tourney && tourney.out && tourney.round === i ? "lost" : "open")),
+              },
+              {
+                id: "WEEKLY",
+                kicker: t("duel.modeWeeklyKicker"),
+                title: t("duel.weeklyTitle"),
+                pitch: t("duel.weeklyLead", { coins: WEEKLY_CHALLENGE_COINS, gems: WEEKLY_CHALLENGE_GEMS }),
+                art: "volcanic_wastes",
+                status: weeklyDone ? t("duel.weeklyDone") : t("duel.modeWeeklyOpen"),
+                prize: null,
+                cta: weeklyDone ? t("duel.modePlayAgain") : t("duel.weeklyPlay"),
+                disabled: false,
+                onPlay: startWeekly,
+                testId: "duel-weekly-start",
+                deck: weekly.myDeck,
+              },
+            ]}
+          />
           {notice && <p className="du-notice">{notice}</p>}
 
-          <section className={`du-event is-${todayEvent}`} data-testid="duel-event">
-            <div>
-              <small className="du-event-kicker">
-                {t("duel.eventTitle")} · {t("duel.eventEndsIn", { time: formatDurationShort((day + 1) * 86_400_000 - now) })}
-              </small>
-              <h2 className="pg-h2">{t(`duel.event.${todayEvent}.name` as TranslationKey)}</h2>
-              <p className="pg-sub">{t(`duel.event.${todayEvent}.desc` as TranslationKey)}</p>
-              <p className="pg-sub">{t("duel.eventLead", { n: EVENT_WIN_COINS })}</p>
-              <p className="pg-sub du-pz">
-                <MaterialIcon kind="DUEL_COINS" size={18} /> {duel.eventWinDay === day ? t("duel.eventPrizeDone") : t("duel.eventPrizeOpen", { n: EVENT_WIN_COINS })}
-              </p>
-            </div>
-            <button className="pg-btn" disabled={(todayEvent === "MIRROR" || todayEvent === "DOUBLE_MANA") && !isValidDeck(duel.deck)} onClick={() => startEvent()} data-testid="duel-event-start">
-              {t("duel.eventPlay")}
-            </button>
-          </section>
+          <div className="du-tabs" role="tablist" aria-label={t("duel.tabsLabel")}>
+            {DUEL_TABS.map((id) => (
+              <button key={id} role="tab" aria-selected={tab === id} className={`du-tab${tab === id ? " is-on" : ""}`} onClick={() => pickTab(id)} data-testid={`duel-tab-${id}`}>
+                <span aria-hidden="true">{TAB_ICON[id]}</span> {t(`duel.tabs.${id}` as TranslationKey)}
+                {id === "missions" && missionsReady > 0 && <b className="du-tab-dot">{missionsReady}</b>}
+                {id === "collection" && masteryReady > 0 && <b className="du-tab-dot">{masteryReady}</b>}
+              </button>
+            ))}
+          </div>
 
+          {tab === "missions" && (
           <section className="du-block" data-testid="duel-missions">
             <h2 className="pg-h2">{t("duel.missionsTitle")}</h2>
             <p className="pg-sub">
@@ -653,7 +719,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               })}
             </div>
           </section>
+          )}
 
+          {tab === "rewards" && (
           <section className="du-block" data-testid="duel-ladder">
             <h2 className="pg-h2">{t("duel.ladderTitle")}</h2>
             <p className="pg-sub">{t("duel.ladderLead")}</p>
@@ -688,44 +756,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               ))}
             </ul>
           </section>
+          )}
 
-          <section className="du-tourney" data-testid="duel-tourney">
-            <div>
-              <h2 className="pg-h2">{t("duel.tourneyTitle")}</h2>
-              <p className="pg-sub">{t("duel.tourneyLead")}</p>
-              <ol className="du-rounds">
-                {TOURNEY_ROUNDS.map((r, i) => {
-                  const done = !!tourney && tourney.round > i;
-                  const lost = !!tourney && tourney.out && tourney.round === i;
-                  return (
-                    <li key={i} className={done ? "is-done" : lost ? "is-lost" : ""}>
-                      <strong>{t("duel.tourneyRound", { n: i + 1 })}</strong>
-                      <PrizeLine prize={r.prize} />
-                      {i === TOURNEY_ROUNDS.length - 1 && <small>{t("duel.tourneyBanner")}</small>}
-                    </li>
-                  );
-                })}
-              </ol>
-            </div>
-            {tourney === null ? (
-              <button className="pg-btn-ghost" disabled>
-                {t("duel.tourneyClosed")}
-              </button>
-            ) : tourney.won ? (
-              <button className="pg-btn-ghost" disabled>
-                {t("duel.tourneyWon")}
-              </button>
-            ) : tourney.out ? (
-              <button className="pg-btn-ghost" disabled>
-                {t("duel.tourneyOut")}
-              </button>
-            ) : (
-              <button className="pg-btn" disabled={!deckOk} onClick={startTourney} data-testid="duel-tourney-start">
-                {t("duel.tourneyPlay", { n: tourney.round + 1 })}
-              </button>
-            )}
-          </section>
-
+          {tab === "rewards" && (
           <section className="du-block" data-testid="duel-weekwins">
             <h2 className="pg-h2">{t("duel.weekWinsTitle")}</h2>
             <p className="pg-sub">{t("duel.weekWinsLead", { n: duel.weekWins.week === week ? duel.weekWins.wins : 0 })}</p>
@@ -748,23 +781,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               })}
             </div>
           </section>
+          )}
 
-          <section className="du-weekly" data-testid="duel-weekly">
-            <div>
-              <h2 className="pg-h2">{t("duel.weeklyTitle")}</h2>
-              <p className="pg-sub">{t("duel.weeklyLead", { coins: WEEKLY_CHALLENGE_COINS, gems: WEEKLY_CHALLENGE_GEMS })}</p>
-              <div className="du-weekly-decks">
-                <span>{t("duel.weeklyYours")}</span>
-                {weekly.myDeck.map((id) => (
-                  <CardFace key={id} id={id} small />
-                ))}
-              </div>
-            </div>
-            <button className={weeklyDone ? "pg-btn-ghost" : "pg-btn"} onClick={startWeekly} data-testid="duel-weekly-start">
-              {weeklyDone ? t("duel.weeklyDone") : t("duel.weeklyPlay")}
-            </button>
-          </section>
-
+          {tab === "shop" && (
           <section className="du-block" data-testid="duel-shop">
             <div className="pg-head">
               <h2 className="pg-h2">{t("duel.shopTitle")}</h2>
@@ -840,7 +859,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               </div>
             ))}
           </section>
+          )}
 
+          {tab === "history" && (
           <section className="du-block" data-testid="duel-history">
             <h2 className="pg-h2">{t("duel.historyTitle")}</h2>
             <p className="pg-sub">{t("duel.historyLead")}</p>
@@ -872,7 +893,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               </ul>
             )}
           </section>
+          )}
 
+          {tab === "collection" && (
           <section className="du-block" data-testid="duel-mastery">
             <h2 className="pg-h2">{t("duel.masteryTitle")}</h2>
             <p className="pg-sub">{t("duel.masteryLead")}</p>
@@ -906,7 +929,9 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               })}
             </div>
           </section>
+          )}
 
+          {tab === "deck" && (
           <section className="du-deck">
             <div className="pg-head">
               <h2 className="pg-h2">{t("duel.deck")}</h2>
@@ -968,6 +993,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               })}
             </div>
           </section>
+          )}
         </div>
       </div>
     </div>
@@ -1421,6 +1447,84 @@ function MatchStats({ engine }: { engine: DuelEngine }) {
   );
 }
 
+// ── lobby: game modes + tabs ─────────────────────────────────────────────
+const DUEL_TABS = ["deck", "missions", "rewards", "collection", "history", "shop"] as const;
+type DuelTab = (typeof DUEL_TABS)[number];
+const TAB_KEY = "hordenova.duel.tab";
+const TAB_ICON: Record<DuelTab, string> = { deck: "🃏", missions: "🎯", rewards: "🏆", collection: "⭐", history: "📜", shop: "🛒" };
+const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
+
+interface DuelModeCard {
+  id: "RANKED" | "EVENT" | "TOURNEY" | "WEEKLY";
+  kicker: string;
+  title: string;
+  pitch: string;
+  /** Duel board art (sprites/duel/<art>.webp). */
+  art: string;
+  status: string;
+  prize: DuelPrize | null;
+  prizeLabel?: string;
+  cta: string;
+  disabled: boolean;
+  onPlay: () => void;
+  testId: string;
+  hot?: boolean;
+  badge?: string;
+  rounds?: ("done" | "lost" | "open")[];
+  deck?: DuelCardId[];
+}
+
+/** The four ways to play, as big illustrated cards at the top of the lobby. */
+function DuelModesGrid({ cards }: { cards: DuelModeCard[] }) {
+  const { t } = useLanguage();
+  return (
+    <section className="dmo" aria-labelledby="dmo-title" data-testid="duel-modes">
+      <h2 className="pg-h2" id="dmo-title">
+        {t("duel.modesTitle")}
+      </h2>
+      <div className="dmo-grid">
+        {cards.map((c) => (
+          <article key={c.id} className={`dmo-card is-${c.id}${c.hot ? " is-hot" : ""}`} data-testid={`duel-mode-${c.id}`}>
+            <div className="dmo-art" style={{ backgroundImage: `url(${assetBase}sprites/duel/${c.art}.webp)` }} onClick={c.disabled ? undefined : c.onPlay} aria-hidden="true">
+              {c.badge && <span className="dmo-badge">{c.badge}</span>}
+              <span className="dmo-glyph">{c.id === "RANKED" ? "⚔" : c.id === "EVENT" ? "✦" : c.id === "TOURNEY" ? "♛" : "⚑"}</span>
+            </div>
+            <div className="dmo-body">
+              <p className="dmo-kicker">{c.kicker}</p>
+              <h3 className="dmo-title">{c.title}</h3>
+              <p className="dmo-pitch">{c.pitch}</p>
+              {c.rounds && (
+                <div className="dmo-rounds" aria-label={c.status}>
+                  {c.rounds.map((r, i) => (
+                    <span key={i} className={`is-${r}`}>{r === "done" ? "✓" : r === "lost" ? "✕" : i + 1}</span>
+                  ))}
+                </div>
+              )}
+              {c.deck && (
+                <div className="dmo-deck">
+                  {c.deck.map((id) => (
+                    <CardFace key={id} id={id} small />
+                  ))}
+                </div>
+              )}
+              <p className="dmo-status">{c.status}</p>
+              {c.prize && (
+                <p className="dmo-prize">
+                  {c.prizeLabel && <span>{c.prizeLabel} </span>}
+                  <PrizeLine prize={c.prize} />
+                </p>
+              )}
+              <button className="dmo-play" disabled={c.disabled} onClick={c.onPlay} data-testid={c.testId}>
+                {c.cta}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function MasteryStars({ level }: { level: number }) {
   if (level <= 0) return null;
   return (
@@ -1653,6 +1757,56 @@ const LOBBY_CSS = `
 .du-draft-deck { display: flex; flex-wrap: wrap; gap: 8px; }
 .du-draft-empty { width: 64px; height: 84px; border-radius: 10px; border: 1px dashed var(--line); }
 .du-cardbtn.is-locked { cursor: default; border-style: dashed; }
+.dmo { padding: 34px 0 6px; }
+.dmo-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.dmo-card { --c1: #e8b04b; --glow: rgba(232,176,75,0.35); display: grid; grid-template-rows: auto 1fr; border-radius: 16px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--c1) 50%, transparent); background: linear-gradient(180deg, color-mix(in srgb, var(--c1) 14%, #120d08), #0f0b07 70%); box-shadow: 0 10px 28px rgba(0,0,0,0.45); transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease; }
+.dmo-card:hover { transform: translateY(-3px); border-color: var(--c1); box-shadow: 0 16px 36px rgba(0,0,0,0.55), 0 0 28px var(--glow); }
+.dmo-card.is-RANKED { --c1: #ffcf5a; --glow: rgba(255,207,90,0.4); }
+.dmo-card.is-EVENT { --c1: #6ff0e0; --glow: rgba(111,240,224,0.35); }
+.dmo-card.is-TOURNEY { --c1: #c48bff; --glow: rgba(196,139,255,0.38); }
+.dmo-card.is-WEEKLY { --c1: #ff7a4a; --glow: rgba(255,122,74,0.38); }
+.dmo-card.is-hot { box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 0 1px var(--c1), 0 0 26px var(--glow); }
+.dmo-art { position: relative; aspect-ratio: 16 / 8; background-size: cover; background-position: center; cursor: pointer; }
+.dmo-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0.05), rgba(12,9,6,0.9)); }
+.dmo-glyph { position: absolute; left: 50%; top: 50%; z-index: 1; transform: translate(-50%, -55%); font-size: 46px; color: #fff6e0; text-shadow: 0 0 14px var(--c1), 0 0 34px var(--c1), 0 3px 0 rgba(0,0,0,0.6); transition: transform 0.25s ease; }
+.dmo-card:hover .dmo-glyph { transform: translate(-50%, -55%) scale(1.12); }
+.dmo-badge { position: absolute; top: 10px; left: 10px; z-index: 2; padding: 4px 9px; border-radius: 20px; background: var(--c1); color: #10221f; font-size: 11.5px; font-weight: 800; }
+.dmo-body { display: grid; align-content: start; gap: 7px; padding: 14px 16px 16px; }
+.dmo-kicker { margin: 0; font-size: 12px; font-weight: 700; color: var(--c1); }
+.dmo-title { margin: 0; font-family: var(--display); font-size: 23px; line-height: 1.1; color: #fbefd6; }
+.dmo-pitch { margin: 0; font-size: 13px; line-height: 1.45; color: var(--ash); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dmo-status { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: #fbefd6; }
+.dmo-prize { margin: 0; font-size: 12.5px; color: var(--ash); display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+.dmo-rounds { display: flex; gap: 6px; }
+.dmo-rounds span { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--c1); font-size: 12px; font-weight: 800; color: #fbefd6; }
+.dmo-rounds .is-done { background: var(--c1); color: #1a0f04; }
+.dmo-rounds .is-lost { border-color: #ff7a6a; color: #ff7a6a; }
+.dmo-deck { display: flex; flex-wrap: wrap; gap: 4px; }
+.dmo-deck .dc-face.is-small { width: 34px; padding: 2px; }
+.dmo-deck .dc-face.is-small canvas { width: 26px !important; height: 26px !important; }
+.dmo-deck .dc-face.is-small .dc-name, .dmo-deck .dc-face.is-small .dc-kind, .dmo-deck .dc-face.is-small .dc-cost { display: none; }
+.dmo-play { margin-top: 4px; padding: 11px 16px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--c1) 80%, #fff); cursor: pointer; font-weight: 800; font-size: 15px; color: #1a0f04 !important; background: linear-gradient(180deg, color-mix(in srgb, var(--c1) 65%, #fff), var(--c1)); box-shadow: 0 6px 18px var(--glow); }
+.dmo-play:hover:not(:disabled) { filter: brightness(1.08); }
+.dmo-play:disabled { opacity: 0.45; cursor: default; box-shadow: none; }
+.dmo-play:focus-visible { outline: 2px solid #fff3d0; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .dmo-card, .dmo-glyph { transition: none; } }
+@media (max-width: 1100px) { .dmo-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .dmo-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .dmo-card { grid-template-rows: none; grid-template-columns: 92px minmax(0, 1fr); }
+  .dmo-art { aspect-ratio: auto; min-height: 100%; }
+  .dmo-glyph { font-size: 34px; }
+  .dmo-badge { top: 6px; left: 6px; font-size: 10.5px; padding: 3px 7px; }
+  .dmo-body { padding: 12px 14px 14px; gap: 5px; }
+  .dmo-title { font-size: 20px; }
+  .dmo-pitch { -webkit-line-clamp: 2; font-size: 12.5px; }
+}
+.du-tabs { position: sticky; top: 0; z-index: 5; display: flex; gap: 6px; margin: 28px 0 0; padding: 10px 0; overflow-x: auto; scrollbar-width: none; background: linear-gradient(180deg, var(--night) 80%, transparent); }
+.du-tab { position: relative; flex: none; display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 10px; border: 1px solid var(--line); background: rgba(24,18,12,0.6); color: var(--ash); font-weight: 700; font-size: 14px; cursor: pointer; white-space: nowrap; }
+.du-tab:hover { color: #fbefd6; border-color: rgba(232,176,75,0.6); }
+.du-tab.is-on { color: #1a0f04; background: linear-gradient(180deg, #ffe08a, #e8b04b); border-color: #ffd56a; }
+.du-tab:focus-visible { outline: 2px solid #fff3d0; outline-offset: 2px; }
+.du-tab-dot { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ff5a4a; color: #fff; font-size: 11px; display: inline-grid; place-items: center; }
 .du-lock { position: absolute; top: 8px; right: 10px; z-index: 1; font-size: 16px; }
 .du-unlock { font-size: 11.5px; color: var(--ash-2); text-align: center; }
 .du-buycard { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 2px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e8b04b; background: rgba(232,176,75,0.12); color: #ffe7b0 !important; font-weight: 800; font-size: 12.5px; cursor: pointer; }
