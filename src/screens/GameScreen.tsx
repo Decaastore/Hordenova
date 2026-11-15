@@ -797,6 +797,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             getFusionEligibility={(ids) => engine.getFusionEligibility(ids)}
             onAttemptFusion={(ids) => engine.attemptFusion(ids)}
             onRerollItem={(id) => engine.rerollItem(id)}
+            equippedTowers={engine.getEquippedItemTowers()}
           />
         )}
       </div>

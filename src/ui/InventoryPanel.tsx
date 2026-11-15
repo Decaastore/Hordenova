@@ -1,58 +1,178 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { createPortal } from "react-dom";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition, type ItemCategory } from "@/config/itemDefinitions";
-import { getRarityDefinition } from "@/config/rarity";
-import { FUSION_ITEM_COUNT, getFusionSuccessChance } from "@/config/itemFusion";
+import { RARITIES, getRarityDefinition, type Rarity } from "@/config/rarity";
+import { FUSION_ITEM_COUNT, getFusionSuccessChance, getNextRarity } from "@/config/itemFusion";
+import { itemRollQuality } from "@/config/itemRolls";
+import type { TowerType } from "@/config/towerStats";
 import type { ItemInstance } from "@/entities/Item";
 import type { FusionEligibility, FusionOutcome } from "@/engine/ItemFusion";
 import { RarityBadge } from "./RarityBadge";
-import { ItemDetailsModal } from "./ItemDetailsModal";
+import { ItemDetailsBody, ItemDetailsModal } from "./ItemDetailsModal";
 import { TradeScreen } from "./TradeScreen";
 import { EconomyStatsPanel } from "./EconomyStatsPanel";
 import { GameEngine } from "@/engine/GameEngine";
 import { ItemGlyph } from "./ItemGlyph";
-import { ItemHoverCard, ITEM_TOOLTIP_KEYFRAMES } from "./ItemTooltip";
 import type { GemCurrency } from "@/config/gemsEconomy";
 
 /**
- * ITENS COMO ITENS REAIS — fixed display order for the inventory's category
- * filter row (real ItemCategory values only — never a fabricated one). A
- * category only shows as a filter chip when the player actually owns at
- * least one item in it (see `availableCategories` below), so a 1-item
- * catalog phase like this one doesn't clutter the UI with empty tabs.
+ * INVENTÁRIO — one wide panel instead of the old narrow scroll.
+ *
+ *  ┌ title · slot meter · shards → gems ─────────────── × ┐
+ *  │ Items | Trade | Stats                                 │
+ *  │ ┌ filters · sort · [Fuse items] ┐ ┌ details / fusion ┐│
+ *  │ │ grid of slots (empty ones too) │ │ side panel       ││
+ *  │ └───────────────────────────────┘ └──────────────────┘│
+ *
+ * Desktop shows the picked item's details in the side panel; on a phone the
+ * panel fills the screen and the details open as a pop-up instead. Fusion is
+ * a mode: while it's on, tapping a tile picks it for the fusion and the side
+ * panel (a bottom tray on phones) becomes the fusion bench. Every rule about
+ * what can be fused still comes from getFusionEligibility — the UI only
+ * dims what obviously can't join the current pick.
+ *
+ * Pure UI overlay: nothing here touches the running wave.
  */
+
+/** Fixed display order for the category filter row; a chip only shows when the player owns an item in it. */
 const CATEGORY_DISPLAY_ORDER: readonly ItemCategory[] = ["AMULET", "MATERIAL", "RELIC", "RUNE", "ARTIFACT", "COSMETIC"];
 
-/**
- * IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items: EPIC+
- * tiles pulse their rarity-colored glow slowly instead of holding a static
- * shadow, the same "power heart" read a tower's core gets. Items aren't
- * canvas-rendered on the map (see RarityBadge/ItemTile), so this layer is
- * CSS rather than a canvas draw call — same underlying idea (a magical
- * object's glow breathes, it isn't decoration painted on top).
- */
-const ITEM_PULSE_KEYFRAMES = `
-@keyframes hordenova-item-core-pulse {
-  0%, 100% { box-shadow: 0 0 10px var(--pulse-color); }
-  50% { box-shadow: 0 0 20px var(--pulse-color); }
-}
-`;
+type Tab = "items" | "trade" | "stats";
+type SortMode = "rarity" | "newest";
+const SORT_KEY = "hordenova.inventory.sort";
 
-/** A subtle lift on hover — collectible-card feel without any exaggerated motion. */
-const ITEM_TILE_HOVER_CSS = `
-.hordenova-item-tile:hover { transform: translateY(-2px); }
-`;
-
-/** EPIC (order 3) and above get the pulsing core read; COMMON/UNCOMMON/RARE stay static. */
-function rarityPulseStyle(rarityDef: { order: number; glow: string }): CSSProperties {
-  if (rarityDef.order < 3) return {};
-  return {
-    animation: "hordenova-item-core-pulse 2.2s ease-in-out infinite",
-    "--pulse-color": rarityDef.glow,
-  } as CSSProperties;
+function readSort(): SortMode {
+  try {
+    return window.localStorage.getItem(SORT_KEY) === "newest" ? "newest" : "rarity";
+  } catch {
+    return "rarity";
+  }
 }
+
+function writeSort(mode: SortMode): void {
+  try {
+    window.localStorage.setItem(SORT_KEY, mode);
+  } catch {
+    /* private mode — the choice just isn't remembered */
+  }
+}
+
+/** True on phone-width screens, where the side panel turns into pop-ups and trays. */
+function useNarrow(maxWidth = 760): boolean {
+  const query = `(max-width: ${maxWidth}px)`;
+  const read = () => (typeof window !== "undefined" && typeof window.matchMedia === "function" ? window.matchMedia(query).matches : false);
+  const [narrow, setNarrow] = useState(read);
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener?.("change", on);
+    return () => mq.removeEventListener?.("change", on);
+  }, [query]);
+  return narrow;
+}
+
+function rarityOf(item: ItemInstance): Rarity | null {
+  return getItemDefinition(item.itemDefinitionId)?.rarity ?? null;
+}
+
+function rarityRank(item: ItemInstance): number {
+  const r = rarityOf(item);
+  return r ? RARITIES.indexOf(r) : -1;
+}
+
+/** Can this copy go into a fusion at all right now (UI hint only — the engine re-checks)? */
+function fusable(item: ItemInstance): boolean {
+  const r = rarityOf(item);
+  return !!r && !!getNextRarity(r) && !item.pendingTrade && !item.pendingAuction;
+}
+
+const CSS = `
+.inv-overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(10,7,4,.82);z-index:30}
+.inv-card{position:relative;display:flex;flex-direction:column;width:min(980px,calc(100% - 32px));height:min(720px,calc(100% - 32px));border-radius:14px;border:1px solid ${PALETTE.uiPanelBorder};background:linear-gradient(160deg,rgba(54,36,22,.985),rgba(26,17,10,.995));color:${PALETTE.uiText};box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
+.inv-head{display:flex;align-items:center;gap:18px;padding:18px 22px 0;flex-wrap:wrap}
+.inv-title{font-family:Georgia,'Times New Roman',serif;font-size:22px;font-weight:700;letter-spacing:1px;color:${PALETTE.uiAccentBright}}
+.inv-meter{display:flex;flex-direction:column;gap:4px;min-width:150px}
+.inv-meter-txt{font-size:11.5px;color:${PALETTE.uiTextDim}}
+.inv-meter-track{height:5px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.inv-meter-fill{height:100%;border-radius:3px}
+.inv-shards{margin-left:auto;margin-right:34px;display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;border-radius:9px;border:1px solid ${PALETTE.gem}55;background:rgba(200,138,255,.07)}
+.inv-shards-txt{font-size:12px;font-weight:700;color:#e8d4ff;white-space:nowrap}
+.inv-shards-btn{padding:6px 11px;border-radius:7px;border:1px solid ${PALETTE.gem};background:rgba(200,138,255,.16);color:#f1e4ff;font-weight:700;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.inv-shards-btn:disabled{opacity:.5;cursor:not-allowed}
+.inv-close{position:absolute;top:12px;right:14px;width:32px;height:32px;border-radius:8px;background:transparent;border:none;color:${PALETTE.uiTextDim};font-size:22px;cursor:pointer;z-index:2}
+.inv-close:hover{color:${PALETTE.uiAccentBright}}
+.inv-tabs{display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid ${PALETTE.uiPanelBorder}66}
+.inv-tab{padding:8px 14px;background:none;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:${PALETTE.uiTextDim};font-weight:700;font-size:12.5px;cursor:pointer}
+.inv-tab[aria-selected=true]{color:${PALETTE.uiAccentBright};border-bottom-color:${PALETTE.uiAccent}}
+.inv-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 320px}
+.inv-body.solo{display:block;overflow-y:auto;padding:16px 22px}
+.inv-main{min-height:0;overflow-y:auto;padding:14px 18px 18px 22px}
+.inv-aside{min-height:0;overflow-y:auto;padding:16px 20px;border-left:1px solid ${PALETTE.uiPanelBorder}55;background:rgba(0,0,0,.18)}
+.inv-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.inv-chip{padding:5px 11px;border-radius:999px;border:1px solid ${PALETTE.uiPanelBorder};background:transparent;color:${PALETTE.uiTextDim};font-weight:700;font-size:11px;cursor:pointer}
+.inv-chip[aria-pressed=true]{border-color:${PALETTE.uiAccent};color:${PALETTE.uiAccentBright};background:rgba(255,210,87,.14)}
+.inv-sort{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:${PALETTE.uiTextDim}}
+.inv-sort select{background:rgba(0,0,0,.35);color:${PALETTE.uiText};border:1px solid ${PALETTE.uiPanelBorder};border-radius:6px;padding:4px 6px;font-size:11.5px}
+.inv-fuse-toggle{padding:6px 12px;border-radius:7px;border:1px solid ${PALETTE.uiAccent};background:rgba(255,210,87,.1);color:${PALETTE.uiAccentBright};font-weight:700;font-size:11.5px;cursor:pointer}
+.inv-fuse-toggle[aria-pressed=true]{background:${PALETTE.uiAccent};color:#2a1a08}
+.inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px}
+.hordenova-item-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:7px;aspect-ratio:1/1.12;padding:12px 6px 10px;border-radius:10px;border:1px solid;background:rgba(0,0,0,.28);color:inherit;cursor:pointer;text-align:center;transition:transform 140ms ease,box-shadow 140ms ease,opacity 140ms ease;font:inherit}
+.hordenova-item-tile:hover:not(:disabled){transform:translateY(-2px)}
+.hordenova-item-tile:focus-visible{outline:2px solid ${PALETTE.uiAccentBright};outline-offset:2px}
+.hordenova-item-tile:disabled{cursor:default;opacity:.32}
+.hordenova-item-tile[aria-pressed=true]{outline:2px solid ${PALETTE.uiAccent};outline-offset:1px}
+.inv-tile-name{font-size:11px;font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.inv-tile-strip{position:absolute;left:10px;right:10px;bottom:5px;height:3px;border-radius:2px}
+.inv-tile-eq{position:absolute;top:5px;left:6px;font-size:9px;font-weight:800;letter-spacing:.3px;padding:1px 5px;border-radius:4px;background:${PALETTE.success}2a;color:${PALETTE.success};border:1px solid ${PALETTE.success}77}
+.inv-tile-check{position:absolute;top:5px;right:6px;width:18px;height:18px;border-radius:5px;background:${PALETTE.uiAccent};color:#2a1a08;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.inv-slot-empty{aspect-ratio:1/1.12;border-radius:10px;border:1px dashed ${PALETTE.uiPanelBorder}44;background:rgba(0,0,0,.12)}
+.inv-empty{font-size:13px;color:${PALETTE.uiTextDim};font-style:italic;padding:30px 0;text-align:center}
+.inv-sec{font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:${PALETTE.uiAccentBright};margin:18px 0 4px}
+.inv-hint{font-size:11.5px;color:${PALETTE.uiTextDim};line-height:1.45;margin-bottom:10px}
+.inv-claim{font-size:10px;font-weight:700;color:${PALETTE.uiAccent}}
+.inv-pick-hint{font-size:12.5px;color:${PALETTE.uiTextDim};text-align:center;margin-top:40%}
+.inv-quick{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.inv-quick button{padding:5px 10px;border-radius:7px;border:1px solid;background:rgba(0,0,0,.25);font-weight:700;font-size:11px;cursor:pointer}
+.inv-bench{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.inv-bench-slot{aspect-ratio:1/1;border-radius:10px;border:1px dashed ${PALETTE.uiPanelBorder}88;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.2);padding:0;color:inherit;cursor:pointer}
+.inv-bench-slot:disabled{cursor:default}
+.inv-count{font-size:11px;color:${PALETTE.uiTextDim};text-align:center;margin:8px 0 2px}
+.inv-row{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:${PALETTE.uiTextDim};padding:3px 0}
+.inv-box{margin-top:10px;padding:9px 11px;border-radius:9px;border:1px solid ${PALETTE.uiPanelBorder}88;background:rgba(0,0,0,.18)}
+.inv-warn{margin-top:6px;font-size:11.5px;font-weight:700;color:${PALETTE.danger};line-height:1.4}
+.inv-blocked{font-size:11.5px;color:${PALETTE.danger};font-style:italic}
+.inv-btn{margin-top:10px;width:100%;padding:10px;border-radius:8px;border:1px solid ${PALETTE.uiAccent};background:rgba(255,210,87,.16);color:${PALETTE.uiAccentBright};font-weight:700;font-size:12.5px;letter-spacing:.4px;cursor:pointer}
+.inv-btn:disabled{opacity:.45;cursor:not-allowed}
+.inv-btn.ghost{border-style:dashed;border-color:${PALETTE.uiPanelBorder};background:rgba(255,255,255,.02);color:${PALETTE.uiText};font-weight:600;margin-top:6px}
+.inv-btn.danger{border-color:${PALETTE.danger};background:rgba(220,70,50,.18);color:#ffd9d2}
+.inv-outcome{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;padding:9px 11px;border-radius:8px;border:1px solid;background:rgba(0,0,0,.25);font-size:12px}
+.inv-outcome button{background:transparent;border:none;color:${PALETTE.uiTextDim};font-size:15px;cursor:pointer}
+@media (max-width:760px){
+  .inv-overlay{position:fixed;z-index:65;background:rgba(10,7,4,.96)}
+  .inv-card{width:100%;height:100%;border-radius:0;border:none}
+  .inv-head{padding:14px 16px 0;gap:12px}
+  .inv-title{font-size:19px}
+  .inv-meter{min-width:110px}
+  .inv-shards{margin:0;width:100%;justify-content:space-between}
+  .inv-tabs{padding:8px 12px 0}
+  .inv-body{display:block;position:relative;overflow:hidden}
+  .inv-main{height:100%;padding:12px 14px 16px}
+  .inv-main.with-tray{padding-bottom:52vh}
+  .inv-body.solo{padding:12px 14px}
+  .inv-aside{display:none}
+  .inv-aside.tray{display:block;position:absolute;left:0;right:0;bottom:0;max-height:48%;border-left:none;border-top:1px solid ${PALETTE.uiPanelBorder};background:linear-gradient(180deg,rgba(44,29,17,.99),rgba(26,17,10,.995));box-shadow:0 -12px 30px rgba(0,0,0,.5);padding:12px 14px}
+  .inv-grid{grid-template-columns:repeat(auto-fill,minmax(74px,1fr));gap:7px}
+  .inv-bench{grid-template-columns:repeat(3,minmax(0,80px));justify-content:center}
+  .inv-sort{margin-left:0}
+  .hordenova-item-tile{padding:9px 4px 8px;gap:5px}
+  .inv-tile-name{font-size:10px}
+}
+@media (prefers-reduced-motion:reduce){.hordenova-item-tile{transition:none}.hordenova-item-tile:hover:not(:disabled){transform:none}}
+`;
 
 interface InventoryPanelProps {
   inventory: readonly ItemInstance[];
@@ -65,37 +185,22 @@ interface InventoryPanelProps {
   /** Progression 2.0 spec section 34 — manual, player-triggered Shards -> Gems conversion. */
   gemShards: number;
   onConvertGemShards: () => void;
-  /** Master Implementation Pass spec section 7-8 — Profile Prestige, the recurring cosmetic Gem sink. GEMS ECONOMY v2 — dual-currency balances. */
   freeGems: number;
   purchasedGems: number;
   prestigeLevel: number;
-  /** The account's all-time record wave — gates whether Prestige is unlocked at all (see config/prestige.ts's canUnlockPrestige). */
+  /** The account's all-time record wave — gates whether Prestige is unlocked at all. */
   bestWave: number;
   onUpgradePrestige: (currency: GemCurrency) => void;
-  /** SISTEMA DE FUSÃO DE ITENS — read-only pre-check for the UI (enables/disables CONFIRMAR FUSÃO, explains why blocked). Re-validated again, unconditionally, by onAttemptFusion itself — the UI's own read is never trusted for the actual spend. */
+  /** Read-only pre-check for the fusion button. onAttemptFusion re-validates on its own; the UI's read is never trusted for the spend. */
   getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
-  /** Pays out the atomic fusion attempt — consumes the 3 selected items and, on success only, creates 1 superior item. See engine/GameEngine.ts's attemptFusion for the exact 8-step guarantee. */
+  /** The atomic fusion attempt — consumes the 3 picked items and, on success only, creates 1 better item. */
   onAttemptFusion: (selectedInstanceIds: string[]) => FusionOutcome;
   /** Re-rolls an item's values for Gem Shards (config/itemRolls.ts). */
   onRerollItem?: (instanceId: string) => number[] | null;
+  /** instanceId -> the tower type wearing it (GameEngine.getEquippedItemTowers). Omitted = equipped state unknown. */
+  equippedTowers?: Readonly<Record<string, TowerType>>;
 }
 
-type Tab = "items" | "trade" | "stats";
-
-/**
- * Item System spec section 32 — the one entry point for Inventory / Item
- * Details / Drop Table / Trade / Stats, opened from a single HUD button.
- *
- * This is a PURE UI OVERLAY: it renders on top of GameScreen while the
- * engine keeps running underneath exactly as it would with the panel
- * closed. Nothing here reads or writes engine state beyond the read-only
- * `inventory`/`localEconomyTotals` props GameScreen passes in — opening or
- * closing it can never reset a wave, an enemy, a tower, a boss, a timer,
- * or Active Idle progression, because it has no way to touch any of that.
- * Closes via the X button, the same HUD toggle, clicking the backdrop, or
- * Escape (LanguageSelector is the only other Escape listener in the app,
- * and it's scoped to the main menu, so there's no conflict here).
- */
 export function InventoryPanel({
   inventory,
   localEconomyTotals,
@@ -113,21 +218,18 @@ export function InventoryPanel({
   getFusionEligibility,
   onAttemptFusion,
   onRerollItem,
+  equippedTowers,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
+  const narrow = useNarrow();
   const [tab, setTab] = useState<Tab>("items");
   const [selectedInstanceId, setSelectedInstanceId] = useState<string | null>(null);
-  // ITENS COMO ITENS REAIS — category filter is local UI state; "ALL" (the
-  // default) shows every real item exactly as before this feature, so
-  // nothing about the existing grid changes unless the player actively
-  // narrows it down.
+  const [detailOpen, setDetailOpen] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<ItemCategory | "ALL">("ALL");
-  // SISTEMA DE FUSÃO DE ITENS — selection is local UI state, not engine
-  // state (nothing is consumed until CONFIRMAR FUSÃO). Auto-drops any
-  // instanceId that stops existing in `inventory` — e.g. after a
-  // successful/failed fusion consumes it, or it gets equipped/traded away
-  // in another tab — so the selection can never silently reference a
-  // now-gone item.
+  const [sort, setSort] = useState<SortMode>(readSort);
+  const [fusionMode, setFusionMode] = useState(false);
+  // Fusion picks are UI state only — nothing is spent until the final confirm.
+  // Any id that stops existing in `inventory` (consumed, traded) drops out.
   const [fusionSelectedIds, setFusionSelectedIds] = useState<string[]>([]);
   const [fusionConfirming, setFusionConfirming] = useState(false);
   const [fusionOutcome, setFusionOutcome] = useState<FusionOutcome | null>(null);
@@ -138,19 +240,20 @@ export function InventoryPanel({
 
   useEffect(() => {
     const handleKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key !== "Escape") return;
+      if (detailOpen) setDetailOpen(false);
+      else onClose();
     };
     document.addEventListener("keydown", handleKey);
     return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose]);
+  }, [onClose, detailOpen]);
 
-  const selectedItem = selectedInstanceId ? inventory.find((i) => i.instanceId === selectedInstanceId) ?? null : null;
+  const towerName = (id: string): string | null | undefined => {
+    if (!equippedTowers) return undefined;
+    const type = equippedTowers[id];
+    return type ? t(`towers.${type}.name` as TranslationKey) : null;
+  };
 
-  // ITENS COMO ITENS REAIS — a category only ever appears as a filter chip
-  // if the player actually owns a real item in it (never a fabricated
-  // category placeholder), and the filter itself only ever excludes items
-  // the player already owns — it never changes what's actually in
-  // `inventory`.
   const availableCategories = useMemo(() => {
     const present = new Set<ItemCategory>();
     for (const item of inventory) {
@@ -160,255 +263,296 @@ export function InventoryPanel({
     return CATEGORY_DISPLAY_ORDER.filter((c) => present.has(c));
   }, [inventory]);
 
-  const filteredInventory = useMemo(() => {
-    if (categoryFilter === "ALL") return inventory;
-    return inventory.filter((item) => getItemDefinition(item.itemDefinitionId)?.category === categoryFilter);
-  }, [inventory, categoryFilter]);
+  const shownItems = useMemo(() => {
+    const list = categoryFilter === "ALL" ? [...inventory] : inventory.filter((item) => getItemDefinition(item.itemDefinitionId)?.category === categoryFilter);
+    if (sort === "newest") list.sort((a, b) => b.acquiredAt - a.acquiredAt);
+    else list.sort((a, b) => rarityRank(b) - rarityRank(a) || a.itemDefinitionId.localeCompare(b.itemDefinitionId) || b.acquiredAt - a.acquiredAt);
+    return list;
+  }, [inventory, categoryFilter, sort]);
 
-  return (
-    <div style={overlayStyle} onClick={onClose}>
-      {/* IDENTIDADE VISUAL HORDENOVA — CAMADA 2 (Núcleo) for rare items:
-          EPIC+ tiles get a slow pulsing glow instead of a static shadow, the
-          same "power heart" read a tower's core gets. Rarity itself already
-          drives every item tile's border/shadow color (see ItemTile/
-          OverflowItemTile below); this only adds the pulse animation. */}
-      <style>{ITEM_PULSE_KEYFRAMES}{ITEM_TOOLTIP_KEYFRAMES}{ITEM_TILE_HOVER_CSS}</style>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        <button onClick={onClose} style={closeButtonStyle}>
+  // Desktop: with nothing picked yet, the side panel shows the first tile.
+  const selectedItem =
+    (selectedInstanceId ? inventory.find((i) => i.instanceId === selectedInstanceId) : undefined) ?? (narrow ? null : shownItems[0] ?? null);
+
+  const fusionRarity: Rarity | null = fusionSelectedIds.length > 0 ? rarityOf(inventory.find((i) => i.instanceId === fusionSelectedIds[0]) ?? inventory[0]!) : null;
+
+  const toggleFusionPick = (instanceId: string) => {
+    setFusionOutcome(null);
+    setFusionConfirming(false);
+    setFusionSelectedIds((prev) => {
+      if (prev.includes(instanceId)) return prev.filter((id) => id !== instanceId);
+      if (prev.length >= FUSION_ITEM_COUNT) return prev; // a 4th pick is ignored
+      return [...prev, instanceId];
+    });
+  };
+
+  const onTile = (item: ItemInstance) => {
+    if (fusionMode) {
+      toggleFusionPick(item.instanceId);
+      return;
+    }
+    setSelectedInstanceId(item.instanceId);
+    if (narrow) setDetailOpen(true);
+  };
+
+  const setFusion = (on: boolean) => {
+    setFusionMode(on);
+    setFusionConfirming(false);
+    if (!on) {
+      setFusionSelectedIds([]);
+      setFusionOutcome(null);
+    }
+  };
+
+  const used = inventory.length;
+  const fillPct = Math.min(100, inventoryCapacity > 0 ? (used / inventoryCapacity) * 100 : 0);
+  const meterColor = used >= inventoryCapacity ? PALETTE.danger : fillPct >= 80 ? "#ffb347" : PALETTE.uiAccent;
+  const rate = GameEngine.GEM_SHARD_TO_GEM_RATE;
+  const canConvert = GameEngine.canConvertGemShards(gemShards);
+  const emptySlots = categoryFilter === "ALL" ? Math.max(0, inventoryCapacity - inventory.length) : 0;
+  const showAside = !narrow || fusionMode;
+
+  const panel = (
+    <div className="inv-overlay" onClick={onClose}>
+      <style>{CSS}</style>
+      <div className="inv-card" role="dialog" aria-modal="true" aria-label={t("inventory.title")} onClick={(e) => e.stopPropagation()}>
+        <button onClick={onClose} className="inv-close" aria-label={t("inventory.close")}>
           ×
         </button>
-        <div style={titleStyle}>{t("inventory.title")}</div>
+        <div className="inv-head">
+          <div className="inv-title">{t("inventory.title")}</div>
+          <div className="inv-meter" data-testid="inventory-capacity">
+            <span className="inv-meter-txt">{t("inventory.capacity", { used, capacity: inventoryCapacity })}</span>
+            <div className="inv-meter-track">
+              <div className="inv-meter-fill" style={{ width: `${fillPct}%`, background: meterColor }} />
+            </div>
+          </div>
+          {gemShards > 0 && (
+            // GameEngine.canConvertGemShards is the one rule both this button and convertGemShards() read.
+            <div className="inv-shards" title={t("inventory.convertNeed", { rate })}>
+              <span className="inv-shards-txt">{t("inventory.shardsLine", { count: gemShards })}</span>
+              <button className="inv-shards-btn" onClick={onConvertGemShards} disabled={!canConvert} data-testid="inventory-convert">
+                {canConvert ? t("inventory.convertShort", { gems: Math.floor(gemShards / rate) }) : t("inventory.convertNeed", { rate })}
+              </button>
+            </div>
+          )}
+        </div>
 
-        <div style={tabRowStyle}>
-          <TabButton active={tab === "items"} onClick={() => setTab("items")} label={t("inventory.tabs.items")} />
-          <TabButton active={tab === "trade"} onClick={() => setTab("trade")} label={t("inventory.tabs.trade")} />
-          <TabButton active={tab === "stats"} onClick={() => setTab("stats")} label={t("inventory.tabs.stats")} />
+        <div className="inv-tabs" role="tablist">
+          {(["items", "trade", "stats"] as const).map((id) => (
+            <button key={id} role="tab" aria-selected={tab === id} className="inv-tab" onClick={() => setTab(id)}>
+              {t(`inventory.tabs.${id}` as TranslationKey)}
+            </button>
+          ))}
         </div>
 
         {tab === "items" && (
-          <>
-            <div style={capacityRowStyle}>
-              <span>{t("inventory.capacity", { used: inventory.length, capacity: inventoryCapacity })}</span>
-            </div>
-
-            {gemShards > 0 && (
-              // AUDITORIA E CORREÇÃO GERAL spec section 18 — exact raw
-              // values (never a "1.2K"-style abbreviation), and section 15's
-              // "a mesma função/regra deve ser usada por UI/clique/validação"
-              // — GameEngine.canConvertGemShards is the ONE eligibility rule
-              // both this button's disabled state and convertGemShards()
-              // itself check, so they can never disagree.
-              <div style={convertBoxStyle}>
-                <div style={convertRowStyle}>
-                  <span>{t("gems.shardsAvailable")}</span>
-                  <span>{gemShards}</span>
-                </div>
-                <div style={convertRowStyle}>
-                  <span>{t("gems.cost")}</span>
-                  <span>{GameEngine.GEM_SHARD_TO_GEM_RATE}</span>
-                </div>
-                <div style={convertRowStyle}>
-                  <span>{t("gems.receive")}</span>
-                  <span>1</span>
-                </div>
-                <button
-                  onClick={onConvertGemShards}
-                  disabled={!GameEngine.canConvertGemShards(gemShards)}
-                  style={{
-                    ...convertButtonStyle,
-                    opacity: GameEngine.canConvertGemShards(gemShards) ? 1 : 0.45,
-                    cursor: GameEngine.canConvertGemShards(gemShards) ? "pointer" : "not-allowed",
-                  }}
-                >
-                  {t("gems.convert")}
-                </button>
-              </div>
-            )}
-
-            {inventory.length === 0 ? (
-              <div style={emptyStyle}>{t("inventory.empty")}</div>
-            ) : (
-              <>
+          <div className="inv-body">
+            <div className={`inv-main${narrow && fusionMode ? " with-tray" : ""}`}>
+              <div className="inv-tools">
                 {availableCategories.length > 1 && (
-                  <div style={categoryFilterRowStyle}>
-                    <CategoryChip
-                      active={categoryFilter === "ALL"}
-                      label={t("inventory.categoryAll")}
-                      onClick={() => setCategoryFilter("ALL")}
-                    />
+                  <>
+                    <button className="inv-chip" aria-pressed={categoryFilter === "ALL"} onClick={() => setCategoryFilter("ALL")}>
+                      {t("inventory.categoryAll")}
+                    </button>
                     {availableCategories.map((category) => (
-                      <CategoryChip
-                        key={category}
-                        active={categoryFilter === category}
-                        label={t(`itemCategory.${category}` as TranslationKey)}
-                        onClick={() => setCategoryFilter(category)}
-                      />
+                      <button key={category} className="inv-chip" aria-pressed={categoryFilter === category} onClick={() => setCategoryFilter(category)}>
+                        {t(`itemCategory.${category}` as TranslationKey)}
+                      </button>
                     ))}
-                  </div>
+                  </>
                 )}
+                {inventory.length > 1 && (
+                  <label className="inv-sort">
+                    {t("inventory.sortLabel")}
+                    <select
+                      value={sort}
+                      onChange={(e) => {
+                        const next = e.target.value === "newest" ? "newest" : "rarity";
+                        setSort(next);
+                        writeSort(next);
+                      }}
+                    >
+                      <option value="rarity">{t("inventory.sortRarity")}</option>
+                      <option value="newest">{t("inventory.sortNewest")}</option>
+                    </select>
+                  </label>
+                )}
+                {inventory.length > 0 && (
+                  <button className="inv-fuse-toggle" aria-pressed={fusionMode} onClick={() => setFusion(!fusionMode)} data-testid="inventory-fusion-toggle">
+                    {fusionMode ? t("inventory.fusion.exitMode") : t("inventory.fusion.mode")}
+                  </button>
+                )}
+              </div>
 
-                {filteredInventory.length === 0 ? (
-                  <div style={emptyStyle}>{t("inventory.noItemsInCategory")}</div>
-                ) : (
-                  <div style={gridStyle}>
-                    {filteredInventory.map((item) => (
+              {inventory.length === 0 ? (
+                <div className="inv-empty">{t("inventory.empty")}</div>
+              ) : shownItems.length === 0 ? (
+                <div className="inv-empty">{t("inventory.noItemsInCategory")}</div>
+              ) : (
+                <div className="inv-grid">
+                  {shownItems.map((item) => {
+                    const picked = fusionSelectedIds.includes(item.instanceId);
+                    const blocked = fusionMode && !picked && (!fusable(item) || (fusionRarity !== null && rarityOf(item) !== fusionRarity) || fusionSelectedIds.length >= FUSION_ITEM_COUNT);
+                    return (
                       <ItemTile
                         key={item.instanceId}
                         item={item}
-                        onClick={() => setSelectedInstanceId(item.instanceId)}
-                        fusionSelected={fusionSelectedIds.includes(item.instanceId)}
-                        onToggleFusionSelect={() => {
-                          setFusionOutcome(null);
-                          setFusionConfirming(false);
-                          setFusionSelectedIds((prev) => {
-                            if (prev.includes(item.instanceId)) return prev.filter((id) => id !== item.instanceId);
-                            if (prev.length >= FUSION_ITEM_COUNT) return prev; // never selects a 4th — the extra is simply ignored
-                            return [...prev, item.instanceId];
-                          });
-                        }}
+                        equipped={!!equippedTowers?.[item.instanceId]}
+                        current={!fusionMode && selectedItem?.instanceId === item.instanceId && !narrow}
+                        picked={picked}
+                        fusionMode={fusionMode}
+                        disabled={blocked}
+                        onClick={() => onTile(item)}
                       />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-
-            <FusionSection
-              inventory={inventory}
-              selectedIds={fusionSelectedIds}
-              onDeselect={(instanceId) => setFusionSelectedIds((prev) => prev.filter((id) => id !== instanceId))}
-              getFusionEligibility={getFusionEligibility}
-              confirming={fusionConfirming}
-              onRequestConfirm={() => setFusionConfirming(true)}
-              onCancelConfirm={() => setFusionConfirming(false)}
-              onConfirm={() => {
-                const outcome = onAttemptFusion(fusionSelectedIds);
-                setFusionOutcome(outcome);
-                setFusionConfirming(false);
-                if (outcome.status !== "BLOCKED") setFusionSelectedIds([]);
-              }}
-              outcome={fusionOutcome}
-              onDismissOutcome={() => setFusionOutcome(null)}
-            />
-
-            {overflowInventory.length > 0 && (
-              <>
-                <div style={overflowTitleStyle}>{t("inventory.overflowTitle")}</div>
-                <div style={overflowHintStyle}>{t("inventory.overflowHint")}</div>
-                <div style={gridStyle}>
-                  {overflowInventory.map((item) => (
-                    <OverflowItemTile key={item.instanceId} item={item} onClaim={() => onClaimOverflowItem(item.instanceId)} />
+                    );
+                  })}
+                  {Array.from({ length: emptySlots }, (_, i) => (
+                    <div key={`empty-${i}`} className="inv-slot-empty" aria-hidden="true" />
                   ))}
                 </div>
-              </>
+              )}
+
+              {overflowInventory.length > 0 && (
+                <>
+                  <div className="inv-sec" style={{ color: PALETTE.danger }}>
+                    {t("inventory.overflowTitle")}
+                  </div>
+                  <div className="inv-hint">{t("inventory.overflowHint")}</div>
+                  <div className="inv-grid">
+                    {overflowInventory.map((item) => (
+                      <OverflowItemTile key={item.instanceId} item={item} onClaim={() => onClaimOverflowItem(item.instanceId)} />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            {showAside && (
+              <aside className={`inv-aside${narrow ? " tray" : ""}`}>
+                {fusionMode ? (
+                  <FusionBench
+                    inventory={inventory}
+                    selectedIds={fusionSelectedIds}
+                    onDeselect={(id) => setFusionSelectedIds((prev) => prev.filter((x) => x !== id))}
+                    onQuickPick={(ids) => {
+                      setFusionOutcome(null);
+                      setFusionConfirming(false);
+                      setFusionSelectedIds(ids);
+                    }}
+                    equippedTowers={equippedTowers}
+                    getFusionEligibility={getFusionEligibility}
+                    confirming={fusionConfirming}
+                    onRequestConfirm={() => setFusionConfirming(true)}
+                    onCancelConfirm={() => setFusionConfirming(false)}
+                    onConfirm={() => {
+                      const outcome = onAttemptFusion(fusionSelectedIds);
+                      setFusionOutcome(outcome);
+                      setFusionConfirming(false);
+                      if (outcome.status !== "BLOCKED") setFusionSelectedIds([]);
+                    }}
+                    outcome={fusionOutcome}
+                    onDismissOutcome={() => setFusionOutcome(null)}
+                  />
+                ) : selectedItem ? (
+                  <ItemDetailsBody key={selectedItem.instanceId} item={selectedItem} gemShards={gemShards} onReroll={onRerollItem} equippedOn={towerName(selectedItem.instanceId)} />
+                ) : (
+                  <div className="inv-pick-hint">{t("inventory.pickHint")}</div>
+                )}
+              </aside>
             )}
-          </>
+          </div>
         )}
 
-        {tab === "trade" && <TradeScreen />}
+        {tab === "trade" && (
+          <div className="inv-body solo">
+            <TradeScreen />
+          </div>
+        )}
 
         {tab === "stats" && (
-          <EconomyStatsPanel
-            summary={{
-              bossesDefeatedTotal: localEconomyTotals.bossesDefeatedTotal,
-              miniBossesDefeatedTotal: localEconomyTotals.miniBossesDefeatedTotal,
-              itemsOwnedTotal: inventory.length,
-              itemsFoundTotal: inventory.length,
-            }}
-            freeGems={freeGems}
-            purchasedGems={purchasedGems}
-            prestigeLevel={prestigeLevel}
-            bestWave={bestWave}
-            onUpgradePrestige={onUpgradePrestige}
-          />
+          <div className="inv-body solo">
+            <EconomyStatsPanel
+              summary={{
+                bossesDefeatedTotal: localEconomyTotals.bossesDefeatedTotal,
+                miniBossesDefeatedTotal: localEconomyTotals.miniBossesDefeatedTotal,
+                itemsOwnedTotal: inventory.length,
+                itemsFoundTotal: inventory.length,
+              }}
+              freeGems={freeGems}
+              purchasedGems={purchasedGems}
+              prestigeLevel={prestigeLevel}
+              bestWave={bestWave}
+              onUpgradePrestige={onUpgradePrestige}
+            />
+          </div>
         )}
       </div>
 
-      {selectedItem && <ItemDetailsModal item={selectedItem} onClose={() => setSelectedInstanceId(null)} gemShards={gemShards} onReroll={onRerollItem} />}
+      {narrow && detailOpen && selectedItem && (
+        <ItemDetailsModal
+          item={selectedItem}
+          onClose={() => setDetailOpen(false)}
+          gemShards={gemShards}
+          onReroll={onRerollItem}
+          equippedOn={towerName(selectedItem.instanceId)}
+        />
+      )}
     </div>
   );
-}
-
-function TabButton({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        ...tabButtonStyle,
-        borderColor: active ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
-        color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-        background: active ? "rgba(255,210,87,0.14)" : "transparent",
-      }}
-    >
-      {label}
-    </button>
-  );
-}
-
-function CategoryChip({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        ...categoryChipStyle,
-        borderColor: active ? PALETTE.uiAccent : PALETTE.uiPanelBorder,
-        color: active ? PALETTE.uiAccentBright : PALETTE.uiTextDim,
-        background: active ? "rgba(255,210,87,0.14)" : "transparent",
-      }}
-    >
-      {label}
-    </button>
-  );
+  // On a phone the game stage is a thin strip between the HUD and the tower
+  // bar, so the panel is lifted out to cover the whole screen instead.
+  return narrow && typeof document !== "undefined" ? createPortal(panel, document.body) : panel;
 }
 
 function ItemTile({
   item,
+  equipped,
+  current,
+  picked,
+  fusionMode,
+  disabled,
   onClick,
-  fusionSelected,
-  onToggleFusionSelect,
 }: {
   item: ItemInstance;
+  equipped: boolean;
+  /** The item shown in the side panel right now. */
+  current: boolean;
+  /** Picked for the fusion. */
+  picked: boolean;
+  fusionMode: boolean;
+  disabled: boolean;
   onClick: () => void;
-  /** SISTEMA DE FUSÃO DE ITENS — whether this item is currently one of the (at most 3) selected for a fusion attempt. */
-  fusionSelected: boolean;
-  onToggleFusionSelect: () => void;
 }) {
   const { t } = useLanguage();
   const def = getItemDefinition(item.itemDefinitionId);
   if (!def) return null;
   const rarityDef = getRarityDefinition(def.rarity);
-
+  const name = t(`items.${def.i18nKey}.name` as TranslationKey);
+  const pulse = rarityDef.order >= 3 && !disabled;
+  const style: CSSProperties = {
+    borderColor: picked || current ? PALETTE.uiAccent : `${rarityDef.color}aa`,
+    boxShadow: picked || current ? `0 0 14px ${PALETTE.uiAccent}88` : `inset 0 0 18px ${rarityDef.glow}`,
+    background: `linear-gradient(180deg, ${rarityDef.color}14, rgba(0,0,0,0.3) 70%)`,
+    ...(pulse && !picked && !current ? ({ animation: "hn-inv-pulse 2.4s ease-in-out infinite", "--pulse": rarityDef.glow } as CSSProperties) : {}),
+  };
   return (
-    <ItemHoverCard itemDefinitionId={item.itemDefinitionId}>
-      <div
-        className="hordenova-item-tile"
-        style={{
-          ...tileStyle,
-          position: "relative",
-          borderColor: fusionSelected ? PALETTE.uiAccent : rarityDef.color,
-          boxShadow: fusionSelected ? `0 0 12px ${PALETTE.uiAccent}` : `0 0 12px ${rarityDef.glow}`,
-          padding: 0,
-          cursor: "default",
-          ...(fusionSelected ? {} : rarityPulseStyle(rarityDef)),
-        }}
-      >
-        <button onClick={onClick} style={tileContentButtonStyle}>
-          <ItemGlyph itemDefinitionId={def.id} size={44} />
-          <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-          <RarityBadge rarity={def.rarity} />
-        </button>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFusionSelect();
-          }}
-          title={t(fusionSelected ? "inventory.fusion.deselectItem" : "inventory.fusion.selectItem")}
-          style={{ ...fusionCheckboxStyle, borderColor: fusionSelected ? PALETTE.uiAccent : PALETTE.uiPanelBorder }}
-        >
-          {fusionSelected ? "✓" : ""}
-        </button>
-      </div>
-    </ItemHoverCard>
+    <button
+      className="hordenova-item-tile"
+      style={style}
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={fusionMode ? picked : current}
+      title={fusionMode ? t(picked ? "inventory.fusion.deselectItem" : "inventory.fusion.selectItem") : name}
+      data-rarity={def.rarity}
+    >
+      <style>{"@keyframes hn-inv-pulse{0%,100%{box-shadow:inset 0 0 14px var(--pulse)}50%{box-shadow:inset 0 0 26px var(--pulse),0 0 10px var(--pulse)}}@media (prefers-reduced-motion:reduce){.hordenova-item-tile{animation:none!important}}"}</style>
+      {equipped && <span className="inv-tile-eq">{t("inventory.equippedBadge")}</span>}
+      {picked && <span className="inv-tile-check">✓</span>}
+      <ItemGlyph itemDefinitionId={def.id} size={46} />
+      <span className="inv-tile-name">{name}</span>
+      <span className="inv-tile-strip" style={{ background: rarityDef.color }} aria-label={t(`rarity.${def.rarity}` as TranslationKey)} />
+    </button>
   );
 }
 
@@ -417,35 +561,25 @@ function OverflowItemTile({ item, onClaim }: { item: ItemInstance; onClaim: () =
   const def = getItemDefinition(item.itemDefinitionId);
   if (!def) return null;
   const rarityDef = getRarityDefinition(def.rarity);
-
   return (
-    <ItemHoverCard itemDefinitionId={item.itemDefinitionId}>
-      <button
-        className="hordenova-item-tile"
-        onClick={onClaim}
-        style={{ ...tileStyle, borderColor: rarityDef.color, opacity: 0.85, ...rarityPulseStyle(rarityDef) }}
-      >
-        <ItemGlyph itemDefinitionId={def.id} size={44} />
-        <div style={tileNameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-        <RarityBadge rarity={def.rarity} />
-        <span style={claimLabelStyle}>{t("inventory.claim")}</span>
-      </button>
-    </ItemHoverCard>
+    <button className="hordenova-item-tile" onClick={onClaim} style={{ borderColor: rarityDef.color, opacity: 0.85 }}>
+      <ItemGlyph itemDefinitionId={def.id} size={40} />
+      <span className="inv-tile-name">{t(`items.${def.i18nKey}.name` as TranslationKey)}</span>
+      <span className="inv-claim">{t("inventory.claim")}</span>
+    </button>
   );
 }
 
 /**
- * SISTEMA DE FUSÃO DE ITENS — "select exactly 3 items of the SAME rarity ->
- * attempt exactly 1 item of the NEXT rarity tier." All engine validation
- * (ownership/rarity/eligibility/max-rarity) is re-read from
- * getFusionEligibility on every render — this component never invents its
- * own copy of those rules, so the UI can never disagree with what
- * onAttemptFusion will actually enforce.
+ * The fusion bench: quick picks, the 3 slots, the odds and the two-step
+ * confirm. Eligibility and the odds are read from the engine every render.
  */
-function FusionSection({
+function FusionBench({
   inventory,
   selectedIds,
   onDeselect,
+  onQuickPick,
+  equippedTowers,
   getFusionEligibility,
   confirming,
   onRequestConfirm,
@@ -457,6 +591,8 @@ function FusionSection({
   inventory: readonly ItemInstance[];
   selectedIds: readonly string[];
   onDeselect: (instanceId: string) => void;
+  onQuickPick: (ids: string[]) => void;
+  equippedTowers?: Readonly<Record<string, TowerType>>;
   getFusionEligibility: (selectedInstanceIds: string[]) => FusionEligibility;
   confirming: boolean;
   onRequestConfirm: () => void;
@@ -466,26 +602,39 @@ function FusionSection({
   onDismissOutcome: () => void;
 }) {
   const { t } = useLanguage();
-  const selectedItems = selectedIds
-    .map((id) => inventory.find((item) => item.instanceId === id))
-    .filter((item): item is ItemInstance => !!item);
-
+  const selectedItems = selectedIds.map((id) => inventory.find((item) => item.instanceId === id)).filter((item): item is ItemInstance => !!item);
   const ready = selectedIds.length === FUSION_ITEM_COUNT;
   const eligibility = ready ? getFusionEligibility([...selectedIds]) : null;
   const canConfirm = ready && !!eligibility?.ok;
 
+  // Quick picks: per rarity with 3+ fusable copies, the 3 weakest rolls,
+  // unequipped ones first — never the best copy the player owns.
+  const quick = useMemo(() => {
+    const byRarity = new Map<Rarity, ItemInstance[]>();
+    for (const item of inventory) {
+      const r = rarityOf(item);
+      if (!r || !fusable(item)) continue;
+      byRarity.set(r, [...(byRarity.get(r) ?? []), item]);
+    }
+    return RARITIES.filter((r) => (byRarity.get(r)?.length ?? 0) >= FUSION_ITEM_COUNT).map((r) => {
+      const pool = [...byRarity.get(r)!].sort(
+        (a, b) =>
+          Number(!!equippedTowers?.[a.instanceId]) - Number(!!equippedTowers?.[b.instanceId]) ||
+          (itemRollQuality(a) ?? 0) - (itemRollQuality(b) ?? 0),
+      );
+      return { rarity: r, ids: pool.slice(0, FUSION_ITEM_COUNT).map((i) => i.instanceId) };
+    });
+  }, [inventory, equippedTowers]);
+
   return (
-    <>
-      <div style={fusionSectionDividerStyle} />
-      <div style={overflowTitleStyle}>{t("inventory.fusion.title")}</div>
+    <div data-testid="inventory-fusion">
+      <div className="inv-sec" style={{ marginTop: 0 }}>
+        {t("inventory.fusion.title")}
+      </div>
+      <div className="inv-hint">{t("inventory.fusion.modeHint")}</div>
 
       {outcome && outcome.status !== "BLOCKED" && (
-        <div
-          style={{
-            ...fusionOutcomeBoxStyle,
-            borderColor: outcome.status === "SUCCESS" ? PALETTE.success : PALETTE.danger,
-          }}
-        >
+        <div className="inv-outcome" style={{ borderColor: outcome.status === "SUCCESS" ? PALETTE.success : PALETTE.danger }}>
           <span>
             {outcome.status === "SUCCESS"
               ? t("inventory.fusion.successResult", {
@@ -496,81 +645,103 @@ function FusionSection({
                 })
               : t("inventory.fusion.failureResult")}
           </span>
-          <button onClick={onDismissOutcome} style={fusionDismissButtonStyle}>
+          <button onClick={onDismissOutcome} aria-label="×">
             ×
           </button>
         </div>
       )}
 
-      <div style={fusionHintStyle}>{t("inventory.fusion.selectHint")}</div>
-      <div style={fusionSelectedRowStyle}>
+      {quick.length > 0 ? (
+        <>
+          <div className="inv-row" style={{ paddingTop: 0 }}>
+            {t("inventory.fusion.readyTitle")}
+          </div>
+          <div className="inv-quick">
+            {quick.map((q) => {
+              const def = getRarityDefinition(q.rarity);
+              return (
+                <button key={q.rarity} style={{ borderColor: def.color, color: def.color }} onClick={() => onQuickPick(q.ids)}>
+                  {t("inventory.fusion.quickPick", { rarity: t(`rarity.${q.rarity}` as TranslationKey) })}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <div className="inv-hint">{t("inventory.fusion.nothingReady")}</div>
+      )}
+
+      <div className="inv-bench">
         {Array.from({ length: FUSION_ITEM_COUNT }, (_, i) => {
           const item = selectedItems[i];
-          if (!item) return <div key={i} style={fusionSlotEmptyStyle}>{t("inventory.fusion.emptySlot")}</div>;
+          if (!item)
+            return (
+              <button key={i} className="inv-bench-slot" disabled aria-label={t("inventory.fusion.emptySlot")}>
+                <span style={{ fontSize: 10.5, color: PALETTE.uiTextDim, fontStyle: "italic" }}>{t("inventory.fusion.emptySlot")}</span>
+              </button>
+            );
           const def = getItemDefinition(item.itemDefinitionId);
           if (!def) return null;
-          const rarityDef = getRarityDefinition(def.rarity);
           return (
             <button
               key={item.instanceId}
+              className="inv-bench-slot"
+              style={{ borderStyle: "solid", borderColor: getRarityDefinition(def.rarity).color }}
               onClick={() => onDeselect(item.instanceId)}
-              style={{ ...fusionSlotFilledStyle, borderColor: rarityDef.color }}
               title={t("inventory.fusion.deselectItem")}
             >
-              {t(`items.${def.i18nKey}.name` as TranslationKey)}
+              <ItemGlyph itemDefinitionId={def.id} size={40} />
             </button>
           );
         })}
       </div>
-      <div style={fusionCountStyle}>{t("inventory.fusion.selectedCount", { count: selectedIds.length })}</div>
+      <div className="inv-count">{t("inventory.fusion.selectedCount", { count: selectedIds.length })}</div>
 
       {ready && eligibility && (
-        <div style={fusionDetailsBoxStyle}>
+        <div className="inv-box">
           {eligibility.ok ? (
             <>
-              <div style={convertRowStyle}>
+              <div className="inv-row">
                 <span>{t("inventory.fusion.currentRarity")}</span>
                 <RarityBadge rarity={eligibility.rarity!} />
               </div>
-              <div style={convertRowStyle}>
+              <div className="inv-row">
                 <span>{t("inventory.fusion.targetRarity")}</span>
                 <RarityBadge rarity={eligibility.nextRarity!} />
               </div>
-              <div style={convertRowStyle}>
+              <div className="inv-row">
                 <span>{t("inventory.fusion.successChance")}</span>
-                <span>{(getFusionSuccessChance(eligibility.rarity!) * 100).toFixed(2)}%</span>
+                <strong style={{ color: PALETTE.uiAccentBright }}>{(getFusionSuccessChance(eligibility.rarity!) * 100).toFixed(2)}%</strong>
               </div>
-              <div style={fusionWarningStyle}>{t("inventory.fusion.warning")}</div>
+              <div className="inv-warn">{t("inventory.fusion.warning")}</div>
             </>
           ) : (
-            <div style={fusionBlockedStyle}>{t(fusionBlockedReasonKey(eligibility.reason))}</div>
+            <div className="inv-blocked">{t(fusionBlockedReasonKey(eligibility.reason))}</div>
           )}
         </div>
       )}
 
       {confirming ? (
-        <div style={fusionConfirmBoxStyle}>
-          <div style={{ fontSize: 10.5, color: PALETTE.uiText, marginBottom: 6 }}>
+        <div className="inv-box">
+          <div style={{ fontSize: 11.5, lineHeight: 1.45 }}>
             {t("inventory.fusion.confirmPrompt", {
               rarity: eligibility?.ok ? t(`rarity.${eligibility.rarity}` as TranslationKey) : "",
               chance: eligibility?.ok ? (getFusionSuccessChance(eligibility.rarity!) * 100).toFixed(2) : "0",
             })}
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-            <button onClick={onConfirm} style={fusionConfirmButtonStyle}>
-              {t("inventory.fusion.confirmYes")}
-            </button>
-            <button onClick={onCancelConfirm} style={fusionCancelButtonStyle}>
-              {t("inventory.fusion.confirmNo")}
-            </button>
-          </div>
+          <button onClick={onConfirm} className="inv-btn danger">
+            {t("inventory.fusion.confirmYes")}
+          </button>
+          <button onClick={onCancelConfirm} className="inv-btn ghost">
+            {t("inventory.fusion.confirmNo")}
+          </button>
         </div>
       ) : (
-        <button onClick={onRequestConfirm} disabled={!canConfirm} style={{ ...fusionConfirmButtonStyle, opacity: canConfirm ? 1 : 0.45 }}>
+        <button onClick={onRequestConfirm} disabled={!canConfirm} className="inv-btn">
           {t("inventory.fusion.confirmButton")}
         </button>
       )}
-    </>
+    </div>
   );
 }
 
@@ -594,343 +765,3 @@ function fusionBlockedReasonKey(reason: FusionEligibility["reason"]): Translatio
       return "inventory.fusion.blockedWrongCount";
   }
 }
-
-const overlayStyle: CSSProperties = {
-  position: "absolute",
-  inset: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  background: "rgba(10,7,4,0.8)",
-  zIndex: 7,
-};
-
-const cardStyle: CSSProperties = {
-  position: "relative",
-  width: 460,
-  maxWidth: "90%",
-  maxHeight: "82%",
-  overflowY: "auto",
-  padding: "22px 24px",
-  borderRadius: 14,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "linear-gradient(160deg, rgba(54,36,22,0.98), rgba(30,20,12,0.99))",
-  color: PALETTE.uiText,
-  boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-};
-
-const closeButtonStyle: CSSProperties = {
-  position: "absolute",
-  top: 12,
-  right: 14,
-  background: "transparent",
-  border: "none",
-  color: PALETTE.uiTextDim,
-  fontSize: 20,
-  cursor: "pointer",
-};
-
-const titleStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 20,
-  fontWeight: 700,
-  letterSpacing: 2,
-  color: PALETTE.uiAccentBright,
-  marginBottom: 14,
-};
-
-const tabRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-  marginBottom: 16,
-};
-
-const tabButtonStyle: CSSProperties = {
-  padding: "7px 14px",
-  borderRadius: 6,
-  border: "1px solid",
-  fontWeight: 700,
-  fontSize: 11,
-  letterSpacing: 0.6,
-  cursor: "pointer",
-};
-
-const gridStyle: CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-  gap: 10,
-};
-
-const categoryFilterRowStyle: CSSProperties = {
-  display: "flex",
-  flexWrap: "wrap",
-  gap: 6,
-  marginBottom: 10,
-};
-
-const categoryChipStyle: CSSProperties = {
-  padding: "5px 11px",
-  borderRadius: 999,
-  border: "1px solid",
-  fontWeight: 700,
-  fontSize: 10,
-  letterSpacing: 0.4,
-  textTransform: "uppercase",
-  cursor: "pointer",
-};
-
-const tileStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 6,
-  padding: "14px 10px 10px",
-  borderRadius: 10,
-  border: "1px solid",
-  background: "rgba(0,0,0,0.25)",
-  textAlign: "center",
-  cursor: "pointer",
-  transition: "transform 140ms ease, box-shadow 140ms ease",
-};
-
-const tileNameStyle: CSSProperties = {
-  fontSize: 11.5,
-  fontWeight: 700,
-  color: PALETTE.uiText,
-  textAlign: "center",
-};
-
-const emptyStyle: CSSProperties = {
-  fontSize: 12.5,
-  color: PALETTE.uiTextDim,
-  fontStyle: "italic",
-  padding: "20px 0",
-  textAlign: "center",
-};
-
-const capacityRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  fontSize: 11,
-  color: PALETTE.uiTextDim,
-  marginBottom: 10,
-};
-
-const convertBoxStyle: CSSProperties = {
-  border: `1px solid #c88aff55`,
-  borderRadius: 8,
-  padding: "8px 10px",
-  marginBottom: 10,
-  display: "flex",
-  flexDirection: "column",
-  gap: 3,
-};
-
-const convertRowStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  fontSize: 10.5,
-  color: PALETTE.uiTextDim,
-};
-
-const convertButtonStyle: CSSProperties = {
-  marginTop: 4,
-  padding: "5px 10px",
-  borderRadius: 6,
-  border: `1px solid #c88aff`,
-  background: "rgba(200,138,255,0.12)",
-  color: "#e8d4ff",
-  fontWeight: 700,
-  fontSize: 10.5,
-  width: "100%",
-};
-
-const overflowTitleStyle: CSSProperties = {
-  fontSize: 11,
-  letterSpacing: 1,
-  textTransform: "uppercase",
-  fontWeight: 700,
-  color: PALETTE.danger,
-  marginTop: 16,
-  marginBottom: 3,
-};
-
-const overflowHintStyle: CSSProperties = {
-  fontSize: 10.5,
-  color: PALETTE.uiTextDim,
-  marginBottom: 10,
-  lineHeight: 1.4,
-};
-
-const claimLabelStyle: CSSProperties = {
-  fontSize: 9.5,
-  fontWeight: 700,
-  color: PALETTE.uiAccent,
-  letterSpacing: 0.4,
-};
-
-const tileContentButtonStyle: CSSProperties = {
-  display: "flex",
-  flexDirection: "column",
-  alignItems: "center",
-  gap: 8,
-  width: "100%",
-  padding: "4px 10px 10px",
-  border: "none",
-  background: "transparent",
-  color: "inherit",
-  textAlign: "center",
-  cursor: "pointer",
-};
-
-const fusionCheckboxStyle: CSSProperties = {
-  position: "absolute",
-  top: 5,
-  right: 5,
-  width: 16,
-  height: 16,
-  borderRadius: 4,
-  border: "1.5px solid",
-  background: "rgba(0,0,0,0.35)",
-  color: PALETTE.uiAccent,
-  fontSize: 10,
-  fontWeight: 700,
-  lineHeight: 1,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  cursor: "pointer",
-};
-
-const fusionSectionDividerStyle: CSSProperties = {
-  height: 1,
-  background: PALETTE.uiPanelBorder,
-  margin: "16px 0 10px",
-};
-
-const fusionHintStyle: CSSProperties = {
-  fontSize: 10.5,
-  color: PALETTE.uiTextDim,
-  marginBottom: 8,
-  lineHeight: 1.4,
-};
-
-const fusionSelectedRowStyle: CSSProperties = {
-  display: "flex",
-  gap: 8,
-};
-
-const fusionSlotEmptyStyle: CSSProperties = {
-  flex: 1,
-  padding: "8px 6px",
-  borderRadius: 7,
-  border: `1px dashed ${PALETTE.uiPanelBorder}`,
-  fontSize: 10,
-  color: PALETTE.uiTextDim,
-  fontStyle: "italic",
-  textAlign: "center",
-};
-
-const fusionSlotFilledStyle: CSSProperties = {
-  flex: 1,
-  padding: "8px 6px",
-  borderRadius: 7,
-  border: "1px solid",
-  background: "rgba(255,255,255,0.04)",
-  color: PALETTE.uiText,
-  fontSize: 10,
-  fontWeight: 700,
-  cursor: "pointer",
-  textAlign: "center",
-};
-
-const fusionCountStyle: CSSProperties = {
-  fontSize: 10,
-  color: PALETTE.uiTextDim,
-  marginTop: 6,
-  textAlign: "center",
-};
-
-const fusionDetailsBoxStyle: CSSProperties = {
-  marginTop: 10,
-  padding: "8px 10px",
-  borderRadius: 8,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "rgba(0,0,0,0.15)",
-  display: "flex",
-  flexDirection: "column",
-  gap: 3,
-};
-
-const fusionWarningStyle: CSSProperties = {
-  marginTop: 4,
-  fontSize: 10.5,
-  fontWeight: 700,
-  color: PALETTE.danger,
-};
-
-const fusionBlockedStyle: CSSProperties = {
-  fontSize: 10.5,
-  color: PALETTE.danger,
-  fontStyle: "italic",
-};
-
-const fusionConfirmButtonStyle: CSSProperties = {
-  marginTop: 8,
-  padding: "8px 10px",
-  borderRadius: 7,
-  border: `1px solid ${PALETTE.uiAccent}`,
-  background: "rgba(255,210,87,0.14)",
-  color: PALETTE.uiAccentBright,
-  fontWeight: 700,
-  fontSize: 12,
-  letterSpacing: 0.5,
-  width: "100%",
-  cursor: "pointer",
-};
-
-const fusionCancelButtonStyle: CSSProperties = {
-  marginTop: 0,
-  padding: "7px 10px",
-  borderRadius: 7,
-  border: `1px dashed ${PALETTE.uiPanelBorder}`,
-  background: "rgba(255,255,255,0.02)",
-  color: PALETTE.uiText,
-  fontWeight: 600,
-  fontSize: 10.5,
-  letterSpacing: 0.4,
-  width: "100%",
-  cursor: "pointer",
-};
-
-const fusionConfirmBoxStyle: CSSProperties = {
-  marginTop: 10,
-  padding: "8px 10px",
-  borderRadius: 7,
-  border: `1px solid ${PALETTE.uiPanelBorder}`,
-  background: "rgba(255,255,255,0.03)",
-};
-
-const fusionOutcomeBoxStyle: CSSProperties = {
-  display: "flex",
-  justifyContent: "space-between",
-  alignItems: "center",
-  gap: 8,
-  marginBottom: 8,
-  padding: "8px 10px",
-  borderRadius: 7,
-  border: "1px solid",
-  background: "rgba(0,0,0,0.2)",
-  fontSize: 11,
-  color: PALETTE.uiText,
-};
-
-const fusionDismissButtonStyle: CSSProperties = {
-  background: "transparent",
-  border: "none",
-  color: PALETTE.uiTextDim,
-  fontSize: 14,
-  cursor: "pointer",
-  flexShrink: 0,
-};

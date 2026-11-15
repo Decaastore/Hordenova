@@ -46,6 +46,19 @@ function renderPanel(props: {
   return { container, root };
 }
 
+function enterFusion(container: HTMLDivElement): void {
+  const toggle = container.querySelector("[data-testid=inventory-fusion-toggle]") as HTMLButtonElement;
+  act(() => toggle.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+}
+
+function fusionTiles(container: HTMLDivElement): HTMLButtonElement[] {
+  return Array.from(container.querySelectorAll<HTMLButtonElement>(".hordenova-item-tile"));
+}
+
+function click(el: Element): void {
+  act(() => el.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+}
+
 function findExactButton(container: HTMLDivElement, text: string): HTMLButtonElement | null {
   return Array.from(container.querySelectorAll("button")).find((b) => b.textContent === text) ?? null;
 }
@@ -56,139 +69,162 @@ function findExactButton(container: HTMLDivElement, text: string): HTMLButtonEle
  * than 3 items selected, and onAttemptFusion (the only place Gems/items are
  * ever actually spent) must never fire before the explicit CONFIRMAR click.
  */
-describe("InventoryPanel — Item Fusion section (SISTEMA DE FUSÃO DE ITENS)", () => {
+describe("InventoryPanel — Item Fusion mode (SISTEMA DE FUSÃO DE ITENS)", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("renders the FUSÃO section with an empty selection by default", () => {
+  it("fusion is a mode: off by default, and turning it on shows the bench with an empty pick", () => {
     const item = makeItem("warden_fragment");
     const { container } = renderPanel({ inventory: [item] });
+    expect(container.textContent).not.toContain("0/3 selected");
+    enterFusion(container);
     expect(container.textContent).toContain("ITEM FUSION");
     expect(container.textContent).toContain("0/3 selected");
   });
 
-  it("selecting fewer than 3 items keeps CONFIRMAR FUSÃO disabled", () => {
+  it("picking fewer than 3 items keeps CONFIRM FUSION disabled", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment")];
     const { container } = renderPanel({ inventory: items });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    expect(checkboxes).toHaveLength(2);
-    act(() => checkboxes[0]!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    enterFusion(container);
+    const tiles = fusionTiles(container);
+    expect(tiles).toHaveLength(2);
+    expect(tiles[0]!.title).toBe("Select for fusion");
+    click(tiles[0]!);
 
     expect(container.textContent).toContain("1/3 selected");
-    const confirmButton = findExactButton(container, "CONFIRM FUSION");
-    expect(confirmButton).not.toBeNull();
-    expect(confirmButton!.disabled).toBe(true);
+    expect(findExactButton(container, "CONFIRM FUSION")!.disabled).toBe(true);
   });
 
-  it("selecting exactly 3 eligible items enables CONFIRMAR FUSÃO and shows the success chance", () => {
+  it("picking exactly 3 eligible items enables CONFIRM FUSION and shows the success chance", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
-    const eligibility: FusionEligibility = { ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" };
-    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => eligibility });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }) });
+    enterFusion(container);
+    for (const tile of fusionTiles(container)) click(tile);
 
     expect(container.textContent).toContain("3/3 selected");
     expect(container.textContent).toContain("40.00%"); // COMMON's chance
-    expect(container.textContent).toContain("destroyed"); // warning text fragment
-    const confirmButton = findExactButton(container, "CONFIRM FUSION");
-    expect(confirmButton!.disabled).toBe(false);
+    expect(container.textContent).toContain("destroyed");
+    expect(findExactButton(container, "CONFIRM FUSION")!.disabled).toBe(false);
   });
 
-  it("clicking CONFIRMAR FUSÃO only arms a confirmation step — onAttemptFusion is NOT called from the initial click", () => {
+  it("the quick pick fills the bench with 3 copies of that rarity", () => {
+    const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("mosswood_charm")];
+    const { container } = renderPanel({ inventory: items });
+    enterFusion(container);
+    expect(findExactButton(container, "3× Uncommon")).toBeNull();
+    click(findExactButton(container, "3× Common")!);
+    expect(container.textContent).toContain("3/3 selected");
+  });
+
+  it("clicking CONFIRM FUSION only arms a confirmation step — onAttemptFusion is NOT called from the first click", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
     const onAttemptFusion = vi.fn();
-    const { container } = renderPanel({
-      inventory: items,
-      getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }),
-      onAttemptFusion,
-    });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findExactButton(container, "CONFIRM FUSION")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }), onAttemptFusion });
+    enterFusion(container);
+    for (const tile of fusionTiles(container)) click(tile);
+    click(findExactButton(container, "CONFIRM FUSION")!);
 
     expect(onAttemptFusion).not.toHaveBeenCalled();
     expect(findExactButton(container, "CONFIRM")).not.toBeNull();
     expect(findExactButton(container, "CANCEL")).not.toBeNull();
   });
 
-  it("confirming the fusion calls onAttemptFusion exactly once with the 3 selected instanceIds", () => {
+  it("confirming calls onAttemptFusion exactly once with the 3 picked instanceIds", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
     const onAttemptFusion = vi.fn((_ids: string[]) => ({ status: "FAILURE", rarity: "COMMON", nextRarity: "UNCOMMON" }) as FusionOutcome);
-    const { container } = renderPanel({
-      inventory: items,
-      getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }),
-      onAttemptFusion,
-    });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findExactButton(container, "CONFIRM FUSION")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findExactButton(container, "CONFIRM")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }), onAttemptFusion });
+    enterFusion(container);
+    const tiles = fusionTiles(container);
+    for (const tile of tiles) click(tile);
+    click(findExactButton(container, "CONFIRM FUSION")!);
+    click(findExactButton(container, "CONFIRM")!);
 
     expect(onAttemptFusion).toHaveBeenCalledTimes(1);
-    expect(onAttemptFusion.mock.calls[0]![0]).toEqual(items.map((i) => i.instanceId));
+    expect([...onAttemptFusion.mock.calls[0]![0]].sort()).toEqual(items.map((i) => i.instanceId).sort());
     expect(container.textContent).toContain("Fusion failed");
   });
 
-  it("shows the exact success message with the new item's name after a successful fusion", () => {
+  it("shows the success message with the new item's name after a successful fusion", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
     const resultItem = createItemInstance("mosswood_charm", "player-1", { type: "FUSION", refId: "fusion" });
-    const onAttemptFusion = vi.fn(
-      () => ({ status: "SUCCESS", rarity: "COMMON", nextRarity: "UNCOMMON", resultItem }) as FusionOutcome,
-    );
-    const { container } = renderPanel({
-      inventory: items,
-      getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }),
-      onAttemptFusion,
-    });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findExactButton(container, "CONFIRM FUSION")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    act(() => findExactButton(container, "CONFIRM")!.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const onAttemptFusion = vi.fn(() => ({ status: "SUCCESS", rarity: "COMMON", nextRarity: "UNCOMMON", resultItem }) as FusionOutcome);
+    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => ({ ok: true, rarity: "COMMON", nextRarity: "UNCOMMON" }), onAttemptFusion });
+    enterFusion(container);
+    for (const tile of fusionTiles(container)) click(tile);
+    click(findExactButton(container, "CONFIRM FUSION")!);
+    click(findExactButton(container, "CONFIRM")!);
 
     expect(container.textContent).toContain("Fusion complete");
     expect(container.textContent).toContain("Mosswood Charm");
   });
 
-  it("mixed rarities are blocked and the reason is shown instead of a success chance", () => {
+  it("after the first pick, items of another rarity can't be picked", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("mosswood_charm")];
-    const { container } = renderPanel({
-      inventory: items,
-      getFusionEligibility: () => ({ ok: false, reason: "MIXED_RARITY" }),
-    });
+    const { container } = renderPanel({ inventory: items });
+    enterFusion(container);
+    const fragment = fusionTiles(container).find((tile) => tile.textContent?.includes("Warden Fragment"))!;
+    click(fragment);
+    const charm = fusionTiles(container).find((tile) => tile.textContent?.includes("Mosswood Charm"))!;
+    expect(charm.disabled).toBe(true);
+  });
 
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-
+  it("an engine block reason is shown instead of the odds", () => {
+    const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
+    const { container } = renderPanel({ inventory: items, getFusionEligibility: () => ({ ok: false, reason: "MIXED_RARITY" }) });
+    enterFusion(container);
+    for (const tile of fusionTiles(container)) click(tile);
     expect(container.textContent).toContain("same rarity");
     expect(findExactButton(container, "CONFIRM FUSION")!.disabled).toBe(true);
   });
 
-  it("selecting a 4th item is a no-op — the extra checkbox stays unselected and the count never exceeds 3", () => {
+  it("a 4th pick is a no-op — the count never exceeds 3", () => {
     const items = [makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment"), makeItem("warden_fragment")];
     const { container } = renderPanel({ inventory: items });
-
-    const checkboxes = Array.from(container.querySelectorAll("button")).filter(
-      (b) => b.title === "Select for fusion",
-    );
-    for (const box of checkboxes) act(() => box.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-
+    enterFusion(container);
+    for (const tile of fusionTiles(container)) click(tile);
     expect(container.textContent).toContain("3/3 selected");
+  });
+});
+
+describe("InventoryPanel — layout", () => {
+  it("shows empty slots up to the capacity, and the first item's details in the side panel", () => {
+    const items = [makeItem("warden_fragment"), makeItem("wardens_eye")];
+    const { container } = renderPanel({ inventory: items });
+    expect(container.querySelectorAll(".inv-slot-empty").length).toBe(18);
+    // sorted by rarity, so the Legendary sits first and is the one described
+    expect(container.querySelector(".inv-aside")!.textContent).toContain("Warden's Eye");
+  });
+
+  it("marks equipped items and names the tower in the details", () => {
+    const eye = makeItem("wardens_eye");
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => {
+      root.render(
+        <LanguageProvider>
+          <InventoryPanel
+            inventory={[eye]}
+            localEconomyTotals={{ bossesDefeatedTotal: 0, miniBossesDefeatedTotal: 0 }}
+            onClose={() => {}}
+            inventoryCapacity={20}
+            overflowInventory={[]}
+            onClaimOverflowItem={() => {}}
+            gemShards={0}
+            onConvertGemShards={() => {}}
+            freeGems={0}
+            purchasedGems={0}
+            prestigeLevel={0}
+            bestWave={0}
+            onUpgradePrestige={() => {}}
+            getFusionEligibility={() => ({ ok: false, reason: "WRONG_COUNT" })}
+            onAttemptFusion={() => ({ status: "BLOCKED", reason: "WRONG_COUNT" })}
+            equippedTowers={{ [eye.instanceId]: "IRONWOOD" }}
+          />
+        </LanguageProvider>,
+      );
+    });
+    expect(container.querySelector(".inv-tile-eq")).not.toBeNull();
+    expect(container.querySelector("[data-testid=item-equipped-on]")!.textContent).toBe("Equipped on Ironwood");
   });
 });
 
@@ -204,7 +240,7 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
   it("shows no category filter row when every owned item is the same category (single-category inventory)", () => {
     const items = [makeItem("mosswood_charm"), makeItem("hollow_sigil")];
     const { container } = renderPanel({ inventory: items });
-    expect(container.textContent).not.toContain("Amulet");
+    expect(findExactButton(container, "Amulet")).toBeNull();
   });
 
   it("shows an ALL + AMULET filter chip row once the inventory mixes an amulet with a non-amulet item", () => {
@@ -247,28 +283,7 @@ describe("InventoryPanel — AMULET category (AMULETOS COMO ITENS REAIS)", () =>
     }
   });
 
-  it("hovering an amulet tile reveals its tooltip with name, AMULET tag, and its real effect range", () => {
-    const items = [makeItem("hollow_sigil")];
-    const { container } = renderPanel({ inventory: items });
-
-    expect(container.textContent).not.toContain("+12–28% Boss Damage");
-
-    // React listens for native "mouseover"/"mouseout" (not "mouseenter"/"mouseleave",
-    // which don't bubble) to simulate onMouseEnter/onMouseLeave, so the event must
-    // be dispatched as one of those and bubble up to ItemHoverCard's wrapper div.
-    const tile = container.querySelector(".hordenova-item-tile") as HTMLElement;
-    expect(tile).not.toBeNull();
-    act(() => tile.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })));
-
-    expect(container.textContent).toContain("Hollow Sigil");
-    expect(container.textContent).toContain("Amulet");
-    expect(container.textContent).toContain("+12–28% Boss Damage");
-
-    act(() => tile.dispatchEvent(new MouseEvent("mouseout", { bubbles: true })));
-    expect(container.textContent).not.toContain("+12–28% Boss Damage");
-  });
-
-  it("clicking an amulet tile opens ItemDetailsModal with its real data (large icon, name, category, effect)", () => {
+  it("clicking an amulet tile shows its real data in the side panel (large icon, name, category, effect)", () => {
     const items = [{ ...makeItem("wardens_eye"), rolls: [15, 10] }];
     const { container } = renderPanel({ inventory: items });
 

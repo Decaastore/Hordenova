@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v145",
+    dateIso: "2026-11-15",
+    category: "INTERFACE",
+    title: {
+      en: "New Inventory",
+      ptBR: "Novo Inventário",
+    },
+    description: {
+      en: "The Inventory was a narrow window that made you scroll for everything. It's now one wide screen: your items on the left, the picked item's details on the right.",
+      ptBR: "O Inventário era uma janela estreita em que tudo exigia rolar. Agora é uma tela larga: seus itens à esquerda e os detalhes do item escolhido à direita.",
+    },
+    highlights: [
+      {
+        en: "Every slot is drawn, empty ones included, with a bar showing how full your bag is.",
+        ptBR: "Todos os espaços aparecem, inclusive os vazios, com uma barra mostrando o quanto a bolsa está cheia.",
+      },
+      {
+        en: "Sort by rarity or by newest, and items worn by a tower are marked \"Equipped\", with the tower's name in the details.",
+        ptBR: "Ordene por raridade ou pelos mais novos, e itens usados por uma torre aparecem marcados como \"Equipado\", com o nome da torre nos detalhes.",
+      },
+      {
+        en: "Fusion is now a mode: tap \"Fuse items\", then tap 3 items, or use the 3× button to fill the bench with your weakest copies of a rarity. Items that can't join are dimmed.",
+        ptBR: "A Fusão virou um modo: toque em \"Fundir itens\" e escolha 3 itens, ou use o botão 3× para encher a bancada com suas cópias mais fracas de uma raridade. Itens que não podem entrar ficam apagados.",
+      },
+      {
+        en: "Gem Shards turn into Free Gems with one button at the top.",
+        ptBR: "Os Fragmentos de Gema viram Gemas Grátis com um botão no topo.",
+      },
+      {
+        en: "On phones the Inventory fills the whole screen; tapping an item opens its details.",
+        ptBR: "No celular o Inventário ocupa a tela inteira, e tocar em um item abre os detalhes.",
+      },
+    ],
+  },
+  {
     id: "v144",
     dateIso: "2026-11-15",
     category: "BALANCE",

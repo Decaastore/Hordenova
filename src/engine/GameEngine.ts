@@ -1587,6 +1587,13 @@ export class GameEngine {
     return tower.equippedItemInstanceIds.map((id) => (id ? findItem(this.inventory, id) : null));
   }
 
+  /** Which tower type wears each equipped item, keyed by instanceId — read by the Inventory to mark equipped copies. */
+  getEquippedItemTowers(): Record<string, TowerType> {
+    const out: Record<string, TowerType> = {};
+    for (const tower of this.towers) for (const id of tower.equippedItemInstanceIds) if (id) out[id] = tower.type;
+    return out;
+  }
+
   /** Whether `instanceId` (an item this account owns) can be equipped into the selected tower's `slotIndex` right now. */
   canEquipItemOnSelectedTower(instanceId: string, slotIndex: number): boolean {
     const tower = this.towers.find((t) => t.id === this.selectedTowerId);

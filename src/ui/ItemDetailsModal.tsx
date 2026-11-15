@@ -17,10 +17,33 @@ interface ItemDetailsModalProps {
   /** Current Gem Shards, for the re-roll button (omit both to hide re-rolling, e.g. outside a run). */
   gemShards?: number;
   onReroll?: (instanceId: string) => number[] | null;
+  equippedOn?: string | null;
 }
 
 /** Item Details — Item System spec sections 8/13/22: rarity, category, lore, effects (declarative, see itemDefinitions.ts header), source, tradable/soulbound, and full trade history for this exact instance. */
-export function ItemDetailsModal({ item, onClose, gemShards, onReroll }: ItemDetailsModalProps) {
+export function ItemDetailsModal({ item, onClose, gemShards, onReroll, equippedOn }: ItemDetailsModalProps) {
+  return (
+    <div style={overlayStyle} onClick={onClose}>
+      <div style={cardStyle} onClick={(e) => e.stopPropagation()} className="hn-item-details-card">
+        <button onClick={onClose} style={closeButtonStyle} aria-label="×">
+          ×
+        </button>
+        <ItemDetailsBody key={item.instanceId} item={item} gemShards={gemShards} onReroll={onReroll} equippedOn={equippedOn} />
+      </div>
+    </div>
+  );
+}
+
+interface ItemDetailsBodyProps {
+  item: ItemInstance;
+  gemShards?: number;
+  onReroll?: (instanceId: string) => number[] | null;
+  /** Translated name of the tower wearing this copy, null when it sits unequipped, undefined when unknown (hides the line). */
+  equippedOn?: string | null;
+}
+
+/** The details themselves, shared by the pop-up above and the Inventory's side panel. Re-mount it (key) per item so the local roll state never leaks between items. */
+export function ItemDetailsBody({ item, gemShards, onReroll, equippedOn }: ItemDetailsBodyProps) {
   const { t } = useLanguage();
   const [showDropTable, setShowDropTable] = useState(false);
   // the copy's own rolls, updated in place right after a re-roll
@@ -39,106 +62,104 @@ export function ItemDetailsModal({ item, onClose, gemShards, onReroll }: ItemDet
   const sourceTable = def.source.type !== "PHASE_MILESTONE" ? getDropTable(def.source.refId) : null;
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        <style>{".hn-roll-flash{animation:hnRoll 700ms ease-out}@keyframes hnRoll{0%{color:#fff;text-shadow:0 0 12px #a860f0}100%{text-shadow:none}}@media (prefers-reduced-motion: reduce){.hn-roll-flash{animation:none}}"}</style>
-        <button onClick={onClose} style={closeButtonStyle}>
-          ×
-        </button>
-
-        <div style={headerRowStyle}>
-          <ItemGlyph itemDefinitionId={def.id} size={64} />
-          <div>
-            <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
-            <RarityBadge rarity={def.rarity} size="md" />
-            <div style={categoryStyle}>{t(`itemCategory.${def.category}` as TranslationKey)}</div>
-          </div>
+    <>
+      <style>{".hn-roll-flash{animation:hnRoll 700ms ease-out}@keyframes hnRoll{0%{color:#fff;text-shadow:0 0 12px #a860f0}100%{text-shadow:none}}@media (prefers-reduced-motion: reduce){.hn-roll-flash{animation:none}}"}</style>
+      <div style={headerRowStyle}>
+        <ItemGlyph itemDefinitionId={def.id} size={64} />
+        <div>
+          <div style={nameStyle}>{t(`items.${def.i18nKey}.name` as TranslationKey)}</div>
+          <RarityBadge rarity={def.rarity} size="md" />
+          <div style={categoryStyle}>{t(`itemCategory.${def.category}` as TranslationKey)}</div>
         </div>
-        <div style={descriptionStyle}>{t(`items.${def.i18nKey}.description` as TranslationKey)}</div>
-        <div style={loreStyle}>{t(`items.${def.i18nKey}.lore` as TranslationKey)}</div>
-
-        <Section label={t("inventory.effects")}>
-          {def.effects.length === 0 ? (
-            <div style={mutedLineStyle}>{t("inventory.noEffects")}</div>
-          ) : (
-            <>
-              {itemEffectsOf({ itemDefinitionId: item.itemDefinitionId, rolls }).map((effect, i) => {
-                const range = effectRange(def.effects[i]!);
-                return (
-                  <div key={i} style={effectLineStyle} className={justRolled ? "hn-roll-flash" : undefined}>
-                    {t(`itemEffect.${effect.kind}` as TranslationKey, { value: effect.value })}
-                    <span style={rangeStyle}> {t("inventory.rollRange", { min: range.min, max: range.max })}</span>
-                  </div>
-                );
-              })}
-              <QualityBar quality={itemRollQuality({ itemDefinitionId: item.itemDefinitionId, rolls }) ?? 0} label={t("inventory.rollQuality")} />
-              {onReroll && rerollCost(item) !== null && (
-                <div style={rerollRowStyle}>
-                  <button
-                    style={{ ...rerollButtonStyle, opacity: (gemShards ?? 0) >= (rerollCost(item) ?? 0) && !item.pendingTrade && !item.pendingAuction ? 1 : 0.5 }}
-                    disabled={(gemShards ?? 0) < (rerollCost(item) ?? 0) || item.pendingTrade || item.pendingAuction}
-                    onClick={() => {
-                      const next = onReroll(item.instanceId);
-                      if (next) {
-                        setRolls(next);
-                        setJustRolled(false);
-                        window.requestAnimationFrame(() => setJustRolled(true));
-                      }
-                    }}
-                    data-testid="item-reroll"
-                  >
-                    {t("inventory.reroll", { cost: rerollCost(item) ?? 0 })}
-                  </button>
-                  <div style={mutedLineStyle}>{t("inventory.rerollHint")}</div>
-                </div>
-              )}
-            </>
-          )}
-        </Section>
-
-        <Section label={t("inventory.tradable")}>
-          {isPassItem(item) ? (
-            <>
-              <div style={{ ...mutedLineStyle, color: "#ffd36b", fontWeight: 700 }} data-testid="item-pass-only">
-                {t("inventory.passOnly")}
-              </div>
-              <div style={mutedLineStyle}>{t("inventory.passOnlyHint")}</div>
-            </>
-          ) : (
-            <div style={mutedLineStyle}>{item.tradable ? t("inventory.tradable") : t("inventory.soulbound")}</div>
-          )}
-        </Section>
-
-        <Section label={t("inventory.acquiredAt")}>
-          <div style={mutedLineStyle}>{new Date(item.acquiredAt).toLocaleDateString()}</div>
-        </Section>
-
-        {history.length > 0 && (
-          <Section label={t("inventory.history")}>
-            {history.map((entry) => (
-              <div key={entry.eventId} style={mutedLineStyle}>
-                {entry.eventType === "ITEM_TRADED" && entry.toOwner
-                  ? t("inventory.historyTraded", { owner: entry.toOwner.slice(0, 12) })
-                  : t("inventory.historyAcquired")}
-                {" — "}
-                {new Date(entry.timestamp).toLocaleDateString()}
-              </div>
-            ))}
-          </Section>
-        )}
-
-        {sourceTable && (
-          <button onClick={() => setShowDropTable((v) => !v)} style={linkButtonStyle}>
-            {t("inventory.viewDropTable")}
-          </button>
-        )}
-        {showDropTable && sourceTable && (
-          <div style={{ marginTop: 10 }}>
-            <DropTableView table={sourceTable} />
-          </div>
-        )}
       </div>
-    </div>
+      {equippedOn !== undefined && (
+        <div style={{ ...equippedLineStyle, color: equippedOn ? PALETTE.success : PALETTE.uiTextDim }} data-testid="item-equipped-on">
+          {equippedOn ? t("inventory.equippedOn", { tower: equippedOn }) : t("inventory.notEquipped")}
+        </div>
+      )}
+      <div style={descriptionStyle}>{t(`items.${def.i18nKey}.description` as TranslationKey)}</div>
+      <div style={loreStyle}>{t(`items.${def.i18nKey}.lore` as TranslationKey)}</div>
+      <Section label={t("inventory.effects")}>
+        {def.effects.length === 0 ? (
+          <div style={mutedLineStyle}>{t("inventory.noEffects")}</div>
+        ) : (
+          <>
+            {itemEffectsOf({ itemDefinitionId: item.itemDefinitionId, rolls }).map((effect, i) => {
+              const range = effectRange(def.effects[i]!);
+              return (
+                <div key={i} style={effectLineStyle} className={justRolled ? "hn-roll-flash" : undefined}>
+                  {t(`itemEffect.${effect.kind}` as TranslationKey, { value: effect.value })}
+                  <span style={rangeStyle}> {t("inventory.rollRange", { min: range.min, max: range.max })}</span>
+                </div>
+              );
+            })}
+            <QualityBar quality={itemRollQuality({ itemDefinitionId: item.itemDefinitionId, rolls }) ?? 0} label={t("inventory.rollQuality")} />
+            {onReroll && rerollCost(item) !== null && (
+              <div style={rerollRowStyle}>
+                <button
+                  style={{ ...rerollButtonStyle, opacity: (gemShards ?? 0) >= (rerollCost(item) ?? 0) && !item.pendingTrade && !item.pendingAuction ? 1 : 0.5 }}
+                  disabled={(gemShards ?? 0) < (rerollCost(item) ?? 0) || item.pendingTrade || item.pendingAuction}
+                  onClick={() => {
+                    const next = onReroll(item.instanceId);
+                    if (next) {
+                      setRolls(next);
+                      setJustRolled(false);
+                      window.requestAnimationFrame(() => setJustRolled(true));
+                    }
+                  }}
+                  data-testid="item-reroll"
+                >
+                  {t("inventory.reroll", { cost: rerollCost(item) ?? 0 })}
+                </button>
+                <div style={mutedLineStyle}>{t("inventory.rerollHint")}</div>
+              </div>
+            )}
+          </>
+        )}
+      </Section>
+
+      <Section label={t("inventory.tradable")}>
+        {isPassItem(item) ? (
+          <>
+            <div style={{ ...mutedLineStyle, color: "#ffd36b", fontWeight: 700 }} data-testid="item-pass-only">
+              {t("inventory.passOnly")}
+            </div>
+            <div style={mutedLineStyle}>{t("inventory.passOnlyHint")}</div>
+          </>
+        ) : (
+          <div style={mutedLineStyle}>{item.tradable ? t("inventory.tradable") : t("inventory.soulbound")}</div>
+        )}
+      </Section>
+
+      <Section label={t("inventory.acquiredAt")}>
+        <div style={mutedLineStyle}>{new Date(item.acquiredAt).toLocaleDateString()}</div>
+      </Section>
+
+      {history.length > 0 && (
+        <Section label={t("inventory.history")}>
+          {history.map((entry) => (
+            <div key={entry.eventId} style={mutedLineStyle}>
+              {entry.eventType === "ITEM_TRADED" && entry.toOwner
+                ? t("inventory.historyTraded", { owner: entry.toOwner.slice(0, 12) })
+                : t("inventory.historyAcquired")}
+              {" — "}
+              {new Date(entry.timestamp).toLocaleDateString()}
+            </div>
+          ))}
+        </Section>
+      )}
+
+      {sourceTable && (
+        <button onClick={() => setShowDropTable((v) => !v)} style={linkButtonStyle}>
+          {t("inventory.viewDropTable")}
+        </button>
+      )}
+      {showDropTable && sourceTable && (
+        <div style={{ marginTop: 10 }}>
+          <DropTableView table={sourceTable} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -276,6 +297,7 @@ const linkButtonStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+const equippedLineStyle: CSSProperties = { fontSize: 11.5, fontWeight: 700, marginTop: 10 };
 const rangeStyle: CSSProperties = { color: PALETTE.uiTextDim, fontWeight: 400, fontSize: 11 };
 const rerollRowStyle: CSSProperties = { marginTop: 10, display: "grid", gap: 4 };
 const rerollButtonStyle: CSSProperties = {
