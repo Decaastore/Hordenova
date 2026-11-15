@@ -150,10 +150,14 @@ const SWARM_COUNT_CAP = 56;
  * busier. A Swarm wave gets a real numbers spike on top.
  */
 export function enemyCountForWave(waveNumber: number): number {
-  const early = 6 + Math.floor(waveNumber * 0.8);
-  const base =
-    early <= EARLY_COUNT_CAP ? early : Math.min(LATE_COUNT_CAP, EARLY_COUNT_CAP + Math.floor(Math.max(0, waveNumber - 25) / LATE_COUNT_STEP_WAVES));
+  const base = enemyCountForWaveBase(waveNumber);
   return getWaveTag(waveNumber) === "SWARM" ? Math.min(SWARM_COUNT_CAP, Math.round(base * 1.6)) : base;
+}
+
+/** The count a wave would have without its Swarm spike (what a Swarm wave's total threat is measured against). */
+export function enemyCountForWaveBase(waveNumber: number): number {
+  const early = 6 + Math.floor(waveNumber * 0.8);
+  return early <= EARLY_COUNT_CAP ? early : Math.min(LATE_COUNT_CAP, EARLY_COUNT_CAP + Math.floor(Math.max(0, waveNumber - 25) / LATE_COUNT_STEP_WAVES));
 }
 
 export function isBossMilestone(waveNumber: number): boolean {

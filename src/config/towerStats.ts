@@ -144,7 +144,9 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
     role: "Slow / Crowd Control / Freeze",
     description: "Every hit slows its target, and higher levels add a chance to freeze it solid. The answer when fast enemies keep slipping past before your other towers can finish them.",
     buildCost: 55,
-    baseDamage: 8,
+    // BALANCE (Nov 2026 simulation pass): was 8 (12 now) — a build without Frostborn reached ~17 waves further
+    // than the same build with it in 8 simulated hours; it stays the support tower, now one that also hurts.
+    baseDamage: 12,
     baseAttackSpeed: 1.1,
     baseRange: 140,
     upgradeCostBase: 44,
@@ -155,7 +157,8 @@ export const TOWER_DEFINITIONS: Record<TowerType, TowerDefinition> = {
     role: "Magic / Chain Damage / Armor Penetration",
     description: "Long-range arcane lightning that arcs between enemies and, at higher levels, tears straight through armor. The tower that keeps working when heavily armored enemies shrug off everything else.",
     buildCost: 70,
-    baseDamage: 14,
+    // BALANCE (Nov 2026 simulation pass): was 14 — after the Frostborn buff, builds without Stormcaller went furthest.
+    baseDamage: 16,
     baseAttackSpeed: 0.6,
     baseRange: 190,
     upgradeCostBase: 56,
@@ -171,7 +174,7 @@ export const TOWER_SPECIALS: {
 } = {
   IRONWOOD: { critChance: 0.15, critMultiplier: 2.0, bossDamageMultiplier: 1 },
   INFERNO: { aoeRadius: 55, burnDamagePerSecond: 3, burnDurationMs: 3000, burnMaxStacks: 1 },
-  FROSTBORN: { slowPercent: 0.25, slowDurationMs: 2000, freezeChance: 0, freezeDurationMs: 900 },
+  FROSTBORN: { slowPercent: 0.3, slowDurationMs: 2000, freezeChance: 0, freezeDurationMs: 900 },
   STORMCALLER: { chainTargets: 2, chainFalloff: 0.5, armorPenetration: 0 },
 };
 

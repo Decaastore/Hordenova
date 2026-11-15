@@ -1,4 +1,5 @@
-import { generateWaveSpawns } from "./waveConfig";
+import { enemyCountForWaveBase, generateWaveSpawns } from "./waveConfig";
+import { getWaveTag } from "./phaseConfig";
 import { GOLD_GROWTH_PER_WAVE, getScaledEnemyStats, hpMultiplierForWaveIndex } from "./enemyStats";
 
 /**
@@ -28,6 +29,8 @@ export const WAVE_THREAT_PER_ENEMY = 94;
 export const WAVE_GOLD_PER_ENEMY = 8.6;
 /** The first map (waves 1-30) is left as it was designed; the budget blends in over the next ten waves. */
 const BUDGET_BLEND_START_WAVE = 30;
+/** A Swarm wave's total threat, as a multiple of a normal wave's (see factorsForWave). */
+export const SWARM_THREAT_VS_NORMAL = 1.2;
 const BUDGET_BLEND_WAVES = 10;
 const MIN_FACTOR = 0.3;
 const MAX_FACTOR = 3;
@@ -69,8 +72,13 @@ function factorsForWave(wave: number): WaveFactors {
     gold += s.goldReward;
   }
   const n = spawns.length;
+  // BALANCE (Nov 2026 simulation pass): a SWARM wave brings 60% more enemies, but its
+  // total threat is capped at SWARM_THREAT_VS_NORMAL of a normal wave — many weaker
+  // enemies, not 1.6x the whole wave's life. Uncapped, the swarm waves (42, 62, 82)
+  // were the walls a steady build hit 15-20 times in a row.
+  const threatN = getWaveTag(w) === "SWARM" ? Math.min(n, enemyCountForWaveBase(w) * SWARM_THREAT_VS_NORMAL) : n;
   const factors: WaveFactors = {
-    hp: earlyBlend(w, clampFactor(WAVE_THREAT_PER_ENEMY * hpMultiplierForWaveIndex(w - 1) * n, threat)),
+    hp: earlyBlend(w, clampFactor(WAVE_THREAT_PER_ENEMY * hpMultiplierForWaveIndex(w - 1) * threatN, threat)),
     gold: earlyBlend(w, clampFactor(WAVE_GOLD_PER_ENEMY * (1 + (w - 1) * GOLD_GROWTH_PER_WAVE) * n, gold)),
   };
   if (cache.size > 5000) cache.clear();

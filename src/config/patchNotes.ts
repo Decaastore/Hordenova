@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v141",
+    dateIso: "2026-11-14",
+    category: "BALANCE",
+    title: {
+      en: "Balance pass: Frostborn and Stormcaller buffs, softer Swarm waves",
+      ptBR: "Revisão de equilíbrio: Frostborn e Stormcaller mais fortes, ondas de Enxame mais justas",
+    },
+    description: {
+      en: "We simulated hundreds of hours of Season play with every tower combination. Frostborn and Stormcaller were pulling less weight than the other two, and Swarm waves spiked well above the waves around them.",
+      ptBR: "Simulamos centenas de horas de Season com todas as combinações de torres. Frostborn e Stormcaller rendiam menos que as outras duas, e as ondas de Enxame davam um pico muito acima das ondas em volta.",
+    },
+    highlights: [
+      {
+        en: "Frostborn: base damage 8 → 12 and slow 25% → 30%. It's still the support tower, but now it hurts too.",
+        ptBR: "Frostborn: dano base de 8 para 12 e lentidão de 25% para 30%. Continua sendo a torre de suporte, mas agora também machuca.",
+      },
+      {
+        en: "Stormcaller: base damage 14 → 16.",
+        ptBR: "Stormcaller: dano base de 14 para 16.",
+      },
+      {
+        en: "Swarm waves (42, 62, 82…) still bring 60% more enemies, but their total life is now capped at 1.2× a normal wave's: many weaker enemies instead of a wall.",
+        ptBR: "As ondas de Enxame (42, 62, 82…) continuam trazendo 60% mais inimigos, mas a vida total agora tem teto de 1,2× a de uma onda normal: muitos inimigos mais fracos em vez de um muro.",
+      },
+      {
+        en: "Ironwood and Inferno are unchanged, and nothing changed for bosses.",
+        ptBR: "Ironwood e Inferno não mudaram, e nada mudou nos chefes.",
+      },
+    ],
+  },
+  {
     id: "v140",
     dateIso: "2026-11-14",
     category: "CONTENT",
