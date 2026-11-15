@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v142",
+    dateIso: "2026-11-14",
+    category: "SYSTEMS",
+    title: {
+      en: "Duel: card collection",
+      ptBR: "Duelo: coleção de cartas",
+    },
+    description: {
+      en: "Everyone starts the Duel with the starter deck; the other 8 cards are earned by climbing the arenas, never sold for Gems or money.",
+      ptBR: "Todo mundo começa o Duelo com o deck inicial; as outras 8 cartas se ganham subindo de arena, e nunca são vendidas por Gemas ou dinheiro.",
+    },
+    highlights: [
+      {
+        en: "Starter deck: the 4 towers plus Crawlers, Runners, Brute and Shieldbearers.",
+        ptBR: "Deck inicial: as 4 torres e Rastejantes, Corredores, Bruto e Escudeiros.",
+      },
+      {
+        en: "Each arena frees two cards the moment you first reach it: Volcanic Wastes (Swarm, Rage), Frozen Tundra (Freeze, Ironclad), Abyss (Meteor, Regenerators), Crystal Sea (Disabler, Rune Ward). Losing trophies later never takes them back.",
+        ptBR: "Cada arena libera duas cartas na primeira vez que você chega nela: Ermos Vulcânicos (Enxame, Fúria), Tundra Congelada (Congelar, Couraçado), Abismo (Meteoro, Regeneradores), Mar de Cristal (Desativador, Égide Rúnica). Perder troféus depois nunca tira a carta.",
+      },
+      {
+        en: "Can't wait? Unlock a card early with Duel Coins (150 to 800), which are earned only by playing.",
+        ptBR: "Não quer esperar? Libere a carta antes com Moedas de Duelo (de 150 a 800), que só se ganham jogando.",
+      },
+      {
+        en: "Draft and Random Decks events still lend every card for the match, so you can try them first. Anything already in one of your decks stays yours.",
+        ptBR: "Os eventos Draft e Decks Aleatórios continuam emprestando todas as cartas na partida, então dá para testar antes. O que já estava num deck seu continua seu.",
+      },
+    ],
+  },
+  {
     id: "v141",
     dateIso: "2026-11-14",
     category: "BALANCE",

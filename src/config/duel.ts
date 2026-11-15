@@ -460,6 +460,54 @@ export interface DuelProfile {
   history: DuelHistoryEntry[];
   /** UTC day the daily event's win prize was paid (-1 never). */
   eventWinDay: number;
+  /** COLEÇÃO DE CARTAS — cards bought early with Duel Coins (arena-unlocked and starter cards aren't listed). */
+  cards: DuelCardId[];
+}
+
+// ── card collection ─────────────────────────────────────────────────────
+/**
+ * COLEÇÃO DE CARTAS — everyone starts with the starter deck. Every other card
+ * unlocks for free on reaching its arena (best trophies ever, so it's never
+ * lost), or can be bought earlier with Duel Coins — earned only by playing.
+ * Never with Gems or money: a card changes the match, and nothing bought may
+ * give an edge in the Duel. Events and the Weekly Challenge lend cards for
+ * the match, so anyone can try them first.
+ */
+export const STARTER_CARDS: readonly DuelCardId[] = DEFAULT_DECK;
+
+export const CARD_UNLOCKS: Partial<Record<DuelCardId, { arenaId: string; price: number }>> = {
+  S_SWARM: { arenaId: "ARENA_VOLCANO", price: 150 },
+  X_RAGE: { arenaId: "ARENA_VOLCANO", price: 150 },
+  X_FREEZE: { arenaId: "ARENA_TUNDRA", price: 300 },
+  S_IRONCLAD: { arenaId: "ARENA_TUNDRA", price: 300 },
+  X_METEOR: { arenaId: "ARENA_ABYSS", price: 500 },
+  S_REGEN: { arenaId: "ARENA_ABYSS", price: 500 },
+  S_DISABLER: { arenaId: "ARENA_CRYSTAL", price: 800 },
+  X_WARD: { arenaId: "ARENA_CRYSTAL", price: 800 },
+};
+
+function arenaMin(arenaId: string): number {
+  return DUEL_ARENAS.find((a) => a.id === arenaId)?.minTrophies ?? 0;
+}
+
+export function ownsCard(p: DuelProfile, id: DuelCardId): boolean {
+  const u = CARD_UNLOCKS[id];
+  if (!u || STARTER_CARDS.includes(id)) return true;
+  return p.cards.includes(id) || p.bestTrophies >= arenaMin(u.arenaId);
+}
+
+export function canBuyCard(p: DuelProfile, id: DuelCardId): boolean {
+  const u = CARD_UNLOCKS[id];
+  return !!u && !ownsCard(p, id) && p.coins >= u.price;
+}
+
+export function buyCard(p: DuelProfile, id: DuelCardId): DuelProfile | null {
+  if (!canBuyCard(p, id)) return null;
+  return { ...p, coins: p.coins - CARD_UNLOCKS[id]!.price, cards: [...p.cards, id] };
+}
+
+export function deckOwned(p: DuelProfile, deck: readonly DuelCardId[]): boolean {
+  return deck.every((id) => ownsCard(p, id));
 }
 
 // ── daily event modes ──────────────────────────────────────────────────
@@ -699,6 +747,7 @@ export function createDuelProfile(): DuelProfile {
     mastery: {},
     history: [],
     eventWinDay: -1,
+    cards: [],
   };
 }
 
@@ -766,6 +815,14 @@ export function sanitizeDuelProfile(raw: unknown): DuelProfile {
     })(),
     history: sanitizeHistory(r.history),
     eventWinDay: intOr(r.eventWinDay, -1),
+    cards: (() => {
+      const known = (x: unknown): x is DuelCardId => typeof x === "string" && !!getDuelCard(x);
+      if (Array.isArray(r.cards)) return [...new Set(r.cards.filter(known))];
+      // saves from before the collection: every card already in a deck stays theirs
+      const used = new Set<DuelCardId>();
+      for (const d of [r.deck, ...(Array.isArray(r.decks) ? (r.decks as unknown[]) : [])]) if (Array.isArray(d)) for (const id of d) if (known(id)) used.add(id);
+      return [...used].filter((id) => !STARTER_CARDS.includes(id));
+    })(),
   };
 }
 

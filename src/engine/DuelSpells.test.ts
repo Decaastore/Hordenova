@@ -256,3 +256,33 @@ describe("Duel: Regenerators, Disabler, Rune Ward and match stats", () => {
     expect(towerStats?.damage ?? 0).toBeGreaterThan(0);
   });
 });
+
+describe("Duel card collection", () => {
+  it("starts with the starter deck, unlocks cards by arena for free, sells them early only for Duel Coins", async () => {
+    const { createDuelProfile, ownsCard, buyCard, canBuyCard, CARD_UNLOCKS, STARTER_CARDS, DUEL_CARDS, deckOwned } = await import("@/config/duel");
+    const p = createDuelProfile();
+    for (const id of STARTER_CARDS) expect(ownsCard(p, id)).toBe(true);
+    expect(deckOwned(p, p.deck)).toBe(true);
+    // every non-starter card has an unlock and none is owned at the start
+    for (const c of DUEL_CARDS) if (!STARTER_CARDS.includes(c.id)) expect(CARD_UNLOCKS[c.id]).toBeDefined();
+    expect(ownsCard(p, "X_METEOR")).toBe(false);
+    // reaching the arena (best trophies) frees it, and losing trophies later never takes it back
+    expect(ownsCard({ ...p, bestTrophies: 1500, trophies: 1200 }, "X_METEOR")).toBe(true);
+    // buying early with coins
+    expect(canBuyCard({ ...p, coins: 100 }, "X_METEOR")).toBe(false);
+    const bought = buyCard({ ...p, coins: 600 }, "X_METEOR")!;
+    expect(bought.coins).toBe(100);
+    expect(ownsCard(bought, "X_METEOR")).toBe(true);
+    expect(buyCard(bought, "X_METEOR")).toBeNull();
+  });
+
+  it("old saves keep every card they already had in a deck", async () => {
+    const { sanitizeDuelProfile, ownsCard } = await import("@/config/duel");
+    const old = sanitizeDuelProfile({ deck: ["X_METEOR", "X_FREEZE", "X_RAGE", "T_IRONWOOD", "T_INFERNO", "S_CRAWLERS", "S_SWARM", "S_BRUTE"] });
+    expect(ownsCard(old, "X_METEOR")).toBe(true);
+    expect(ownsCard(old, "S_SWARM")).toBe(true);
+    expect(ownsCard(old, "X_WARD")).toBe(false);
+    // and a new save stays with the starter set
+    expect(sanitizeDuelProfile(JSON.parse(JSON.stringify(sanitizeDuelProfile({})))).cards).toEqual([]);
+  });
+});

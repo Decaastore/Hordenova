@@ -47,6 +47,10 @@ import {
   duelSkinLooks,
   toggleDuelCosmetic,
   addMasteryWin,
+  buyCard,
+  CARD_UNLOCKS,
+  deckOwned,
+  ownsCard,
   commanderFor,
   canReplay,
   cardMasteryLevel,
@@ -213,6 +217,8 @@ type MatchResult = {
   tourneyRound?: number | null;
   tourneyWon?: boolean;
   unlocked?: string[];
+  /** Cards freed by reaching a new arena this match. */
+  cardsUnlocked?: DuelCardId[];
 };
 
 const LEAGUE_COLOR: Record<LeagueId, [string, string]> = {
@@ -326,7 +332,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
   const arena = arenaFor(duel.trophies);
   const rank = rankFor(duel.trophies);
   const fmt = (n: number) => n.toLocaleString(language === "ptBR" ? "pt-BR" : "en-US");
-  const deckOk = isValidDeck(deck);
+  const deckOk = isValidDeck(deck) && deckOwned(duel, deck);
   const missions = duelMissionsFor(day);
   const mState = duel.missions.day === day ? duel.missions : { day, progress: {} as Record<string, number>, claimed: [] as string[] };
   const rankName = (r: DuelRank) => `${t(`duel.league.${r.league}` as TranslationKey)}${r.league === "MASTER" || r.league === "LEGEND" ? "" : " " + ROMAN[r.division]}`;
@@ -474,7 +480,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
     const r = applyDuelResult(cur.duel, { outcome, myCastle: snap.players[0]!.castle, foeCastle: snap.players[1]!.castle, sends: snap.players[0]!.sends, deck: cur.duel.deck }, Date.now());
     const next = updateSave({ ...grantPrize(cur, r.prize, "duel_match"), duel: { ...r.profile, history: pushHistory(r.profile.history, historyEntry(snap, "RANKED", r.trophyChange)) } });
     setSave(next);
-    setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus, unlocked: r.unlocked });
+    const cardsUnlocked = DUEL_CARDS.filter((c) => !ownsCard(cur.duel, c.id) && ownsCard(r.profile, c.id)).map((c) => c.id);
+    setResult({ outcome, weekly: false, trophyChange: r.trophyChange, prize: r.prize, rankBefore: r.rankBefore, rankAfter: r.rankAfter, firstWin: r.firstWin, streakBonus: r.streakBonus, unlocked: r.unlocked, cardsUnlocked });
   };
 
   const claimMission = (id: string) => {
@@ -916,10 +923,37 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
               </span>
             </div>
             <p className="pg-sub">{deckOk ? t("duel.deckHint") : t("duel.deckInvalid")}</p>
+            <p className="pg-sub">{t("duel.collectionHint")}</p>
             <div className="du-cards">
               {DUEL_CARDS.map((c) => {
                 const on = deck.includes(c.id);
                 const lvl = cardMasteryLevel(duel.mastery[c.id]?.wins ?? 0);
+                const lock = CARD_UNLOCKS[c.id];
+                if (lock && !ownsCard(duel, c.id))
+                  return (
+                    <div key={c.id} className="du-cardbtn is-locked" data-testid={`deck-${c.id}`}>
+                      <span className="du-lock" aria-hidden="true">
+                        🔒
+                      </span>
+                      <CardFace id={c.id} dim />
+                      <span className="du-desc">{t(`duel.card.${c.id}.desc` as TranslationKey)}</span>
+                      <span className="du-unlock">{t("duel.cardUnlockAt", { arena: t(`duel.arenas.${lock.arenaId}` as TranslationKey) })}</span>
+                      <button
+                        className="du-buycard"
+                        disabled={duel.coins < lock.price}
+                        onClick={() => {
+                          const cur = loadSave();
+                          const next = buyCard(cur.duel, c.id);
+                          if (!next) return;
+                          setSave(updateSave({ duel: next }));
+                          setNotice(t("duel.cardBought", { name: t(`duel.card.${c.id}.name` as TranslationKey) }));
+                        }}
+                        data-testid={`buy-card-${c.id}`}
+                      >
+                        <MaterialIcon kind="DUEL_COINS" size={15} /> {t("duel.cardBuy", { n: lock.price })}
+                      </button>
+                    </div>
+                  );
                 return (
                   <button key={c.id} className={`du-cardbtn${on ? " is-on" : ""}`} onClick={() => toggleCard(c.id)} aria-pressed={on} data-testid={`deck-${c.id}`}>
                     {lvl > 0 && (
@@ -1180,6 +1214,11 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
             {!result.tourneyWon && result.tourneyRound ? <p className="dm-tag">{t("duel.tourneyNext", { n: result.tourneyRound + 1 })}</p> : null}
             {result.unlocked && result.unlocked.length > 0 && (
               <p className="dm-tag is-gold">{t("duel.unlockedTag", { list: result.unlocked.map((id) => t(`duel.shop.${id}` as TranslationKey)).join(", ") })}</p>
+            )}
+            {result.cardsUnlocked && result.cardsUnlocked.length > 0 && (
+              <p className="dm-tag is-gold" data-testid="cards-unlocked">
+                {t("duel.cardsUnlockedTag", { list: result.cardsUnlocked.map((id) => t(`duel.card.${id}.name` as TranslationKey)).join(", ") })}
+              </p>
             )}
             {result.firstWin && <p className="dm-tag">{t("duel.firstWinTag")}</p>}
             {result.streakBonus && <p className="dm-tag">{t("duel.streakTag", { n: result.streakBonus })}</p>}
@@ -1613,6 +1652,12 @@ const LOBBY_CSS = `
 .du-draft-opt { width: 190px; }
 .du-draft-deck { display: flex; flex-wrap: wrap; gap: 8px; }
 .du-draft-empty { width: 64px; height: 84px; border-radius: 10px; border: 1px dashed var(--line); }
+.du-cardbtn.is-locked { cursor: default; border-style: dashed; }
+.du-lock { position: absolute; top: 8px; right: 10px; z-index: 1; font-size: 16px; }
+.du-unlock { font-size: 11.5px; color: var(--ash-2); text-align: center; }
+.du-buycard { display: inline-flex; align-items: center; justify-content: center; gap: 5px; margin-top: 2px; padding: 6px 10px; border-radius: 8px; border: 1px solid #e8b04b; background: rgba(232,176,75,0.12); color: #ffe7b0 !important; font-weight: 800; font-size: 12.5px; cursor: pointer; }
+.du-buycard:disabled { opacity: 0.45; cursor: default; }
+.du-buycard:focus-visible { outline: 2px solid #fff3d0; outline-offset: 2px; }
 .du-slots { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 10px 0 2px; }
 .du-slot { padding: 8px 16px; border-radius: 9px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--ash); font-weight: 700; cursor: pointer; }
 .du-slot.is-on { border-color: rgba(232,176,75,0.8); color: var(--gold-hi); background: linear-gradient(180deg, rgba(232,176,75,0.16), rgba(24,18,12,0.6)); }
