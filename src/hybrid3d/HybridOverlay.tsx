@@ -12,7 +12,9 @@ import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castl
 import { Effects } from "@/battlefield3d/fx";
 import { castleDressingFor } from "@/rendering/castleSprites";
 import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
-import { Footprints } from "./footprints";
+import { footprints } from "@/rendering/footprints";
+import { TILT_COS } from "@/rendering3d/enemyProjection";
+import { WORLD_SIZE } from "@/config/gameBalance";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "@/battlefield3d/creatures";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 
@@ -85,12 +87,12 @@ function Lights() {
   }, []);
   return (
     <>
-      <hemisphereLight args={["#b4c4d8", "#3a3020", 0.95]} />
+      <hemisphereLight args={["#c4d0e0", "#4a3e2c", 1.25]} />
       <directionalLight
         ref={sun}
         color="#ffe0b8"
         intensity={1.9}
-        position={[340, 520, 300]}
+        position={[420, 520, 40]}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -105,11 +107,11 @@ function Lights() {
       />
       <directionalLight color="#8fb0d8" intensity={0.6} position={[400, 200, 500]} />
       {/* soft fill from the viewer's side, so faces turned to the camera are never black */}
-      <directionalLight color="#ffe8cc" intensity={0.9} position={[0, 300, -600]} />
+      <directionalLight color="#ffe8cc" intensity={1.5} position={[-120, 300, -600]} />
       {/* an invisible floor that only shows the shadows the 3D things cast onto the 2D map */}
       <mesh rotation-x={-Math.PI / 2} position-y={0.05} receiveShadow>
         <planeGeometry args={[1400, 1200]} />
-        <shadowMaterial transparent opacity={0.32} />
+        <shadowMaterial transparent opacity={0.2} />
       </mesh>
     </>
   );
@@ -272,8 +274,8 @@ function Castle({
     }
     // darker under the walls (contact shade), then a soft edge into the map
     const ao = g.createRadialGradient(128, 128, 10, 128, 128, 128);
-    ao.addColorStop(0, "rgba(0,0,0,0.45)");
-    ao.addColorStop(0.45, "rgba(0,0,0,0.25)");
+    ao.addColorStop(0, "rgba(0,0,0,0.22)");
+    ao.addColorStop(0.45, "rgba(0,0,0,0.1)");
     ao.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = ao;
     g.fillRect(0, 0, 256, 256);
@@ -423,6 +425,15 @@ function Castle({
 
 // ----------------------------------------------------------------- creatures
 const ENEMY_HEIGHT = 62; // world units — the 2D creature sheets are 23–33 tall
+/** A print from the 3D layer's ground space (x, z and a yaw around +Y) into world units for the 2D ground. */
+function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean) {
+  const wx = WORLD_SIZE.width / 2 - x;
+  const wy = WORLD_SIZE.height / 2 - z * TILT_COS;
+  const dx = -Math.sin(yaw);
+  const dy = -Math.cos(yaw) * TILT_COS;
+  footprints.stamp(wx, wy, Math.atan2(dy, dx), length, left);
+}
+
 /** Footprint length (world units) of each ordinary 2D enemy, roughly its foot size. */
 const ORDINARY_PRINT: Record<string, number> = { CRAWLER: 9, SWARMLING: 7, RUNNER: 9.5, BRUTE: 14, SHIELDBEARER: 11, REGENERATOR: 10, IRONCLAD: 12.5, DISABLER: 9.5 };
 /** Most creatures drawn in 3D at once; beyond that the extra ones keep their 2D sprite. */
@@ -463,7 +474,6 @@ function Creatures({
   fortress,
   roadLength,
   castleAt,
-  prints,
 }: {
   engine: GameEngine;
   hiddenIds: RefObject<Set<string>>;
@@ -474,7 +484,6 @@ function Creatures({
   roadLength: number;
   /** Road distance from the castle to the road's end (the castle stands a little short of it on edge maps). */
   castleAt: number;
-  prints: Footprints;
 }) {
   const gltfs = useLoader(GLTFLoader, CREATURE_URLS) as GLTF[];
   const kits = useMemo(() => prepareCreatures(gltfs), [gltfs]);
@@ -512,8 +521,7 @@ function Creatures({
           st.left = !st.left;
           const side = { x: -en.direction.y, y: en.direction.x };
           const off = size * 0.32 * (st.left ? -1 : 1);
-          const p = loc({ x: en.position.x + side.x * off, y: en.position.y + side.y * off });
-          prints.stamp(p.x, p.z, worldDirectionToThreeYaw(en.direction), size, st.left);
+          footprints.stamp(en.position.x + side.x * off, en.position.y + side.y * off, Math.atan2(en.direction.y, en.direction.x), size, st.left);
         }
         continue;
       }
@@ -617,7 +625,7 @@ function Creatures({
           st.min = Math.min(st.min + dt * e.h * 0.02, y);
           if (!st.down && y < st.min + e.h * 0.03) {
             st.down = true;
-            prints.stamp(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0);
+            stampLocal(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0);
             if (e.heavy) fx.smoke.emit(footTmp.clone().setY(1), { count: 3, color: "#6a5a48", colorEnd: "#2a241e", size: e.h * 0.1, life: 0.9, speed: 10, up: 6, grow: 2.2, alpha: 0.35, drag: 2 });
           } else if (st.down && y > st.min + e.h * 0.07) st.down = false;
         }
@@ -710,24 +718,12 @@ function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject
   const fortress = anchorInfo.position;
   const portal = useMemo(() => getPortalAnchor(layout.path), [layout]);
   const fx = useMemo(() => new Effects(), []);
-  const prints = useMemo(() => new Footprints(), []);
   const castle = useRef<CastleState | null>(null);
-  const look = castleDressingFor(engine.getRenderSnapshot().biomeId);
-  useEffect(() => prints.setLook(look), [prints, look]);
-  useFrame((_, dt) => {
-    fx.update(dt);
-    prints.update(dt);
-    const now = castleDressingFor(engine.getRenderSnapshot().biomeId);
-    if (now !== lookRef.current) {
-      lookRef.current = now;
-      prints.setLook(now);
-    }
-  });
-  const lookRef = useRef(look);
+  useFrame((_, dt) => fx.update(dt));
+  useEffect(() => () => footprints.clear(), []);
   return (
     <WorldScale fx={fx}>
       <Lights />
-      <primitive object={prints.mesh} />
       <primitive object={fx.root} />
       <GatePath
         key={`path-${lid}`}
@@ -738,7 +734,7 @@ function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
-          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} prints={prints} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />
+          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />
         </Suspense>
       </LayerBoundary>
     </WorldScale>

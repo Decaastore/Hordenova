@@ -1,3 +1,4 @@
+import { footprints } from "./footprints";
 import { deathImpact } from "./deathImpact";
 import { activeKillFx, drawKillFx } from "./duelLooks";
 import { LootFx } from "./lootFx";
@@ -552,6 +553,8 @@ export function CanvasRenderer({
       headingState = nextHeadingState;
 
       deathImpact.drawGround(ctx, timestamp);
+      // footprints lie on the ground, under every creature
+      footprints.draw(ctx, biome.id);
       // HÍBRIDO — with the 3D castle standing on the road, a creature that has reached the castle is
       // inside it: it is no longer drawn (nor its health bar), instead of walking on out the far side.
       const castleEndLeft = hideCastleRef.current ? Math.hypot(roadPath[roadPath.length - 1]!.x - getFortressAnchor(roadPath).position.x, roadPath[roadPath.length - 1]!.y - getFortressAnchor(roadPath).position.y) : -1;
