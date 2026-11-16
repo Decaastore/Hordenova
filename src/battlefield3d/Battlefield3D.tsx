@@ -23,6 +23,7 @@ import { buildTowerModel } from "./models/towerModel";
 import { buildCastleModel } from "./models/castleModel";
 import { threeToWorld, worldDirToYaw, worldToThree } from "./coords";
 import { Effects } from "./fx";
+import { buildProps } from "./props";
 
 /**
  * CAMPO DE BATALHA 3D (prévia) — the battlefield rendered as a real-time 3D
@@ -127,6 +128,7 @@ function World({
   const pads = useMemo(() => layout.sites.map((s) => s.position), [layout]);
   const terrain = useMemo(() => buildTerrain(biome, layout.path, pads, fortress.position), [biome, layout, pads, fortress.position]);
   const scenery = useMemo(() => buildScenery(biome, terrain, pads, fortress.position, layout.path, quality), [biome, terrain, pads, fortress.position, layout, quality]);
+  const props = useMemo(() => buildProps(biome, terrain, pads, fortress.position, layout.path), [biome, terrain, pads, fortress.position, layout]);
   const fx = useMemo(() => new Effects(), []);
   const groundMat = useMemo(
     () =>
@@ -154,12 +156,20 @@ function World({
       env.dispose();
     };
   }, [gl, scene]);
+  const accent = biome.palette.accentGlow;
+  const firefly = useMemo(() => new THREE.Vector3(), []);
   useFrame((_, dt) => {
     scenery.windTime.value += dt;
+    for (const f of props.flames) if (Math.random() < 0.75) fx.flame(f.clone(), 0.75);
+    for (const c of props.crystals) if (Math.random() < 0.12) fx.mote(c.clone(), accent, 8, 10);
+    // fireflies drifting over the clearing
+    if (Math.random() < 0.5) {
+      const w = { x: Math.random() * WORLD_SIZE.width, y: Math.random() * WORLD_SIZE.height };
+      fx.mote(firefly.copy(worldToThree(w, terrain.heightAt(w) + 6 + Math.random() * 14)), "#d8ff7a", 2, 3);
+    }
     fx.update(dt);
   });
   const fog = new THREE.Color(biome.palette.fogColor).lerp(new THREE.Color("#0a0f0d"), 0.75);
-  const accent = biome.palette.accentGlow;
   return (
     <>
       <color attach="background" args={[fog]} />
@@ -167,6 +177,7 @@ function World({
       <Lights quality={quality} />
       <mesh geometry={terrain.geometry} material={groundMat} receiveShadow />
       <primitive object={scenery.group} />
+      <primitive object={props.group} />
       <primitive object={fx.root} />
       <TowerPads engine={engine} sites={layout.sites} terrain={terrain} color={biome.palette.slotStone} glow={accent} ui={ui} />
       <Castle engine={engine} biomeId={biomeId} fortress={fortress} terrain={terrain} fx={fx} />
@@ -264,12 +275,12 @@ function TowerPads({
   ui?: MutableRefObject<Battlefield3DUiState>;
 }) {
   const geo = useMemo(() => {
-    const g = new THREE.CylinderGeometry(22, 25, 4, 10, 1);
+    const g = new THREE.CylinderGeometry(17, 19, 3, 10, 1);
     g.translate(0, 1, 0);
     return g;
   }, []);
   const highGeo = useMemo(() => {
-    const g = new THREE.CylinderGeometry(21, 27, 9, 9, 1);
+    const g = new THREE.CylinderGeometry(16, 20, 7, 9, 1);
     g.translate(0, 3.5, 0);
     return g;
   }, []);
@@ -304,8 +315,8 @@ function TowerPads({
       {sites.map((s, i) => (
         <group key={s.id} position={worldToThree(s.position, terrain.heightAt(s.position))}>
           <mesh geometry={s.trait === "HIGH_GROUND" ? highGeo : geo} material={mat} castShadow receiveShadow />
-          <mesh ref={(m) => (rings.current[i] = m)} rotation-x={-Math.PI / 2} position-y={s.trait === "HIGH_GROUND" ? 8.2 : 3.1} material={mats.cold}>
-            <ringGeometry args={[17, 18.6, 40]} />
+          <mesh ref={(m) => (rings.current[i] = m)} rotation-x={-Math.PI / 2} position-y={s.trait === "HIGH_GROUND" ? 7.3 : 2.8} material={mats.cold}>
+            <ringGeometry args={[13, 14.4, 40]} />
           </mesh>
         </group>
       ))}
@@ -331,7 +342,7 @@ function RangePreview({
   const sel = useMemo(() => new THREE.MeshBasicMaterial({ color: "#fff", transparent: true, opacity: 0.9, depthTest: false, depthWrite: false }), []);
   const edgeGeo = useMemo(() => new THREE.RingGeometry(0.985, 1, 96).rotateX(-Math.PI / 2), []);
   const fillGeo = useMemo(() => new THREE.CircleGeometry(1, 96).rotateX(-Math.PI / 2), []);
-  const selGeo = useMemo(() => new THREE.RingGeometry(24, 27, 48).rotateX(-Math.PI / 2), []);
+  const selGeo = useMemo(() => new THREE.RingGeometry(17, 19.5, 48).rotateX(-Math.PI / 2), []);
   const refs = useRef<{ edge: THREE.Mesh | null; fill: THREE.Mesh | null; sel: THREE.Mesh | null }>({ edge: null, fill: null, sel: null });
   useFrame(({ clock }) => {
     const { edge: e, fill: f, sel: s } = refs.current;
@@ -451,7 +462,7 @@ function Castle({
   const anchor = worldToThree(fortress.position, terrain.heightAt(fortress.position));
   // the gate faces the viewer, turned a little towards the road the horde comes in on
   const yaw = -0.5;
-  const SCALE = 1.75;
+  const SCALE = 1.3;
   const tmp = useMemo(() => new THREE.Vector3(), []);
   const at = (name: string) => {
     const a = model.anchors[name];
@@ -463,7 +474,7 @@ function Castle({
     const fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
     const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
     for (const sx of [-1, 1]) {
-      const p = anchor.clone().addScaledVector(fwd, 92).addScaledVector(side, sx * 34);
+      const p = anchor.clone().addScaledVector(fwd, 66).addScaledVector(side, sx * 24);
       const w = threeToWorld(p);
       p.y = terrain.heightAt(w);
       out.push(p);
@@ -473,8 +484,8 @@ function Castle({
 
   // an outer curtain wall around the plaza, open wherever the road runs through
   const wall = useMemo(() => {
-    const R = 122;
-    const segLen = 13;
+    const R = 88;
+    const segLen = 10;
     const n = Math.round((2 * Math.PI * R) / segLen);
     const blocks: { p: THREE.Vector3; yaw: number }[] = [];
     const posts: THREE.Vector3[] = [];
@@ -482,17 +493,17 @@ function Castle({
     for (let i = 0; i <= n; i++) {
       const a = (i / n) * Math.PI * 2;
       const w = { x: fortress.position.x + Math.cos(a) * R, y: fortress.position.y + Math.sin(a) * R };
-      const open = terrain.roadDistance(w) < 40 || w.x > WORLD_SIZE.width + 60 || w.y > WORLD_SIZE.height + 60 || w.y < -60;
+      const open = terrain.roadDistance(w) < 30 || w.x > WORLD_SIZE.width + 60 || w.y > WORLD_SIZE.height + 60 || w.y < -60;
       const p = worldToThree(w, terrain.heightAt(w));
       if (!open && i < n) blocks.push({ p, yaw: -a + Math.PI / 2 });
       if (open !== wasOpen && i > 0) posts.push(p);
       wasOpen = open;
     }
     const stone = new THREE.MeshStandardMaterial({ color: model.lava ? "#4a3e3a" : "#8a8273", roughness: 0.92 });
-    const segGeo = new THREE.BoxGeometry(segLen + 0.6, 11, 5);
-    segGeo.translate(0, 5.5, 0);
-    const merlon = new THREE.BoxGeometry(4, 3.2, 5.4);
-    merlon.translate(0, 12.6, 0);
+    const segGeo = new THREE.BoxGeometry(segLen + 0.6, 7, 3.6);
+    segGeo.translate(0, 3.5, 0);
+    const merlon = new THREE.BoxGeometry(3, 2.4, 4);
+    merlon.translate(0, 8.2, 0);
     const segs = new THREE.InstancedMesh(segGeo, stone, blocks.length);
     const mers = new THREE.InstancedMesh(merlon, stone, blocks.length);
     const m = new THREE.Matrix4();
@@ -507,10 +518,10 @@ function Castle({
     segs.castShadow = segs.receiveShadow = mers.castShadow = true;
     const g = new THREE.Group();
     g.add(segs, mers);
-    const postGeo = new THREE.CylinderGeometry(7, 8, 22, 10);
-    postGeo.translate(0, 10, 0);
-    const capGeo = new THREE.ConeGeometry(8.6, 10, 10);
-    capGeo.translate(0, 26, 0);
+    const postGeo = new THREE.CylinderGeometry(4.6, 5.4, 14, 10);
+    postGeo.translate(0, 6.5, 0);
+    const capGeo = new THREE.ConeGeometry(5.8, 7, 10);
+    capGeo.translate(0, 17, 0);
     const roof = new THREE.MeshStandardMaterial({ color: "#6a2418", roughness: 0.8 });
     for (const p of posts) {
       const post = new THREE.Mesh(postGeo, stone);
@@ -551,8 +562,8 @@ function Castle({
       if (p && Math.random() < 0.8) fx.flame(p.clone(), 0.9);
     }
     for (const b of braziers) {
-      if (Math.random() < 0.9) fx.flame(b.clone().add(new THREE.Vector3(0, 15, 0)), 1.5);
-      if (Math.random() < 0.05) fx.smokePuff(b.clone().add(new THREE.Vector3(0, 26, 0)), 0.6);
+      if (Math.random() < 0.9) fx.flame(b.clone().add(new THREE.Vector3(0, 10, 0)), 1);
+      if (Math.random() < 0.05) fx.smokePuff(b.clone().add(new THREE.Vector3(0, 18, 0)), 0.45);
     }
     // the crystal core breathes magic upwards
     const c = at("core");
@@ -573,7 +584,7 @@ function Castle({
   return (
     <>
       <mesh rotation-x={-Math.PI / 2} position={[anchor.x, anchor.y + 0.8, anchor.z]} material={plaza} receiveShadow renderOrder={1}>
-        <circleGeometry args={[125, 48]} />
+        <circleGeometry args={[90, 48]} />
       </mesh>
       <primitive object={wall.group} />
       <group ref={group} position={anchor} scale={SCALE} rotation-y={yaw}>
@@ -582,7 +593,7 @@ function Castle({
         <pointLight ref={coreLight} color={model.core} intensity={2600} distance={120} decay={2} position={[0, 50, 20]} />
       </group>
       {braziers.map((b, i) => (
-        <group key={i} position={b}>
+        <group key={i} position={b} scale={0.65}>
           <mesh castShadow position-y={6}>
             <cylinderGeometry args={[3.2, 4.6, 12, 8]} />
             <meshStandardMaterial color="#4a4640" roughness={0.9} />
@@ -666,28 +677,28 @@ function Portal({ path, terrain, glow, fx }: { path: readonly { x: number; y: nu
     const t = clock.elapsedTime;
     vortex.uniforms.uTime!.value = t;
     if (light.current) light.current.intensity = 4200 + Math.sin(t * 3.1) * 1200;
-    if (Math.random() < 0.6) fx.mote(p.clone().add(new THREE.Vector3(0, 3, 0)), glow, 22, 26);
+    if (Math.random() < 0.6) fx.mote(p.clone().add(new THREE.Vector3(0, 3, 0)), glow, 14, 20);
   });
   const N = 7;
   return (
     <group position={p}>
       <mesh rotation-x={-Math.PI / 2} position-y={1.2} material={vortex} renderOrder={6}>
-        <circleGeometry args={[30, 64]} />
+        <circleGeometry args={[19, 64]} />
       </mesh>
       {Array.from({ length: N }, (_, i) => {
         const a = (i / N) * Math.PI * 2 + 0.3;
-        const r = 38;
+        const r = 25;
         return (
-          <group key={i} position={[Math.cos(a) * r, 0, Math.sin(a) * r]} rotation={[(Math.random() - 0.5) * 0.25, a, (Math.random() - 0.5) * 0.3]}>
-            <mesh geometry={stones} material={stoneMat} castShadow receiveShadow scale={[1, 0.7 + (i % 3) * 0.25, 1]} />
-            <mesh position={[0, 14, 3.4]} material={runeMat}>
-              <boxGeometry args={[1.2, 5, 0.6]} />
+          <group key={i} position={[Math.cos(a) * r, 0, Math.sin(a) * r]} scale={1} rotation={[(Math.random() - 0.5) * 0.25, a, (Math.random() - 0.5) * 0.3]}>
+            <mesh geometry={stones} material={stoneMat} castShadow receiveShadow scale={[0.65, 0.45 + (i % 3) * 0.15, 0.65]} />
+            <mesh position={[0, 7, 2.2]} material={runeMat}>
+              <boxGeometry args={[0.8, 3.2, 0.4]} />
             </mesh>
           </group>
         );
       })}
       <mesh rotation-x={-Math.PI / 2} position-y={0.7} material={glowDiscMaterial(glow, 0.6)}>
-        <circleGeometry args={[70, 32]} />
+        <circleGeometry args={[42, 32]} />
       </mesh>
       <pointLight ref={light} color={glow} intensity={4200} distance={170} decay={2} position={[0, 24, 0]} />
     </group>
@@ -748,19 +759,19 @@ function Towers({ engine, terrain, fx }: { engine: GameEngine; terrain: TerrainD
         const model = towerModel(tw.type, stage, tw.equippedSkinId ?? "base");
         const obj = model.root.clone(true);
         const turret = obj.children[model.root.children.indexOf(model.turret)] ?? null;
-        const s = TOWER_PRESENTATION_SCALE * 2.35;
+        const s = TOWER_PRESENTATION_SCALE * 1.3;
         obj.scale.setScalar(s);
         obj.position.copy(worldToThree(tw.position, terrain.heightAt(tw.position) + 2.5));
         // a floating crystal over the roof: the tower's colour, readable from above
         const box = new THREE.Box3().setFromObject(model.root);
         const top = box.max.y + 6;
         const crystal = new THREE.Mesh(crystalGeo, crystalMats[tw.type] ?? crystalMats.IRONWOOD!);
-        crystal.scale.set(1, 1.6, 1).multiplyScalar((1.1 + stage * 0.2) / s);
+        crystal.scale.set(1, 1.6, 1).multiplyScalar((0.6 + stage * 0.1) / s);
         crystal.position.y = top;
         obj.add(crystal);
         const disc = new THREE.Mesh(discGeo, discMats[tw.type] ?? discMats.IRONWOOD!);
         disc.position.copy(obj.position).setY(obj.position.y + 1.4);
-        disc.scale.setScalar(36 + stage * 4);
+        disc.scale.setScalar(22 + stage * 2);
         disc.renderOrder = 2;
         g.add(obj, disc);
         entry = { key, obj, turret, aim: 0, crystal, top, disc };
@@ -803,7 +814,7 @@ function Towers({ engine, terrain, fx }: { engine: GameEngine; terrain: TerrainD
 // ----------------------------------------------------------------- enemies
 const PLACEHOLDER_BODIES = ["/models/enemies/Puglin.glb", "/models/enemies/Imp.glb"] as const;
 const ANIMATION_LIBRARY = "/models/enemies/anims.glb";
-const ENEMY_HEIGHT = 56; // world units — big enough that a creature reads as a creature
+const ENEMY_HEIGHT = 38; // world units — big enough that a creature reads as a creature
 
 interface LiveEnemy {
   obj: THREE.Object3D;
@@ -887,7 +898,7 @@ function Enemies({
         const scale = (ENEMY_HEIGHT * tier) / body.height;
         obj.scale.setScalar(scale);
         const shadow = new THREE.Mesh(blobGeo, blobMat);
-        shadow.scale.setScalar(13 * tier);
+        shadow.scale.setScalar(8 * tier);
         shadow.renderOrder = 3;
         g.add(obj, shadow);
         // only enemies that start at the rift crawl out of it
@@ -1196,7 +1207,7 @@ function HudLayer({ engine, canvas }: { engine: GameEngine; terrain: TerrainData
       const w = 30;
       const frac = Math.max(0, Math.min(1, tw.mana / MANA_MAX));
       const x = s.x - w / 2;
-      const y = s.y + 16;
+      const y = s.y + 11;
       ctx.fillStyle = "rgba(6,8,14,0.8)";
       ctx.fillRect(x - 1, y - 1, w + 2, 5);
       ctx.fillStyle = frac >= 1 ? "#a8e4ff" : "#3a7ad8";

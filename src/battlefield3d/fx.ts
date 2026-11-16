@@ -11,6 +11,8 @@ import * as THREE from "three";
 const MAX_PARTICLES = 4000;
 const MAX_BOLT_SEGMENTS = 600;
 const MAX_RINGS = 48;
+/** Effects are authored a little large; this brings them to the size of the units on the board. */
+const FX_SCALE = 0.65;
 
 export interface EmitOptions {
   count: number;
@@ -120,7 +122,9 @@ class ParticlePool {
     this.life.fill(0);
   }
 
-  emit(origin: THREE.Vector3, o: EmitOptions) {
+  emit(origin: THREE.Vector3, opts: EmitOptions) {
+    const k = FX_SCALE;
+    const o: EmitOptions = { ...opts, size: opts.size * k, speed: opts.speed * k, radius: (opts.radius ?? 0) * k, up: (opts.up ?? 0) * k, gravity: (opts.gravity ?? 0) * k };
     const c0 = new THREE.Color(o.color);
     const c1 = new THREE.Color(o.colorEnd ?? o.color);
     const spread = o.spread ?? 1;
@@ -211,7 +215,8 @@ class BoltPool {
     this.age.fill(1);
   }
   /** A jagged bolt from a to b, with a couple of forks. Colour is boosted well past 1 so bloom catches it. */
-  bolt(a: THREE.Vector3, b: THREE.Vector3, color: THREE.ColorRepresentation, life = 0.16, jag = 9) {
+  bolt(a: THREE.Vector3, b: THREE.Vector3, color: THREE.ColorRepresentation, life = 0.16, jagIn = 9) {
+    const jag = jagIn * FX_SCALE;
     const c = new THREE.Color(color).multiplyScalar(4);
     const steps = Math.max(4, Math.round(a.distanceTo(b) / 14));
     let prev = a.clone();
@@ -277,8 +282,8 @@ class RingPool {
     (r.mesh.material as THREE.MeshBasicMaterial).color.set(color).multiplyScalar(2.5);
     r.age = 0;
     r.life = life;
-    r.r0 = r0;
-    r.r1 = r1;
+    r.r0 = r0 * FX_SCALE;
+    r.r1 = r1 * FX_SCALE;
     r.mesh.visible = true;
   }
   update(dt: number) {

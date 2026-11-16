@@ -34,6 +34,21 @@ function displaced(geo: THREE.BufferGeometry, amount: number, freq: number, seed
   return g;
 }
 
+/** Vertex colours from a dark underside to a sunlit top, so foliage reads as volume from above. */
+function shadeByHeight(geo: THREE.BufferGeometry, y0: number, y1: number): THREE.BufferGeometry {
+  const pos = geo.attributes.position as THREE.BufferAttribute;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    const t = Math.max(0, Math.min(1, (pos.getY(i) - y0) / (y1 - y0)));
+    const k = 0.35 + t * 0.6;
+    col[i * 3] = k * 0.95;
+    col[i * 3 + 1] = k;
+    col[i * 3 + 2] = k * 0.85;
+  }
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 export interface Scenery {
   group: THREE.Group;
   /** Wind sway uniform shared by grass and leaves. */
@@ -68,32 +83,18 @@ export function buildScenery(
     trees.push({ p, s, rot: rand() * Math.PI * 2 });
   };
   // the wood around the clearing: dense outside, thinning towards the play area
-  for (let k = 0; k < 2600 && trees.length < (quality === "high" ? 420 : 220); k++) {
+  const maxTrees = quality === "high" ? 950 : 560;
+  for (let k = 0; k < 9000 && trees.length < maxTrees; k++) {
     const p = { x: -TERRAIN_MARGIN_X + rand() * TERRAIN_WIDTH, y: -TERRAIN_MARGIN_Z + rand() * TERRAIN_DEPTH };
     const out = Math.max(-p.x, p.x - W, -p.y, p.y - H);
     const inside = out < 0;
-    const chance = inside ? 0.035 + (fbmNoise2D(p.x * 0.01, p.y * 0.01, 2) > 0.6 ? 0.25 : 0) : 0.95;
-    if (rand() < chance) tryTree(p, (inside ? 0.85 : 1.05) + rand() * 0.6);
+    const clump = fbmNoise2D(p.x * 0.012, p.y * 0.012, 2);
+    const chance = inside ? 0.03 + (clump > 0.6 ? 0.3 : 0) : out < 40 ? 0.7 : 0.98;
+    if (rand() < chance) tryTree(p, (inside ? 0.8 : 1.0) + rand() * 0.55);
   }
 
   const bark = new THREE.MeshStandardMaterial({ color: new THREE.Color("#3a2c22"), roughness: 0.95 });
-  const trunkGeo = new THREE.CylinderGeometry(1.1, 2.4, 22, 7, 2);
-  trunkGeo.translate(0, 11, 0);
-  const trunks = new THREE.InstancedMesh(trunkGeo, bark, trees.length);
-  trunks.castShadow = trunks.receiveShadow = true;
-
-  // A conifer crown: stacked, ragged cones (one merged geometry per tree).
-  const tiers: THREE.BufferGeometry[] = [];
-  for (let k = 0; k < 5; k++) {
-    const r = 15 - k * 2.6;
-    const h = 17 - k * 1.6;
-    const cone = new THREE.ConeGeometry(r, h, 9, 2, true);
-    cone.translate(0, 12 + k * 8.5 + h / 2, 0);
-    tiers.push(displaced(cone, 0.28, 0.35, k * 3 + 1));
-  }
-  const crownGeo = mergeGeometries(tiers);
-  const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0, side: THREE.DoubleSide });
-  leafMat.onBeforeCompile = (shader) => {
+  const windSway = (shader: { uniforms: Record<string, unknown>; vertexShader: string }) => {
     shader.uniforms.uTime = windTime;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nuniform float uTime;")
@@ -105,28 +106,74 @@ export function buildScenery(
          transformed.x += sway;`,
       );
   };
-  const leaves = new THREE.InstancedMesh(crownGeo, leafMat, trees.length);
-  leaves.castShadow = leaves.receiveShadow = true;
+
+  // --- conifers: stacked ragged cones
+  const tiers: THREE.BufferGeometry[] = [];
+  for (let k = 0; k < 5; k++) {
+    const r = 15 - k * 2.6;
+    const h = 17 - k * 1.6;
+    const cone = new THREE.ConeGeometry(r, h, 9, 2, true);
+    cone.translate(0, 12 + k * 8.5 + h / 2, 0);
+    tiers.push(displaced(cone, 0.28, 0.35, k * 3 + 1));
+  }
+  const pineCrown = shadeByHeight(mergeGeometries(tiers), 12, 60);
+
+  // --- broadleaf: a cluster of lumpy foliage balls, darker underneath, sunlit on top
+  const blobs: THREE.BufferGeometry[] = [];
+  const blobDefs = [
+    [0, 30, 0, 13],
+    [8, 26, 4, 9.5],
+    [-8, 27, -3, 10],
+    [3, 25, -8, 9],
+    [-4, 36, 3, 9],
+  ] as const;
+  blobDefs.forEach(([x, y, z, r], k) => {
+    const b = new THREE.IcosahedronGeometry(r, quality === "high" ? 2 : 1);
+    b.translate(x, y, z);
+    blobs.push(displaced(b, 0.32, 0.22, k * 5 + 2));
+  });
+  const oakTrunkGeo = new THREE.CylinderGeometry(1.3, 2.6, 24, 7, 2);
+  oakTrunkGeo.translate(0, 12, 0);
+  const oakCrown = shadeByHeight(mergeGeometries(blobs), 16, 44);
+
+  const trunkGeo = new THREE.CylinderGeometry(1.1, 2.4, 22, 7, 2);
+  trunkGeo.translate(0, 11, 0);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.88, metalness: 0, vertexColors: true, side: THREE.DoubleSide });
+  leafMat.onBeforeCompile = windSway;
+  const oakMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.9, metalness: 0, vertexColors: true, flatShading: false });
+  oakMat.onBeforeCompile = windSway;
+
+  const pines = trees.filter((_, i) => (i * 7919) % 10 < 4);
+  const oaks = trees.filter((_, i) => (i * 7919) % 10 >= 4);
+  const pineTrunks = new THREE.InstancedMesh(trunkGeo, bark, pines.length);
+  const pineLeaves = new THREE.InstancedMesh(pineCrown, leafMat, pines.length);
+  const oakTrunks = new THREE.InstancedMesh(oakTrunkGeo, bark, oaks.length);
+  const oakLeaves = new THREE.InstancedMesh(oakCrown, oakMat, oaks.length);
+  for (const im of [pineTrunks, pineLeaves, oakTrunks, oakLeaves]) im.castShadow = im.receiveShadow = true;
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const c = new THREE.Color();
-  const greens = ["#1f3326", "#253c2a", "#2c4630", "#1a2b24"].map((h) => new THREE.Color(h));
-  trees.forEach((t, i) => {
-    const base = worldToThree(t.p, terrain.heightAt(t.p) - 0.5);
-    e.set((rand() - 0.5) * 0.06, t.rot, (rand() - 0.5) * 0.06);
-    q.setFromEuler(e);
-    const s = new THREE.Vector3(t.s, t.s * (1 + rand() * 0.45), t.s);
-    m.compose(base, q, s);
-    trunks.setMatrixAt(i, m);
-    leaves.setMatrixAt(i, m);
-    leaves.setColorAt(i, c.copy(greens[Math.floor(rand() * greens.length)]!).multiplyScalar(0.8 + rand() * 0.45));
-  });
-  group.add(trunks, leaves);
+  const pineGreens = ["#1f3326", "#253c2a", "#2c4630", "#1a2b24"].map((h) => new THREE.Color(h));
+  const oakGreens = [P.vegetationPrimary, "#24461e", "#2c4a22", "#1c3618", "#34502a"].map((h) => new THREE.Color(h));
+  const place = (list: typeof trees, trunk: THREE.InstancedMesh, crown: THREE.InstancedMesh, greens: THREE.Color[], tall: number) =>
+    list.forEach((t, i) => {
+      const base = worldToThree(t.p, terrain.heightAt(t.p) - 0.5);
+      e.set((rand() - 0.5) * 0.06, t.rot, (rand() - 0.5) * 0.06);
+      q.setFromEuler(e);
+      const sc = new THREE.Vector3(t.s, t.s * (1 + rand() * tall), t.s);
+      m.compose(base, q, sc);
+      trunk.setMatrixAt(i, m);
+      crown.setMatrixAt(i, m);
+      crown.setColorAt(i, c.copy(greens[Math.floor(rand() * greens.length)]!).multiplyScalar(0.75 + rand() * 0.35));
+    });
+  place(pines, pineTrunks, pineLeaves, pineGreens, 0.45);
+  place(oaks, oakTrunks, oakLeaves, oakGreens, 0.2);
+  group.add(pineTrunks, pineLeaves, oakTrunks, oakLeaves);
 
   // ------------------------------------------------------------- boulders
   const rocks: { p: Vector2; s: number }[] = [];
-  for (let k = 0; k < 900 && rocks.length < 70; k++) {
+  for (let k = 0; k < 900 && rocks.length < 45; k++) {
     const p = { x: -80 + rand() * (W + 160), y: -60 + rand() * (H + 120) };
     if (blocked(p, 4)) continue;
     if (fbmNoise2D(p.x * 0.015 + 4, p.y * 0.015, 2) < 0.52) continue;

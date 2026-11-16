@@ -121,10 +121,13 @@ export function buildTerrain(biome: BiomeDefinition, path: readonly Vector2[], p
   const shade = hexToRgb(P.groundShadowed);
   const accA = hexToRgb(P.groundAccentA);
   const accB = hexToRgb(P.groundAccentB);
-  const road = hexToRgb(P.roadFill).map((v) => v * 0.78) as [number, number, number];
-  const roadL = hexToRgb(P.roadFillLight).map((v) => v * 0.8) as [number, number, number];
+  const road = hexToRgb(P.roadFill).map((v) => v * 0.86) as [number, number, number];
+  const roadL = hexToRgb(P.roadFillLight).map((v) => v * 0.9) as [number, number, number];
   const roadE = hexToRgb(P.roadEdge);
   const moss = hexToRgb(P.vegetationDark);
+  const lush = hexToRgb(P.vegetationPrimary).map((v) => v * 0.95) as [number, number, number];
+  const lushLight = hexToRgb(P.vegetationHighlight).map((v) => v * 0.55) as [number, number, number];
+  const deep = hexToRgb(P.vegetationDark).map((v) => v * 0.9) as [number, number, number];
   for (let py = 0; py < lowH; py++) {
     for (let px = 0; px < lowW; px++) {
       const wx = x0 + (px / lowW) * TERRAIN_WIDTH;
@@ -143,14 +146,20 @@ export function buildTerrain(biome: BiomeDefinition, path: readonly Vector2[], p
       mixIn(accA, smooth(0.55, 0.8, n2) * 0.55);
       mixIn(accB, smooth(0.6, 0.85, 1 - n2) * 0.45);
       mixIn(moss, smooth(0.5, 0.9, n3) * 0.25);
+      // living ground: broad patches of moss and short grass, like the 2D map's forest floor
+      mixIn(lush, smooth(0.25, 0.62, n1) * 0.72);
+      mixIn(lushLight, smooth(0.62, 0.85, n2) * 0.22);
+      // under the trees around the clearing the floor goes dark and deep
+      const outside = Math.max(-wx, wx - W, -wy, wy - H);
+      mixIn(deep, smooth(-30, 60, outside) * 0.75);
       // road: worn dirt with a lighter crown and darker shoulders
-      const rk = 1 - smooth(ROAD_HALF - 8 + n2 * 8, ROAD_HALF + 6 + n2 * 8, d);
+      const rk = 1 - smooth(ROAD_HALF - 4 + n2 * 6, ROAD_HALF + 2 + n2 * 6, d);
       if (rk > 0) {
         const crown = 1 - smooth(0, ROAD_HALF * 0.7, d);
         const rc: [number, number, number] = [road[0] + (roadL[0] - road[0]) * crown * n3, road[1] + (roadL[1] - road[1]) * crown * n3, road[2] + (roadL[2] - road[2]) * crown * n3];
         mixIn(rc, rk);
         const shoulder = smooth(ROAD_HALF - 10, ROAD_HALF - 2, d) * (1 - smooth(ROAD_HALF, ROAD_HALF + 8, d));
-        mixIn(roadE, shoulder * 0.6);
+        mixIn(roadE, shoulder * 0.75);
       }
       const o = (py * lowW + px) * 4;
       const v = 0.82 + n3 * 0.3;
@@ -210,6 +219,22 @@ export function buildTerrain(biome: BiomeDefinition, path: readonly Vector2[], p
       ctx.ellipse(cx, cy, s, s * 0.5, rnd() * 3, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+  // grass tufts spilling over the road's edges, so the dirt has a living border
+  for (let k = 0; k < 14000; k++) {
+    const p = { x: rnd() * W, y: rnd() * H };
+    const d = sampleGrid(dist, p);
+    if (Math.abs(d - ROAD_HALF) > 7) continue;
+    const [cx, cy] = toPx(p);
+    const len = (2 + rnd() * 4) * sx;
+    const ang = rnd() * Math.PI * 2;
+    const c = rnd() < 0.5 ? lush : lushLight;
+    ctx.strokeStyle = `rgba(${c[0] * 1.1},${c[1] * 1.15},${c[2]},${0.45 + rnd() * 0.35})`;
+    ctx.lineWidth = (0.6 + rnd() * 0.8) * sx;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(ang) * len, cy + Math.sin(ang) * len);
+    ctx.stroke();
   }
   const albedo = new THREE.CanvasTexture(canvas);
   albedo.colorSpace = THREE.SRGBColorSpace;
