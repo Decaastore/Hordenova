@@ -76,6 +76,7 @@ import type { DualGemPrice } from "@/config/gemsEconomy";
 // `isWebGLAvailable()` below); on any environment without WebGL, this
 // import is never even requested.
 // CAMPO DE BATALHA 3D (prévia) — opt-in with ?view=3d while the 3D battlefield is being built.
+import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 const Battlefield3D = lazy(() => import("@/battlefield3d/Battlefield3D").then((m) => ({ default: m.Battlefield3D })));
 const PREVIEW_3D = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "3d";
 const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
@@ -163,6 +164,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   // never leaves a tower's 2D sprite permanently hidden.
   const hidden3DTowerIdsRef = useRef<Set<string>>(new Set());
   const mapPointerBridgeRef = useRef<MapPointerBridge | null>(null);
+  const battlefield3dUiRef = useRef<Battlefield3DUiState>({ pendingTowerType: null, placingTower: null });
 
   // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
   // small state machine: "picking" a destination on the map, then either
@@ -279,6 +281,8 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
     ? (hud.deployBench.find((b) => b.id === deployPick)?.id ?? [...hud.deployBench].sort((a, b) => b.level - a.level)[0]?.id ?? null)
     : null;
   const placingTower = benchSelectedId ? (engine.getDeployBench().find((tw) => tw.id === benchSelectedId) ?? null) : null;
+  // CAMPO DE BATALHA 3D (prévia) — what the 3D field needs to preview a build (read every frame, so a ref, not props).
+  battlefield3dUiRef.current = { pendingTowerType, placingTower };
 
   // ---- FIRST-RUN TUTORIAL (tutorial/tutorialFlow.ts) ----
   const [tutorial, setTutorial] = useState<TutorialState>(FINISHED_STATE);
@@ -508,9 +512,9 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           }}
         />
         {PREVIEW_3D && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 1 }} data-testid="battlefield-3d">
+          <div style={{ position: "absolute", inset: 0 }} data-testid="battlefield-3d">
             <Suspense fallback={null}>
-              <Battlefield3D engine={engine} pointerBridge={mapPointerBridgeRef} />
+              <Battlefield3D engine={engine} pointerBridge={mapPointerBridgeRef} uiState={battlefield3dUiRef} />
             </Suspense>
           </div>
         )}
