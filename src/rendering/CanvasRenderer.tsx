@@ -1,3 +1,4 @@
+import { drawSkinImpacts } from "@/rendering/skinShotFx";
 import { footprints } from "./footprints";
 import { getViewTransform, getZoom, panBy, zoomAt } from "./viewCamera";
 import { deathImpact } from "./deathImpact";
@@ -622,6 +623,7 @@ export function CanvasRenderer({
         if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
+      drawSkinImpacts(ctx);
       combatFx.drawSolid(ctx);
       // Magic air layer (piercing lance, firestorm, frost nova, sky strikes) — over units, under damage numbers.
       specialVfx.drawAir(ctx, timestamp);

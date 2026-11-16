@@ -843,6 +843,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // fires from `orb`; every stage adds pieces.
   // ---------------------------------------------------------------------------
   function frostSkinBody(L: FrostLook, s: number, top: number, ice: THREE.Material, iceDeep: THREE.Material): boolean {
+    // only the looks that still read as this tower's element get their own structure; the rest keep the standard tower
+    if (!FROST_OWN.has(SKIN)) return false;
     const glow = (col: string, ei = 2.2) => plainMat(col, { emissive: col, ei, rough: 0.3 });
     const metal = (col: string, rough = 0.3, met = 0.8) => plainMat(col, { rough, metal: met });
     const orbM = () => new THREE.MeshStandardMaterial({ color: L.orb[0], emissive: L.orb[1], emissiveIntensity: 0.9, roughness: 0.1 });
@@ -1513,6 +1515,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // ---------------------------------------------------------------------------
   interface Ballista { deckY: number; wood: THREE.Material; fit: THREE.Material; arm: THREE.Material; crew: "hood" | "helm" | "bot" | "skull" | "none"; crewM: THREE.Material; eye: string }
   function ironSkinBody(L: IronLook, s: number): Ballista | null {
+    // only the looks that still read as this tower's element get their own structure; the rest keep the standard tower
+    if (!IRON_OWN.has(SKIN)) return null;
     const glow = (col: string, ei = 2.2) => plainMat(col, { emissive: col, ei, rough: 0.4 });
     const metal = (col: string, rough = 0.35, met = 0.75) => plainMat(col, { rough, metal: met });
     const r = rng(SKIN.length * 29 + 5);
@@ -2167,6 +2171,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
     return t;
   }
 
+  const INF_OWN = new Set(["INFERNO_ASHEN_TYRANT", "INFERNO_VOLCANIC_COLOSSUS", "INFERNO_INDUSTRIAL_FORGE", "INFERNO_SOLAR_ASCENDANT", "INFERNO_PRESTIGE_ASCENDANT", "INFERNO_BLUE_FLAME", "INFERNO_COPPER", "INFERNO_EMERALD", "INFERNO_LEGEND"]);
+  const FROST_OWN = new Set(["FROSTBORN_ARCANE_CRYSTAL", "FROSTBORN_GLACIAL_WARLORD", "FROSTBORN_LEGEND", "FROSTBORN_CHAMPION", "FROSTBORN_CELESTIAL_ICE"]);
+  const STORM_OWN = new Set(["STORMCALLER_THUNDER", "STORMCALLER_VOID", "STORMCALLER_COPPER", "STORMCALLER_RUBY", "STORMCALLER_PRESTIGE_ASCENDANT", "STORMCALLER_LEGEND", "STORMCALLER_CHAMPION"]);
+  const IRON_OWN = new Set(["IRONWOOD_ANCIENT_HUNTER", "IRONWOOD_AUTUMN", "IRONWOOD_BIRCH", "IRONWOOD_BLOODWOOD", "IRONWOOD_CELESTIAL_WARDEN", "IRONWOOD_CHAMPION", "IRONWOOD_FROSTPINE", "IRONWOOD_LEGEND", "IRONWOOD_PRESTIGE_ASCENDANT", "IRONWOOD_WARDEN_OF_THE_ABYSS"]);
+
   // ---------------------------------------------------------------------------
   // INFERNO SKIN BODIES — every skin is its own machine, not a recolour: a demon
   // skull, a volcano, a steam boiler, a sun temple, an alchemist's still, a
@@ -2176,6 +2185,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // from `smoke1`/`smoke2`, and grows new pieces every stage.
   // ---------------------------------------------------------------------------
   function infernoSkinBody(L: InfLook, s: number): boolean {
+    // only the looks that still read as this tower's element get their own structure; the rest keep the standard tower
+    if (!INF_OWN.has(SKIN)) return false;
     const fireCol = new THREE.Color(L.fire);
     const hot = `#${fireCol.clone().lerp(new THREE.Color("#fff0c0"), 0.45).getHexString()}`;
     const fireM = (col: string, op = 0.85) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -2993,6 +3004,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // `orb` and arcs from the `rodN` tips; every stage adds pieces.
   // ---------------------------------------------------------------------------
   function stormSkinBody(L: StormLook, s: number, daisStone: TexSet): boolean {
+    // only the looks that still read as this tower's element get their own structure; the rest keep the standard tower
+    if (!STORM_OWN.has(SKIN)) return false;
     const glow = (col: string, ei = 2.2) => plainMat(col, { emissive: col, ei, rough: 0.3 });
     const metal = (col: string, rough = 0.3, met = 0.8) => plainMat(col, { rough, metal: met });
     const orb = (x: number, y: number, z: number, rad = 3.2) => {

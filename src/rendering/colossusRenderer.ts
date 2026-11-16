@@ -11,6 +11,7 @@
  * offscreen canvas and then only stamped, so a frame stays cheap. Purely
  * visual; reads only the snapshot.
  */
+import { drawSkinImpacts } from "@/rendering/skinShotFx";
 import { drawProjectile, drawTower } from "./EntityRenderer";
 import { CombatFx, preloadCombatFxArt } from "./combatFx";
 import { SpecialVfxLayer } from "./specialVfx";
@@ -1319,6 +1320,7 @@ export class ColossusFxLayer {
 
   drawAir(ctx: CanvasRenderingContext2D, timeMs: number): void {
     for (const f of this.flying) drawProjectile(ctx, f.p);
+    drawSkinImpacts(ctx);
     this.combat.drawSolid(ctx);
     this.special.drawAir(ctx, timeMs);
     this.combat.drawEmissive(ctx);

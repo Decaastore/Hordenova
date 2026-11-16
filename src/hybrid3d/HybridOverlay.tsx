@@ -1,3 +1,4 @@
+import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -819,7 +820,6 @@ function Creatures({
 // ----------------------------------------------------------------- towers (prévia: ?towers=3d)
 /** PRÉVIA — live 3D towers on the 2D map; only with `?towers=3d`, never on by default. */
 export const TOWERS_3D_PREVIEW = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("towers") === "3d";
-const TOWER_COLORS: Record<string, string> = { IRONWOOD: "#ffd27a", INFERNO: "#ff7a2a", FROSTBORN: "#8fe6ff", STORMCALLER: "#c49bff" };
 /** The point each tower fires from (an anchor on its turret). */
 const MUZZLE: Record<string, string[]> = { IRONWOOD: ["boltTip", "eyes"], INFERNO: ["mouth"], FROSTBORN: ["orb"], STORMCALLER: ["orb", "rod0"] };
 
@@ -869,6 +869,21 @@ function runeTexture() {
   return runeTex;
 }
 
+/** The colours and idle behaviour of a tower's effects: its skin's own, or the tower's default. */
+interface TowerFx { col: string; part: string; behavior: string }
+const DEFAULT_FX: Record<string, TowerFx> = {
+  IRONWOOD: { col: "#ffd27a", part: "#c8ff7a", behavior: "drifting-leaves" },
+  INFERNO: { col: "#ff7a2a", part: "#ffd27a", behavior: "embers" },
+  FROSTBORN: { col: "#8fe6ff", part: "#bfeeff", behavior: "frost-shards" },
+  STORMCALLER: { col: "#c49bff", part: "#c49bff", behavior: "sparks" },
+};
+function towerFx(type: string, skinId: string | null | undefined): TowerFx {
+  const base = DEFAULT_FX[type] ?? { col: "#ffffff", part: "#ffffff", behavior: "light-motes" };
+  const sk = skinId ? getTowerSkinDefinition(skinId) : null;
+  if (!sk) return base;
+  return { col: sk.paletteOverride.accent ?? base.col, part: sk.particleStyle.color ?? base.part, behavior: sk.particleStyle.behavior ?? base.behavior };
+}
+
 const towerKits = new Map<string, TowerModel>();
 function towerKit(type: string, stage: number, skin: string) {
   const key = `${type}|${stage}|${skin}`;
@@ -901,6 +916,8 @@ interface LiveTower {
   orbit: THREE.Group | null;
   /** Stage 4+: a rune circle turning on the ground under it. */
   rune: THREE.Mesh | null;
+  /** Its skin's effect colours and idle particle behaviour. */
+  fxc: TowerFx;
   type: string;
   boltT: number;
 }
@@ -921,7 +938,8 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
   };
   /** What each kind of tower keeps doing between shots. */
   const towerLife = (e: LiveTower, tw: TowerInstance, dt: number) => {
-    const col = TOWER_COLORS[tw.type] ?? "#fff";
+    const col = e.fxc.col;
+    const part = e.fxc.part;
     const k = 0.6 + e.stage * 0.1;
     if (tw.type === "INFERNO") {
       // flames licking up out of the cauldron (or the furnace mouth on the furnace skins)
@@ -930,20 +948,20 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         for (let i = 0; i < 2; i++) {
           const a = Math.random() * Math.PI * 2;
           const r = Math.random() * 5.5 * TOWER_PRESENTATION_SCALE;
-          if (Math.random() < 0.8) fx.flame(c.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)), (0.4 + Math.random() * 0.35) * k, "#ff6a14");
+          if (Math.random() < 0.8) fx.flame(c.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)), (0.4 + Math.random() * 0.35) * k, col);
         }
       } else {
         const m = anchorAt(e, "mouth");
-        if (m && Math.random() < 0.7) fx.flame(m, 0.35 * k, "#ff7a1a");
+        if (m && Math.random() < 0.7) fx.flame(m, 0.35 * k, col);
       }
       for (const sk of ["smoke1", "smoke2"]) {
         const p = anchorAt(e, sk);
         if (p && Math.random() < 0.06) fx.smokePuff(p, 0.35);
-        if (p && Math.random() < 0.15) fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: "#ff3a0a", size: 1.6, life: 0.8, speed: 4, up: 14, drag: 0.6, radius: 1 });
+        if (p && Math.random() < 0.15) fx.glow.emit(p, { count: 1, color: part, colorEnd: col, size: 1.6, life: 0.8, speed: 4, up: 14, drag: 0.6, radius: 1 });
       }
     } else if (tw.type === "FROSTBORN") {
       const o = anchorAt(e, "orb") ?? anchorAt(e, "core");
-      if (o && Math.random() < 0.25 * k) fx.mote(o, "#bfeeff", 9, -3);
+      if (o && Math.random() < 0.25 * k) fx.mote(o, part, 9, -3);
     } else if (tw.type === "STORMCALLER") {
       e.boltT -= dt;
       if (e.boltT <= 0) {
@@ -955,9 +973,65 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       }
     } else if (tw.type === "IRONWOOD") {
       const eyes = anchorAt(e, "eyes");
-      if (eyes && Math.random() < 0.12 * k) fx.mote(eyes.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, -6, (Math.random() - 0.5) * 16)), "#c8ff7a", 6, 6);
+      if (eyes && Math.random() < 0.12 * k) fx.mote(eyes.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, -6, (Math.random() - 0.5) * 16)), part, 6, 6);
     }
     if (e.stage >= 6 && Math.random() < 0.3) fx.mote(e.obj.position.clone().setY(4), col, 14, 22);
+    skinAura(e, dt);
+  };
+  /** Each skin's own ambient effect around the tower — embers, wisps, snow, sparks, leaves, bubbles… */
+  const skinAura = (e: LiveTower, dt: number) => {
+    const { col, part, behavior } = e.fxc;
+    const S = TOWER_PRESENTATION_SCALE;
+    const base = e.obj.position;
+    const rate = (0.5 + e.stage * 0.12) * dt * 60;
+    const rnd = (r: number) => (Math.random() - 0.5) * 2 * r;
+    const at = (r: number, y: number) => new THREE.Vector3(base.x + rnd(r * S), base.y + y * S, base.z + rnd(r * S));
+    switch (behavior) {
+      case "embers":
+        if (Math.random() < 0.18 * rate) fx.glow.emit(at(10, 6 + Math.random() * 14), { count: 1, color: part, colorEnd: col, size: 1.3, life: 1.2, speed: 4, up: 18, drag: 0.4, radius: 1 });
+        break;
+      case "solar-flares":
+        if (Math.random() < 0.12 * rate) fx.glow.emit(at(8, 10 + Math.random() * 12), { count: 2, color: "#ffffff", colorEnd: part, size: 2.4, life: 0.7, speed: 10, up: 10, grow: 1.4, drag: 1, radius: 2 });
+        if (Math.random() < 0.01 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), part, 4, 26 * S, 0.8);
+        break;
+      case "void-wisps":
+      case "spirit-wisps":
+        if (Math.random() < 0.12 * rate) fx.glow.emit(at(12, 4 + Math.random() * 16), { count: 1, color: part, colorEnd: "#1a0830", size: 2.6, life: 1.6, speed: 6, up: 4, grow: 1.6, drag: 0.6, radius: 2 });
+        if (Math.random() < 0.04 * rate) fx.smoke.emit(at(8, 3), { count: 1, color: col, colorEnd: "#0a0410", size: 5, life: 1.4, speed: 4, up: 6, grow: 2, alpha: 0.35, radius: 3 });
+        break;
+      case "light-motes":
+      case "starlight":
+        if (Math.random() < 0.14 * rate) fx.glow.emit(at(13, 6 + Math.random() * 22), { count: 1, color: "#ffffff", colorEnd: part, size: 1.6, life: 1.4, speed: 2, up: 3, drag: 0.5, radius: 1 });
+        break;
+      case "prism-sparkles": {
+        const cols = ["#ff8ad8", "#8ad8ff", "#fff08a", "#a8ff9a"];
+        if (Math.random() < 0.16 * rate) fx.glow.emit(at(11, 6 + Math.random() * 18), { count: 1, color: "#ffffff", colorEnd: cols[Math.floor(Math.random() * 4)]!, size: 1.8, life: 0.9, speed: 3, up: 2, drag: 0.5, radius: 1 });
+        break;
+      }
+      case "sparks":
+      case "circuit-pulses":
+        if (Math.random() < 0.14 * rate) fx.glow.emit(at(9, 6 + Math.random() * 18), { count: 3, color: "#ffffff", colorEnd: part, size: 0.9, life: 0.3, speed: 30, drag: 4, radius: 1 });
+        if (behavior === "circuit-pulses" && Math.random() < 0.015 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), part, 3, 22 * S, 0.6);
+        break;
+      case "frost-shards":
+        if (Math.random() < 0.16 * rate) fx.glow.emit(at(14, 26 + Math.random() * 8), { count: 1, color: "#ffffff", colorEnd: part, size: 1.2, life: 2, speed: 2, up: -8, drag: 0.3, radius: 1 });
+        break;
+      case "steam":
+        if (Math.random() < 0.05 * rate) fx.smoke.emit(at(6, 14 + Math.random() * 8), { count: 1, color: "#e8ecf0", colorEnd: "#8a9096", size: 4, life: 1.6, speed: 3, up: 14, grow: 2.4, alpha: 0.4, radius: 2 });
+        break;
+      case "toxic-bubbles":
+        if (Math.random() < 0.12 * rate) fx.glow.emit(at(9, 4 + Math.random() * 10), { count: 1, color: part, colorEnd: col, size: 2, life: 1.6, speed: 1, up: 8, grow: 1.3, drag: 0.2, radius: 1 });
+        break;
+      case "drifting-leaves":
+        if (Math.random() < 0.08 * rate) fx.glow.emit(at(13, 24 + Math.random() * 8), { count: 1, color: part, colorEnd: col, size: 1.8, life: 2.4, speed: 6, up: -6, drag: 0.4, radius: 2 });
+        break;
+      case "wind-swirl":
+        if (Math.random() < 0.18 * rate) {
+          const a = performance.now() / 300 + Math.random();
+          fx.glow.emit(new THREE.Vector3(base.x + Math.cos(a) * 12 * S, base.y + (6 + Math.random() * 18) * S, base.z + Math.sin(a) * 12 * S), { count: 1, color: "#ffffff", colorEnd: part, size: 1.2, life: 0.8, speed: 8, up: 6, drag: 0.6, radius: 1 });
+        }
+        break;
+    }
   };
 
   useFrame(({ clock }, rawDt) => {
@@ -1009,12 +1083,13 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
           obj.add(sp);
           halos.push({ sprite: sp, base: 0.9 * stageK, size });
         }
+        const fxc = towerFx(tw.type, tw.equippedSkinId);
         let orbit: THREE.Group | null = null;
         if (tw.type === "FROSTBORN") {
           const at = kit.anchors.orb ?? kit.anchors.core ?? new THREE.Vector3(0, 20, 0);
           orbit = new THREE.Group();
           orbit.position.copy(at);
-          const shardMat = new THREE.MeshStandardMaterial({ color: "#cfefff", emissive: new THREE.Color("#7fdcff"), emissiveIntensity: 1.6, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.9 });
+          const shardMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(fxc.part).lerp(new THREE.Color("#ffffff"), 0.5), emissive: new THREE.Color(fxc.col), emissiveIntensity: 1.6, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.9 });
           const n = 2 + stage;
           for (let i = 0; i < n; i++) {
             const sh = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), shardMat);
@@ -1030,7 +1105,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         if (stage >= 4) {
           rune = new THREE.Mesh(
             new THREE.PlaneGeometry(38, 38).rotateX(-Math.PI / 2),
-            new THREE.MeshBasicMaterial({ map: runeTexture(), color: new THREE.Color(TOWER_COLORS[tw.type] ?? "#fff"), transparent: true, opacity: 0.35 + (stage - 4) * 0.12, blending: THREE.AdditiveBlending, depthWrite: false }),
+            new THREE.MeshBasicMaterial({ map: runeTexture(), color: new THREE.Color(fxc.col), transparent: true, opacity: 0.35 + (stage - 4) * 0.12, blending: THREE.AdditiveBlending, depthWrite: false }),
           );
           rune.position.y = 0.6;
           rune.renderOrder = 3;
@@ -1042,11 +1117,11 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         // little so the tower keeps the tall silhouette of its art under the map's higher camera
         obj.position.y = topOf(tw);
         g.add(obj);
-        e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? Math.PI, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0, halos, orbit, rune, type: tw.type, boltT: Math.random() };
+        e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? Math.PI, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0, halos, orbit, rune, type: tw.type, boltT: Math.random(), fxc };
         live.current.set(tw.id, e);
         hidden.add(tw.id);
         const base = obj.position.clone();
-        const col = TOWER_COLORS[tw.type] ?? "#fff";
+        const col = fxc.col;
         if (upgraded) {
           // a new stage: a column of its light and a ring along the ground
           fx.rings.ring(base.clone().setY(0.5), col, 6, 60, 0.7);
@@ -1098,7 +1173,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       if (e.rune) e.rune.rotation.y -= dt * 0.35;
       if (!disabled) towerLife(e, tw, dt);
       if (disabled && Math.random() < 0.2) fx.smokePuff(e.obj.position.clone().setY(18), 0.5);
-      if (tw.mana >= MANA_MAX && Math.random() < 0.25) fx.mote(e.obj.position.clone().setY(10), TOWER_COLORS[tw.type] ?? "#fff", 10, 26);
+      if (tw.mana >= MANA_MAX && Math.random() < 0.25) fx.mote(e.obj.position.clone().setY(10), e.fxc.col, 10, 26);
     }
     // shots fired this frame: recoil, crystal flare and a muzzle flash at the turret
     const now = new Set<string>();
@@ -1117,7 +1192,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         holder.updateMatrixWorld(true);
         holder.localToWorld(tmp.copy(a));
         g.parent.worldToLocal(tmp);
-        fx.muzzle(tmp.clone(), TOWER_COLORS[tw!.type] ?? "#fff", p.isSpecial);
+        fx.muzzle(tmp.clone(), e.fxc.col, p.isSpecial);
       }
     }
     seenShots.current = now;

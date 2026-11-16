@@ -1,3 +1,4 @@
+import { drawSkinTrail } from "./skinShotFx";
 import { lookSkinId } from "./duelLooks";
 import { MANA_MAX, MANA_OVERCHARGE_MAX } from "@/config/towerMana";
 import type { TowerInstance } from "@/entities/Tower";
@@ -3820,6 +3821,8 @@ export function drawProjectile(ctx: CanvasRenderingContext2D, projectile: Projec
       drawStormcallerBolt(ctx, projectile, progress, skin);
       break;
   }
+  // each skin's own trail (and the impact it leaves when it lands)
+  if (skin) drawSkinTrail(ctx, projectile, progress);
 
   // Impact stamp — VISUAL POLISH: a soft additive flash that blooms in as
   // the shot lands (was a flat solid dot sitting on the target from frame 1).

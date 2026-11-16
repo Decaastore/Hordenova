@@ -1,3 +1,4 @@
+import { drawSkinImpacts } from "@/rendering/skinShotFx";
 import type { EnemyInstance } from "@/entities/Enemy";
 import { advanceEnemy, applyBurn, applySlow, createEnemyInstance } from "@/entities/Enemy";
 import { createTowerInstance, getTowerMuzzleOffset, getTowerStats, type TowerInstance } from "@/entities/Tower";
@@ -337,6 +338,7 @@ export class HomeDiorama {
     }
 
     for (const shot of this.shots) drawProjectile(ctx, shot.projectile);
+    drawSkinImpacts(ctx);
 
     for (const d of this.deaths) {
       const p = Math.min(1, (now - d.start) / 700);
