@@ -552,7 +552,12 @@ export function CanvasRenderer({
       headingState = nextHeadingState;
 
       deathImpact.drawGround(ctx, timestamp);
+      // HÍBRIDO — with the 3D castle standing on the road, a creature that has reached the castle is
+      // inside it: it is no longer drawn (nor its health bar), instead of walking on out the far side.
+      const castleEndLeft = hideCastleRef.current ? Math.hypot(roadPath[roadPath.length - 1]!.x - getFortressAnchor(roadPath).position.x, roadPath[roadPath.length - 1]!.y - getFortressAnchor(roadPath).position.y) : -1;
+      const insideCastle = (e: { distanceTraveled: number }) => castleEndLeft >= 0 && layout.length - e.distanceTraveled < castleEndLeft + 6;
       for (const enemy of snapshot.enemies) {
+        if (insideCastle(enemy)) continue;
         const hitFlashMs = timestamp - (prevEnemies.get(enemy.id)?.lastHitTimestamp ?? -Infinity);
         // CHEFE MAIOR — "Void Colossus" identity: the main boss's body/aura
         // recolor per the active terrain biome's own accent color, instead
@@ -703,7 +708,7 @@ export function CanvasRenderer({
       // their OWN pass, after every projectile/particle/damage-number, so
       // they're never momentarily hidden underneath one (see
       // EntityRenderer.drawEnemyHpBar's own doc comment).
-      for (const enemy of snapshot.enemies) if (emergenceProgress(enemy.distanceTraveled) >= 1) drawEnemyHpBar(ctx, enemy);
+      for (const enemy of snapshot.enemies) if (emergenceProgress(enemy.distanceTraveled) >= 1 && !insideCastle(enemy)) drawEnemyHpBar(ctx, enemy);
 
       if (!drawRealisticAtmosphere(ctx, biome, timestamp, visibleBounds)) {
         drawFog(ctx, biome, timestamp);

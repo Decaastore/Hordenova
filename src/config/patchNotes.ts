@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v147",
+    dateIso: "2026-11-16",
+    category: "CASTLE",
+    title: {
+      en: "Footprints and a Castle on Solid Ground",
+      ptBR: "Pegadas e um Castelo no Chão",
+    },
+    description: {
+      en: "The horde now leaves its tracks on the road, and the 3D castle stands on the map's own ground instead of sitting on a platform, with a gate that swings open for the creatures that reach it.",
+      ptBR: "A horda agora deixa rastros na estrada, e o castelo 3D fica direto no chão do mapa em vez de em cima de uma plataforma, com um portão que se abre para os monstros que chegam até ele.",
+    },
+    highlights: [
+      {
+        en: "Every creature leaves footprints that fade after a few seconds. The 3D ones print exactly where each foot lands; heavy ones raise a little dust.",
+        ptBR: "Todo monstro deixa pegadas que somem depois de alguns segundos. Os monstros 3D marcam o chão exatamente onde cada pé pisa, e os pesados levantam um pouco de poeira.",
+      },
+      {
+        en: "Each map takes prints its own way: mud in the forest, pressed snow on the ice, sand in the desert, ash with a dying ember on the volcano, a faint glow in the Abyss.",
+        ptBR: "Cada mapa marca do seu jeito: barro na floresta, neve afundada no gelo, areia no deserto, cinza com brasa se apagando no vulcão e um leve brilho no Abismo.",
+      },
+      {
+        en: "The castle stands on packed earth with rubble around its walls, and its shadow falls the same way as every other shadow on the map.",
+        ptBR: "O castelo fica sobre terra batida com entulho em volta das muralhas, e a sombra dele cai para o mesmo lado das outras sombras do mapa.",
+      },
+      {
+        en: "A trodden path leads from the road to the gate. When the horde arrives the portcullis rises and two wooden doors swing open.",
+        ptBR: "Um caminho de terra leva da estrada até o portão. Quando a horda chega, a grade sobe e duas portas de madeira se abrem.",
+      },
+      {
+        en: "Creatures that get in die inside the walls: dust and a dark burst rise over the castle, and they no longer walk out the far side.",
+        ptBR: "Os monstros que entram morrem lá dentro: sobe poeira e uma explosão escura por cima das muralhas, e eles não saem mais pelo outro lado.",
+      },
+    ],
+  },
+  {
     id: "v146",
     dateIso: "2026-11-16",
     category: "CONTENT",

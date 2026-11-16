@@ -5,14 +5,16 @@ import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
 import { getMapLayout } from "@/data/mapLayouts";
+import { getBiome } from "@/rendering/biomes";
 import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
 import { computeScreenTransform, cameraPosition, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Effects } from "@/battlefield3d/fx";
 import { castleDressingFor } from "@/rendering/castleSprites";
 import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
+import { Footprints } from "./footprints";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "@/battlefield3d/creatures";
-import type { Vector2 } from "@/utils/geometry";
+import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 
 /**
  * HÍBRIDO (prévia) — the 2D map stays exactly as it is; on top of it a
@@ -88,7 +90,7 @@ function Lights() {
         ref={sun}
         color="#ffe0b8"
         intensity={1.9}
-        position={[-360, 520, -260]}
+        position={[340, 520, 300]}
         castShadow
         shadow-mapSize-width={2048}
         shadow-mapSize-height={2048}
@@ -195,22 +197,97 @@ function Castle({
     }
     return worldDirectionToThreeYaw({ x: gx, y: gy });
   }, [facing.x, facing.y]);
-  // size it to the 2D castle's footprint (about 100 world units across)
+  // the castle stands straight on the map's ground: its round stone platform is taken away
+  // (the ground patch below takes its place), and it is sized to the 2D castle's footprint
   const scale = useMemo(() => {
+    for (const n of ["mound", "yard"]) {
+      const o = model.root.getObjectByName(n);
+      if (o) o.removeFromParent();
+    }
     const box = new THREE.Box3().setFromObject(model.root);
-    return 148 / Math.max(1, box.max.x - box.min.x);
+    return 118 / Math.max(1, box.max.x - box.min.x);
   }, [model]);
   const parts = useMemo(() => {
     const portcullis = model.root.getObjectByName("portcullis") ?? null;
-    const door = model.root.getObjectByName("gateDoor") ?? null;
+    const door = model.root.getObjectByName("gateDoor") as THREE.Mesh | undefined;
     const core = (model.root.getObjectByName("core") as THREE.Mesh | undefined) ?? null;
     if (core) core.material = (core.material as THREE.Material).clone();
     model.root.traverse((o) => {
       const m = o as THREE.Mesh;
       if (m.isMesh) m.castShadow = m.receiveShadow = true;
     });
-    return { portcullis, door, core, portY: portcullis?.position.y ?? 0 };
+    // two real door leaves on hinges in place of the flat door, so the gate swings open
+    const leaves: THREE.Object3D[] = [];
+    if (door) {
+      const g = door.geometry as THREE.PlaneGeometry;
+      const w = g.parameters.width;
+      const h = g.parameters.height;
+      door.visible = false;
+      for (const side of [-1, 1]) {
+        const hinge = new THREE.Group();
+        hinge.position.set(door.position.x + (side * w) / 2, door.position.y - h / 2, door.position.z + 0.6);
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w / 2, h, 0.9), door.material);
+        leaf.position.set((-side * w) / 4, h / 2, 0);
+        leaf.castShadow = leaf.receiveShadow = true;
+        // iron bands across each leaf
+        for (const k of [0.25, 0.7]) {
+          const band = new THREE.Mesh(new THREE.BoxGeometry(w / 2, 0.7, 1.1), new THREE.MeshStandardMaterial({ color: "#2a2724", metalness: 0.7, roughness: 0.45 }));
+          band.position.set((-side * w) / 4, h * k, 0);
+          hinge.add(band);
+        }
+        hinge.add(leaf);
+        hinge.userData.side = side;
+        door.parent!.add(hinge);
+        leaves.push(hinge);
+      }
+    }
+    return { portcullis, core, leaves, portY: portcullis?.position.y ?? 0 };
   }, [model]);
+  // the ground the castle stands on: packed earth fading into the map, darker where the walls meet it
+  const groundPatch = useMemo(() => {
+    const pal = getBiome(biomeId).palette;
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d")!;
+    const base = new THREE.Color(pal.roadFill).lerp(new THREE.Color(pal.groundShadowed), 0.45);
+    let seed = 99;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    g.fillStyle = `#${base.getHexString()}`;
+    g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1400; i++) {
+      const k = 0.7 + rnd() * 0.6;
+      const col = base.clone().multiplyScalar(k);
+      g.fillStyle = `rgba(${(col.r * 255) | 0},${(col.g * 255) | 0},${(col.b * 255) | 0},0.5)`;
+      g.beginPath();
+      g.ellipse(rnd() * 256, rnd() * 256, 1 + rnd() * 4, 1 + rnd() * 3, rnd() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    // scattered stones and rubble
+    for (let i = 0; i < 90; i++) {
+      const sc = new THREE.Color(pal.rock ?? "#777").multiplyScalar(0.6 + rnd() * 0.5);
+      g.fillStyle = `#${sc.getHexString()}`;
+      g.beginPath();
+      g.ellipse(rnd() * 256, rnd() * 256, 1.5 + rnd() * 3, 1 + rnd() * 2.2, rnd() * 3, 0, Math.PI * 2);
+      g.fill();
+    }
+    // darker under the walls (contact shade), then a soft edge into the map
+    const ao = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+    ao.addColorStop(0, "rgba(0,0,0,0.45)");
+    ao.addColorStop(0.45, "rgba(0,0,0,0.25)");
+    ao.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = ao;
+    g.fillRect(0, 0, 256, 256);
+    g.globalCompositeOperation = "destination-in";
+    const edge = g.createRadialGradient(128, 128, 60, 128, 128, 128);
+    edge.addColorStop(0, "rgba(0,0,0,1)");
+    edge.addColorStop(0.75, "rgba(0,0,0,0.85)");
+    edge.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = edge;
+    g.fillRect(0, 0, 256, 256);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 1 });
+  }, [biomeId]);
   const flags = useMemo(() => {
     const out: THREE.Mesh[] = [];
     const roof = new THREE.Color("#8a1e18");
@@ -284,8 +361,10 @@ function Castle({
     if (s) {
       const want = performance.now() < s.holdOpenUntil ? 1 : 0;
       s.open += (want - s.open) * Math.min(1, dt * (want ? 3.5 : 2));
-      if (parts.portcullis) parts.portcullis.position.y = parts.portY + s.open * 15;
-      if (parts.door) parts.door.visible = s.open < 0.35;
+      if (parts.portcullis) parts.portcullis.position.y = parts.portY + Math.min(1, s.open * 1.4) * 15;
+      // the leaves swing inwards once the portcullis is up
+      const swing = Math.max(0, (s.open - 0.25) / 0.75);
+      for (const h of parts.leaves) h.rotation.y = (h.userData.side as number) * -swing * 1.75;
     }
     // banners
     for (const f of flags) (f.material as THREE.ShaderMaterial).uniforms.uTime!.value = t + f.id;
@@ -325,6 +404,10 @@ function Castle({
   });
 
   return (
+    <>
+    <mesh rotation-x={-Math.PI / 2} position={[anchor.x, 0.08, anchor.z]} material={groundPatch} receiveShadow renderOrder={1}>
+      <circleGeometry args={[82, 48]} />
+    </mesh>
     <group ref={group} position={anchor} rotation-y={YAW} scale={scale}>
       <primitive object={model.root} />
       {flags.map((f) => (
@@ -334,11 +417,14 @@ function Castle({
       <pointLight ref={coreLight} color={model.core} intensity={120} distance={40} decay={1.6} position={[0, 30, 30]} />
       <pointLight ref={flash} color="#ff3a1a" intensity={0} distance={90} decay={1.4} position={[0, 12, 40]} />
     </group>
+    </>
   );
 }
 
 // ----------------------------------------------------------------- creatures
 const ENEMY_HEIGHT = 62; // world units — the 2D creature sheets are 23–33 tall
+/** Footprint length (world units) of each ordinary 2D enemy, roughly its foot size. */
+const ORDINARY_PRINT: Record<string, number> = { CRAWLER: 9, SWARMLING: 7, RUNNER: 9.5, BRUTE: 14, SHIELDBEARER: 11, REGENERATOR: 10, IRONCLAD: 12.5, DISABLER: 9.5 };
 /** Most creatures drawn in 3D at once; beyond that the extra ones keep their 2D sprite. */
 const MAX_3D_CREATURES = 90;
 /** How far before the castle (along the road, world units) a creature turns off for the gate. */
@@ -361,6 +447,11 @@ interface Live {
   inside: boolean;
   /** Where it was when it left the road to head for the gate. */
   approachFrom: THREE.Vector3 | null;
+  /** World height it was scaled to. */
+  h: number;
+  heavy: boolean;
+  /** Per foot: lowest height seen lately and whether it is planted. */
+  feet: { min: number; down: boolean }[];
 }
 
 function Creatures({
@@ -372,6 +463,7 @@ function Creatures({
   fortress,
   roadLength,
   castleAt,
+  prints,
 }: {
   engine: GameEngine;
   hiddenIds: RefObject<Set<string>>;
@@ -382,6 +474,7 @@ function Creatures({
   roadLength: number;
   /** Road distance from the castle to the road's end (the castle stands a little short of it on edge maps). */
   castleAt: number;
+  prints: Footprints;
 }) {
   const gltfs = useLoader(GLTFLoader, CREATURE_URLS) as GLTF[];
   const kits = useMemo(() => prepareCreatures(gltfs), [gltfs]);
@@ -392,6 +485,9 @@ function Creatures({
   const portal3 = useMemo(() => loc(portal, 3), [portal]);
   /** The gate plane in scene (pixel) space — what the clipped materials read. */
   const clipScene = useMemo(() => new THREE.Plane(), []);
+  const footTmp = useMemo(() => new THREE.Vector3(), []);
+  const strides = useRef(new Map<string, { at: number; left: boolean; last: number }>());
+  const strideSeen = useMemo(() => new Set<string>(), []);
 
   useFrame((_, dt) => {
     const g = group.current;
@@ -403,14 +499,32 @@ function Creatures({
     let anyNearGate = false;
     for (const en of snap.enemies as readonly EnemyInstance[]) {
       // only the special ones are 3D creatures: Elites, Mini-Bosses and Bosses; ordinary enemies keep their 2D look
-      if (!en.elite && !en.boss) continue;
+      if (!en.elite && !en.boss) {
+        // …but they still leave footprints: one per stride, left and right in turn
+        strideSeen.add(en.id);
+        const st = strides.current.get(en.id);
+        const size = ORDINARY_PRINT[en.type] ?? 7;
+        if (roadLength - en.distanceTraveled < castleAt + APPROACH_LEAD + 40) anyNearGate = true;
+        if (st) st.last = en.distanceTraveled;
+        if (!st) strides.current.set(en.id, { at: en.distanceTraveled, left: false, last: en.distanceTraveled });
+        else if (en.distanceTraveled - st.at > size * 1.5 && en.distanceTraveled > 60 && roadLength - en.distanceTraveled > castleAt + 30) {
+          st.at = en.distanceTraveled;
+          st.left = !st.left;
+          const side = { x: -en.direction.y, y: en.direction.x };
+          const off = size * 0.32 * (st.left ? -1 : 1);
+          const p = loc({ x: en.position.x + side.x * off, y: en.position.y + side.y * off });
+          prints.stamp(p.x, p.z, worldDirectionToThreeYaw(en.direction), size, st.left);
+        }
+        continue;
+      }
       seen.add(en.id);
       let e = live.current.get(en.id);
       const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
       if (!e) {
         if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
         const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss);
-        const c = new Creature(kits[cid], ENEMY_HEIGHT * tier * heightFactor(en.type), { id: cid, biomeId: snap.biomeId });
+        const h = ENEMY_HEIGHT * tier * heightFactor(en.type);
+        const c = new Creature(kits[cid], h, { id: cid, biomeId: snap.biomeId });
         const obj = c.obj;
         const scale = c.scale;
         const shadow = new THREE.Mesh(blobGeo, blobMat);
@@ -418,7 +532,7 @@ function Creatures({
         shadow.renderOrder = 1;
         g.add(obj, shadow);
         const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
-        e = { c, obj, scale, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, clipped: false, inside: false, approachFrom: null };
+        e = { c, obj, scale, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, clipped: false, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -482,13 +596,44 @@ function Creatures({
         e.shadow.visible = !past;
         if (past && !e.inside) {
           e.inside = true;
+          // it dies in there: it falls behind the gate, dust and a dark burst rise over the wall
+          e.c.fall();
+          const over = gate.gateInside.clone().setY(e.h * 0.9);
+          fx.smoke.emit(over, { count: en.boss ? 26 : 10, color: "#4a3e34", colorEnd: "#16120e", size: e.h * 0.35, life: 1.8, speed: 14, up: 30, grow: 2.6, alpha: 0.55, radius: 6 });
+          fx.glow.emit(over, { count: en.boss ? 40 : 14, color: "#ff9a6a", colorEnd: "#5a0a0a", size: 3.2, life: 0.9, speed: 50, up: 40, gravity: 80 });
           gate.struck();
           fx.glow.emit(gate.gateFront.clone().setY(10), { count: en.boss ? 60 : 24, color: "#fff0c0", colorEnd: "#ff4a1a", size: 3, life: 0.6, speed: 60, up: 24, gravity: 90 });
           fx.rings.ring(gate.gateFront.clone().setY(0.5), "#ff5a2a", 4, 40, 0.5);
         }
       }
+      // footprints: a print wherever a foot comes down (not while climbing out of the rift or once through the gate)
+      if (e.born >= 1 && !e.inside && e.c.feet.length === 2 && g.parent) {
+        e.obj.updateMatrixWorld(true);
+        for (let k = 0; k < 2; k++) {
+          const st = e.feet[k]!;
+          e.c.feet[k]!.getWorldPosition(footTmp);
+          g.parent.worldToLocal(footTmp);
+          const y = footTmp.y;
+          st.min = Math.min(st.min + dt * e.h * 0.02, y);
+          if (!st.down && y < st.min + e.h * 0.03) {
+            st.down = true;
+            prints.stamp(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0);
+            if (e.heavy) fx.smoke.emit(footTmp.clone().setY(1), { count: 3, color: "#6a5a48", colorEnd: "#2a241e", size: e.h * 0.1, life: 0.9, speed: 10, up: 6, grow: 2.2, alpha: 0.35, drag: 2 });
+          } else if (st.down && y > st.min + e.h * 0.07) st.down = false;
+        }
+      }
       if (en.burn && Math.random() < 0.4) fx.flame(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, ENEMY_HEIGHT * 0.5, 0)), 0.5, "#ff4a0a");
     }
+    for (const [id, st] of strides.current)
+      if (!strideSeen.has(id)) {
+        // an ordinary creature that got through: the gate takes the blow and dust rises inside
+        if (gate && roadLength - st.last < castleAt + 40) {
+          gate.struck();
+          fx.smoke.emit(gate.gateInside.clone().setY(40), { count: 6, color: "#4a3e34", colorEnd: "#16120e", size: 14, life: 1.5, speed: 10, up: 24, grow: 2.4, alpha: 0.45, radius: 5 });
+        }
+        strides.current.delete(id);
+      }
+    strideSeen.clear();
     if (gate && anyNearGate) gate.holdOpenUntil = performance.now() + 1500;
     if (gate && g.parent) clipScene.copy(gate.gatePlane).applyMatrix4(g.parent.matrixWorld);
 
@@ -565,20 +710,114 @@ function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject
   const fortress = anchorInfo.position;
   const portal = useMemo(() => getPortalAnchor(layout.path), [layout]);
   const fx = useMemo(() => new Effects(), []);
+  const prints = useMemo(() => new Footprints(), []);
   const castle = useRef<CastleState | null>(null);
-  useFrame((_, dt) => fx.update(dt));
+  const look = castleDressingFor(engine.getRenderSnapshot().biomeId);
+  useEffect(() => prints.setLook(look), [prints, look]);
+  useFrame((_, dt) => {
+    fx.update(dt);
+    prints.update(dt);
+    const now = castleDressingFor(engine.getRenderSnapshot().biomeId);
+    if (now !== lookRef.current) {
+      lookRef.current = now;
+      prints.setLook(now);
+    }
+  });
+  const lookRef = useRef(look);
   return (
     <WorldScale fx={fx}>
       <Lights />
+      <primitive object={prints.mesh} />
       <primitive object={fx.root} />
+      <GatePath
+        key={`path-${lid}`}
+        castle={castle}
+        biomeId={engine.getRenderSnapshot().biomeId}
+        from={loc(getPointAtDistance(layout.path, layout.length - Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y) - APPROACH_LEAD).position)}
+      />
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
-          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />
+          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} prints={prints} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />
         </Suspense>
       </LayerBoundary>
     </WorldScale>
   );
+}
+
+/** A strip of trodden earth from the road to the castle gate, along the curve the creatures walk. */
+function GatePath({ castle, from, biomeId }: { castle: React.MutableRefObject<CastleState | null>; from: THREE.Vector3; biomeId: string }) {
+  const [mesh, setMesh] = useState<THREE.Mesh | null>(null);
+  const built = useRef(false);
+  useFrame(() => {
+    const gate = castle.current;
+    if (built.current || !gate) return;
+    built.current = true;
+    const C = gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 45);
+    const E = gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, -2);
+    const N = 40;
+    const W = 30;
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const idx: number[] = [];
+    for (let i = 0; i <= N; i++) {
+      const t = i / N;
+      const u = 1 - t;
+      const p = new THREE.Vector3(u * u * from.x + 2 * u * t * C.x + t * t * E.x, 0.1, u * u * from.z + 2 * u * t * C.z + t * t * E.z);
+      const d = new THREE.Vector3(2 * u * (C.x - from.x) + 2 * t * (E.x - C.x), 0, 2 * u * (C.z - from.z) + 2 * t * (E.z - C.z)).normalize();
+      const side = new THREE.Vector3(-d.z, 0, d.x);
+      const w = W * (0.85 + 0.15 * t);
+      pos.push(p.x + side.x * w * 0.5, 0.1, p.z + side.z * w * 0.5, p.x - side.x * w * 0.5, 0.1, p.z - side.z * w * 0.5);
+      uv.push(0, t, 1, t);
+      if (i < N) {
+        const a = i * 2;
+        idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const pal = getBiome(biomeId).palette;
+    const c = document.createElement("canvas");
+    c.width = 64;
+    c.height = 256;
+    const g = c.getContext("2d")!;
+    const road = new THREE.Color(pal.roadFill);
+    g.fillStyle = `#${road.getHexString()}`;
+    g.fillRect(0, 0, 64, 256);
+    let seed = 7;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 500; i++) {
+      const k = 0.75 + rnd() * 0.5;
+      const col = road.clone().multiplyScalar(k);
+      g.fillStyle = `rgba(${(col.r * 255) | 0},${(col.g * 255) | 0},${(col.b * 255) | 0},0.6)`;
+      g.fillRect(rnd() * 64, rnd() * 256, 1 + rnd() * 3, 1 + rnd() * 3);
+    }
+    // soft shoulders, and the start blends into the road it leaves
+    g.globalCompositeOperation = "destination-in";
+    const across = g.createLinearGradient(0, 0, 64, 0);
+    across.addColorStop(0, "rgba(0,0,0,0)");
+    across.addColorStop(0.22, "rgba(0,0,0,0.9)");
+    across.addColorStop(0.78, "rgba(0,0,0,0.9)");
+    across.addColorStop(1, "rgba(0,0,0,0)");
+    g.fillStyle = across;
+    g.fillRect(0, 0, 64, 256);
+    const along = g.createLinearGradient(0, 0, 0, 256);
+    along.addColorStop(0, "rgba(0,0,0,0)");
+    along.addColorStop(0.25, "rgba(0,0,0,1)");
+    along.addColorStop(1, "rgba(0,0,0,1)");
+    g.fillStyle = along;
+    g.fillRect(0, 0, 64, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: tex, transparent: true, depthWrite: false, roughness: 1 }));
+    m.receiveShadow = true;
+    m.renderOrder = 1;
+    setMesh(m);
+  });
+  return mesh ? <primitive object={mesh} /> : null;
 }
 
 export function HybridOverlay({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>> }) {

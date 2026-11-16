@@ -535,12 +535,14 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     moundGeo.computeVertexNormals();
     const mound = new THREE.Mesh(moundGeo, stoneMat("mound", 8, 0.6, { rows: 3, cols: 12, mossy: 1 }));
     mound.position.y = -2.5;
+    mound.name = "mound";
     mound.receiveShadow = true;
     root.add(mound);
     const yardMat = stoneMat("yard", 6, 6, { rows: 12, cols: 12, mossy: 0.8 });
     yardMat.color = new THREE.Color(D.ground).lerp(new THREE.Color(0xffffff), 0.35);
     const yard = new THREE.Mesh(new THREE.CylinderGeometry(50, 50, 0.4, 48), yardMat);
     yard.position.y = 0;
+    yard.name = "yard";
     yard.receiveShadow = true;
     root.add(yard);
 

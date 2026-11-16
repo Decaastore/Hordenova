@@ -143,6 +143,8 @@ export class Creature {
   readonly walk: THREE.AnimationAction;
   /** World height the creature is scaled to. */
   readonly scale: number;
+  /** The ankle bones (left, right), for footprints. Empty when a model has none. */
+  readonly feet: THREE.Object3D[];
   private fallT = -1;
   private fallDir = 1;
 
@@ -163,6 +165,9 @@ export class Creature {
     this.walk.play();
     this.scale = worldHeight / kit.height;
     this.obj.scale.setScalar(this.scale);
+    const left = body.getObjectByProperty("name", "mixamorigLeftFoot") ?? body.getObjectByProperty("name", "mixamorig:LeftFoot");
+    const right = body.getObjectByProperty("name", "mixamorigRightFoot") ?? body.getObjectByProperty("name", "mixamorig:RightFoot");
+    this.feet = left && right ? [left, right] : [];
   }
 
   /** Start the death fall (tips over backwards or sideways, then lies still). */
