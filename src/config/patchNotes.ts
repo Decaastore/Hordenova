@@ -78,29 +78,29 @@ export const PATCH_NOTES: readonly PatchNoteEntry[] = [
       ptBR: "Castelo e Monstros em 3D",
     },
     description: {
-      en: "The castle and the horde are now living 3D models on top of the map you know: the creatures really walk, turn and fall, and the castle moves, opens its gate and takes the hits.",
-      ptBR: "O castelo e a horda agora são modelos 3D vivos sobre o mapa que você já conhece: os monstros andam, viram e caem de verdade, e o castelo se mexe, abre o portão e sente os golpes.",
+      en: "The castle and the horde's strongest are now living 3D models on top of the map you know: the castle moves, opens its gate and takes the hits, and every Elite, Mini-Boss and Boss is a new animated creature.",
+      ptBR: "O castelo e os mais fortes da horda agora são modelos 3D vivos sobre o mapa que você já conhece: o castelo se mexe, abre o portão e sente os golpes, e todo Elite, Mini-Chefe e Chefe é um monstro animado novo.",
     },
     highlights: [
       {
-        en: "Five new animated creatures replace the flat sprites, each playing a kind of enemy, and every map dresses them in its own colours: reddish on the volcano, frosted on the ice, purple in the Abyss.",
-        ptBR: "Cinco novos monstros animados substituem as figuras planas, cada um fazendo um tipo de inimigo, e cada mapa os veste com as suas cores: avermelhados no vulcão, gelados no gelo, roxos no Abismo.",
+        en: "Ordinary enemies keep their usual look. Elites, Mini-Bosses and Bosses are five new animated creatures that really walk, turn and fall, and every map dresses them in its own colours: reddish on the volcano, frosted on the ice, purple in the Abyss.",
+        ptBR: "Os inimigos comuns continuam com o visual de sempre. Elites, Mini-Chefes e Chefes são cinco monstros animados novos, que andam, viram e caem de verdade, e cada mapa os veste com as suas cores: avermelhados no vulcão, gelados no gelo, roxos no Abismo.",
       },
       {
         en: "The castle's gate faces the road the horde comes in on. Banners wave, torches burn and the gate crystal pulses.",
         ptBR: "O portão do castelo fica de frente para a estrada por onde a horda chega. As bandeiras balançam, as tochas queimam e o cristal do portão pulsa.",
       },
       {
-        en: "When the horde arrives the portcullis rises: each creature that gets through walks in by the gate and is gone, and the castle shakes and throws sparks.",
-        ptBR: "Quando a horda chega, a grade do portão sobe: cada monstro que passa entra pelo portão e some lá dentro, e o castelo treme e solta faíscas.",
+        en: "When one of them reaches the castle the portcullis rises: it walks in by the gate and is gone, and the castle shakes and throws sparks.",
+        ptBR: "Quando um deles chega ao castelo, a grade do portão sobe: ele entra pelo portão e some lá dentro, e o castelo treme e solta faíscas.",
       },
       {
         en: "As it loses HP the castle starts to smoke, then its windows catch fire. Castle skins and each map's castle look carry over.",
         ptBR: "Conforme perde vida, o castelo começa a soltar fumaça e depois pega fogo nas janelas. As skins de castelo e o visual de castelo de cada mapa continuam valendo.",
       },
       {
-        en: "Creatures now climb out of the rift and cast real shadows on the ground.",
-        ptBR: "Os monstros agora saem de dentro da fenda e projetam sombras de verdade no chão.",
+        en: "These creatures climb out of the rift and cast real shadows on the ground.",
+        ptBR: "Esses monstros saem de dentro da fenda e projetam sombras de verdade no chão.",
       },
     ],
   },

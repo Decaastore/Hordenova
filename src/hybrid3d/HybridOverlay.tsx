@@ -402,12 +402,14 @@ function Creatures({
     const gate = castle.current;
     let anyNearGate = false;
     for (const en of snap.enemies as readonly EnemyInstance[]) {
+      // only the special ones are 3D creatures: Elites, Mini-Bosses and Bosses; ordinary enemies keep their 2D look
+      if (!en.elite && !en.boss) continue;
       seen.add(en.id);
       let e = live.current.get(en.id);
       const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
       if (!e) {
         if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
-        const cid = creatureFor(en.type, !!en.boss);
+        const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss);
         const c = new Creature(kits[cid], ENEMY_HEIGHT * tier * heightFactor(en.type), { id: cid, biomeId: snap.biomeId });
         const obj = c.obj;
         const scale = c.scale;
@@ -527,7 +529,10 @@ function Creatures({
   // never leave ids hidden in the 2D layer if this layer goes away
   useEffect(() => {
     const set = hiddenIds.current;
-    return () => set?.clear();
+    const mine = live.current;
+    return () => {
+      for (const id of mine.keys()) set?.delete(id);
+    };
   }, [hiddenIds]);
 
   return <group ref={group} />;

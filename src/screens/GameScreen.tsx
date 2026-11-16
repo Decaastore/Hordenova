@@ -156,7 +156,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   // this session, 2D enemy rendering (already the default when this ref
   // stays empty) takes over permanently instead of retrying.
   const [hybridOn, setHybridOn] = useState(HYBRID_DEFAULT);
-  const [enable3DEnemies, setEnable3DEnemies] = useState(() => !HYBRID_DEFAULT && isWebGLAvailable());
+  const [enable3DEnemies, setEnable3DEnemies] = useState(() => isWebGLAvailable());
   const hidden3DEnemyIdsRef = useRef<Set<string>>(new Set());
 
   // MUNDO 3D — FASE 1: background terrain/atmosphere layer, independent

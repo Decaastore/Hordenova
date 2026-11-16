@@ -23,7 +23,7 @@ export type CreatureId = keyof typeof CREATURE_FILES;
 export const CREATURE_URLS = Object.values(CREATURE_FILES);
 const IDS = Object.keys(CREATURE_FILES) as CreatureId[];
 
-/** Which creature plays each enemy type (bosses use the Mutant, bigger). */
+/** Which creature plays each enemy type (a Boss is the Mutant, a Mini-Boss the dark brute, both bigger). */
 const FOR_TYPE: Record<string, CreatureId> = {
   BRUTE: "warrok",
   CRAWLER: "parasite",
@@ -35,8 +35,8 @@ const FOR_TYPE: Record<string, CreatureId> = {
   REGENERATOR: "brute2",
 };
 
-export function creatureFor(type: string, boss: boolean): CreatureId {
-  if (boss) return "mutant";
+export function creatureFor(type: string, boss: boolean, mainBoss = false): CreatureId {
+  if (boss) return mainBoss ? "mutant" : "brute2";
   return FOR_TYPE[type] ?? IDS[(type.charCodeAt(0) + type.length) % IDS.length]!;
 }
 

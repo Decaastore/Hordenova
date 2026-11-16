@@ -39,6 +39,7 @@ interface TrackedEnemy {
 export function Enemy3DLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hiddenIdsRef: React.RefObject<Set<string>> }) {
   const [renderedIds, setRenderedIds] = useState<string[]>([]);
   const trackedRef = useRef(new Map<string, TrackedEnemy>());
+  const ownHiddenRef = useRef<Set<string>>(new Set());
   const anchorsRef = useRef(new Map<string, THREE.Group>());
   const scaleGroupsRef = useRef(new Map<string, THREE.Group>());
   const handlesRef = useRef(new Map<string, CreatureHandle>());
@@ -63,7 +64,8 @@ export function Enemy3DLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hid
     // `enemy.boss` here restores the real, correctly-scaled 2D sprite +
     // aura for every Boss/Mini-Boss, unchanged from before this overlay
     // existed; ordinary BRUTE enemies keep the 3D treatment exactly as before.
-    const registered = snapshot.enemies.filter((e) => ENEMY_3D_REGISTRY[e.type] !== undefined && !e.boss);
+    // Elites are drawn by the 3D creature layer (hybrid3d/HybridOverlay.tsx), so this one keeps to ordinary enemies.
+    const registered = snapshot.enemies.filter((e) => ENEMY_3D_REGISTRY[e.type] !== undefined && !e.boss && !e.elite);
     const aliveIds = new Set(registered.map((e) => e.id));
     const tracked = trackedRef.current;
 
@@ -144,8 +146,10 @@ export function Enemy3DLayer({ engine, hiddenIdsRef }: { engine: GameEngine; hid
     // shrink animation runs.
     const hidden = hiddenIdsRef.current;
     if (hidden) {
-      hidden.clear();
+      // the set is shared with the 3D creature layer: only touch the ids this layer owns
+      for (const id of ownHiddenRef.current) if (!aliveIds.has(id)) hidden.delete(id);
       for (const id of aliveIds) hidden.add(id);
+      ownHiddenRef.current = aliveIds;
     }
 
     const nextRendered = Array.from(tracked.keys());
