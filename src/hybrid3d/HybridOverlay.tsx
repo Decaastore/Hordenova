@@ -7,7 +7,9 @@ import type { GameEngine } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
 import { getMapLayout } from "@/data/mapLayouts";
 import { getBiome } from "@/rendering/biomes";
-import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
+import { getFortressAnchor, getPortalAnchor, platformStyleFor } from "@/rendering/MapRenderer";
+import { buildFoundation, type FoundationStyle } from "./foundations";
+import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Effects } from "@/battlefield3d/fx";
@@ -922,8 +924,18 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
     const col = TOWER_COLORS[tw.type] ?? "#fff";
     const k = 0.6 + e.stage * 0.1;
     if (tw.type === "INFERNO") {
-      const m = anchorAt(e, "mouth");
-      if (m && Math.random() < 0.7) fx.flame(m, 0.35 * k, "#ff7a1a");
+      // flames licking up out of the cauldron (or the furnace mouth on the furnace skins)
+      const c = anchorAt(e, "cauldron");
+      if (c) {
+        for (let i = 0; i < 2; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const r = Math.random() * 5.5 * TOWER_PRESENTATION_SCALE;
+          if (Math.random() < 0.8) fx.flame(c.clone().add(new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r)), (0.4 + Math.random() * 0.35) * k, "#ff6a14");
+        }
+      } else {
+        const m = anchorAt(e, "mouth");
+        if (m && Math.random() < 0.7) fx.flame(m, 0.35 * k, "#ff7a1a");
+      }
       for (const sk of ["smoke1", "smoke2"]) {
         const p = anchorAt(e, sk);
         if (p && Math.random() < 0.06) fx.smokePuff(p, 0.35);
@@ -1024,11 +1036,11 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
           rune.renderOrder = 3;
           obj.add(rune);
         }
-        obj.scale.setScalar(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
-        obj.position.copy(loc(tw.position));
-        // the map is seen from ~58° up but the tower art from ~38°: tip the tower towards the viewer
-        // by the difference so it keeps its tall, three-quarter silhouette
-        obj.rotation.x = TOWER_VIEW_TIP;
+        obj.scale.set(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE, TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE * TOWER_STRETCH, TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
+        obj.position.copy(loc({ x: tw.position.x, y: tw.position.y + SITE_BASE_OFFSET }));
+        // stands upright on its foundation: the base stays flat on the stone, only the height is drawn out a
+        // little so the tower keeps the tall silhouette of its art under the map's higher camera
+        obj.position.y = topOf(tw);
         g.add(obj);
         e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? Math.PI, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0, halos, orbit, rune, type: tw.type, boltT: Math.random() };
         live.current.set(tw.id, e);
@@ -1044,11 +1056,12 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
           fx.rings.ring(base.clone().setY(0.5), col, 4, 40, 0.5);
         }
       }
+      e.obj.position.y = topOf(tw);
       // rises out of the ground when built
       if (e.built < 1) {
         e.built = Math.min(1, e.built + dt * 2.2);
         const k = 1 - Math.pow(1 - e.built, 3);
-        e.obj.scale.set(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE, TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE * (0.15 + 0.85 * k), TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
+        e.obj.scale.set(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE, TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE * TOWER_STRETCH * (0.15 + 0.85 * k), TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
       }
       // aim: the enemy furthest along the road inside its range; idle sweep otherwise
       const range = getTowerStats(tw).range;
@@ -1128,8 +1141,51 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
 }
 /** Size of the 3D towers relative to the 2D tower art (tuned so both cover the same footprint). */
 const TOWER_3D_SIZE = 1;
-/** Radians the towers are tipped towards the camera (58° map view → the 38° tower-art view). */
-const TOWER_VIEW_TIP = THREE.MathUtils.degToRad(20);
+/** Height stretch so an upright tower under the map's ~58° camera keeps the silhouette of its ~38° art. */
+const TOWER_STRETCH = 1.32;
+/** The painted platforms (and so the towers' bases) sit this far below a site's point, in world units. */
+const SITE_BASE_OFFSET = 4.5;
+/** Height of the foundation each site's tower stands on (filled in by <Foundations>). */
+const siteTop = new Map<string, number>();
+const topOf = (tw: TowerInstance) => siteTop.get(tw.slotId) ?? 0;
+
+
+/** PRÉVIA — real 3D build sites under the 3D towers (see foundations.ts). */
+function Foundations({ engine, ui }: { engine: GameEngine; ui?: React.MutableRefObject<Battlefield3DUiState> }) {
+  const snap0 = engine.getRenderSnapshot();
+  const [keys, setKeys] = useState({ layout: snap0.mapLayoutId, biome: snap0.biomeId });
+  const built = useMemo(() => {
+    const layout = getMapLayout(keys.layout);
+    const biome = getBiome(keys.biome);
+    siteTop.clear();
+    return layout.sites.map((site, i) => {
+      const f = buildFoundation(platformStyleFor(site, i) as FoundationStyle, biome, i * 7 + 3);
+      f.group.position.copy(loc({ x: site.position.x, y: site.position.y + SITE_BASE_OFFSET }));
+      siteTop.set(site.id, f.topY);
+      return { site, f };
+    });
+  }, [keys]);
+  useFrame(({ clock }) => {
+    const n = engine.getRenderSnapshot();
+    if (n.mapLayoutId !== keys.layout || n.biomeId !== keys.biome) setKeys({ layout: n.mapLayoutId, biome: n.biomeId });
+    const t = clock.elapsedTime;
+    const u = ui?.current;
+    const choosing = !!u && (u.pendingTowerType !== null || u.placingTower !== null || n.phase === "DEPLOY");
+    const taken = new Set(n.towers.map((tw) => tw.slotId));
+    for (const { site, f } of built) {
+      if (f.glow) f.glow.emissiveIntensity = 1.6 + Math.sin(t * 2 + site.position.x) * 0.8;
+      const m = f.pick.material as THREE.MeshBasicMaterial;
+      m.opacity = choosing && !taken.has(site.id) ? 0.55 + Math.sin(t * 5) * 0.3 : 0;
+    }
+  });
+  return (
+    <>
+      {built.map(({ site, f }) => (
+        <primitive key={site.id} object={f.group} />
+      ))}
+    </>
+  );
+}
 
 // ----------------------------------------------------------------- root
 class LayerBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
@@ -1163,7 +1219,7 @@ function EnvLight({ intensity }: { intensity: number }) {
   return null;
 }
 
-function Scene({ engine, hiddenIds, hiddenTowerIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>> }) {
+function Scene({ engine, hiddenIds, hiddenTowerIds, ui }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>>; ui?: React.MutableRefObject<Battlefield3DUiState> }) {
   const layoutId = engine.getRenderSnapshot().mapLayoutId;
   const [lid, setLid] = useState(layoutId);
   useFrame(() => {
@@ -1188,6 +1244,7 @@ function Scene({ engine, hiddenIds, hiddenTowerIds }: { engine: GameEngine; hidd
         biomeId={engine.getRenderSnapshot().biomeId}
         from={loc(getPointAtDistance(layout.path, layout.length - Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y) - APPROACH_LEAD).position)}
       />
+      {TOWERS_3D_PREVIEW && <Foundations engine={engine} ui={ui} />}
       {TOWERS_3D_PREVIEW && hiddenTowerIds && <Towers3D engine={engine} hiddenIds={hiddenTowerIds} fx={fx} />}
       {TOWERS_3D_PREVIEW && <EnvLight intensity={0.55} />}
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
@@ -1275,7 +1332,7 @@ function GatePath({ castle, from, biomeId }: { castle: React.MutableRefObject<Ca
   return mesh ? <primitive object={mesh} /> : null;
 }
 
-export function HybridOverlay({ engine, hiddenIds, hiddenTowerIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>> }) {
+export function HybridOverlay({ engine, hiddenIds, hiddenTowerIds, ui }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>>; ui?: React.MutableRefObject<Battlefield3DUiState> }) {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} data-testid="hybrid-3d">
       <Canvas
@@ -1292,7 +1349,7 @@ export function HybridOverlay({ engine, hiddenIds, hiddenTowerIds }: { engine: G
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />
-        <Scene engine={engine} hiddenIds={hiddenIds} hiddenTowerIds={hiddenTowerIds} />
+        <Scene engine={engine} hiddenIds={hiddenIds} hiddenTowerIds={hiddenTowerIds} ui={ui} />
       </Canvas>
     </div>
   );

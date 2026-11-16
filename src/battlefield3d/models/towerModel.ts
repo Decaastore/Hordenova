@@ -833,7 +833,113 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // band + crystals, 4 silver-capped plinth + floating rune ring, 5 second
   // plinth tier + crown shards, 6 glacial crown + frost-capped stepped base.
   // ---------------------------------------------------------------------------
+  /** Frostborn looks that keep the original obelisk (paid skins whose signature pieces are built around it). */
+  const OBELISK_SKINS = new Set(["FROSTBORN_ANCIENT_GUARDIAN", "FROSTBORN_VOID_FROST", "FROSTBORN_ARCANE_CRYSTAL", "FROSTBORN_CELESTIAL_ICE", "FROSTBORN_GLACIAL_WARLORD", "FROSTBORN_PRESTIGE_ASCENDANT"]);
+
+  // ---------------------------------------------------------------------------
+  // FROSTBORN (glacier) — a hexagonal stone plinth with a living glacier grown
+  // out of it: one great ice crystal with a glowing frozen heart, a cluster of
+  // smaller crystals leaning out, all clamped by a stone-and-iron collar, and a
+  // floating ice shard above where the cold is gathered and fired. Stages: 2
+  // ice at the plinth edge, 3 rune-stones round the base, 4 silver collar and
+  // floating rune ring, 5 a second plinth tier and a bigger cluster, 6 an ice
+  // crown round the shard and snow settling on the steps.
+  // ---------------------------------------------------------------------------
+  function buildFrostbornGlacier() {
+    const s = STAGE;
+    const L = FROST_LOOKS[SKIN] ?? FROST_LOOKS.base!;
+    const plinthStone = stoneTex(11, L.plinth[0], L.plinth[1], L.plinth[2], 4, 6, { frost: 0.6 * L.frost });
+    const capStone = stoneTex(31, L.cap[0], L.cap[1], L.cap[2], 2, 4, { frost: L.frost });
+    const runeStone = stoneTex(23, L.obelisk[0], L.obelisk[1], L.obelisk[2], 3, 3, { frost: 0.35 * L.frost, runes: L.rune, runeRows: [1] });
+    const flag = flagTex(37, L.flag[0], L.flag[1], L.flag[2], 0.8 * L.frost);
+    const topMat = mat(flag, 1, 1, { bump: 1.2 });
+    const tiered = (side: TexSet, rx: number, ry: number) => [mat(side, rx, ry), topMat, topMat];
+    const silver = metalTex(41, L.trim, { rivets: true });
+    const iron = metalTex(43, L.iron, { rivets: true });
+    const metalM = (t: TexSet) => mat(t, 2, 0.5, { rough: 0.4, metal: 0.45 });
+    const shell = new THREE.MeshPhysicalMaterial({ color: L.ice[0], emissive: L.ice[1], emissiveIntensity: 0.35, roughness: 0.08, metalness: 0, transparent: true, opacity: 0.82, clearcoat: 1, clearcoatRoughness: 0.1, depthWrite: false });
+    const ice = new THREE.MeshStandardMaterial({ color: L.ice[0], emissive: L.ice[1], emissiveIntensity: 0.5, roughness: 0.12, metalness: 0.1, transparent: true, opacity: 0.9 });
+    const iceDeep = new THREE.MeshStandardMaterial({ color: L.ice2[0], emissive: L.ice2[1], emissiveIntensity: 0.75, roughness: 0.18, metalness: 0.1 });
+    const heart = plainMat(L.orb[0], { emissive: L.rune, ei: 2.4, rough: 0.2 });
+
+    // plinth
+    let top = 0;
+    if (s >= 5) {
+      hexPrism(16.5, 2.2, tiered(plinthStone, 3, 0.6), 0);
+      top = 2.2;
+    }
+    hexPrism(s >= 5 ? 14 : 15, 3.2, tiered(plinthStone, 3, 0.8), top);
+    top += 3.2;
+    hexPrism(s >= 5 ? 13 : 14, 1.1, tiered(capStone, 3, 0.3), top);
+    top += 1.1;
+
+    // the glacier: a great central crystal with a glowing heart inside
+    const MAIN = s >= 5 ? 32 : 28;
+    const R = s >= 5 ? 5.2 : 4.6;
+    const main = crystal(MAIN, R, shell, 0, top - 0.6, 0, 0.04, -0.03);
+    main.rotation.y = 0.3;
+    crystal(MAIN * 0.78, R * 0.42, heart, 0, top, 0, 0.04, -0.03);
+    // a cluster of smaller crystals leaning out of it
+    const r = rng(77);
+    const n = s >= 5 ? 9 : s >= 3 ? 7 : 6;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + r() * 0.4;
+      const d = R * 0.9 + r() * 1.8;
+      const lean = 0.32 + r() * 0.3;
+      crystal(9 + r() * (s >= 5 ? 14 : 10), 1.5 + r() * 1.3, i % 3 === 0 ? iceDeep : ice, Math.cos(a) * d, top - 0.8, Math.sin(a) * d, Math.sin(a) * lean, -Math.cos(a) * lean);
+    }
+    // the collar that holds the glacier to the plinth
+    const collar = mesh(new THREE.CylinderGeometry(R + 3.4, R + 4.2, 2.6, 6), [mat(capStone, 2, 0.4), topMat, topMat], 0, top + 1.3, 0);
+    collar.rotation.y = Math.PI / 6;
+    mesh(new THREE.TorusGeometry(R + 3.6, 0.45, 8, 6), metalM(s >= 4 ? silver : iron), 0, top + 2.6, 0).rotation.set(Math.PI / 2, 0, Math.PI / 6);
+    if (s >= 4) {
+      mesh(new THREE.TorusGeometry(R + 0.9, 0.42, 8, 6), metalM(silver), 0, top + MAIN * 0.42, 0).rotation.set(Math.PI / 2, 0, 0.3);
+      anchors.runeOrbit = new THREE.Vector3(0, top + MAIN * 0.42, 0);
+    }
+
+    // the floating shard where the cold gathers
+    const orbY = top + MAIN + 3;
+    anchors.orb = new THREE.Vector3(0, orbY, 0);
+    const shard = mesh(new THREE.OctahedronGeometry(3, 0), new THREE.MeshStandardMaterial({ color: L.orb[0], emissive: L.orb[1], emissiveIntensity: 0.9, roughness: 0.1 }), 0, orbY, 0);
+    shard.scale.set(0.8, 1.35, 0.8);
+    pointLights.push({ pos: new THREE.Vector3(0, orbY, 2), color: L.rune, intensity: 220 + s * 60, dist: 40 });
+    pointLights.push({ pos: new THREE.Vector3(0, top + MAIN * 0.4, 4), color: L.rune, intensity: 120 + s * 20, dist: 26 });
+
+    if (s >= 2) {
+      // ice breaking through at the plinth edge
+      const m = s >= 5 ? 6 : 3;
+      for (let i = 0; i < m; i++) {
+        const a = (i / m) * Math.PI * 2 + 1.1;
+        const d = (s >= 5 ? 12 : 12.8) + r();
+        crystal(4 + r() * 4, 0.9 + r() * 0.5, i % 2 ? ice : iceDeep, Math.cos(a) * d, top - 1, Math.sin(a) * d, Math.sin(a) * 0.4, -Math.cos(a) * 0.4);
+      }
+    }
+    if (s >= 3) {
+      // carved rune-stones standing round the glacier
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2 + 0.5;
+        const st = mesh(new THREE.BoxGeometry(2.6, 6.5, 1.8), mat(runeStone, 0.6, 1, { emissiveColor: L.rune, emissiveIntensity: 2.4 }), Math.cos(a) * 10.8, top + 3.1, Math.sin(a) * 10.8);
+        st.rotation.y = -a + Math.PI / 2;
+        st.rotation.z = 0.05;
+      }
+    }
+    if (s >= 6) {
+      // an ice crown round the shard, and snow on the steps
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        crystal(5.5, 0.8, ice, Math.cos(a) * 4.6, orbY - 3.5, Math.sin(a) * 4.6, Math.sin(a) * 0.45, -Math.cos(a) * 0.45);
+      }
+      const snow = new THREE.MeshStandardMaterial({ color: L.snow, roughness: 0.85 });
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + r();
+        const m = mesh(new THREE.SphereGeometry(1.5 + r(), 10, 8), snow, Math.cos(a) * 15.2, 2.3, Math.sin(a) * 15.2);
+        m.scale.y = 0.4;
+      }
+    }
+  }
+
   function buildFrostborn() {
+    if (!OBELISK_SKINS.has(SKIN)) return buildFrostbornGlacier();
     const s = STAGE;
     const L = FROST_LOOKS[SKIN] ?? FROST_LOOKS.base!;
     const plinthStone = stoneTex(11, L.plinth[0], L.plinth[1], L.plinth[2], 4, 6, { frost: 0.6 * L.frost });
@@ -1157,6 +1263,38 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // pressure pipes, 4 brass studs/trim, 5 twin chimneys + bellows, 6 gilded
   // furnace with lava-rune vents.
   // ---------------------------------------------------------------------------
+  /** Swirling molten fire for the surface inside the cauldron. */
+  function lavaTexture(fire: string) {
+    const c = document.createElement("canvas");
+    c.width = c.height = 128;
+    const g = c.getContext("2d")!;
+    const col = new THREE.Color(fire);
+    const r = rng(311);
+    g.fillStyle = `#${col.clone().multiplyScalar(0.55).getHexString()}`;
+    g.fillRect(0, 0, 128, 128);
+    for (let i = 0; i < 70; i++) {
+      const x = r() * 128, y = r() * 128, rad = 6 + r() * 18;
+      const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+      const hot = col.clone().lerp(new THREE.Color("#fff2a0"), 0.3 + r() * 0.6);
+      gr.addColorStop(0, `rgba(${(hot.r * 255) | 0},${(hot.g * 255) | 0},${(hot.b * 255) | 0},0.85)`);
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      g.fillStyle = gr;
+      g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    }
+    // dark crust veins drifting on top
+    g.strokeStyle = "rgba(60,14,4,0.35)";
+    g.lineWidth = 3;
+    for (let i = 0; i < 5; i++) {
+      g.beginPath();
+      g.moveTo(r() * 128, r() * 128);
+      g.bezierCurveTo(r() * 128, r() * 128, r() * 128, r() * 128, r() * 128, r() * 128);
+      g.stroke();
+    }
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
   function buildInferno() {
     const s = STAGE;
     const L = INF_LOOKS[SKIN] ?? INF_LOOKS.base!;
@@ -1186,11 +1324,37 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
     const dome = mesh(new THREE.CylinderGeometry(5.5, 5.5, 15, 24, 1, false, 0, Math.PI), bodyMat, 0, 15, 0);
     dome.rotation.z = Math.PI / 2;
     // fire mouth on the front face
-    anchors.mouth = new THREE.Vector3(0, 10.5, 5.8);
-    const ring = mesh(new THREE.TorusGeometry(4.2, 0.9, 10, 32), metalM(s >= 4 ? brass : darkIron), 0, 10.5, 5.6);
-    void ring;
-    mesh(new THREE.CircleGeometry(3.6, 32), plainMat("#1a0a06", { emissive: L.fire, ei: 0.5 }), 0, 10.5, 5.55);
-    pointLights.push({ pos: new THREE.Vector3(0, 10.5, 11), color: L.fire, intensity: 380 + s * 60, dist: 40 });
+    // the round mouth is a drum of fire jutting from the furnace, open at the front like a
+    // cauldron on its side: a sooty throat lit from within, a molten back wall, a bed of
+    // coals and tongues of flame
+    const FZ = 5.5, DEPTH = 3.8, MZ = FZ + DEPTH;
+    anchors.mouth = new THREE.Vector3(0, 10.5, MZ + 0.4);
+    const drum = mesh(new THREE.CylinderGeometry(4.6, 4.9, DEPTH, 32, 1, true), bodyMat, 0, 10.5, FZ + DEPTH / 2);
+    drum.rotation.x = Math.PI / 2;
+    const throatM = plainMat("#1a0a06", { emissive: L.fire, ei: 0.6, rough: 0.9 });
+    throatM.side = THREE.BackSide;
+    mesh(new THREE.CylinderGeometry(3.8, 3.8, DEPTH, 32, 1, true), throatM, 0, 10.5, FZ + DEPTH / 2).rotation.x = Math.PI / 2;
+    const back = plainMat(L.fire, { emissive: L.fire, ei: 2.2, rough: 0.7 });
+    back.emissiveMap = lavaTexture(L.fire);
+    back.map = back.emissiveMap;
+    mesh(new THREE.CircleGeometry(3.8, 32), back, 0, 10.5, FZ + 0.05);
+    const fr = rng(41);
+    const coalM = plainMat("#2a0e06", { emissive: L.fire, ei: 1.2, rough: 0.8 });
+    for (let i = 0; i < 10; i++) {
+      const c = mesh(new THREE.DodecahedronGeometry(0.6 + fr() * 0.45, 0), coalM, (fr() - 0.5) * 5, 7.5 + fr() * 0.5, FZ + 0.6 + fr() * (DEPTH - 1));
+      c.rotation.set(fr() * 3, fr() * 3, fr() * 3);
+    }
+    const flameM = (col: string) => new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+    for (let i = 0; i < 7; i++) {
+      const x = (i / 6 - 0.5) * 5;
+      const h = 3 + fr() * 2.6 - Math.abs(x) * 0.4;
+      const f = mesh(new THREE.ConeGeometry(0.95 + fr() * 0.4, h, 7), flameM(i % 2 ? "#ffb347" : L.fire), x, 7.6 + h / 2, FZ + 0.8 + fr() * (DEPTH - 1.6));
+      f.rotation.z = (fr() - 0.5) * 0.3;
+    }
+    mesh(new THREE.ConeGeometry(1.5, 5, 8), flameM("#fff0a0"), 0, 10.2, FZ + DEPTH / 2);
+    // the lip of the drum
+    mesh(new THREE.TorusGeometry(4.5, 0.75, 10, 32), metalM(s >= 4 ? brass : darkIron), 0, 10.5, MZ);
+    pointLights.push({ pos: new THREE.Vector3(0, 10.5, MZ + 4), color: L.fire, intensity: 380 + s * 60, dist: 40 });
     // rear chimney(s)
     const chH = s >= 3 ? 17 : 13;
     const ch = (x: number, h: number) => {
@@ -1214,7 +1378,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
       // brass studs framing the mouth
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * Math.PI * 2;
-        mesh(new THREE.SphereGeometry(0.45, 8, 6), metalM(brass), Math.cos(a) * 5.6, 10.5 + Math.sin(a) * 5.6, 5.8);
+        mesh(new THREE.SphereGeometry(0.45, 8, 6), metalM(brass), Math.cos(a) * 4.5, 10.5 + Math.sin(a) * 4.5, MZ + 0.7);
       }
     }
     if (s >= 5) {
@@ -1238,7 +1402,115 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   // orb. Arcs, the orb and discharges are live. Stages: 2 copper coil, 3 more
   // rods, 4 satellite orb (live), 5 tesla spikes on the dais, 6 storm crown.
   // ---------------------------------------------------------------------------
+  /** Stormcaller looks that keep the original pillar (paid skins whose signature pieces are built around it). */
+  const PILLAR_SKINS = new Set(["STORMCALLER_VOID", "STORMCALLER_THUNDER", "STORMCALLER_CELESTIAL", "STORMCALLER_ARCANE", "STORMCALLER_TEMPEST", "STORMCALLER_PRESTIGE_ASCENDANT"]);
+
+  // ---------------------------------------------------------------------------
+  // STORMCALLER (coil) — a storm engine: a round stone dais with glowing
+  // channels, a column wound tight in copper and stacked with glass insulators,
+  // and on top a polished ring (the great coil) holding the storm orb between
+  // its lightning rods. The crown leans towards the target. Stages: 2 iron
+  // struts brace the column, 3 more rods and lit insulators, 4 satellite orb,
+  // 5 tesla spikes on the dais, 6 a second ring and floating storm-stones.
+  // ---------------------------------------------------------------------------
+  function buildStormcallerCoil() {
+    const s = STAGE;
+    const L = STORM_LOOKS[SKIN] ?? STORM_LOOKS.base!;
+    const daisStone = stoneTex(81, L.dais[0], L.dais[1], L.dais[2], 3, 8);
+    const flag = flagTex(85, L.dais[0], L.dais[1], L.dais[2]);
+    const copper = metalTex(87, L.rod, { rivets: false });
+    const dark = metalTex(89, L.band, { rivets: true });
+    const metalM = (t: TexSet, rx = 1, ry = 1) => mat(t, rx, ry, { rough: 0.35, metal: 0.6 });
+    const violet = plainMat(L.glow, { emissive: L.glow, ei: 1.4 });
+    const glass = new THREE.MeshPhysicalMaterial({ color: L.orb[0], emissive: L.glow, emissiveIntensity: s >= 3 ? 0.9 : 0.25, roughness: 0.1, transparent: true, opacity: 0.85, clearcoat: 1 });
+    const topM = mat(flag, 1, 1);
+
+    // dais
+    mesh(new THREE.CylinderGeometry(14.5, 15.2, 3, 32), [mat(daisStone, 4, 0.6), topM, topM], 0, 1.5, 0);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2 + 0.2;
+      const c = mesh(new THREE.BoxGeometry(6, 0.25, 0.5), violet, Math.cos(a) * 9.5, 3.05, Math.sin(a) * 9.5);
+      c.rotation.y = -a;
+    }
+    mesh(new THREE.CylinderGeometry(6.6, 7.4, 3, 8), [mat(daisStone, 2, 0.4), topM, topM], 0, 4.5, 0);
+    mesh(new THREE.TorusGeometry(6.8, 0.4, 8, 8), metalM(dark, 3, 0.3), 0, 6, 0).rotation.x = Math.PI / 2;
+
+    // the column: a dark core wound tight in copper, stacked with insulators
+    const base = 6;
+    const PH = 21;
+    mesh(new THREE.CylinderGeometry(2.6, 3.2, PH, 16), metalM(dark, 1, 3), 0, base + PH / 2, 0);
+    const pts: THREE.Vector3[] = [];
+    const turns = 22;
+    for (let i = 0; i <= turns * 16; i++) {
+      const t = i / (turns * 16);
+      const a = t * Math.PI * 2 * turns;
+      const rr = 3.25 - t * 0.55;
+      pts.push(new THREE.Vector3(Math.cos(a) * rr, base + 2 + t * (PH - 5), Math.sin(a) * rr));
+    }
+    mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), turns * 16, 0.3, 6, false), metalM(copper, 8, 1));
+    for (const f of [0.12, 0.55, 0.92]) {
+      const y = base + PH * f;
+      const rr = 3.2 - f * 0.6;
+      for (let k = 0; k < 3; k++) mesh(new THREE.CylinderGeometry(rr + 1.6 - k * 0.3, rr + 1.8 - k * 0.3, 0.45, 20), glass, 0, y - 0.8 + k * 0.7, 0);
+    }
+    if (s >= 2) {
+      // iron struts bracing the column
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        tube([new THREE.Vector3(Math.cos(a) * 11.5, 3, Math.sin(a) * 11.5), new THREE.Vector3(Math.cos(a) * 7, 9, Math.sin(a) * 7), new THREE.Vector3(Math.cos(a) * 3.4, base + PH * 0.55, Math.sin(a) * 3.4)], 0.45, metalM(dark), 10);
+        mesh(new THREE.BoxGeometry(1.6, 0.8, 1.6), metalM(dark), Math.cos(a) * 11.5, 3.2, Math.sin(a) * 11.5);
+      }
+    }
+    const topY = base + PH;
+
+    // the crown — collar, the great coil ring, the orb and its lightning rods — leans towards the target
+    PARENT = turret;
+    TURRET_MODE = "tilt";
+    TURRET_PIVOT_Y = topY;
+    mesh(new THREE.CylinderGeometry(3.6, 2.8, 2.2, 16), metalM(dark), 0, topY + 1.1, 0);
+    const ringM = plainMat(L.rod, { metal: 0.85, rough: 0.22 });
+    mesh(new THREE.TorusGeometry(6.2, 1.7, 16, 40), ringM, 0, topY + 3.4, 0).rotation.x = Math.PI / 2;
+    mesh(new THREE.TorusGeometry(6.2, 0.35, 8, 40), violet, 0, topY + 3.4, 0).rotation.x = Math.PI / 2;
+    if (s >= 6) {
+      mesh(new THREE.TorusGeometry(4.2, 1.1, 14, 32), ringM, 0, topY + 9.8, 0).rotation.x = Math.PI / 2;
+    }
+    anchors.orb = new THREE.Vector3(0, topY + 6.8, 0);
+    mesh(new THREE.SphereGeometry(3.4, 28, 20), plainMat(L.orb[0], { emissive: L.orb[1], ei: 0.9, rough: 0.2 }), 0, topY + 6.8, 0);
+    const rods = s >= 6 ? 6 : s >= 3 ? 5 : 3;
+    for (let i = 0; i < rods; i++) {
+      const a = (i / rods) * Math.PI * 2 + 0.5;
+      const tall = s >= 6 ? 14 : 11;
+      tube([new THREE.Vector3(Math.cos(a) * 6.2, topY + 4.6, Math.sin(a) * 6.2), new THREE.Vector3(Math.cos(a) * 6.8, topY + 8, Math.sin(a) * 6.8), new THREE.Vector3(Math.cos(a) * 5.6, topY + tall, Math.sin(a) * 5.6)], 0.34, metalM(copper));
+      mesh(new THREE.SphereGeometry(0.6, 8, 6), violet, Math.cos(a) * 5.6, topY + tall, Math.sin(a) * 5.6);
+      anchors[`rod${i}`] = new THREE.Vector3(Math.cos(a) * 5.6, topY + tall, Math.sin(a) * 5.6);
+    }
+    PARENT = root;
+    pointLights.push({ pos: new THREE.Vector3(0, topY + 6.8, 4), color: L.glow, intensity: 260 + s * 50, dist: 40 });
+    pointLights.push({ pos: new THREE.Vector3(0, 4, 8), color: L.glow, intensity: 90, dist: 22 });
+    if (s >= 4) anchors.satellite = new THREE.Vector3(0, topY + 6.8, 0);
+    if (s >= 5) {
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        mesh(new THREE.ConeGeometry(0.7, 5, 6), metalM(copper), Math.cos(a) * 12.5, 5.5, Math.sin(a) * 12.5);
+        mesh(new THREE.SphereGeometry(0.55, 8, 6), violet, Math.cos(a) * 12.5, 8.2, Math.sin(a) * 12.5);
+        anchors[`spike${i}`] = new THREE.Vector3(Math.cos(a) * 12.5, 8.2, Math.sin(a) * 12.5);
+      }
+    }
+    if (s >= 6) {
+      PARENT = turret;
+      const r = rng(91);
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const st = mesh(new THREE.DodecahedronGeometry(1.2 + r() * 0.6, 0), mat(daisStone, 0.3, 0.3), Math.cos(a) * 9, topY + 14 + r() * 2, Math.sin(a) * 9);
+        st.rotation.set(r() * 3, r() * 3, r() * 3);
+      }
+      PARENT = root;
+    }
+    for (const k of ["orb", "satellite", "rod0", "rod1", "rod2", "rod3", "rod4", "rod5"]) if (anchors[k]) turretAnchors.add(k);
+  }
+
   function buildStormcaller() {
+    if (!PILLAR_SKINS.has(SKIN)) return buildStormcallerCoil();
     const s = STAGE;
     const L = STORM_LOOKS[SKIN] ?? STORM_LOOKS.base!;
     const daisStone = stoneTex(81, L.dais[0], L.dais[1], L.dais[2], 3, 8);
