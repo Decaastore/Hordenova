@@ -75,6 +75,9 @@ import type { DualGemPrice } from "@/config/gemsEconomy";
 // this screen's own bundle unless the overlay actually mounts (gated by
 // `isWebGLAvailable()` below); on any environment without WebGL, this
 // import is never even requested.
+// CAMPO DE BATALHA 3D (prévia) — opt-in with ?view=3d while the 3D battlefield is being built.
+const Battlefield3D = lazy(() => import("@/battlefield3d/Battlefield3D").then((m) => ({ default: m.Battlefield3D })));
+const PREVIEW_3D = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "3d";
 const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
 
 // MUNDO 3D — same lazy/WebGL-gated pattern as the enemy overlay above, for
@@ -502,6 +505,13 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
           }}
         />
+        {PREVIEW_3D && (
+          <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }} data-testid="battlefield-3d">
+            <Suspense fallback={null}>
+              <Battlefield3D engine={engine} quality={new URLSearchParams(window.location.search).get("q") === "low" ? "low" : "high"} />
+            </Suspense>
+          </div>
+        )}
         {enable3DEnemies && (
           <Enemy3DErrorBoundary
             onError={() => {
