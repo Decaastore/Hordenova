@@ -1,4 +1,4 @@
-import { memo, Suspense, useEffect, useMemo, useRef } from "react";
+import { Component, memo, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { EffectComposer, Bloom, N8AO, Vignette, ToneMapping, SMAA } from "@react-three/postprocessing";
@@ -106,9 +106,11 @@ function World({ engine, quality }: { engine: GameEngine; quality: Quality }) {
       <Castle biomeId={biomeId} position={fortress.position} terrain={terrain} />
       <Portal terrain={terrain} glow={biome.palette.accentGlow} />
       <Towers engine={engine} terrain={terrain} />
-      <Suspense fallback={null}>
-        <Enemies engine={engine} terrain={terrain} />
-      </Suspense>
+      <SceneErrorBoundary>
+        <Suspense fallback={null}>
+          <Enemies engine={engine} terrain={terrain} />
+        </Suspense>
+      </SceneErrorBoundary>
       <Projectiles engine={engine} terrain={terrain} />
     </>
   );
@@ -230,10 +232,6 @@ function Towers({ engine, terrain }: { engine: GameEngine; terrain: TerrainData 
         const turret = obj.children[model.root.children.indexOf(model.turret)] ?? null;
         obj.scale.setScalar(TOWER_PRESENTATION_SCALE * 1.55);
         obj.position.copy(worldToThree(t.position, terrain.heightAt(t.position) + 2.5));
-        // a little coloured light under each tower so its crystals light the pad
-        const light = new THREE.PointLight(TOWER_COLORS[t.type] ?? "#fff", 1800, 70, 2);
-        light.position.set(0, 26, 8);
-        obj.add(light);
         g.add(obj);
         entry = { key, obj, turret, aim: 0 };
         live.current.set(t.id, entry);
@@ -252,7 +250,8 @@ function Towers({ engine, terrain }: { engine: GameEngine; terrain: TerrainData 
 }
 
 // ----------------------------------------------------------------- enemies
-const PLACEHOLDER_BODIES = ["/_labmodels/bestiary/Puglin.glb", "/_labmodels/bestiary/Imp.glb"] as const;
+const PLACEHOLDER_BODIES = ["/models/enemies/Puglin.glb", "/models/enemies/Imp.glb"] as const;
+const ANIMATION_LIBRARY = "/models/enemies/anims.glb";
 const ENEMY_HEIGHT = 34; // world units — big enough that a creature reads as a creature
 
 interface LiveEnemy {
@@ -265,7 +264,7 @@ interface LiveEnemy {
 }
 
 function Enemies({ engine, terrain }: { engine: GameEngine; terrain: TerrainData }) {
-  const [a, b, anims] = useLoader(GLTFLoader, [PLACEHOLDER_BODIES[0], PLACEHOLDER_BODIES[1], "/_labmodels/bestiary/UAL.glb"]) as [GLTF, GLTF, GLTF];
+  const [a, b, anims] = useLoader(GLTFLoader, [PLACEHOLDER_BODIES[0], PLACEHOLDER_BODIES[1], ANIMATION_LIBRARY]) as [GLTF, GLTF, GLTF];
   const bodies = useMemo(() => {
     return [a.scene, b.scene].map((scene) => {
       scene.traverse((o) => {
@@ -391,16 +390,64 @@ function Projectiles({ engine, terrain }: { engine: GameEngine; terrain: Terrain
 }
 
 // ----------------------------------------------------------------- root
-export const Battlefield3D = memo(function Battlefield3D({ engine, quality = "high" }: { engine: GameEngine; quality?: Quality }) {
+/** If one layer of the scene fails to load (a model file, say), drop just that layer instead of the whole battlefield. */
+class SceneErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.warn("[battlefield3d] scene layer failed to load", error);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+/**
+ * Watches the frame rate for the first seconds on screen. A device that can't
+ * hold ~40 fps on the high tier drops to the low tier once, for the session.
+ */
+function FrameRateGuard({ quality, onSlow }: { quality: Quality; onSlow: () => void }) {
+  const acc = useRef({ t: 0, frames: 0, warm: 0, done: false });
+  useFrame((_, dt) => {
+    const a = acc.current;
+    if (a.done || quality !== "high") return;
+    if (a.warm < 1.5) {
+      a.warm += dt; // skip shader compile and first uploads
+      return;
+    }
+    a.t += Math.min(dt, 0.5);
+    a.frames++;
+    if (a.t >= 3) {
+      a.done = true;
+      if (a.frames / a.t < 40) onSlow();
+    }
+  });
+  return null;
+}
+
+export function pickAutoQuality(): Quality {
+  if (typeof window === "undefined") return "low";
+  const forced = new URLSearchParams(window.location.search).get("q");
+  if (forced === "low" || forced === "high") return forced;
+  const coarse = window.matchMedia?.("(pointer: coarse)").matches ?? false;
+  const cores = navigator.hardwareConcurrency ?? 4;
+  return coarse || cores <= 4 ? "low" : "high";
+}
+
+export const Battlefield3D = memo(function Battlefield3D({ engine, quality: initial }: { engine: GameEngine; quality?: Quality }) {
+  const [quality, setQuality] = useState<Quality>(() => initial ?? pickAutoQuality());
   return (
     <Canvas
       shadows="soft"
-      dpr={quality === "high" ? [1, 2] : 1}
+      dpr={quality === "high" ? [1, 1.5] : 1}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
       camera={{ fov: 30, position: [0, 900, 700] }}
       style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
     >
       <CameraRig />
+      <FrameRateGuard quality={quality} onSlow={() => setQuality("low")} />
       <World engine={engine} quality={quality} />
       <EffectComposer multisampling={0}>
         {quality === "high" ? <N8AO aoRadius={18} intensity={2.4} distanceFalloff={1.2} quality="medium" /> : <></>}

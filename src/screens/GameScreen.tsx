@@ -508,7 +508,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
         {PREVIEW_3D && (
           <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }} data-testid="battlefield-3d">
             <Suspense fallback={null}>
-              <Battlefield3D engine={engine} quality={new URLSearchParams(window.location.search).get("q") === "low" ? "low" : "high"} />
+              <Battlefield3D engine={engine} />
             </Suspense>
           </div>
         )}
