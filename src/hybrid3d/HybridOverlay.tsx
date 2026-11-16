@@ -9,6 +9,8 @@ import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
 import { computeScreenTransform, cameraPosition, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Effects } from "@/battlefield3d/fx";
+import { castleDressingFor } from "@/rendering/castleSprites";
+import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "@/battlefield3d/creatures";
 import type { Vector2 } from "@/utils/geometry";
 
@@ -171,7 +173,10 @@ function Castle({
 }) {
   const biomeId = engine.getRenderSnapshot().biomeId;
   const [tier, setTier] = useState(1);
-  const model: CastleModel = useMemo(() => buildCastleModel(biomeId, tier), [biomeId, tier]);
+  const [skinId, setSkinId] = useState(() => getActiveCastleSkin()?.id ?? "");
+  // the same look per map as the 2D castle (expansion maps borrow one of the six dressings)
+  const dressing = castleDressingFor(biomeId).toUpperCase();
+  const model: CastleModel = useMemo(() => buildCastleModel(dressing, tier, skinId), [dressing, tier, skinId]);
   const group = useRef<THREE.Group>(null);
   const torch = useRef<THREE.PointLight>(null);
   const flash = useRef<THREE.PointLight>(null);
@@ -179,8 +184,17 @@ function Castle({
   const shake = useRef(0);
   const hpT = useRef(0);
   const anchor = loc(fortress);
-  // front-on like the 2D castle (the model's gate is +Z, the camera sits on −Z), turned a little towards the incoming road
-  const YAW = Math.PI + 0.45 * Math.sign(-facing.x || 1);
+  // the gate (the model's +Z) faces back along the road the horde comes in on, turned towards
+  // the viewer so the castle still shows its face rather than a flank or its back
+  const YAW = useMemo(() => {
+    let gx = -facing.x;
+    let gy = -facing.y + 0.9;
+    if (Math.hypot(gx, gy) < 0.3) {
+      gx = Math.sign(gx) || -1;
+      gy = 0.3;
+    }
+    return worldDirectionToThreeYaw({ x: gx, y: gy });
+  }, [facing.x, facing.y]);
   // size it to the 2D castle's footprint (about 100 world units across)
   const scale = useMemo(() => {
     const box = new THREE.Box3().setFromObject(model.root);
@@ -263,6 +277,8 @@ function Castle({
       const h = engine.getHudSnapshot();
       const nt = castleTier(h.maxBaseHp > 0 ? h.baseHp / h.maxBaseHp : 1);
       if (nt !== tier) setTier(nt);
+      const sk = getActiveCastleSkin()?.id ?? "";
+      if (sk !== skinId) setSkinId(sk);
     }
     // gate
     if (s) {
@@ -323,9 +339,10 @@ function Castle({
 
 // ----------------------------------------------------------------- creatures
 const ENEMY_HEIGHT = 62; // world units — the 2D creature sheets are 23–33 tall
-/** Distance left on the road (world units) where a creature turns off for the gate, and where it is fully inside. */
-const APPROACH_START = 300;
-const APPROACH_END = 150;
+/** Most creatures drawn in 3D at once; beyond that the extra ones keep their 2D sprite. */
+const MAX_3D_CREATURES = 90;
+/** How far before the castle (along the road, world units) a creature turns off for the gate. */
+const APPROACH_LEAD = 170;
 
 interface Live {
   c: Creature;
@@ -354,6 +371,7 @@ function Creatures({
   portal,
   fortress,
   roadLength,
+  castleAt,
 }: {
   engine: GameEngine;
   hiddenIds: RefObject<Set<string>>;
@@ -362,6 +380,8 @@ function Creatures({
   portal: Vector2;
   fortress: Vector2;
   roadLength: number;
+  /** Road distance from the castle to the road's end (the castle stands a little short of it on edge maps). */
+  castleAt: number;
 }) {
   const gltfs = useLoader(GLTFLoader, CREATURE_URLS) as GLTF[];
   const kits = useMemo(() => prepareCreatures(gltfs), [gltfs]);
@@ -386,7 +406,9 @@ function Creatures({
       let e = live.current.get(en.id);
       const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
       if (!e) {
-        const c = new Creature(kits[creatureFor(en.type, !!en.boss)], ENEMY_HEIGHT * tier * heightFactor(en.type));
+        if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
+        const cid = creatureFor(en.type, !!en.boss);
+        const c = new Creature(kits[cid], ENEMY_HEIGHT * tier * heightFactor(en.type), { id: cid, biomeId: snap.biomeId });
         const obj = c.obj;
         const scale = c.scale;
         const shadow = new THREE.Mesh(blobGeo, blobMat);
@@ -415,9 +437,9 @@ function Creatures({
       // the last stretch: leave the road, curve round to the front of the gate and walk in
       let yaw = worldDirectionToThreeYaw(en.direction);
       const remaining = roadLength - en.distanceTraveled;
-      if (gate && remaining < APPROACH_START) {
+      if (gate && remaining < castleAt + APPROACH_LEAD) {
         if (!e.approachFrom) e.approachFrom = pos.clone();
-        const t = Math.min(1, (APPROACH_START - remaining) / (APPROACH_START - APPROACH_END));
+        const t = Math.min(1, (castleAt + APPROACH_LEAD - remaining) / APPROACH_LEAD);
         const P0 = e.approachFrom;
         const C = gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 45);
         const E = gate.gateInside;
@@ -436,7 +458,7 @@ function Creatures({
       e.obj.rotation.y += d * Math.min(1, dt * 8);
       e.c.walk.timeScale = en.slow ? 0.55 : 1.0;
       e.c.update(dt);
-      const nearCastle = roadLength - en.distanceTraveled < APPROACH_START + 40 || Math.hypot(en.position.x - fortress.x, en.position.y - fortress.y) < 140;
+      const nearCastle = roadLength - en.distanceTraveled < castleAt + APPROACH_LEAD + 40 || Math.hypot(en.position.x - fortress.x, en.position.y - fortress.y) < 140;
       if (nearCastle) anyNearGate = true;
       // close to the castle the creature is cut by the gate's plane, so it vanishes as it walks in
       if (nearCastle && gate && !e.clipped) {
@@ -472,7 +494,7 @@ function Creatures({
       if (seen.has(id)) continue;
       if (e.gone < 0) {
         e.gone = 0;
-        const reached = !!e.last && (roadLength - e.last.distanceTraveled < 40 || e.inside);
+        const reached = !!e.last && (roadLength - e.last.distanceTraveled < castleAt + 40 || e.inside);
         if (reached) {
           // it walked in through the gate (and was cut away by it); nothing left to show
           if (!e.inside && gate) gate.struck();
@@ -547,7 +569,7 @@ function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
-          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} />
+          <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />
         </Suspense>
       </LayerBoundary>
     </WorldScale>

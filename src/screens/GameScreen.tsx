@@ -79,8 +79,13 @@ import type { DualGemPrice } from "@/config/gemsEconomy";
 import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 const Battlefield3D = lazy(() => import("@/battlefield3d/Battlefield3D").then((m) => ({ default: m.Battlefield3D })));
 const PREVIEW_3D = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "3d";
-/** HÍBRIDO (prévia) — 2D map with a live 3D castle and creatures on top (?view=hybrid). */
-const PREVIEW_HYBRID = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "hybrid";
+/**
+ * HÍBRIDO — the 2D map with a live 3D castle and 3D creatures on top. On by
+ * default wherever WebGL works; `?view=2d` turns it off (pure 2D), and the
+ * full-3D preview (`?view=3d`) replaces it.
+ */
+const VIEW_PARAM = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("view") : null;
+const HYBRID_DEFAULT = VIEW_PARAM !== "2d" && VIEW_PARAM !== "3d" && isWebGLAvailable();
 const HybridOverlay = lazy(() => import("@/hybrid3d/HybridOverlay").then((m) => ({ default: m.HybridOverlay })));
 const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
 
@@ -150,7 +155,8 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   // "never end up with no enemies" fallback contract: once disabled for
   // this session, 2D enemy rendering (already the default when this ref
   // stays empty) takes over permanently instead of retrying.
-  const [enable3DEnemies, setEnable3DEnemies] = useState(() => !PREVIEW_HYBRID && isWebGLAvailable());
+  const [hybridOn, setHybridOn] = useState(HYBRID_DEFAULT);
+  const [enable3DEnemies, setEnable3DEnemies] = useState(() => !HYBRID_DEFAULT && isWebGLAvailable());
   const hidden3DEnemyIdsRef = useRef<Set<string>>(new Set());
 
   // MUNDO 3D — FASE 1: background terrain/atmosphere layer, independent
@@ -508,17 +514,25 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
           pointerBridge={mapPointerBridgeRef}
-          hideCastle={PREVIEW_HYBRID}
+          hideCastle={hybridOn}
           placingTower={placingTower}
           previewLabels={{
             highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
             altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
           }}
         />
-        {PREVIEW_HYBRID && (
-          <Suspense fallback={null}>
-            <HybridOverlay engine={engine} hiddenIds={hidden3DEnemyIdsRef} />
-          </Suspense>
+        {hybridOn && (
+          <Enemy3DErrorBoundary
+            onError={() => {
+              // anything wrong with the 3D layer: fall back to the full 2D castle and creatures
+              hidden3DEnemyIdsRef.current.clear();
+              setHybridOn(false);
+            }}
+          >
+            <Suspense fallback={null}>
+              <HybridOverlay engine={engine} hiddenIds={hidden3DEnemyIdsRef} />
+            </Suspense>
+          </Enemy3DErrorBoundary>
         )}
         {PREVIEW_3D && (
           <div style={{ position: "absolute", inset: 0 }} data-testid="battlefield-3d">

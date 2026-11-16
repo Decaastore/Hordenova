@@ -863,7 +863,8 @@ function Enemies({
       let e = live.current.get(en.id);
       if (!e) {
         const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
-        const c = new Creature(kits[creatureFor(en.type, !!en.boss)], ENEMY_HEIGHT * tier * heightFactor(en.type));
+        const cid = creatureFor(en.type, !!en.boss);
+        const c = new Creature(kits[cid], ENEMY_HEIGHT * tier * heightFactor(en.type), { id: cid, biomeId: snap.biomeId });
         const obj = c.obj;
         const scale = c.scale;
         const shadow = new THREE.Mesh(blobGeo, blobMat);
