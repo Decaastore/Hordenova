@@ -1,7 +1,7 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { PALETTE } from "@/rendering/theme";
-import { WORLD_SIZE } from "@/config/gameBalance";
+import { getViewTransform } from "@/rendering/viewCamera";
 
 /** Something to point at: a tagged element (`data-tutorial="…"`) or a spot on the map in world units. */
 export type TutorialTarget = { kind: "dom"; id: string } | { kind: "world"; x: number; y: number; r: number };
@@ -40,9 +40,11 @@ function measure(target: TutorialTarget): Box | null {
   const canvas = document.querySelector(MAP_SELECTOR);
   if (!canvas) return null;
   const c = canvas.getBoundingClientRect();
-  const sc = Math.min(c.width / WORLD_SIZE.width, c.height / WORLD_SIZE.height);
-  const ox = c.left + (c.width - WORLD_SIZE.width * sc) / 2;
-  const oy = c.top + (c.height - WORLD_SIZE.height * sc) / 2;
+  // the map's own camera (zoom included), so a highlight sits on the spot even when zoomed in
+  const v = getViewTransform(c.width, c.height);
+  const sc = v.scale;
+  const ox = c.left + v.offsetX;
+  const oy = c.top + v.offsetY;
   const r = Math.max(18, target.r * sc);
   return { left: ox + target.x * sc - r, top: oy + target.y * sc - r, width: r * 2, height: r * 2, round: true };
 }

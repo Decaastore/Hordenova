@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { Canvas, useThree } from "@react-three/fiber";
+import { useEffect, useRef, useState } from "react";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import type { GameEngine } from "@/engine/GameEngine";
 import { WorldTerrain } from "./WorldTerrain";
-import { cameraPosition, computeScreenTransform } from "../enemyProjection";
+import { cameraPosition, groundGroupPlacement } from "../enemyProjection";
 import { hasGroundBake } from "@/rendering/groundBakes";
 
 /** Same manual orthographic-frustum rig as `rendering3d/Enemy3DOverlay.tsx`'s `CameraRig` — kept as its own small copy (not shared) so this layer and the enemy overlay stay independently mountable/removable while both use the identical tilt, matching camera math (`enemyProjection.ts` is the single source of truth for the numbers either rig uses). */
@@ -35,10 +35,17 @@ function CameraRig() {
  * that makes the letterbox offset cancel out here).
  */
 function ScaledWorld({ biomeId }: { biomeId: string }) {
-  const { size } = useThree();
-  const transform = computeScreenTransform(size.width, size.height);
+  const ref = useRef<THREE.Group>(null);
+  // ZOOM — follow the shared view camera every frame
+  useFrame(({ size }) => {
+    const g = ref.current;
+    if (!g) return;
+    const p = groundGroupPlacement(size.width, size.height);
+    g.scale.setScalar(p.scale);
+    g.position.set(p.x, 0, p.z);
+  });
   return (
-    <group scale={transform.scale}>
+    <group ref={ref}>
       <WorldTerrain biomeId={biomeId} />
     </group>
   );

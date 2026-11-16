@@ -40,18 +40,28 @@ export function creatureFor(type: string, boss: boolean, mainBoss = false): Crea
   return FOR_TYPE[type] ?? IDS[(type.charCodeAt(0) + type.length) % IDS.length]!;
 }
 
-/** Relative height of each enemy type (world units of the shortest is ~1). */
+/**
+ * Relative height of each enemy type, the same ratios as the 2D creature sheets
+ * (CRAWLER 23 … BRUTE 33 world units, normalised to 27), so a 3D creature keeps
+ * the proportions of its kind.
+ */
+const TYPE_HEIGHT: Record<string, number> = {
+  CRAWLER: 0.85,
+  SWARMLING: 0.89,
+  RUNNER: 1,
+  REGENERATOR: 1,
+  DISABLER: 0.96,
+  SHIELDBEARER: 1.11,
+  IRONCLAD: 1.07,
+  BRUTE: 1.22,
+};
 export function heightFactor(type: string): number {
-  switch (type) {
-    case "CRAWLER":
-    case "SWARMLING":
-      return 0.8;
-    case "BRUTE":
-    case "IRONCLAD":
-      return 1.15;
-    default:
-      return 1;
-  }
+  return TYPE_HEIGHT[type] ?? 1;
+}
+
+/** Size multipliers by rank — exactly the 2D renderer's (elite 1.3×, mini-boss 1.4×, boss 1.9×). */
+export function rankScale(elite: boolean, boss: { isMainBoss: boolean } | undefined): number {
+  return boss ? (boss.isMainBoss ? 1.9 : 1.4) : elite ? 1.3 : 1;
 }
 
 export interface CreatureKit {
@@ -136,6 +146,47 @@ function tinted(id: CreatureId, biomeId: string, m: THREE.Material): THREE.Mater
   return out;
 }
 
+const OUTLINE_COLOR = new THREE.Color("#140b06");
+const outlineMats = new Map<number, THREE.MeshBasicMaterial>();
+function outlineMaterial(thickness: number) {
+  const key = Math.round(thickness * 1e4);
+  let m = outlineMats.get(key);
+  if (m) return m;
+  m = new THREE.MeshBasicMaterial({ color: OUTLINE_COLOR, side: THREE.BackSide });
+  m.onBeforeCompile = (shader) => {
+    shader.uniforms.uThick = { value: thickness };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float uThick;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\n  transformed += normalize(normal) * uThick;");
+  };
+  m.customProgramCacheKey = () => `outline-${key}`;
+  outlineMats.set(key, m);
+  return m;
+}
+
+/** Inverted-hull outline: a slightly fattened, back-facing, ink-coloured copy of every skinned mesh. */
+function addOutline(body: THREE.Object3D, relative: number) {
+  const meshes: THREE.SkinnedMesh[] = [];
+  body.traverse((o) => {
+    const m = o as THREE.SkinnedMesh;
+    if (m.isSkinnedMesh) meshes.push(m);
+  });
+  for (const m of meshes) {
+    // thickness in the mesh's own (bind-pose) units: a fixed share of its height, whatever units it was exported in
+    if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+    const bb = m.geometry.boundingBox!;
+    const tall = Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y, bb.max.z - bb.min.z);
+    const hull = new THREE.SkinnedMesh(m.geometry, outlineMaterial(tall * relative));
+    hull.bind(m.skeleton, m.bindMatrix);
+    hull.position.copy(m.position);
+    hull.quaternion.copy(m.quaternion);
+    hull.scale.copy(m.scale);
+    hull.frustumCulled = false;
+    hull.userData.outline = true;
+    m.parent?.add(hull);
+  }
+}
+
 /** One live creature on the field. */
 export class Creature {
   readonly obj: THREE.Object3D;
@@ -165,6 +216,8 @@ export class Creature {
     this.walk.play();
     this.scale = worldHeight / kit.height;
     this.obj.scale.setScalar(this.scale);
+    // the same dark ink outline the 2D creature sprites have, so 3D and 2D read as one style
+    addOutline(body, 0.012);
     const left = body.getObjectByProperty("name", "mixamorigLeftFoot") ?? body.getObjectByProperty("name", "mixamorig:LeftFoot");
     const right = body.getObjectByProperty("name", "mixamorigRightFoot") ?? body.getObjectByProperty("name", "mixamorig:RightFoot");
     this.feet = left && right ? [left, right] : [];

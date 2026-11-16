@@ -1949,6 +1949,11 @@ export const ptBR: TranslationSchema = {
     equipped: "EQUIPADA",
     updated: "Atualizado em {date}",
   },
+  mapView: {
+    zoomIn: "Aproximar",
+    zoomOut: "Afastar",
+    fit: "Ver o mapa inteiro",
+  },
   deploy: {
     title: "Coloque suas torres",
     kicker: "Mapa novo",

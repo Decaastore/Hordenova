@@ -7,7 +7,7 @@ import type { EnemyInstance } from "@/entities/Enemy";
 import { getMapLayout } from "@/data/mapLayouts";
 import { getBiome } from "@/rendering/biomes";
 import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
-import { computeScreenTransform, cameraPosition, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
+import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Effects } from "@/battlefield3d/fx";
 import { castleDressingFor } from "@/rendering/castleSprites";
@@ -15,7 +15,7 @@ import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { footprints } from "@/rendering/footprints";
 import { TILT_COS } from "@/rendering3d/enemyProjection";
 import { WORLD_SIZE } from "@/config/gameBalance";
-import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "@/battlefield3d/creatures";
+import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures, rankScale } from "@/battlefield3d/creatures";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -71,10 +71,17 @@ function CameraRig() {
 
 /** Everything inside is authored in world units; this group scales it to CSS pixels exactly like the 2D canvas. */
 function WorldScale({ children, fx }: { children: ReactNode; fx: Effects }) {
-  const { size, gl } = useThree();
-  const t = computeScreenTransform(size.width, size.height);
-  useEffect(() => fx.setOrthoScale(t.scale * gl.getPixelRatio()), [fx, t.scale, gl]);
-  return <group scale={t.scale}>{children}</group>;
+  const ref = useRef<THREE.Group>(null);
+  // follows the shared view camera every frame, so zooming and panning move the 3D layer with the map
+  useFrame(({ size, gl }) => {
+    const g = ref.current;
+    if (!g) return;
+    const p = groundGroupPlacement(size.width, size.height);
+    g.scale.setScalar(p.scale);
+    g.position.set(p.x, 0, p.z);
+    fx.setOrthoScale(p.scale * gl.getPixelRatio());
+  }, -1);
+  return <group ref={ref}>{children}</group>;
 }
 
 // ----------------------------------------------------------------- lights + shadow catcher
@@ -424,7 +431,12 @@ function Castle({
 }
 
 // ----------------------------------------------------------------- creatures
-const ENEMY_HEIGHT = 62; // world units — the 2D creature sheets are 23–33 tall
+/**
+ * World height of an ordinary-sized 3D creature. Seen from the board's tilt a standing body
+ * shows about 60% of its height, so this lands a creature at the on-screen size of the 2D
+ * sprite of its kind; rank (elite / mini-boss / boss) then scales it exactly as the 2D does.
+ */
+const ENEMY_HEIGHT = 39;
 /** A print from the 3D layer's ground space (x, z and a yaw around +Y) into world units for the 2D ground. */
 function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean) {
   const wx = WORLD_SIZE.width / 2 - x;
@@ -626,7 +638,7 @@ function Creatures({
       // already went in through the gate while the game still has it on the road: stays hidden, not redrawn
       if (entered.current.has(en.id)) continue;
       let e = live.current.get(en.id);
-      const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
+      const tier = rankScale(!!en.elite, en.boss);
       if (!e) {
         if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
         const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss);

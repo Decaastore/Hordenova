@@ -22,6 +22,7 @@ import { CanvasRenderer, type MapPointerBridge } from "@/rendering/CanvasRendere
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
+import { MapZoomControls } from "@/ui/MapZoomControls";
 import { DailyMissionsPanel } from "@/ui/DailyMissionsPanel";
 import { getMainBossForWave } from "@/config/bossConfig";
 import { useTabPresence } from "@/hooks/useTabPresence";
@@ -521,6 +522,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
           }}
         />
+        <MapZoomControls mapRef={mapAreaRef} />
         {hybridOn && (
           <Enemy3DErrorBoundary
             onError={() => {

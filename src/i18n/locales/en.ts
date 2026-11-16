@@ -1948,6 +1948,11 @@ export const en = {
     equipped: "EQUIPPED",
     updated: "Updated {date}",
   },
+  mapView: {
+    zoomIn: "Zoom in",
+    zoomOut: "Zoom out",
+    fit: "Show the whole map",
+  },
   deploy: {
     title: "Place your towers",
     kicker: "New map",

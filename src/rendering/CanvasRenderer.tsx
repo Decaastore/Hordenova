@@ -1,4 +1,5 @@
 import { footprints } from "./footprints";
+import { getViewTransform, getZoom, panBy, zoomAt } from "./viewCamera";
 import { deathImpact } from "./deathImpact";
 import { activeKillFx, drawKillFx } from "./duelLooks";
 import { LootFx } from "./lootFx";
@@ -227,6 +228,10 @@ export function CanvasRenderer({
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
+  const cssSizeRef = useRef({ w: WORLD_SIZE.width, h: WORLD_SIZE.height });
+  /** ZOOM — a press that turns into a drag pans the map and must not also click. */
+  const dragRef = useRef<{ x: number; y: number; moved: boolean; id: number } | null>(null);
+  const suppressClickRef = useRef(false);
   const latestSnapshotRef = useRef<RenderSnapshot | null>(null);
   const pendingTowerTypeRef = useRef<TowerType | null>(pendingTowerType);
   pendingTowerTypeRef.current = pendingTowerType;
@@ -296,10 +301,14 @@ export function CanvasRenderer({
       canvas.style.width = `${cssWidth}px`;
       canvas.style.height = `${cssHeight}px`;
 
-      const scale = Math.min(cssWidth / WORLD_SIZE.width, cssHeight / WORLD_SIZE.height);
-      const offsetX = (cssWidth - WORLD_SIZE.width * scale) / 2;
-      const offsetY = (cssHeight - WORLD_SIZE.height * scale) / 2;
-      transformRef.current = { scale: scale * dpr, offsetX: offsetX * dpr, offsetY: offsetY * dpr };
+      cssSizeRef.current = { w: cssWidth, h: cssHeight };
+      applyView();
+    };
+    // ZOOM — the world→screen transform comes from the shared view camera (fit-the-map at zoom 1)
+    const applyView = () => {
+      const dpr = window.devicePixelRatio || 1;
+      const v = getViewTransform(cssSizeRef.current.w, cssSizeRef.current.h);
+      transformRef.current = { scale: v.scale * dpr, offsetX: v.offsetX * dpr, offsetY: v.offsetY * dpr };
     };
 
     resize();
@@ -443,6 +452,7 @@ export function CanvasRenderer({
       seenSpecialIds = liveSpecialIds;
       specialVfx.update(frameDt);
 
+      applyView();
       const { scale, offsetX, offsetY } = transformRef.current;
       const shake = vfx.getShakeOffset();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -742,6 +752,10 @@ export function CanvasRenderer({
   };
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     const worldPoint = toWorld(event);
     if (worldPoint) handleWorldClick(worldPoint);
   };
@@ -781,6 +795,36 @@ export function CanvasRenderer({
       onClick={handleClick}
       onMouseMove={(e) => (hoverWorldRef.current = toWorld(e))}
       onMouseLeave={() => (hoverWorldRef.current = null)}
+      onWheel={(e) => {
+        // ZOOM — the wheel zooms towards the pointer
+        const rect = e.currentTarget.getBoundingClientRect();
+        zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.15 : 1 / 1.15, rect.width, rect.height);
+      }}
+      onPointerDown={(e) => {
+        if (e.button !== 0 && e.button !== 1) return;
+        dragRef.current = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId };
+      }}
+      onPointerMove={(e) => {
+        const d = dragRef.current;
+        if (!d || d.id !== e.pointerId || getZoom() <= 1) return;
+        const dx = e.clientX - d.x;
+        const dy = e.clientY - d.y;
+        if (!d.moved && Math.hypot(dx, dy) < 6) return;
+        if (!d.moved) e.currentTarget.setPointerCapture(e.pointerId);
+        d.moved = true;
+        const rect = e.currentTarget.getBoundingClientRect();
+        panBy(dx, dy, rect.width, rect.height);
+        d.x = e.clientX;
+        d.y = e.clientY;
+      }}
+      onPointerUp={(e) => {
+        const d = dragRef.current;
+        if (d && d.id === e.pointerId) {
+          if (d.moved) suppressClickRef.current = true;
+          dragRef.current = null;
+        }
+      }}
+      onPointerCancel={() => (dragRef.current = null)}
       style={{
         width: "100%",
         height: "100%",

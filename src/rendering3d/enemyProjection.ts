@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import type { Vector2 } from "@/utils/geometry";
 import { WORLD_SIZE } from "@/config/gameBalance";
+import { getViewTransform } from "@/rendering/viewCamera";
 
 /**
  * INIMIGOS 3D — the same tilted-orthographic alignment technique already
@@ -25,12 +26,24 @@ export interface ScreenTransform {
   height: number;
 }
 
-/** Mirrors CanvasRenderer.tsx's resize() exactly, in CSS pixels (no DPR — r3f/Three already handles DPR internally). */
+/** The 2D canvas's own world→screen transform (the shared view camera, zoom included), in CSS pixels (no DPR — r3f/Three already handles DPR internally). */
 export function computeScreenTransform(width: number, height: number): ScreenTransform {
-  const scale = Math.min(width / WORLD_SIZE.width, height / WORLD_SIZE.height);
-  const offsetX = (width - WORLD_SIZE.width * scale) / 2;
-  const offsetY = (height - WORLD_SIZE.height * scale) / 2;
+  const { scale, offsetX, offsetY } = getViewTransform(width, height);
   return { scale, offsetX, offsetY, width, height };
+}
+
+/**
+ * ZOOM — where to put a group whose children are authored in unit ground space
+ * (`worldToLocalGround`): scale it by `scale` and move it by (x, 0, z). At zoom 1
+ * the move is zero (the letterbox identity); zoomed or panned it carries the offset.
+ */
+export function groundGroupPlacement(width: number, height: number): { scale: number; x: number; z: number } {
+  const t = getViewTransform(width, height);
+  return {
+    scale: t.scale,
+    x: width / 2 - t.offsetX - (WORLD_SIZE.width / 2) * t.scale,
+    z: -(t.offsetY - height / 2 + (WORLD_SIZE.height / 2) * t.scale) / TILT_COS,
+  };
 }
 
 /**

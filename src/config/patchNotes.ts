@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v149",
+    dateIso: "2026-11-16",
+    category: "INTERFACE",
+    title: {
+      en: "Map Zoom and Matching Creatures",
+      ptBR: "Zoom no Mapa e Monstros na Mesma Escala",
+    },
+    description: {
+      en: "You can now zoom into the battle and move around the map, and the 3D Elites and bosses finally match the rest of the horde in size and style.",
+      ptBR: "Agora dá para aproximar a câmera da batalha e andar pelo mapa, e os Elites e chefes em 3D finalmente combinam com o resto da horda em tamanho e estilo.",
+    },
+    highlights: [
+      {
+        en: "Mouse wheel zooms in where the pointer is; drag the map to move around. The buttons in the map's corner (or the +, − and 0 keys) zoom in, zoom out and show the whole map again.",
+        ptBR: "A roda do mouse aproxima onde o ponteiro está, e arrastar o mapa move a câmera. Os botões no canto do mapa (ou as teclas +, − e 0) aproximam, afastam e voltam a mostrar o mapa inteiro.",
+      },
+      {
+        en: "Everything follows the zoom: towers, creatures, the castle, footprints and effects, and tapping a spot to build works the same zoomed in.",
+        ptBR: "Tudo acompanha o zoom: torres, monstros, castelo, pegadas e efeitos, e tocar num lugar para construir funciona igual com o zoom.",
+      },
+      {
+        en: "3D Elites, Mini-Bosses and Bosses now follow the same size rule as the rest of the horde: an Elite is a little bigger than its ordinary kind, a Boss about twice its size, instead of towering over everything.",
+        ptBR: "Elites, Mini-Chefes e Chefes em 3D agora seguem a mesma regra de tamanho do resto da horda: um Elite é um pouco maior que o comum do mesmo tipo e um Chefe tem cerca do dobro, em vez de ficarem gigantes.",
+      },
+      {
+        en: "They also got the same dark ink outline as the other creatures, so the whole horde reads as one.",
+        ptBR: "Eles também ganharam o mesmo contorno escuro dos outros monstros, então a horda inteira parece uma coisa só.",
+      },
+    ],
+  },
+  {
     id: "v148",
     dateIso: "2026-11-16",
     category: "BOSSES",
