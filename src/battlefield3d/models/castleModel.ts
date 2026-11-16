@@ -782,6 +782,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
         dune.scale.set(1.4, 0.28, 0.8);
         const a = -Math.PI / 2 + (rr() - 0.5) * 2.6;
         dune.position.set(Math.cos(a) * 40, 0, Math.sin(a) * -26 + 10);
+        dune.name = "groundDressing";
         dune.receiveShadow = true;
         root.add(dune);
       }
@@ -797,6 +798,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
         m.scale.set(1.6, 0.35, 1);
         m.position.set(Math.cos(a) * rad, 0.1, Math.sin(a) * rad * 0.8);
         m.rotation.y = -a;
+        m.name = "groundDressing";
         m.receiveShadow = true;
         root.add(m);
       }

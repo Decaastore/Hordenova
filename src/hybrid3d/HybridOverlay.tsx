@@ -213,6 +213,12 @@ function Castle({
       const o = model.root.getObjectByName(n);
       if (o) o.removeFromParent();
     }
+    // snow piles and dunes were shaped for the old platform's rim; on the map's own ground they float
+    const loose: THREE.Object3D[] = [];
+    model.root.traverse((o) => {
+      if (o.name === "groundDressing") loose.push(o);
+    });
+    for (const o of loose) o.removeFromParent();
     const box = new THREE.Box3().setFromObject(model.root);
     return 118 / Math.max(1, box.max.x - box.min.x);
   }, [model]);
@@ -258,7 +264,8 @@ function Castle({
     const c = document.createElement("canvas");
     c.width = c.height = 256;
     const g = c.getContext("2d")!;
-    const base = new THREE.Color(pal.roadFill).lerp(new THREE.Color(pal.groundShadowed), 0.45);
+    // the map's own road earth, only slightly darker, so it reads as trodden ground rather than a hole
+    const base = new THREE.Color(pal.roadFill).lerp(new THREE.Color(pal.groundBase), 0.35).multiplyScalar(0.92);
     let seed = 99;
     const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
     g.fillStyle = `#${base.getHexString()}`;
@@ -281,18 +288,30 @@ function Castle({
     }
     // darker under the walls (contact shade), then a soft edge into the map
     const ao = g.createRadialGradient(128, 128, 10, 128, 128, 128);
-    ao.addColorStop(0, "rgba(0,0,0,0.22)");
-    ao.addColorStop(0.45, "rgba(0,0,0,0.1)");
+    ao.addColorStop(0, "rgba(0,0,0,0.16)");
+    ao.addColorStop(0.45, "rgba(0,0,0,0.06)");
     ao.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = ao;
     g.fillRect(0, 0, 256, 256);
     g.globalCompositeOperation = "destination-in";
-    const edge = g.createRadialGradient(128, 128, 60, 128, 128, 128);
-    edge.addColorStop(0, "rgba(0,0,0,1)");
-    edge.addColorStop(0.75, "rgba(0,0,0,0.85)");
+    // irregular soft edge (not a perfect circle) so the patch melts into the map
+    const edge = g.createRadialGradient(128, 128, 40, 128, 128, 128);
+    edge.addColorStop(0, "rgba(0,0,0,0.92)");
+    edge.addColorStop(0.55, "rgba(0,0,0,0.7)");
     edge.addColorStop(1, "rgba(0,0,0,0)");
     g.fillStyle = edge;
     g.fillRect(0, 0, 256, 256);
+    g.globalCompositeOperation = "destination-out";
+    g.filter = "blur(6px)";
+    for (let i = 0; i < 26; i++) {
+      const a = rnd() * Math.PI * 2;
+      const r = 92 + rnd() * 30;
+      g.fillStyle = `rgba(0,0,0,${0.35 + rnd() * 0.4})`;
+      g.beginPath();
+      g.arc(128 + Math.cos(a) * r, 128 + Math.sin(a) * r, 10 + rnd() * 18, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.filter = "none";
     const t = new THREE.CanvasTexture(c);
     t.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshStandardMaterial({ map: t, transparent: true, depthWrite: false, roughness: 1 });

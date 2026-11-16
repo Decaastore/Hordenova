@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v150",
+    dateIso: "2026-11-16",
+    category: "FIXES",
+    title: {
+      en: "The Castle Stands on Every Map",
+      ptBR: "O Castelo Firme em Todos os Mapas",
+    },
+    description: {
+      en: "On some maps the 3D castle still looked set down on top of the ground. It now stands on the ground of every map.",
+      ptBR: "Em alguns mapas o castelo 3D ainda parecia apoiado por cima do chão. Agora ele fica firme no chão de todos os mapas.",
+    },
+    highlights: [
+      {
+        en: "The snow piles on the ice maps and the dunes in the desert, which used to float around the castle, are gone.",
+        ptBR: "Os montes de neve nos mapas de gelo e as dunas do deserto, que flutuavam em volta do castelo, foram removidos.",
+      },
+      {
+        en: "The trodden earth under the castle now uses each map's own ground colour, with a softer, irregular edge, instead of a dark patch that looked like a hole on the volcano, the ruins and the Abyss.",
+        ptBR: "A terra batida embaixo do castelo agora usa a cor do chão de cada mapa, com uma borda mais suave e irregular, em vez de uma mancha escura que parecia um buraco no vulcão, nas ruínas e no Abismo.",
+      },
+    ],
+  },
+  {
     id: "v149",
     dateIso: "2026-11-16",
     category: "INTERFACE",
