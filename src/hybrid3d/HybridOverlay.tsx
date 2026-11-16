@@ -452,10 +452,15 @@ interface Live {
   shadow: THREE.Mesh;
   last: EnemyInstance | null;
   speed: number;
-  /** Materials swapped for clipped copies once it nears the gate. */
-  clipped: boolean;
-  /** Already walked through the gate (counted the hit once). */
+  /** Seconds into its entry at the gate (−1 = not there yet). */
+  enterT: number;
+  /** Blows already landed on the gate (bosses smash it before going in). */
+  smashes: number;
+  /** Its own fading copies of its materials, made when the entry starts. */
+  fading: THREE.MeshStandardMaterial[];
+  /** Already at the gate (no more footprints). */
   inside: boolean;
+  boss: "main" | "mini" | null;
   /** Where it was when it left the road to head for the gate. */
   approachFrom: THREE.Vector3 | null;
   /** World height it was scaled to. */
@@ -492,11 +497,103 @@ function Creatures({
   const blobMat = useMemo(() => new THREE.MeshBasicMaterial({ map: blobTexture(), color: "#000", transparent: true, opacity: 0.5, depthWrite: false }), []);
   const blobGeo = useMemo(() => new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), []);
   const portal3 = useMemo(() => loc(portal, 3), [portal]);
-  /** The gate plane in scene (pixel) space — what the clipped materials read. */
-  const clipScene = useMemo(() => new THREE.Plane(), []);
   const footTmp = useMemo(() => new THREE.Vector3(), []);
+  const entered = useRef(new Set<string>());
   const strides = useRef(new Map<string, { at: number; left: boolean; last: number }>());
   const strideSeen = useMemo(() => new Set<string>(), []);
+
+  /** Where a creature stands before the gate: further out the bigger it is. */
+  const standPoint = (gate: CastleState, h: number) => gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 4 + h * 0.22).setY(0);
+
+  const startEntry = (e: Live) => {
+    if (e.enterT >= 0) return;
+    e.enterT = 0;
+    e.inside = true;
+    e.fading = [];
+    e.obj.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      const swap = (mm: THREE.Material) => {
+        const c = mm.clone() as THREE.MeshStandardMaterial;
+        c.transparent = true;
+        c.userData.base = c.color ? c.color.clone() : null;
+        e.fading.push(c);
+        return c;
+      };
+      m.material = Array.isArray(m.material) ? m.material.map(swap) : swap(m.material);
+    });
+  };
+
+  /**
+   * One frame of a creature's entry. Bosses first smash the gate (two blows for a Mini-Boss,
+   * three for a Boss); then the creature steps in and comes apart into dark mist drawn in through
+   * the doorway. Returns true when it is gone.
+   */
+  const stepEntry = (e: Live, rawDt: number, gate: CastleState) => {
+    // never skip through the entry, even after a long frame
+    const dt = Math.min(rawDt, 1 / 20);
+    e.enterT += dt;
+    const blows = e.boss === "main" ? 3 : e.boss === "mini" ? 2 : 0;
+    const BLOW = 0.62;
+    const smashTime = blows * BLOW;
+    const melt = e.boss ? 1.6 : 1.0;
+    const stand = standPoint(gate, e.h);
+    const inward = gate.gatePlane.normal.clone().negate();
+    // face the gate
+    const face = Math.atan2(inward.x, inward.z);
+    const d = Math.atan2(Math.sin(face - e.obj.rotation.y), Math.cos(face - e.obj.rotation.y));
+    e.obj.rotation.y += d * Math.min(1, dt * 10);
+    const body = e.obj.children[0]!;
+    if (e.enterT < smashTime) {
+      // rear back and slam the gate
+      const ph = (e.enterT % BLOW) / BLOW;
+      body.rotation.x = ph < 0.55 ? -0.25 * Math.sin((ph / 0.55) * Math.PI * 0.5) : -0.25 + 0.75 * Math.sin(((ph - 0.55) / 0.45) * Math.PI * 0.5);
+      e.c.walk.timeScale = 0.15;
+      e.c.update(dt);
+      const n = Math.floor(e.enterT / BLOW);
+      if (n >= e.smashes && ph > 0.92) {
+        e.smashes = n + 1;
+        gate.struck();
+        const at = gate.gateFront.clone().setY(10);
+        fx.smoke.emit(at, { count: 14, color: "#7a7064", colorEnd: "#2a2622", size: 10, life: 1.1, speed: 40, up: 18, grow: 2, alpha: 0.6, radius: 6 });
+        fx.glow.emit(at, { count: 30, color: "#fff0c0", colorEnd: "#ff4a1a", size: 2.8, life: 0.7, speed: 80, up: 30, gravity: 120 });
+        fx.rings.ring(gate.gateFront.clone().setY(0.5), "#ffb070", 6, 60, 0.6);
+      }
+      e.obj.position.copy(stand);
+    } else {
+      // step in and come apart into the dark of the doorway
+      body.rotation.x *= 1 - Math.min(1, dt * 8);
+      const k = Math.min(1, (e.enterT - smashTime) / melt);
+      e.c.walk.timeScale = 0.7;
+      e.c.update(dt);
+      e.obj.position.copy(stand).lerp(gate.gateInside, k * 0.55);
+      e.obj.scale.setScalar(e.scale * (1 - 0.3 * k));
+      for (const m of e.fading) {
+        m.opacity = Math.max(0, 1 - Math.pow(k, 1.3));
+        const base = m.userData.base as THREE.Color | null;
+        if (base && m.color) m.color.copy(base).multiplyScalar(1 - 0.85 * k);
+      }
+      // mist peeling off the body and drawn in through the gate
+      const n = e.boss ? 3 : 2;
+      for (let i = 0; i < n; i++) {
+        const p = e.obj.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * e.h * 0.35, Math.random() * e.h * 0.85, (Math.random() - 0.5) * e.h * 0.35));
+        const toGate = gate.gateInside.clone().setY(e.h * 0.2).sub(p).normalize();
+        fx.smoke.emit(p, { count: 1, color: "#4a3a5e", colorEnd: "#1a1222", size: e.h * 0.08, life: 0.7, speed: 50, dir: toGate, spread: 0.12, grow: 1.4, alpha: 0.32, drag: 0.4 });
+        fx.glow.emit(p, { count: 1, color: "#e0c8ff", colorEnd: "#5a2a9a", size: 1.6, life: 0.6, speed: 60, dir: toGate, spread: 0.1, drag: 0.3 });
+      }
+      if (Math.random() < 0.6) fx.glow.emit(e.obj.position.clone().setY(e.h * 0.5), { count: 2, color: "#ffb07a", colorEnd: "#5a0a2a", size: 2.2, life: 0.6, speed: 30, dir: inward, spread: 0.4, up: 6 });
+      (e.shadow.material as THREE.MeshBasicMaterial).opacity = 0.5;
+      e.shadow.scale.setScalar(9 * (e.h / ENEMY_HEIGHT) * (1 - k));
+      if (k >= 1) {
+        // the last of it: a dull thud inside the walls
+        gate.struck();
+        fx.smoke.emit(gate.gateInside.clone().setY(e.h * 0.6), { count: e.boss ? 10 : 5, color: "#5a4c44", colorEnd: "#1e1814", size: e.h * 0.18, life: 1.5, speed: 12, up: 26, grow: 2.2, alpha: 0.35, radius: 5 });
+        return true;
+      }
+    }
+    e.shadow.position.set(e.obj.position.x, 0.2, e.obj.position.z);
+    return false;
+  };
 
   useFrame((_, dt) => {
     const g = group.current;
@@ -526,6 +623,8 @@ function Creatures({
         continue;
       }
       seen.add(en.id);
+      // already went in through the gate while the game still has it on the road: stays hidden, not redrawn
+      if (entered.current.has(en.id)) continue;
       let e = live.current.get(en.id);
       const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
       if (!e) {
@@ -540,7 +639,7 @@ function Creatures({
         shadow.renderOrder = 1;
         g.add(obj, shadow);
         const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
-        e = { c, obj, scale, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, clipped: false, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
+        e = { c, obj, scale, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -558,64 +657,35 @@ function Creatures({
         pos.y -= (1 - k) * ENEMY_HEIGHT * 0.9;
         e.obj.scale.setScalar(e.scale * (0.5 + 0.5 * k));
       }
-      // the last stretch: leave the road, curve round to the front of the gate and walk in
+      // the last stretch: leave the road and curve round to stand before the gate, facing it
       let yaw = worldDirectionToThreeYaw(en.direction);
       const remaining = roadLength - en.distanceTraveled;
-      if (gate && remaining < castleAt + APPROACH_LEAD) {
+      const nearCastle = remaining < castleAt + APPROACH_LEAD + 40 || Math.hypot(en.position.x - fortress.x, en.position.y - fortress.y) < 140;
+      if (nearCastle) anyNearGate = true;
+      if (gate && e.enterT < 0 && remaining < castleAt + APPROACH_LEAD) {
         if (!e.approachFrom) e.approachFrom = pos.clone();
         const t = Math.min(1, (castleAt + APPROACH_LEAD - remaining) / APPROACH_LEAD);
         const P0 = e.approachFrom;
-        const C = gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 45);
-        const E = gate.gateInside;
+        const S = standPoint(gate, e.h);
+        const C = S.clone().addScaledVector(gate.gatePlane.normal, 40);
         const u = 1 - t;
-        pos.set(
-          u * u * P0.x + 2 * u * t * C.x + t * t * E.x,
-          pos.y,
-          u * u * P0.z + 2 * u * t * C.z + t * t * E.z,
-        );
-        const tan = new THREE.Vector3(2 * u * (C.x - P0.x) + 2 * t * (E.x - C.x), 0, 2 * u * (C.z - P0.z) + 2 * t * (E.z - C.z));
+        pos.set(u * u * P0.x + 2 * u * t * C.x + t * t * S.x, pos.y, u * u * P0.z + 2 * u * t * C.z + t * t * S.z);
+        const tan = new THREE.Vector3(2 * u * (C.x - P0.x) + 2 * t * (S.x - C.x), 0, 2 * u * (C.z - P0.z) + 2 * t * (S.z - C.z));
         if (tan.lengthSq() > 1e-6) yaw = Math.atan2(tan.x, tan.z);
+        if (t >= 1) startEntry(e);
       }
-      e.obj.position.copy(pos);
-      e.shadow.position.set(pos.x, 0.2, pos.z);
-      const d = Math.atan2(Math.sin(yaw - e.obj.rotation.y), Math.cos(yaw - e.obj.rotation.y));
-      e.obj.rotation.y += d * Math.min(1, dt * 8);
-      e.c.walk.timeScale = en.slow ? 0.55 : 1.0;
-      e.c.update(dt);
-      const nearCastle = roadLength - en.distanceTraveled < castleAt + APPROACH_LEAD + 40 || Math.hypot(en.position.x - fortress.x, en.position.y - fortress.y) < 140;
-      if (nearCastle) anyNearGate = true;
-      // close to the castle the creature is cut by the gate's plane, so it vanishes as it walks in
-      if (nearCastle && gate && !e.clipped) {
-        e.clipped = true;
-        e.obj.traverse((o) => {
-          const m = o as THREE.Mesh;
-          if (!m.isMesh) return;
-          const mats = Array.isArray(m.material) ? m.material : [m.material];
-          const cloned = mats.map((mm) => {
-            const c = (mm as THREE.Material).clone();
-            c.clippingPlanes = [clipScene];
-            return c;
-          });
-          m.material = Array.isArray(m.material) ? cloned : cloned[0]!;
-        });
-      }
-      if (gate && nearCastle) {
-        const past = gate.gatePlane.distanceToPoint(pos) < 0;
-        e.shadow.visible = !past;
-        if (past && !e.inside) {
-          e.inside = true;
-          // it dies in there: it falls behind the gate, dust and a dark burst rise over the wall
-          e.c.fall();
-          const over = gate.gateInside.clone().setY(e.h * 0.9);
-          fx.smoke.emit(over, { count: en.boss ? 26 : 10, color: "#4a3e34", colorEnd: "#16120e", size: e.h * 0.35, life: 1.8, speed: 14, up: 30, grow: 2.6, alpha: 0.55, radius: 6 });
-          fx.glow.emit(over, { count: en.boss ? 40 : 14, color: "#ff9a6a", colorEnd: "#5a0a0a", size: 3.2, life: 0.9, speed: 50, up: 40, gravity: 80 });
-          gate.struck();
-          fx.glow.emit(gate.gateFront.clone().setY(10), { count: en.boss ? 60 : 24, color: "#fff0c0", colorEnd: "#ff4a1a", size: 3, life: 0.6, speed: 60, up: 24, gravity: 90 });
-          fx.rings.ring(gate.gateFront.clone().setY(0.5), "#ff5a2a", 4, 40, 0.5);
-        }
+      if (e.enterT >= 0 && gate) {
+        stepEntry(e, dt, gate);
+      } else {
+        e.obj.position.copy(pos);
+        e.shadow.position.set(pos.x, 0.2, pos.z);
+        const d = Math.atan2(Math.sin(yaw - e.obj.rotation.y), Math.cos(yaw - e.obj.rotation.y));
+        e.obj.rotation.y += d * Math.min(1, dt * 8);
+        e.c.walk.timeScale = en.slow ? 0.55 : 1.0;
+        e.c.update(dt);
       }
       // footprints: a print wherever a foot comes down (not while climbing out of the rift or once through the gate)
-      if (e.born >= 1 && !e.inside && e.c.feet.length === 2 && g.parent) {
+      if (e.born >= 1 && e.enterT < 0 && e.c.feet.length === 2 && g.parent) {
         e.obj.updateMatrixWorld(true);
         for (let k = 0; k < 2; k++) {
           const st = e.feet[k]!;
@@ -642,20 +712,28 @@ function Creatures({
         strides.current.delete(id);
       }
     strideSeen.clear();
+    for (const e of live.current.values()) if (e.enterT >= 0) anyNearGate = true;
     if (gate && anyNearGate) gate.holdOpenUntil = performance.now() + 1500;
-    if (gate && g.parent) clipScene.copy(gate.gatePlane).applyMatrix4(g.parent.matrixWorld);
 
     for (const [id, e] of live.current) {
       if (seen.has(id)) continue;
-      if (e.gone < 0) {
-        e.gone = 0;
-        const reached = !!e.last && (roadLength - e.last.distanceTraveled < castleAt + 40 || e.inside);
-        if (reached) {
-          // it walked in through the gate (and was cut away by it); nothing left to show
-          if (!e.inside && gate) gate.struck();
+      if (e.enterT >= 0 || (e.gone < 0 && e.last && roadLength - e.last.distanceTraveled < castleAt + 40)) {
+        // it reached the castle: finish its entry at the gate, whatever the game has already counted
+        e.gone = Math.max(e.gone, 0);
+        if (!gate) {
           remove(id, e);
           continue;
-        } else {
+        }
+        if (e.enterT < 0) {
+          e.obj.position.copy(standPoint(gate, e.h));
+          startEntry(e);
+        }
+        if (stepEntry(e, dt, gate)) remove(id, e);
+        continue;
+      }
+      if (e.gone < 0) {
+        e.gone = 0;
+        {
           e.mode = "dying";
           fx.death(e.obj.position.clone().add(new THREE.Vector3(0, ENEMY_HEIGHT * 0.4, 0)), !!e.last?.boss);
           e.c.fall();
@@ -672,10 +750,18 @@ function Creatures({
       }
     }
 
+    for (const id of entered.current)
+      if (!seen.has(id)) {
+        entered.current.delete(id);
+        hidden.delete(id);
+      }
+
     function remove(id: string, e: Live) {
       g!.remove(e.obj, e.shadow);
+      for (const m of e.fading) m.dispose();
       live.current.delete(id);
-      hidden!.delete(id);
+      if (e.enterT >= 0 && seen.has(id)) entered.current.add(id);
+      else hidden!.delete(id);
     }
   });
 

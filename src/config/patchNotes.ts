@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v148",
+    dateIso: "2026-11-16",
+    category: "BOSSES",
+    title: {
+      en: "Bosses Break Down the Gate",
+      ptBR: "Chefes Arrombam o Portão",
+    },
+    description: {
+      en: "Elites, Mini-Bosses and Bosses that reach the castle no longer squeeze through a gate far too small for them. Each one stops before the gate and goes in its own way.",
+      ptBR: "Elites, Mini-Chefes e Chefes que chegam ao castelo não se espremem mais por um portão pequeno demais para eles. Cada um para diante do portão e entra do seu jeito.",
+    },
+    highlights: [
+      {
+        en: "A Boss strikes the gate three times and a Mini-Boss twice. Every blow shakes the castle, throws sparks and stone dust and sends a shockwave along the ground.",
+        ptBR: "O Chefe golpeia o portão três vezes e o Mini-Chefe duas. Cada golpe faz o castelo tremer, solta faíscas e pó de pedra e espalha uma onda de impacto pelo chão.",
+      },
+      {
+        en: "Then it darkens and comes apart into a violet mist drawn in through the doorway, ending in a dull blow inside the walls.",
+        ptBR: "Depois ele escurece e se desfaz numa névoa roxa puxada para dentro pela porta, e termina com um golpe surdo atrás das muralhas.",
+      },
+      {
+        en: "Elites walk straight up to the open gate and dissolve as they step in.",
+        ptBR: "Os Elites vão direto até o portão aberto e se desfazem ao entrar.",
+      },
+    ],
+  },
+  {
     id: "v147",
     dateIso: "2026-11-16",
     category: "CASTLE",
