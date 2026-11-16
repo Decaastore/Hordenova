@@ -17,7 +17,9 @@ import { buildTerrain, type TerrainData } from "./terrain";
 import { buildScenery } from "./vegetation";
 import { buildTowerModel } from "./models/towerModel";
 import { buildCastleModel } from "./models/castleModel";
-import { worldDirToYaw, worldToThree } from "./coords";
+import { threeToWorld, worldDirToYaw, worldToThree } from "./coords";
+import type { MapPointerBridge } from "@/rendering/CanvasRenderer";
+import type { MutableRefObject } from "react";
 
 /**
  * CAMPO DE BATALHA 3D (prévia) — the battlefield rendered as a real-time 3D
@@ -32,17 +34,19 @@ const TOWER_COLORS: Record<string, string> = { IRONWOOD: "#ffd27a", INFERNO: "#f
 // ----------------------------------------------------------------- camera
 function CameraRig() {
   const { camera, size, scene } = useThree();
-  if (import.meta.env.DEV) (window as unknown as { __b3dScene?: THREE.Scene }).__b3dScene = scene;
+  if (import.meta.env.DEV) Object.assign(window, { __b3dScene: scene, __b3dCamera: camera });
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera;
-    cam.fov = 30;
+    cam.fov = 24;
     cam.aspect = size.width / size.height;
     cam.near = 20;
     cam.far = 6000;
-    // Fit the whole 1000×600 field: look at its centre from the south at a
-    // ~52° pitch, then pull back until every corner is on screen.
-    const target = new THREE.Vector3(0, 0, 18);
-    const dir = new THREE.Vector3(0, Math.sin(THREE.MathUtils.degToRad(42)), Math.cos(THREE.MathUtils.degToRad(42)));
+    // Fit the whole 1000×600 field: look down at its centre from high in the
+    // south (~64° pitch, narrow lens) so it reads like a classic tower
+    // defence board, then pull back until every corner is on screen.
+    const target = new THREE.Vector3(0, 0, 8);
+    const pitch = THREE.MathUtils.degToRad(64);
+    const dir = new THREE.Vector3(0, Math.sin(pitch), Math.cos(pitch));
     const corners = [
       [-WORLD_SIZE.width / 2, -WORLD_SIZE.height / 2],
       [WORLD_SIZE.width / 2, -WORLD_SIZE.height / 2],
@@ -59,7 +63,7 @@ function CameraRig() {
       cam.updateProjectionMatrix();
       const fits = corners.every((c) => {
         const p = c.clone().project(cam);
-        return Math.abs(p.x) <= 0.98 && Math.abs(p.y) <= 0.98;
+        return Math.abs(p.x) <= 0.97 && Math.abs(p.y) <= 0.96;
       });
       if (fits) hi = mid;
       else lo = mid;
@@ -149,6 +153,9 @@ function Lights({ quality }: { quality: Quality }) {
   );
 }
 
+/** World position under the pointer on the 3D ground (null when off the field). Shared by the pointer bridge and the pads. */
+const hoverWorld: { current: { x: number; y: number } | null } = { current: null };
+
 function TowerPads({ pads, terrain, color, glow }: { pads: readonly { x: number; y: number }[]; terrain: TerrainData; color: string; glow: string }) {
   const geo = useMemo(() => {
     const g = new THREE.CylinderGeometry(22, 25, 4, 10, 1);
@@ -157,12 +164,24 @@ function TowerPads({ pads, terrain, color, glow }: { pads: readonly { x: number;
   }, []);
   const mat = useMemo(() => new THREE.MeshStandardMaterial({ color, roughness: 0.85, metalness: 0.05 }), [color]);
   const ring = useMemo(() => new THREE.MeshStandardMaterial({ color: "#000", emissive: new THREE.Color(glow), emissiveIntensity: 1.6, transparent: true, opacity: 0.85 }), [glow]);
+  const ringHot = useMemo(() => new THREE.MeshStandardMaterial({ color: "#000", emissive: new THREE.Color(glow), emissiveIntensity: 7, transparent: true, opacity: 1 }), [glow]);
+  const rings = useRef<(THREE.Mesh | null)[]>([]);
+  useFrame(() => {
+    const h = hoverWorld.current;
+    pads.forEach((p, i) => {
+      const r = rings.current[i];
+      if (!r) return;
+      const hot = !!h && Math.hypot(h.x - p.x, h.y - p.y) < 30;
+      r.material = hot ? ringHot : ring;
+      r.scale.setScalar(hot ? 1.12 : 1);
+    });
+  });
   return (
     <>
       {pads.map((p, i) => (
         <group key={i} position={worldToThree(p, terrain.heightAt(p))}>
           <mesh geometry={geo} material={mat} castShadow receiveShadow />
-          <mesh rotation-x={-Math.PI / 2} position-y={3.1} material={ring}>
+          <mesh ref={(m) => (rings.current[i] = m)} rotation-x={-Math.PI / 2} position-y={3.1} material={ring}>
             <ringGeometry args={[17, 18.2, 40]} />
           </mesh>
         </group>
@@ -175,7 +194,7 @@ function Castle({ biomeId, position, terrain }: { biomeId: string; position: { x
   const model = useMemo(() => buildCastleModel(biomeId, 1), [biomeId]);
   const anchor = worldToThree(position, terrain.heightAt(position));
   return (
-    <group position={anchor} scale={1.55} rotation-y={-0.5}>
+    <group position={anchor} scale={1.2} rotation-y={-0.5}>
       <primitive object={model.root} />
       <pointLight color="#ffa050" intensity={6000} distance={160} decay={2} position={[0, 30, 40]} />
     </group>
@@ -230,7 +249,7 @@ function Towers({ engine, terrain }: { engine: GameEngine; terrain: TerrainData 
         const model = towerModel(t.type, stage, t.equippedSkinId ?? "base");
         const obj = model.root.clone(true);
         const turret = obj.children[model.root.children.indexOf(model.turret)] ?? null;
-        obj.scale.setScalar(TOWER_PRESENTATION_SCALE * 1.55);
+        obj.scale.setScalar(TOWER_PRESENTATION_SCALE * 1.9);
         obj.position.copy(worldToThree(t.position, terrain.heightAt(t.position) + 2.5));
         g.add(obj);
         entry = { key, obj, turret, aim: 0 };
@@ -252,7 +271,7 @@ function Towers({ engine, terrain }: { engine: GameEngine; terrain: TerrainData 
 // ----------------------------------------------------------------- enemies
 const PLACEHOLDER_BODIES = ["/models/enemies/Puglin.glb", "/models/enemies/Imp.glb"] as const;
 const ANIMATION_LIBRARY = "/models/enemies/anims.glb";
-const ENEMY_HEIGHT = 34; // world units — big enough that a creature reads as a creature
+const ENEMY_HEIGHT = 46; // world units — big enough that a creature reads as a creature
 
 interface LiveEnemy {
   obj: THREE.Object3D;
@@ -427,6 +446,54 @@ function FrameRateGuard({ quality, onSlow }: { quality: Quality; onSlow: () => v
   return null;
 }
 
+/**
+ * Turns a click / tap / hover on the 3D ground into a world position and hands
+ * it to the 2D map's own handlers, so building, selecting and cancelling work
+ * exactly as on the flat map.
+ */
+function PointerBridge({ bridge }: { bridge?: MutableRefObject<MapPointerBridge | null> }) {
+  const { camera, gl } = useThree();
+  useEffect(() => {
+    const el = gl.domElement;
+    const ray = new THREE.Raycaster();
+    const ndc = new THREE.Vector2();
+    const ground = new THREE.Plane(new THREE.Vector3(0, 1, 0), -1);
+    const hit = new THREE.Vector3();
+    const toWorld = (e: PointerEvent | MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+      ray.setFromCamera(ndc, camera);
+      if (!ray.ray.intersectPlane(ground, hit)) return null;
+      const w = threeToWorld(hit);
+      if (w.x < -40 || w.y < -40 || w.x > WORLD_SIZE.width + 40 || w.y > WORLD_SIZE.height + 40) return null;
+      return w;
+    };
+    const move = (e: PointerEvent) => {
+      const w = toWorld(e);
+      hoverWorld.current = w;
+      bridge?.current?.hover(w);
+    };
+    const leave = () => {
+      hoverWorld.current = null;
+      bridge?.current?.hover(null);
+    };
+    const click = (e: MouseEvent) => {
+      const w = toWorld(e);
+      if (w) bridge?.current?.click(w);
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerleave", leave);
+    el.addEventListener("click", click);
+    el.style.cursor = "pointer";
+    return () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerleave", leave);
+      el.removeEventListener("click", click);
+    };
+  }, [camera, gl, bridge]);
+  return null;
+}
+
 export function pickAutoQuality(): Quality {
   if (typeof window === "undefined") return "low";
   const forced = new URLSearchParams(window.location.search).get("q");
@@ -436,7 +503,15 @@ export function pickAutoQuality(): Quality {
   return coarse || cores <= 4 ? "low" : "high";
 }
 
-export const Battlefield3D = memo(function Battlefield3D({ engine, quality: initial }: { engine: GameEngine; quality?: Quality }) {
+export const Battlefield3D = memo(function Battlefield3D({
+  engine,
+  quality: initial,
+  pointerBridge,
+}: {
+  engine: GameEngine;
+  quality?: Quality;
+  pointerBridge?: MutableRefObject<MapPointerBridge | null>;
+}) {
   const [quality, setQuality] = useState<Quality>(() => initial ?? pickAutoQuality());
   return (
     <Canvas
@@ -444,9 +519,10 @@ export const Battlefield3D = memo(function Battlefield3D({ engine, quality: init
       dpr={quality === "high" ? [1, 1.5] : 1}
       gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
       camera={{ fov: 30, position: [0, 900, 700] }}
-      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+      style={{ position: "absolute", inset: 0 }}
     >
       <CameraRig />
+      <PointerBridge bridge={pointerBridge} />
       <FrameRateGuard quality={quality} onSlow={() => setQuality("low")} />
       <World engine={engine} quality={quality} />
       <EffectComposer multisampling={0}>

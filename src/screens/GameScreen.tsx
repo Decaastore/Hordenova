@@ -18,7 +18,7 @@ import { isWebGLAvailable } from "@/rendering3d/webglSupport";
 import { Enemy3DErrorBoundary } from "@/rendering3d/Enemy3DErrorBoundary";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { audioManager } from "@/audio/AudioManager";
-import { CanvasRenderer } from "@/rendering/CanvasRenderer";
+import { CanvasRenderer, type MapPointerBridge } from "@/rendering/CanvasRenderer";
 import { HUD } from "@/ui/HUD";
 import { TowerPalette } from "@/ui/TowerPalette";
 import { TowerInfoPanel } from "@/ui/TowerInfoPanel";
@@ -162,6 +162,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   // gives a 3D body — cleared on any world-layer failure below so a crash
   // never leaves a tower's 2D sprite permanently hidden.
   const hidden3DTowerIdsRef = useRef<Set<string>>(new Set());
+  const mapPointerBridgeRef = useRef<MapPointerBridge | null>(null);
 
   // BALANCEAMENTO DEFINITIVO spec section 6/8 — Tower Repositioning's own
   // small state machine: "picking" a destination on the map, then either
@@ -499,6 +500,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           hidden3DEnemyIds={hidden3DEnemyIdsRef}
           hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
+          pointerBridge={mapPointerBridgeRef}
           placingTower={placingTower}
           previewLabels={{
             highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
@@ -506,9 +508,9 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           }}
         />
         {PREVIEW_3D && (
-          <div style={{ position: "absolute", inset: 0, zIndex: 1, pointerEvents: "none" }} data-testid="battlefield-3d">
+          <div style={{ position: "absolute", inset: 0, zIndex: 1 }} data-testid="battlefield-3d">
             <Suspense fallback={null}>
-              <Battlefield3D engine={engine} />
+              <Battlefield3D engine={engine} pointerBridge={mapPointerBridgeRef} />
             </Suspense>
           </div>
         )}

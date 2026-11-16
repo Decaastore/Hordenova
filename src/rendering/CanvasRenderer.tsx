@@ -8,7 +8,7 @@ import { getMapDecorations } from "./mapDecorations";
 import { drawCity } from "./citySprites";
 import { getCityPlots } from "@/data/cityPlots";
 import { builtBuildings, type CityBuildingId } from "@/config/city";
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useRef, type MutableRefObject, type RefObject } from "react";
 import type { GameEngine, RenderSnapshot } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
 import type { CombatVfxEvent } from "@/engine/CombatVfxEvents";
@@ -119,6 +119,18 @@ interface CanvasRendererProps {
    * established.
    */
   worldLayerActive?: boolean;
+  /**
+   * CAMPO DE BATALHA 3D (prévia) — filled with this canvas's own click and
+   * hover handling, keyed by world position, so a layer drawn on top (the 3D
+   * battlefield) can turn a tap on its ground into exactly the same action a
+   * click here would take.
+   */
+  pointerBridge?: MutableRefObject<MapPointerBridge | null>;
+}
+
+export interface MapPointerBridge {
+  click(world: Vector2): void;
+  hover(world: Vector2 | null): void;
 }
 
 interface PrevEnemyState {
@@ -207,6 +219,7 @@ export function CanvasRenderer({
   worldLayerActive = false,
   placingTower = null,
   previewLabels,
+  pointerBridge,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
@@ -714,19 +727,11 @@ export function CanvasRenderer({
   };
 
   const handleClick = (event: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
-    const { scale, offsetX, offsetY } = transformRef.current;
+    const worldPoint = toWorld(event);
+    if (worldPoint) handleWorldClick(worldPoint);
+  };
 
-    const canvasX = (event.clientX - rect.left) * dpr;
-    const canvasY = (event.clientY - rect.top) * dpr;
-    const worldPoint: Vector2 = {
-      x: (canvasX - offsetX) / scale,
-      y: (canvasY - offsetY) / scale,
-    };
-
+  function handleWorldClick(worldPoint: Vector2) {
     const snapshot = latestSnapshotRef.current;
     if (!snapshot) return;
 
@@ -745,7 +750,14 @@ export function CanvasRenderer({
     }
 
     onBackgroundClick();
-  };
+  }
+
+  if (pointerBridge) {
+    pointerBridge.current = {
+      click: handleWorldClick,
+      hover: (p) => (hoverWorldRef.current = p),
+    };
+  }
 
   return (
     <canvas
