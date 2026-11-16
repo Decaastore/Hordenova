@@ -79,6 +79,9 @@ import type { DualGemPrice } from "@/config/gemsEconomy";
 import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 const Battlefield3D = lazy(() => import("@/battlefield3d/Battlefield3D").then((m) => ({ default: m.Battlefield3D })));
 const PREVIEW_3D = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "3d";
+/** HÍBRIDO (prévia) — 2D map with a live 3D castle and creatures on top (?view=hybrid). */
+const PREVIEW_HYBRID = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("view") === "hybrid";
+const HybridOverlay = lazy(() => import("@/hybrid3d/HybridOverlay").then((m) => ({ default: m.HybridOverlay })));
 const Enemy3DOverlay = lazy(() => import("@/rendering3d/Enemy3DOverlay").then((m) => ({ default: m.Enemy3DOverlay })));
 
 // MUNDO 3D — same lazy/WebGL-gated pattern as the enemy overlay above, for
@@ -147,7 +150,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   // "never end up with no enemies" fallback contract: once disabled for
   // this session, 2D enemy rendering (already the default when this ref
   // stays empty) takes over permanently instead of retrying.
-  const [enable3DEnemies, setEnable3DEnemies] = useState(() => isWebGLAvailable());
+  const [enable3DEnemies, setEnable3DEnemies] = useState(() => !PREVIEW_HYBRID && isWebGLAvailable());
   const hidden3DEnemyIdsRef = useRef<Set<string>>(new Set());
 
   // MUNDO 3D — FASE 1: background terrain/atmosphere layer, independent
@@ -505,12 +508,18 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           hidden3DTowerIds={hidden3DTowerIdsRef}
           worldLayerActive={enableWorldLayer}
           pointerBridge={mapPointerBridgeRef}
+          hideCastle={PREVIEW_HYBRID}
           placingTower={placingTower}
           previewLabels={{
             highGround: t("deploy.highGround", { pct: Math.round((HIGH_GROUND_RANGE_MULT - 1) * 100) }),
             altar: t("deploy.runeAltar", { pct: Math.round((RUNE_ALTAR_DAMAGE_MULT - 1) * 100) }),
           }}
         />
+        {PREVIEW_HYBRID && (
+          <Suspense fallback={null}>
+            <HybridOverlay engine={engine} hiddenIds={hidden3DEnemyIdsRef} />
+          </Suspense>
+        )}
         {PREVIEW_3D && (
           <div style={{ position: "absolute", inset: 0 }} data-testid="battlefield-3d">
             <Suspense fallback={null}>

@@ -62,10 +62,11 @@ const VERT = /* glsl */ `
   attribute vec4 aColor;
   varying vec4 vColor;
   uniform float uScale;
+  uniform float uOrtho;
   void main() {
     vColor = aColor;
     vec4 mv = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uScale / -mv.z;
+    gl_PointSize = uOrtho > 0.5 ? aSize * uScale : aSize * uScale / -mv.z;
     gl_Position = projectionMatrix * mv;
   }
 `;
@@ -95,7 +96,7 @@ class ParticlePool {
   private c1 = new Float32Array(MAX_PARTICLES * 3);
   private a0 = new Float32Array(MAX_PARTICLES);
   private next = 0;
-  readonly uniforms: { uScale: { value: number }; uMap: { value: THREE.Texture } };
+  readonly uniforms: { uScale: { value: number }; uOrtho: { value: number }; uMap: { value: THREE.Texture } };
 
   constructor(additive: boolean, map: THREE.Texture) {
     const geo = new THREE.BufferGeometry();
@@ -106,7 +107,7 @@ class ParticlePool {
     geo.setAttribute("aColor", new THREE.BufferAttribute(this.col, 4).setUsage(THREE.DynamicDrawUsage));
     geo.setAttribute("aSize", new THREE.BufferAttribute(this.siz, 1).setUsage(THREE.DynamicDrawUsage));
     geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e5);
-    this.uniforms = { uScale: { value: 600 }, uMap: { value: map } };
+    this.uniforms = { uScale: { value: 600 }, uOrtho: { value: 0 }, uMap: { value: map } };
     const mat = new THREE.ShaderMaterial({
       vertexShader: VERT,
       fragmentShader: FRAG,
@@ -321,6 +322,14 @@ export class Effects {
     const s = px / (2 * Math.tan(THREE.MathUtils.degToRad(fovDeg) / 2));
     this.glow.uniforms.uScale.value = s;
     this.smoke.uniforms.uScale.value = s;
+  }
+
+  /** For an orthographic camera: how many drawing-buffer pixels one world unit covers. */
+  setOrthoScale(pxPerUnit: number) {
+    for (const p of [this.glow, this.smoke]) {
+      p.uniforms.uOrtho.value = 1;
+      p.uniforms.uScale.value = pxPerUnit;
+    }
   }
 
   update(dt: number) {

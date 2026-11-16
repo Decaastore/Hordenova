@@ -666,25 +666,31 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const doorMat = new THREE.MeshStandardMaterial({ map: wood.map, bumpMap: wood.bump, bumpScale: 1.5, roughness: 0.85 });
     const door = new THREE.Mesh(new THREE.PlaneGeometry(aw * 2, ah + aw * 0.9), doorMat);
     door.position.set(0, (ah + aw * 0.9) / 2, frontZ - gd / 2 + 3.2);
+    door.name = "gateDoor";
     root.add(door);
+    // the portcullis bars live in their own group so a live renderer can raise it
+    const portcullis = new THREE.Group();
+    portcullis.name = "portcullis";
+    root.add(portcullis);
     const gridTop = ah + aw - 1;
     const gridBottom = TIER >= 3 ? 2 : 7;
     for (let i = -2; i <= 2; i++) {
       const bar = new THREE.Mesh(new THREE.BoxGeometry(0.7, gridTop - gridBottom, 0.7), ironMat);
       bar.position.set(i * 2.4, (gridTop + gridBottom) / 2, frontZ + 2.2 + gd / 2 - 3);
-      root.add(bar);
+      portcullis.add(bar);
     }
     for (let j = 0; j < 4; j++) {
       const yb = gridBottom + 1 + j * ((gridTop - gridBottom - 2) / 3);
       const bar = new THREE.Mesh(new THREE.BoxGeometry(aw * 2 - 0.6, 0.6, 0.6), ironMat);
       bar.position.set(0, yb, frontZ + 2.2 + gd / 2 - 3);
-      root.add(bar);
+      portcullis.add(bar);
     }
     // Keystone crystal (the castle's magic core) above the arch.
     const coreMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(D.core), emissive: new THREE.Color(D.core), emissiveIntensity: 2.2, roughness: 0.2, metalness: 0.1 });
     const core = new THREE.Mesh(new THREE.OctahedronGeometry(2.4, 0), coreMat);
     core.position.set(0, ah + aw + 3.8, frontZ + 2.2 + gd / 2 - 1.4);
     core.scale.set(0.8, 1.25, 0.8);
+    core.name = "core";
     root.add(core);
     anchors.core = core.position.clone();
     // Gatehouse parapet.

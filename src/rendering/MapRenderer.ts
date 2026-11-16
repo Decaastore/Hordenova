@@ -996,7 +996,7 @@ export function drawPathEndpoints(
    * to false, so every existing caller (main menu's cinematic fortress,
    * any test) is pixel-identical to before this param existed.
    */
-  skipCastleBody = false,
+  skipCastleBody: boolean | "all" = false,
   /**
    * Gameplay only: draw the ground rift enemies climb out of (at the road's
    * start, see riftPortal.ts) instead of the classic floating portal.
@@ -1010,6 +1010,8 @@ export function drawPathEndpoints(
   else drawMagicPortal(ctx, { x: start.x + startDir.x * ENDPOINT_INSET, y: start.y + startDir.y * ENDPOINT_INSET }, timeMs);
 
   const { position: fortressPos } = getFortressAnchor(path);
+  // HÍBRIDO (prévia) — "all": a live 3D castle stands here with its own fire, smoke and banners, so nothing of the 2D fortress is drawn.
+  if (skipCastleBody === "all") return;
   drawFortress(ctx, fortressPos, biome, timeMs, 1, 0, hpPercent, null, skipCastleBody);
 }
 

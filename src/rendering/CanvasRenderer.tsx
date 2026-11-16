@@ -126,6 +126,8 @@ interface CanvasRendererProps {
    * click here would take.
    */
   pointerBridge?: MutableRefObject<MapPointerBridge | null>;
+  /** HÍBRIDO (prévia) — a live 3D castle is drawn over the map, so skip the whole 2D fortress. */
+  hideCastle?: boolean;
 }
 
 export interface MapPointerBridge {
@@ -220,6 +222,7 @@ export function CanvasRenderer({
   placingTower = null,
   previewLabels,
   pointerBridge,
+  hideCastle = false,
 }: CanvasRendererProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const transformRef = useRef<Transform>({ scale: 1, offsetX: 0, offsetY: 0 });
@@ -233,6 +236,8 @@ export function CanvasRenderer({
   /** Pointer position in world units (null when the pointer is off the map). */
   const hoverWorldRef = useRef<Vector2 | null>(null);
   const worldLayerActiveRef = useRef(worldLayerActive);
+  const hideCastleRef = useRef(hideCastle);
+  hideCastleRef.current = hideCastle;
   worldLayerActiveRef.current = worldLayerActive;
 
   useEffect(() => {
@@ -482,7 +487,7 @@ export function CanvasRenderer({
       const cityState = { built: cityBuilt, burning: hud.city.burning, raisedAt: cityRaisedAt };
       const castleBaseY = getFortressAnchor(roadPath).position.y;
       drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, false);
-      drawPathEndpoints(ctx, roadPath, biome, timestamp, castleHpPercent, false, { emergingIds, rimBaked: groundBake !== null });
+      drawPathEndpoints(ctx, roadPath, biome, timestamp, castleHpPercent, hideCastleRef.current ? "all" : false, { emergingIds, rimBaked: groundBake !== null });
       drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, true);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
@@ -612,6 +617,8 @@ export function CanvasRenderer({
       // extra frame.
       deathAnimations = deathAnimations.filter((d) => timestamp - d.startTimestamp < d.totalMs);
       for (const anim of deathAnimations) {
+        // a creature drawn by a 3D layer plays its own fall there
+        if (hidden3DEnemyIds?.current?.has(anim.enemy.id)) continue;
         const progress = Math.min(1, (timestamp - anim.startTimestamp) / anim.totalMs);
         const eased = 1 - Math.pow(1 - progress, 2);
         // MORTES COM IMPACTO — the body is thrown back off its own heading

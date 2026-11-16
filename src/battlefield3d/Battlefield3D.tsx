@@ -4,7 +4,6 @@ import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js"
 import { EffectComposer, Bloom, N8AO, Vignette, ToneMapping, SMAA } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
-import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { GameEngine } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
@@ -23,6 +22,7 @@ import { buildTowerModel } from "./models/towerModel";
 import { buildCastleModel } from "./models/castleModel";
 import { threeToWorld, worldDirToYaw, worldToThree } from "./coords";
 import { Effects } from "./fx";
+import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "./creatures";
 import { buildProps } from "./props";
 
 /**
@@ -812,15 +812,11 @@ function Towers({ engine, terrain, fx }: { engine: GameEngine; terrain: TerrainD
 }
 
 // ----------------------------------------------------------------- enemies
-const PLACEHOLDER_BODIES = ["/models/enemies/Puglin.glb", "/models/enemies/Imp.glb"] as const;
-const ANIMATION_LIBRARY = "/models/enemies/anims.glb";
-const ENEMY_HEIGHT = 38; // world units — big enough that a creature reads as a creature
+const ENEMY_HEIGHT = 56; // world units — big enough that a creature reads as a creature
 
 interface LiveEnemy {
+  c: Creature;
   obj: THREE.Object3D;
-  mixer: THREE.AnimationMixer;
-  walk: THREE.AnimationAction;
-  death: THREE.AnimationAction | null;
   dyingFor: number;
   scale: number;
   born: number;
@@ -844,25 +840,8 @@ function Enemies({
   fortress: { x: number; y: number };
   portal: { x: number; y: number };
 }) {
-  const [a, b, anims] = useLoader(GLTFLoader, [PLACEHOLDER_BODIES[0], PLACEHOLDER_BODIES[1], ANIMATION_LIBRARY]) as [GLTF, GLTF, GLTF];
-  const bodies = useMemo(() => {
-    return [a.scene, b.scene].map((scene) => {
-      scene.traverse((o) => {
-        const mesh = o as THREE.Mesh;
-        if (mesh.isMesh) {
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          mesh.frustumCulled = false;
-        }
-      });
-      const box = new THREE.Box3().setFromObject(scene);
-      return { scene, height: box.max.y - box.min.y };
-    });
-  }, [a, b]);
-  if (!anims) throw new Error("animation library missing");
-
-  const walkClip = anims.animations.find((c) => c.name === "Walk_Loop") ?? anims.animations[0]!;
-  const deathClip = anims.animations.find((c) => c.name === "Death01") ?? null;
+  const gltfs = useLoader(GLTFLoader, CREATURE_URLS) as GLTF[];
+  const kits = useMemo(() => prepareCreatures(gltfs), [gltfs]);
   const group = useRef<THREE.Group>(null);
   const live = useRef(new Map<string, LiveEnemy>());
   const last = useRef(new Map<string, EnemyInstance>());
@@ -883,27 +862,17 @@ function Enemies({
       last.current.set(en.id, en);
       let e = live.current.get(en.id);
       if (!e) {
-        const body = bodies[(en.type.charCodeAt(0) + en.type.length) % bodies.length]!;
-        const obj = cloneSkinned(body.scene);
-        const mixer = new THREE.AnimationMixer(obj);
-        const walk = mixer.clipAction(walkClip);
-        walk.time = Math.random() * walkClip.duration;
-        walk.play();
-        const death = deathClip ? mixer.clipAction(deathClip) : null;
-        if (death) {
-          death.setLoop(THREE.LoopOnce, 1);
-          death.clampWhenFinished = true;
-        }
         const tier = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
-        const scale = (ENEMY_HEIGHT * tier) / body.height;
-        obj.scale.setScalar(scale);
+        const c = new Creature(kits[creatureFor(en.type, !!en.boss)], ENEMY_HEIGHT * tier * heightFactor(en.type));
+        const obj = c.obj;
+        const scale = c.scale;
         const shadow = new THREE.Mesh(blobGeo, blobMat);
         shadow.scale.setScalar(8 * tier);
         shadow.renderOrder = 3;
         g.add(obj, shadow);
         // only enemies that start at the rift crawl out of it
         const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
-        e = { obj, mixer, walk, death, dyingFor: -1, scale, born: fresh ? 0 : 1, boss: !!en.boss, shadow };
+        e = { c, obj, dyingFor: -1, scale, born: fresh ? 0 : 1, boss: !!en.boss, shadow };
         live.current.set(en.id, e);
         if (fresh) {
           fx.glow.emit(portal3.clone(), { count: e.boss ? 60 : 14, color: "#ffffff", colorEnd: "#8a3aff", size: 4, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -924,8 +893,8 @@ function Enemies({
       const yaw = worldDirToYaw(en.direction);
       const d = Math.atan2(Math.sin(yaw - e.obj.rotation.y), Math.cos(yaw - e.obj.rotation.y));
       e.obj.rotation.y += d * Math.min(1, dt * 8);
-      e.walk.timeScale = en.slow ? 0.55 : 1.1;
-      e.mixer.update(dt);
+      e.c.walk.timeScale = en.slow ? 0.55 : 1.0;
+      e.c.update(dt);
       const tierK = en.boss ? (en.boss.isMainBoss ? 2.1 : 1.6) : en.elite ? 1.3 : 1;
       const headY = pos.y + ENEMY_HEIGHT * tierK * (e.obj.scale.x / e.scale) + 6;
       enemyHeads.set(en.id, new THREE.Vector3(pos.x, headY, pos.z));
@@ -942,13 +911,11 @@ function Enemies({
         const lastPos = last.current.get(id)?.position;
         const reachedCastle = !!lastPos && Math.hypot(lastPos.x - fortress.x, lastPos.y - fortress.y) < 110;
         if (!reachedCastle) fx.death(e.obj.position.clone().add(new THREE.Vector3(0, ENEMY_HEIGHT * 0.4, 0)), e.boss);
-        if (e.death && !reachedCastle) {
-          e.walk.fadeOut(0.1);
-          e.death.reset().fadeIn(0.1).play();
-        } else e.dyingFor = 99;
+        if (!reachedCastle) e.c.fall();
+        else e.dyingFor = 99;
       }
       e.dyingFor += dt;
-      e.mixer.update(dt);
+      e.c.update(dt);
       if (e.dyingFor > 1.6) {
         e.obj.position.y -= dt * 12;
         (e.shadow.material as THREE.MeshBasicMaterial).opacity = 0.55;
