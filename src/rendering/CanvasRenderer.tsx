@@ -529,9 +529,8 @@ export function CanvasRenderer({
         // currently rendering a 3D body for skips its 2D sprite here — the
         // range circle below is drawn unconditionally regardless, so
         // selection feedback is never lost for it.
-        if (!hidden3DTowerIds?.current?.has(tower.id)) {
-          drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs);
-        }
+        // a 3D layer drawing this tower's body still leaves its ring, level badge and mana bar to the 2D map
+        drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs, false, !!hidden3DTowerIds?.current?.has(tower.id));
         if (tower.id === snapshot.selectedTowerId) {
           drawRangeCircle(ctx, tower.position, getTowerStats(tower).range);
         }

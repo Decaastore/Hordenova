@@ -532,7 +532,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             }}
           >
             <Suspense fallback={null}>
-              <HybridOverlay engine={engine} hiddenIds={hidden3DEnemyIdsRef} />
+              <HybridOverlay engine={engine} hiddenIds={hidden3DEnemyIdsRef} hiddenTowerIds={hidden3DTowerIdsRef} />
             </Suspense>
           </Enemy3DErrorBoundary>
         )}

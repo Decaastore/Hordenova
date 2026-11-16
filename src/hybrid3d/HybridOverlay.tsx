@@ -2,6 +2,7 @@ import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNo
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
 import { GLTFLoader, type GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import type { GameEngine } from "@/engine/GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
 import { getMapLayout } from "@/data/mapLayouts";
@@ -10,6 +11,10 @@ import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
 import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Effects } from "@/battlefield3d/fx";
+import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
+import { getTowerVisualStage, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
+import { getTowerStats, type TowerInstance } from "@/entities/Tower";
+import { MANA_MAX } from "@/config/towerMana";
 import { castleDressingFor } from "@/rendering/castleSprites";
 import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { footprints } from "@/rendering/footprints";
@@ -808,6 +813,178 @@ function Creatures({
   return <group ref={group} />;
 }
 
+
+// ----------------------------------------------------------------- towers (prévia: ?towers=3d)
+/** PRÉVIA — live 3D towers on the 2D map; only with `?towers=3d`, never on by default. */
+export const TOWERS_3D_PREVIEW = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("towers") === "3d";
+const TOWER_COLORS: Record<string, string> = { IRONWOOD: "#ffd27a", INFERNO: "#ff7a2a", FROSTBORN: "#8fe6ff", STORMCALLER: "#c49bff" };
+/** The point each tower fires from (an anchor on its turret). */
+const MUZZLE: Record<string, string[]> = { IRONWOOD: ["boltTip", "eyes"], INFERNO: ["mouth"], FROSTBORN: ["orb"], STORMCALLER: ["orb", "rod0"] };
+
+const towerKits = new Map<string, TowerModel>();
+function towerKit(type: string, stage: number, skin: string) {
+  const key = `${type}|${stage}|${skin}`;
+  let m = towerKits.get(key);
+  if (!m) {
+    m = buildTowerModel(type, stage, skin);
+    m.root.traverse((o) => {
+      const mesh = o as THREE.Mesh;
+      if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true;
+    });
+    towerKits.set(key, m);
+  }
+  return m;
+}
+
+interface LiveTower {
+  key: string;
+  stage: number;
+  obj: THREE.Group;
+  turret: THREE.Object3D | null;
+  kit: TowerModel;
+  yaw: number;
+  recoil: number;
+  built: number;
+  glows: { mat: THREE.MeshStandardMaterial; base: number }[];
+  flash: number;
+}
+
+function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; fx: Effects }) {
+  const group = useRef<THREE.Group>(null);
+  const live = useRef(new Map<string, LiveTower>());
+  const seenShots = useRef(new Set<string>());
+  const tmp = useMemo(() => new THREE.Vector3(), []);
+  useFrame(({ clock }, rawDt) => {
+    const g = group.current;
+    const hidden = hiddenIds.current;
+    if (!g || !hidden) return;
+    const dt = Math.min(rawDt, 0.05);
+    const t = clock.elapsedTime;
+    const snap = engine.getRenderSnapshot();
+    const seen = new Set<string>();
+    for (const tw of snap.towers as readonly TowerInstance[]) {
+      seen.add(tw.id);
+      const stage = getTowerVisualStage(tw.level);
+      const skin = tw.equippedSkinId ?? "base";
+      const key = `${tw.type}|${stage}|${skin}`;
+      let e = live.current.get(tw.id);
+      if (!e || e.key !== key) {
+        const upgraded = !!e && stage > e.stage;
+        if (e) g.remove(e.obj);
+        const kit = towerKit(tw.type, stage, skin);
+        const obj = kit.root.clone(true);
+        const turret = obj.children[kit.root.children.indexOf(kit.turret)] ?? null;
+        // its own copies of the glowing materials, so its crystals can flare when it fires
+        const glows: LiveTower["glows"] = [];
+        const own = new Map<THREE.Material, THREE.Material>();
+        obj.traverse((o) => {
+          const mesh = o as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          const m = mesh.material as THREE.MeshStandardMaterial;
+          if (!m.emissive || m.emissiveIntensity <= 0.3 || m.emissive.getHex() === 0) return;
+          let c = own.get(m) as THREE.MeshStandardMaterial | undefined;
+          if (!c) {
+            c = m.clone();
+            own.set(m, c);
+            glows.push({ mat: c, base: m.emissiveIntensity });
+          }
+          mesh.material = c;
+        });
+        obj.scale.setScalar(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
+        obj.position.copy(loc(tw.position));
+        // the map is seen from ~58° up but the tower art from ~38°: tip the tower towards the viewer
+        // by the difference so it keeps its tall, three-quarter silhouette
+        obj.rotation.x = TOWER_VIEW_TIP;
+        g.add(obj);
+        e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? 0, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0 };
+        live.current.set(tw.id, e);
+        hidden.add(tw.id);
+        const base = obj.position.clone();
+        const col = TOWER_COLORS[tw.type] ?? "#fff";
+        if (upgraded) {
+          // a new stage: a column of its light and a ring along the ground
+          fx.rings.ring(base.clone().setY(0.5), col, 6, 60, 0.7);
+          fx.glow.emit(base.clone().setY(20), { count: 60, color: "#ffffff", colorEnd: col, size: 3, life: 1.2, speed: 40, up: 70, gravity: 30, radius: 8 });
+        } else {
+          fx.smoke.emit(base.clone().setY(2), { count: 14, color: "#7a6a58", colorEnd: "#2a241e", size: 9, life: 1, speed: 26, up: 8, grow: 2, alpha: 0.5, radius: 10 });
+          fx.rings.ring(base.clone().setY(0.5), col, 4, 40, 0.5);
+        }
+      }
+      // rises out of the ground when built
+      if (e.built < 1) {
+        e.built = Math.min(1, e.built + dt * 2.2);
+        const k = 1 - Math.pow(1 - e.built, 3);
+        e.obj.scale.set(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE, TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE * (0.15 + 0.85 * k), TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
+      }
+      // aim: the enemy furthest along the road inside its range; idle sweep otherwise
+      const range = getTowerStats(tw).range;
+      let target: EnemyInstance | null = null;
+      for (const en of snap.enemies as readonly EnemyInstance[])
+        if (Math.hypot(en.position.x - tw.position.x, en.position.y - tw.position.y) <= range && (!target || en.distanceTraveled > target.distanceTraveled)) target = en;
+      if (e.turret) {
+        const want = target
+          ? worldDirectionToThreeYaw({ x: target.position.x - tw.position.x, y: target.position.y - tw.position.y }) - Math.PI / 2
+          : e.yaw + Math.sin(t * 0.4 + tw.position.x) * 0.004;
+        const d = Math.atan2(Math.sin(want - e.yaw), Math.cos(want - e.yaw));
+        e.yaw += d * Math.min(1, dt * (target ? 9 : 2));
+        e.turret.rotation.y = e.yaw;
+        // recoil: kicked back along its aim, springs forward again
+        e.recoil = Math.max(0, e.recoil - dt * 6);
+        const kick = Math.sin(Math.min(1, e.recoil) * Math.PI * 0.5) * 2.2;
+        e.turret.position.x = (e.kit.turret.position.x) - Math.cos(e.yaw) * kick;
+        e.turret.position.z = (e.kit.turret.position.z) + Math.sin(e.yaw) * kick;
+      }
+      // crystals breathe; flare on a shot or a new stage; go dark while disabled
+      e.flash = Math.max(0, e.flash - dt * 3);
+      const disabled = tw.disabledRemainingMs > 0;
+      const breathe = 1 + Math.sin(t * 2.2 + tw.position.x * 0.1) * 0.18;
+      for (const gl of e.glows) gl.mat.emissiveIntensity = disabled ? gl.base * 0.15 : gl.base * (breathe + e.flash * 1.6);
+      if (disabled && Math.random() < 0.2) fx.smokePuff(e.obj.position.clone().setY(18), 0.5);
+      if (tw.mana >= MANA_MAX && Math.random() < 0.25) fx.mote(e.obj.position.clone().setY(10), TOWER_COLORS[tw.type] ?? "#fff", 10, 26);
+    }
+    // shots fired this frame: recoil, crystal flare and a muzzle flash at the turret
+    const now = new Set<string>();
+    for (const p of snap.projectiles) {
+      now.add(p.id);
+      if (seenShots.current.has(p.id)) continue;
+      const tw = snap.towers.find((x) => Math.hypot(p.from.x - x.position.x, p.from.y - x.position.y) < 40);
+      const e = tw ? live.current.get(tw.id) : undefined;
+      if (!e) continue;
+      e.recoil = 1;
+      e.flash = Math.max(e.flash, p.isSpecial ? 1.4 : 0.7);
+      const muzzleKey = (MUZZLE[tw!.type] ?? []).find((k) => e.kit.anchors[k]);
+      if (muzzleKey && g.parent) {
+        const a = e.kit.anchors[muzzleKey]!;
+        const holder = e.kit.turretAnchors.has(muzzleKey) && e.turret ? e.turret : e.obj;
+        holder.updateMatrixWorld(true);
+        holder.localToWorld(tmp.copy(a));
+        g.parent.worldToLocal(tmp);
+        fx.muzzle(tmp.clone(), TOWER_COLORS[tw!.type] ?? "#fff", p.isSpecial);
+      }
+    }
+    seenShots.current = now;
+    for (const [id, e] of live.current)
+      if (!seen.has(id)) {
+        g.remove(e.obj);
+        for (const gl of e.glows) gl.mat.dispose();
+        live.current.delete(id);
+        hidden.delete(id);
+      }
+  });
+  useEffect(() => {
+    const set = hiddenIds.current;
+    const mine = live.current;
+    return () => {
+      for (const id of mine.keys()) set?.delete(id);
+    };
+  }, [hiddenIds]);
+  return <group ref={group} />;
+}
+/** Size of the 3D towers relative to the 2D tower art (tuned so both cover the same footprint). */
+const TOWER_3D_SIZE = 1;
+/** Radians the towers are tipped towards the camera (58° map view → the 38° tower-art view). */
+const TOWER_VIEW_TIP = THREE.MathUtils.degToRad(20);
+
 // ----------------------------------------------------------------- root
 class LayerBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
   state = { failed: false };
@@ -823,7 +1000,24 @@ class LayerBoundary extends Component<{ children: ReactNode; onError: () => void
   }
 }
 
-function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>> }) {
+/** Soft image-based light so painted/PBR surfaces read from every side, like the baked art. */
+function EnvLight({ intensity }: { intensity: number }) {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environment = env;
+    scene.environmentIntensity = intensity;
+    pmrem.dispose();
+    return () => {
+      scene.environment = null;
+      env.dispose();
+    };
+  }, [gl, scene, intensity]);
+  return null;
+}
+
+function Scene({ engine, hiddenIds, hiddenTowerIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>> }) {
   const layoutId = engine.getRenderSnapshot().mapLayoutId;
   const [lid, setLid] = useState(layoutId);
   useFrame(() => {
@@ -848,6 +1042,8 @@ function Scene({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject
         biomeId={engine.getRenderSnapshot().biomeId}
         from={loc(getPointAtDistance(layout.path, layout.length - Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y) - APPROACH_LEAD).position)}
       />
+      {TOWERS_3D_PREVIEW && hiddenTowerIds && <Towers3D engine={engine} hiddenIds={hiddenTowerIds} fx={fx} />}
+      {TOWERS_3D_PREVIEW && <EnvLight intensity={0.55} />}
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
@@ -933,7 +1129,7 @@ function GatePath({ castle, from, biomeId }: { castle: React.MutableRefObject<Ca
   return mesh ? <primitive object={mesh} /> : null;
 }
 
-export function HybridOverlay({ engine, hiddenIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>> }) {
+export function HybridOverlay({ engine, hiddenIds, hiddenTowerIds }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; hiddenTowerIds?: RefObject<Set<string>> }) {
   return (
     <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }} data-testid="hybrid-3d">
       <Canvas
@@ -950,7 +1146,7 @@ export function HybridOverlay({ engine, hiddenIds }: { engine: GameEngine; hidde
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
       >
         <CameraRig />
-        <Scene engine={engine} hiddenIds={hiddenIds} />
+        <Scene engine={engine} hiddenIds={hiddenIds} hiddenTowerIds={hiddenTowerIds} />
       </Canvas>
     </div>
   );

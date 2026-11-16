@@ -292,6 +292,8 @@ export function drawTower(
   attackFlashMs = Infinity,
   /** DUELO draws its own level pips — no level badge or mana bar there. */
   bodyOnly = false,
+  /** A 3D layer draws this tower's body: keep only the selection ring, level badge and mana bar. */
+  hudOnly = false,
 ): void {
   const stats = getTowerStats(tower);
   // Tower Skin architecture (Progression 2.0 spec section 10/11): a skin
@@ -318,17 +320,19 @@ export function drawTower(
   // Pre-rendered 3D body when one exists for this type/skin/stage (see
   // towerSprites.ts); otherwise the original vector tower below.
   const sprite = getTowerSprite(tower.type, lookId, visualStage);
-  if (!bodyOnly) {
+  if (!bodyOnly && !hudOnly) {
     drawEclipseUnder(ctx, timeMs);
     drawMasteryUnder(ctx, tower.masteryLevel, theme.accent, timeMs);
   }
-  if (sprite) {
+  if (hudOnly) {
+    // body drawn elsewhere
+  } else if (sprite) {
     ctx.drawImage(sprite.image, sprite.origin.x, sprite.origin.y, sprite.origin.size, sprite.origin.size);
     drawBakedTowerLive(ctx, tower.type, sprite, theme, stats.level, visualStage, timeMs, attackFlashMs, readiness, skin, tower.id);
     if (skin && isSkinEvolved(skin.id)) drawSkinEvolution(ctx, skin, timeMs, visualStage);
   } else if (tower.type !== "IRONWOOD") drawPlinth(ctx);
 
-  if (!sprite) switch (tower.type) {
+  if (!sprite && !hudOnly) switch (tower.type) {
     case "IRONWOOD":
       drawIronwood(ctx, theme, stats.level, timeMs, attackFlashMs, readiness, visualStage, skin);
       break;
@@ -343,7 +347,7 @@ export function drawTower(
       break;
   }
 
-  if (!bodyOnly) {
+  if (!bodyOnly && !hudOnly) {
     drawMasteryOver(ctx, tower.masteryLevel, theme.accent, timeMs, MASTERY_TOP_Y[tower.type]);
     // the Eclipse sits above the Mastery halo/crown when both are on
     drawEclipseOver(ctx, timeMs, MASTERY_TOP_Y[tower.type] - (tower.masteryLevel >= 60 ? 22 : 0));
