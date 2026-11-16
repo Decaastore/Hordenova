@@ -821,6 +821,52 @@ const TOWER_COLORS: Record<string, string> = { IRONWOOD: "#ffd27a", INFERNO: "#f
 /** The point each tower fires from (an anchor on its turret). */
 const MUZZLE: Record<string, string[]> = { IRONWOOD: ["boltTip", "eyes"], INFERNO: ["mouth"], FROSTBORN: ["orb"], STORMCALLER: ["orb", "rod0"] };
 
+let haloTex: THREE.Texture | null = null;
+function haloTexture() {
+  if (haloTex) return haloTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,255,255,0.95)");
+  gr.addColorStop(0.18, "rgba(255,255,255,0.55)");
+  gr.addColorStop(0.5, "rgba(255,255,255,0.14)");
+  gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  haloTex = new THREE.CanvasTexture(c);
+  return haloTex;
+}
+let runeTex: THREE.Texture | null = null;
+/** A ring of rune marks (white, tinted per tower) for the ground circle of high-stage towers. */
+function runeTexture() {
+  if (runeTex) return runeTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  g.translate(128, 128);
+  g.strokeStyle = "rgba(255,255,255,0.9)";
+  g.lineWidth = 3;
+  g.beginPath();
+  g.arc(0, 0, 118, 0, Math.PI * 2);
+  g.stroke();
+  g.lineWidth = 1.5;
+  g.beginPath();
+  g.arc(0, 0, 96, 0, Math.PI * 2);
+  g.stroke();
+  g.fillStyle = "#fff";
+  for (let i = 0; i < 18; i++) {
+    g.save();
+    g.rotate((i / 18) * Math.PI * 2);
+    g.fillRect(-1.5, -114, 3, 14);
+    g.fillRect(-6, -108 + (i % 3) * 3, 12, 2.5);
+    if (i % 2) g.fillRect(4, -112, 2.5, 8);
+    g.restore();
+  }
+  runeTex = new THREE.CanvasTexture(c);
+  return runeTex;
+}
+
 const towerKits = new Map<string, TowerModel>();
 function towerKit(type: string, stage: number, skin: string) {
   const key = `${type}|${stage}|${skin}`;
@@ -847,6 +893,14 @@ interface LiveTower {
   built: number;
   glows: { mat: THREE.MeshStandardMaterial; base: number }[];
   flash: number;
+  /** Soft light halos over its crystals / orb / furnace (the glow the baked art has). */
+  halos: { sprite: THREE.Sprite; base: number; size: number }[];
+  /** Frostborn: ice shards circling the orb. */
+  orbit: THREE.Group | null;
+  /** Stage 4+: a rune circle turning on the ground under it. */
+  rune: THREE.Mesh | null;
+  type: string;
+  boltT: number;
 }
 
 function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; fx: Effects }) {
@@ -854,6 +908,46 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
   const live = useRef(new Map<string, LiveTower>());
   const seenShots = useRef(new Set<string>());
   const tmp = useMemo(() => new THREE.Vector3(), []);
+  /** A model anchor in the layer's world-unit space (turret anchors follow the turret). */
+  const anchorAt = (e: LiveTower, key: string) => {
+    const a = e.kit.anchors[key];
+    const g = group.current;
+    if (!a || !g?.parent) return null;
+    const holder = e.kit.turretAnchors.has(key) && e.turret ? e.turret : e.obj;
+    holder.updateMatrixWorld(true);
+    return g.parent.worldToLocal(holder.localToWorld(new THREE.Vector3().copy(a)));
+  };
+  /** What each kind of tower keeps doing between shots. */
+  const towerLife = (e: LiveTower, tw: TowerInstance, dt: number) => {
+    const col = TOWER_COLORS[tw.type] ?? "#fff";
+    const k = 0.6 + e.stage * 0.1;
+    if (tw.type === "INFERNO") {
+      const m = anchorAt(e, "mouth");
+      if (m && Math.random() < 0.7) fx.flame(m, 0.35 * k, "#ff7a1a");
+      for (const sk of ["smoke1", "smoke2"]) {
+        const p = anchorAt(e, sk);
+        if (p && Math.random() < 0.06) fx.smokePuff(p, 0.35);
+        if (p && Math.random() < 0.15) fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: "#ff3a0a", size: 1.6, life: 0.8, speed: 4, up: 14, drag: 0.6, radius: 1 });
+      }
+    } else if (tw.type === "FROSTBORN") {
+      const o = anchorAt(e, "orb") ?? anchorAt(e, "core");
+      if (o && Math.random() < 0.25 * k) fx.mote(o, "#bfeeff", 9, -3);
+    } else if (tw.type === "STORMCALLER") {
+      e.boltT -= dt;
+      if (e.boltT <= 0) {
+        e.boltT = 0.35 + Math.random() * (1.4 - e.stage * 0.15);
+        const rods = Object.keys(e.kit.anchors).filter((n) => n.startsWith("rod"));
+        const orb = anchorAt(e, "orb");
+        const r = rods.length ? anchorAt(e, rods[Math.floor(Math.random() * rods.length)]!) : null;
+        if (orb && r) fx.bolts.bolt(r, orb, col, 0.12, 2.5);
+      }
+    } else if (tw.type === "IRONWOOD") {
+      const eyes = anchorAt(e, "eyes");
+      if (eyes && Math.random() < 0.12 * k) fx.mote(eyes.clone().add(new THREE.Vector3((Math.random() - 0.5) * 16, -6, (Math.random() - 0.5) * 16)), "#c8ff7a", 6, 6);
+    }
+    if (e.stage >= 6 && Math.random() < 0.3) fx.mote(e.obj.position.clone().setY(4), col, 14, 22);
+  };
+
   useFrame(({ clock }, rawDt) => {
     const g = group.current;
     const hidden = hiddenIds.current;
@@ -890,13 +984,53 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
           }
           mesh.material = c;
         });
+        // light halos where the model keeps its glow (its point-light spots), brighter at higher stages
+        const halos: LiveTower["halos"] = [];
+        const stageK = 0.55 + stage * 0.12;
+        for (const pl of kit.pointLights) {
+          // drawn over the model like a bloom: the light spills over the tower's own edges
+          const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTexture(), color: new THREE.Color(pl.color), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, opacity: 0.9 * stageK }));
+          const size = pl.dist * 0.62 * (0.85 + stage * 0.06);
+          sp.scale.setScalar(size);
+          sp.position.copy(pl.pos);
+          sp.renderOrder = 14;
+          obj.add(sp);
+          halos.push({ sprite: sp, base: 0.9 * stageK, size });
+        }
+        let orbit: THREE.Group | null = null;
+        if (tw.type === "FROSTBORN") {
+          const at = kit.anchors.orb ?? kit.anchors.core ?? new THREE.Vector3(0, 20, 0);
+          orbit = new THREE.Group();
+          orbit.position.copy(at);
+          const shardMat = new THREE.MeshStandardMaterial({ color: "#cfefff", emissive: new THREE.Color("#7fdcff"), emissiveIntensity: 1.6, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.9 });
+          const n = 2 + stage;
+          for (let i = 0; i < n; i++) {
+            const sh = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), shardMat);
+            sh.scale.set(0.7, 1.9, 0.7);
+            const a2 = (i / n) * Math.PI * 2;
+            sh.position.set(Math.cos(a2) * 7.5, Math.sin(a2 * 2) * 1.2, Math.sin(a2) * 7.5);
+            sh.castShadow = true;
+            orbit.add(sh);
+          }
+          obj.add(orbit);
+        }
+        let rune: THREE.Mesh | null = null;
+        if (stage >= 4) {
+          rune = new THREE.Mesh(
+            new THREE.PlaneGeometry(38, 38).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ map: runeTexture(), color: new THREE.Color(TOWER_COLORS[tw.type] ?? "#fff"), transparent: true, opacity: 0.35 + (stage - 4) * 0.12, blending: THREE.AdditiveBlending, depthWrite: false }),
+          );
+          rune.position.y = 0.6;
+          rune.renderOrder = 3;
+          obj.add(rune);
+        }
         obj.scale.setScalar(TOWER_PRESENTATION_SCALE * TOWER_3D_SIZE);
         obj.position.copy(loc(tw.position));
         // the map is seen from ~58° up but the tower art from ~38°: tip the tower towards the viewer
         // by the difference so it keeps its tall, three-quarter silhouette
         obj.rotation.x = TOWER_VIEW_TIP;
         g.add(obj);
-        e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? 0, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0 };
+        e = { key, stage, obj, turret, kit, yaw: e?.yaw ?? Math.PI, recoil: 0, built: e ? 1 : 0, glows, flash: upgraded ? 1.5 : 0, halos, orbit, rune, type: tw.type, boltT: Math.random() };
         live.current.set(tw.id, e);
         hidden.add(tw.id);
         const base = obj.position.clone();
@@ -923,22 +1057,33 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         if (Math.hypot(en.position.x - tw.position.x, en.position.y - tw.position.y) <= range && (!target || en.distanceTraveled > target.distanceTraveled)) target = en;
       if (e.turret) {
         const want = target
-          ? worldDirectionToThreeYaw({ x: target.position.x - tw.position.x, y: target.position.y - tw.position.y }) - Math.PI / 2
-          : e.yaw + Math.sin(t * 0.4 + tw.position.x) * 0.004;
+          ? worldDirectionToThreeYaw({ x: target.position.x - tw.position.x, y: target.position.y - tw.position.y })
+          : Math.PI + Math.sin(t * 0.35 + tw.position.x) * 0.55; // at rest it faces the viewer, glancing left and right
         const d = Math.atan2(Math.sin(want - e.yaw), Math.cos(want - e.yaw));
         e.yaw += d * Math.min(1, dt * (target ? 9 : 2));
         e.turret.rotation.y = e.yaw;
         // recoil: kicked back along its aim, springs forward again
         e.recoil = Math.max(0, e.recoil - dt * 6);
         const kick = Math.sin(Math.min(1, e.recoil) * Math.PI * 0.5) * 2.2;
-        e.turret.position.x = (e.kit.turret.position.x) - Math.cos(e.yaw) * kick;
-        e.turret.position.z = (e.kit.turret.position.z) + Math.sin(e.yaw) * kick;
+        e.turret.position.x = e.kit.turret.position.x - Math.sin(e.yaw) * kick;
+        e.turret.position.z = e.kit.turret.position.z - Math.cos(e.yaw) * kick;
       }
       // crystals breathe; flare on a shot or a new stage; go dark while disabled
       e.flash = Math.max(0, e.flash - dt * 3);
       const disabled = tw.disabledRemainingMs > 0;
       const breathe = 1 + Math.sin(t * 2.2 + tw.position.x * 0.1) * 0.18;
       for (const gl of e.glows) gl.mat.emissiveIntensity = disabled ? gl.base * 0.15 : gl.base * (breathe + e.flash * 1.6);
+      for (const h of e.halos) {
+        const k = disabled ? 0.1 : h.base * (0.85 + 0.15 * breathe + e.flash * 0.9);
+        (h.sprite.material as THREE.SpriteMaterial).opacity = Math.min(1, k);
+        h.sprite.scale.setScalar(h.size * (1 + e.flash * 0.35));
+      }
+      if (e.orbit) {
+        e.orbit.rotation.y += dt * (disabled ? 0.2 : 1.1 + e.stage * 0.08);
+        e.orbit.children.forEach((c, i) => (c.rotation.y += dt * (1.5 + i * 0.2)));
+      }
+      if (e.rune) e.rune.rotation.y -= dt * 0.35;
+      if (!disabled) towerLife(e, tw, dt);
       if (disabled && Math.random() < 0.2) fx.smokePuff(e.obj.position.clone().setY(18), 0.5);
       if (tw.mana >= MANA_MAX && Math.random() < 0.25) fx.mote(e.obj.position.clone().setY(10), TOWER_COLORS[tw.type] ?? "#fff", 10, 26);
     }
@@ -967,6 +1112,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       if (!seen.has(id)) {
         g.remove(e.obj);
         for (const gl of e.glows) gl.mat.dispose();
+        for (const h of e.halos) h.sprite.material.dispose();
         live.current.delete(id);
         hidden.delete(id);
       }
