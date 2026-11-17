@@ -1,3 +1,4 @@
+import { WORLD_SIZE } from "@/config/gameBalance";
 import { castleDressingFor } from "./castleSprites";
 
 /**
@@ -14,11 +15,11 @@ import { castleDressingFor } from "./castleSprites";
  */
 
 const MAX_PRINTS = 600;
-const LIFE_MS = 6500;
-const FADE_FROM_MS = 4000;
-/** Monster prints sink deeper into the ground and stay much longer. */
-const CLAW_LIFE_MS = 12000;
-const CLAW_FADE_FROM_MS = 8000;
+/** The ground layer's resolution (pixels per world unit), so tracks stay crisp when zoomed in. */
+const BAKE_RES = 2.5;
+/** How the pressed-in tracks fade: a wash this strong this often — about two minutes to half strength. */
+const WASH_EVERY_MS = 2000;
+const WASH_ALPHA = 0.012;
 
 /** "foot": an ordinary creature's sole. "claw": a monster's clawed paw sunk deep. "boss": the same, so heavy the ground cracks round it. */
 export type PrintKind = "foot" | "claw" | "boss";
@@ -50,6 +51,8 @@ interface Print {
   bornMs: number;
   kind: PrintKind;
   seed: number;
+  /** Already pressed into the ground layer; kept only while its glow still burns. */
+  baked?: boolean;
 }
 
 /** A sole seen from above, toes towards +x, in white on transparent (alpha = shape). */
@@ -184,6 +187,15 @@ class FootprintStore {
   private body: HTMLCanvasElement | null = null;
   private rim: HTMLCanvasElement | null = null;
   private glow: HTMLCanvasElement | null = null;
+  /**
+   * The ground itself: every print, once its foot has lifted, is pressed into
+   * this world-sized layer and stays exactly where it was made, fading only
+   * very slowly over the stage (a light wash every couple of seconds), like
+   * real tracks in mud, sand or snow.
+   */
+  private baked: HTMLCanvasElement | null = null;
+  private bakedCtx: CanvasRenderingContext2D | null = null;
+  private lastWash = 0;
   /** The monster paw: floor, shadowed wall, lit wall, lip, glow. */
   private claw: { body: HTMLCanvasElement; dark: HTMLCanvasElement; lit: HTMLCanvasElement; rim: HTMLCanvasElement; glow: HTMLCanvasElement | null } | null = null;
 
@@ -192,6 +204,8 @@ class FootprintStore {
     const look = castleDressingFor(biomeId);
     if (look === this.look && this.body) return true;
     this.look = look;
+    // a new map: its ground starts clean
+    this.bakedCtx?.clearRect(0, 0, this.baked!.width, this.baked!.height);
     this.style = STYLES[look] ?? STYLES.ancient_forest!;
     this.shape ??= soleShape();
     this.body = tinted(this.shape, this.style.color);
@@ -220,50 +234,106 @@ class FootprintStore {
 
   clear() {
     this.prints = [];
+    this.bakedCtx?.clearRect(0, 0, this.baked!.width, this.baked!.height);
   }
 
-  /** Draws every live print in world space (the caller's transform is the map's). */
+  private groundLayer() {
+    if (!this.baked) {
+      this.baked = document.createElement("canvas");
+      this.baked.width = WORLD_SIZE.width * BAKE_RES;
+      this.baked.height = WORLD_SIZE.height * BAKE_RES;
+      this.bakedCtx = this.baked.getContext("2d");
+      this.bakedCtx?.setTransform(BAKE_RES, 0, 0, BAKE_RES, 0, 0);
+    }
+    return this.bakedCtx;
+  }
+
+  /** Press a print into the ground for good (full strength, no glow). */
+  private bake(p: Print) {
+    const g = this.groundLayer();
+    if (!g) return;
+    if (p.kind === "foot") this.drawFoot(g, p, 1, 0);
+    else this.drawClaw(g, p, 1, 0);
+  }
+
+  /** Tracks fade very slowly: a light wash over the ground layer every couple of seconds. */
+  private wash(now: number) {
+    if (!this.bakedCtx || now - this.lastWash < WASH_EVERY_MS) return;
+    this.lastWash = now;
+    const g = this.bakedCtx;
+    g.save();
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalCompositeOperation = "destination-out";
+    g.globalAlpha = WASH_ALPHA;
+    g.fillRect(0, 0, this.baked!.width, this.baked!.height);
+    g.restore();
+  }
+
+  /** Draws the tracks in world space (the caller's transform is the map's): the ground layer, then the prints still settling. */
   draw(ctx: CanvasRenderingContext2D, biomeId: string) {
-    if (!this.prints.length || !this.ensure(biomeId) || !this.body) return;
+    if (!this.ensure(biomeId) || !this.body) return;
     const now = performance.now();
-    this.prints = this.prints.filter((p) => now - p.bornMs < (p.kind === "foot" ? LIFE_MS : CLAW_LIFE_MS));
+    this.wash(now);
+    if (this.baked) ctx.drawImage(this.baked, 0, 0, WORLD_SIZE.width, WORLD_SIZE.height);
+    if (!this.prints.length) return;
     const st = this.style;
+    const keep: Print[] = [];
     for (const p of this.prints) {
       const age = now - p.bornMs;
-      if (p.kind !== "foot") {
-        this.drawClaw(ctx, p, age);
-        continue;
+      const settle = p.kind === "foot" ? 450 : 120;
+      if (!p.baked && age >= settle) {
+        this.bake(p);
+        p.baked = true;
       }
-      // shows a beat after the foot lifts, fades out at the end
-      const f = age < 250 ? 0 : age < 450 ? (age - 250) / 200 : age > FADE_FROM_MS ? 1 - (age - FADE_FROM_MS) / (LIFE_MS - FADE_FROM_MS) : 1;
-      if (f <= 0) continue;
-      const w = p.length * 0.55;
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(p.angle);
-      if (p.left) ctx.scale(1, -1);
+      const glowMs = st.glowMs ?? 0;
+      const glowLeft = p.kind === "foot" ? glowMs + 250 - age : glowMs * 1.6 - age;
+      const glowA = glowMs && glowLeft > 0 ? (p.kind === "foot" ? Math.pow(1 - Math.max(0, age - 250) / glowMs, 1.5) * 0.9 : Math.pow(1 - age / (glowMs * 1.6), 1.5) * 0.85) : 0;
+      if (!p.baked) {
+        // still settling: fades in where the foot lifts
+        const f = p.kind === "foot" ? (age < 250 ? 0 : (age - 250) / 200) : age / 120;
+        if (p.kind === "foot") this.drawFoot(ctx, p, f, glowA);
+        else this.drawClaw(ctx, p, f, glowA);
+        keep.push(p);
+      } else if (glowA > 0) {
+        // pressed in already; only its embers / rune light still glow on top
+        if (p.kind === "foot") this.drawFoot(ctx, p, 0, glowA);
+        else this.drawClaw(ctx, p, 0, glowA);
+        keep.push(p);
+      }
+    }
+    this.prints = keep;
+  }
+
+  /** An ordinary creature's sole, at strength `f`, plus its glow at `glowA`. */
+  private drawFoot(ctx: CanvasRenderingContext2D, p: Print, f: number, glowA: number) {
+    if (!this.body) return;
+    const st = this.style;
+    const w = p.length * 0.55;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    if (p.left) ctx.scale(1, -1);
+    if (f > 0) {
       ctx.globalAlpha = st.alpha * f;
       ctx.drawImage(this.body, -p.length / 2, -w / 2, p.length, w);
       if (this.rim) {
         ctx.globalAlpha = 0.55 * f;
         ctx.drawImage(this.rim, -p.length / 2, -w / 2, p.length, w);
       }
-      if (this.glow && st.glowMs && age < st.glowMs + 250) {
-        ctx.globalCompositeOperation = "lighter";
-        ctx.globalAlpha = Math.pow(1 - Math.max(0, age - 250) / st.glowMs, 1.5) * 0.9;
-        ctx.drawImage(this.glow, -p.length / 2, -w / 2, p.length, w);
-      }
-      ctx.restore();
     }
+    if (this.glow && glowA > 0) {
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = glowA;
+      ctx.drawImage(this.glow, -p.length / 2, -w / 2, p.length, w);
+    }
+    ctx.restore();
   }
 
   /** A monster's paw sunk into the ground: dark floor, a shadowed and a lit wall, a lip of pushed-up soil, and for a boss cracks and clods. */
-  private drawClaw(ctx: CanvasRenderingContext2D, p: Print, age: number) {
+  private drawClaw(ctx: CanvasRenderingContext2D, p: Print, f: number, glowA: number) {
     const c = this.claw;
     if (!c) return;
     const st = this.style;
-    const f = age < 120 ? age / 120 : age > CLAW_FADE_FROM_MS ? 1 - (age - CLAW_FADE_FROM_MS) / (CLAW_LIFE_MS - CLAW_FADE_FROM_MS) : 1;
-    if (f <= 0) return;
     const L = p.length * 1.6;
     const W = L * 0.7;
     const boss = p.kind === "boss";
@@ -271,6 +341,15 @@ class FootprintStore {
     ctx.translate(p.x, p.y);
     ctx.rotate(p.angle);
     if (p.left) ctx.scale(1, -1);
+    if (f <= 0) {
+      if (c.glow && glowA > 0) {
+        ctx.globalCompositeOperation = "lighter";
+        ctx.globalAlpha = glowA;
+        ctx.drawImage(c.glow, -L / 2, -W / 2, L, W);
+      }
+      ctx.restore();
+      return;
+    }
     // the pushed-up lip round the hole
     ctx.globalAlpha = 0.5 * f;
     ctx.drawImage(c.rim, -L / 2, -W / 2, L, W);
@@ -322,9 +401,9 @@ class FootprintStore {
         ctx.fill();
       }
     }
-    if (c.glow && st.glowMs && age < st.glowMs * 1.6) {
+    if (c.glow && glowA > 0) {
       ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = Math.pow(1 - age / (st.glowMs * 1.6), 1.5) * 0.85;
+      ctx.globalAlpha = glowA;
       ctx.drawImage(c.glow, -L / 2, -W / 2, L, W);
     }
     ctx.restore();
