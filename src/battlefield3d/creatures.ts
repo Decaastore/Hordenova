@@ -27,8 +27,12 @@ export const CREATURE_FILES = {
 export type CreatureId = keyof typeof CREATURE_FILES;
 /** Death animations (no mesh), shared by every creature through the common Mixamo skeleton. */
 const DEATH_FILES = ["/models/enemies/mixamo/death1.glb", "/models/enemies/mixamo/death2.glb"];
-/** Everything the creature layer loads: the characters first, then the death clips. */
-export const CREATURE_URLS = [...Object.values(CREATURE_FILES), ...DEATH_FILES];
+/** One-off moves (no mesh): the boss's roar, its punch at the castle gate, the run when it is enraged. */
+const MOVE_FILES = { roar: "/models/enemies/mixamo/roar.glb", punch: "/models/enemies/mixamo/punch.glb", run: "/models/enemies/mixamo/run.glb" } as const;
+type MoveId = keyof typeof MOVE_FILES;
+const MOVE_IDS = Object.keys(MOVE_FILES) as MoveId[];
+/** Everything the creature layer loads: the characters, then the death clips, then the moves. */
+export const CREATURE_URLS = [...Object.values(CREATURE_FILES), ...DEATH_FILES, ...Object.values(MOVE_FILES)];
 const IDS = Object.keys(CREATURE_FILES) as CreatureId[];
 
 /** Which creature plays each enemy type (a Boss is the Mutant, a Mini-Boss the Pumpkin Hulk, both bigger). */
@@ -78,6 +82,8 @@ export interface CreatureKit {
   walk: THREE.AnimationClip;
   /** Death clips to pick from when it dies (empty: a procedural fall). */
   deaths: THREE.AnimationClip[];
+  /** Roar, punch and run, when loaded. */
+  moves: Partial<Record<MoveId, THREE.AnimationClip>>;
 }
 
 /** A walk that stays in place: the hips keep their height and sway but never travel forward. */
@@ -121,7 +127,8 @@ function fitHips(clip: THREE.AnimationClip, scene: THREE.Object3D): THREE.Animat
 export function prepareCreatures(gltfs: readonly GLTF[]): Record<CreatureId, CreatureKit> {
   const byId = Object.fromEntries(IDS.map((id, i) => [id, gltfs[i]!])) as Record<CreatureId, GLTF>;
   const sharedWalk = byId.warrok.animations.find((a) => a.name === "Walk") ?? byId.warrok.animations[0]!;
-  const deaths = gltfs.slice(IDS.length).flatMap((g) => g.animations.slice(0, 1));
+  const deaths = gltfs.slice(IDS.length, IDS.length + DEATH_FILES.length).flatMap((g) => g.animations.slice(0, 1));
+  const moveClips = gltfs.slice(IDS.length + DEATH_FILES.length);
   const out = {} as Record<CreatureId, CreatureKit>;
   for (const id of IDS) {
     const g = byId[id];
@@ -136,7 +143,12 @@ export function prepareCreatures(gltfs: readonly GLTF[]): Record<CreatureId, Cre
     g.scene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(g.scene);
     const walk = g.animations.find((a) => a.name === "Walk") ?? sharedWalk;
-    out[id] = { scene: g.scene, height: Math.max(0.01, box.max.y - box.min.y), walk: inPlace(walk), deaths: deaths.map((d) => fitHips(d, g.scene)) };
+    out[id] = { scene: g.scene, height: Math.max(0.01, box.max.y - box.min.y), walk: inPlace(walk), deaths: deaths.map((d) => fitHips(d, g.scene)), moves: {} };
+    MOVE_IDS.forEach((m, i) => {
+      const clip = moveClips[i]?.animations[0];
+      // every move stays on the spot: the game moves the body, the clip only animates it
+      if (clip) out[id]!.moves[m] = inPlace(fitHips(clip, g.scene));
+    });
   }
   return out;
 }
@@ -234,6 +246,11 @@ export class Creature {
   private fallT = -1;
   private fallDir = 1;
   private readonly deaths: THREE.AnimationClip[];
+  private readonly moves: Partial<Record<MoveId, THREE.AnimationAction>> = {};
+  /** The looping gait it is in: walk, or run when enraged. */
+  private gait: THREE.AnimationAction;
+  /** A one-off move (roar / punch) is playing over the gait. */
+  private oneOff: THREE.AnimationAction | null = null;
   /** Playing a real death clip (rather than the procedural tip-over). */
   private clipDeath = false;
 
@@ -251,6 +268,24 @@ export class Creature {
     this.mixer = new THREE.AnimationMixer(body);
     this.deaths = kit.deaths ?? [];
     this.walk = this.mixer.clipAction(kit.walk);
+    this.gait = this.walk;
+    for (const m of MOVE_IDS) {
+      const clip = kit.moves?.[m];
+      if (!clip) continue;
+      const a = this.mixer.clipAction(clip);
+      if (m !== "run") {
+        a.setLoop(THREE.LoopOnce, 1);
+        a.clampWhenFinished = false;
+      }
+      this.moves[m] = a;
+    }
+    this.mixer.addEventListener("finished", (ev) => {
+      // a roar or punch is over: back to walking (or running)
+      if (ev.action !== this.oneOff || this.fallT >= 0) return;
+      this.oneOff = null;
+      this.gait.reset().play();
+      ev.action.crossFadeTo(this.gait, 0.2, false);
+    });
     this.walk.time = Math.random() * kit.walk.duration;
     this.walk.play();
     this.scale = worldHeight / kit.height;
@@ -263,6 +298,37 @@ export class Creature {
     this.head = body.getObjectByProperty("name", "mixamorigHead") ?? body.getObjectByProperty("name", "mixamorig:Head") ?? null;
   }
 
+  /** Whether it can play `move` (the clip loaded). */
+  has(move: MoveId) {
+    return !!this.moves[move];
+  }
+
+  /** Play a roar or a punch once over its gait, `speed`× as fast, then go back to walking. */
+  playOnce(move: Exclude<MoveId, "run">, speed = 1) {
+    const a = this.moves[move];
+    if (!a || this.fallT >= 0) return;
+    const from = this.oneOff ?? this.gait;
+    a.reset();
+    a.timeScale = speed;
+    a.play();
+    from.crossFadeTo(a, 0.12, false);
+    this.oneOff = a;
+  }
+
+  /** Switch between walking and running (enraged); `speed` sets the stride rate. */
+  setRunning(on: boolean, speed = 1) {
+    const run = this.moves.run;
+    if (!run || this.fallT >= 0) return;
+    const next = on ? run : this.walk;
+    next.timeScale = speed;
+    if (next === this.gait) return;
+    const prev = this.gait;
+    this.gait = next;
+    if (this.oneOff) return; // the gait takes over when the move ends
+    next.reset().play();
+    prev.crossFadeTo(next, 0.25, false);
+  }
+
   /** Start the death fall (tips over backwards or sideways, then lies still). */
   fall() {
     if (this.fallT >= 0) return;
@@ -273,11 +339,11 @@ export class Creature {
       die.setLoop(THREE.LoopOnce, 1);
       die.clampWhenFinished = true;
       die.reset().play();
-      this.walk.crossFadeTo(die, 0.18, false);
+      (this.oneOff ?? this.gait).crossFadeTo(die, 0.18, false);
       this.clipDeath = true;
       return;
     }
-    this.walk.fadeOut(0.25);
+    (this.oneOff ?? this.gait).fadeOut(0.25);
   }
 
   get falling() {

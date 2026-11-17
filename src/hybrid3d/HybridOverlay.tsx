@@ -558,6 +558,10 @@ interface Live {
   approachFrom: THREE.Vector3 | null;
   /** World height it was scaled to. */
   h: number;
+  /** Gate blows already thrown as punches. */
+  punches: number;
+  /** A boss roars once, as it steps out of the rift. */
+  roared: boolean;
   /** Menace: glowing eyes and a pulsing ring of its rank's colour round its feet. */
   eyes: THREE.Sprite[];
   aura: THREE.Mesh;
@@ -607,6 +611,15 @@ function Creatures({
     const t = performance.now() / 1000;
     const enraged = !!en.boss?.enraged || en.hp < en.maxHp * 0.3;
     const col = enraged ? "#ff1a0a" : e.rank;
+    // a boss roars as it steps out of the rift, the ground ringing round it
+    if (!e.roared && e.born >= 1 && e.enterT < 0) {
+      e.roared = true;
+      e.c.playOnce("roar", 1.25);
+      fx.rings.ring(e.obj.position.clone().setY(0.6), e.rank, 8, e.h * 1.6, 0.8);
+      fx.smoke.emit(e.obj.position.clone().setY(2), { count: 10, color: "#6a5a48", colorEnd: "#1e1814", size: e.h * 0.16, life: 1.2, speed: 30, up: 8, grow: 2.2, alpha: 0.4, radius: e.h * 0.2 });
+    }
+    // enraged, it breaks into a run (the stride follows how fast the game really moves it)
+    if (e.enterT < 0) e.c.setRunning(enraged, Math.min(1.4, Math.max(0.7, e.speed / 45)));
     const auraMat = e.aura.material as THREE.MeshBasicMaterial;
     e.aura.position.set(e.obj.position.x, 0.4, e.obj.position.z);
     e.aura.scale.setScalar(e.h * 0.42 * (1 + 0.08 * Math.sin(t * (enraged ? 9 : 3))));
@@ -677,10 +690,18 @@ function Creatures({
     if (e.enterT < smashTime) {
       // rear back and slam the gate
       const ph = (e.enterT % BLOW) / BLOW;
-      body.rotation.x = ph < 0.55 ? -0.25 * Math.sin((ph / 0.55) * Math.PI * 0.5) : -0.25 + 0.75 * Math.sin(((ph - 0.55) / 0.45) * Math.PI * 0.5);
-      e.c.walk.timeScale = 0.15;
-      e.c.update(dt);
       const n = Math.floor(e.enterT / BLOW);
+      if (e.c.has("punch")) {
+        // a real punch at the gate for every blow, timed so the fist lands as the gate shakes
+        if (n >= e.punches) {
+          e.punches = n + 1;
+          e.c.playOnce("punch", 1.08 / BLOW);
+        }
+      } else {
+        body.rotation.x = ph < 0.55 ? -0.25 * Math.sin((ph / 0.55) * Math.PI * 0.5) : -0.25 + 0.75 * Math.sin(((ph - 0.55) / 0.45) * Math.PI * 0.5);
+        e.c.walk.timeScale = 0.15;
+      }
+      e.c.update(dt);
       if (n >= e.smashes && ph > 0.92) {
         e.smashes = n + 1;
         gate.struck();
@@ -782,7 +803,7 @@ function Creatures({
         aura.renderOrder = 2;
         g.add(obj, shadow, aura, ...eyes);
         if (fresh && en.boss) fx.rings.ring(portal3.clone(), rank, 10, en.boss.isMainBoss ? 160 : 110, 0.9);
-        e = { c, obj, scale, eyes, aura, rank, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
+        e = { c, obj, scale, eyes, aura, rank, punches: 0, roared: !en.boss || !fresh, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
