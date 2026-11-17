@@ -44,10 +44,15 @@ export const ELEMENT_FIRST_WAVE = 6;
 /** The element a wave carries, or null (early waves and boss waves — a boss fights on its own terms). Deterministic per wave. */
 export function waveElementFor(wave: number, isBossWave = false): WaveElement | null {
   if (wave < ELEMENT_FIRST_WAVE || isBossWave) return null;
-  let h = (wave * 2654435761) >>> 0;
-  h ^= h >>> 15;
-  h = Math.imul(h, 2246822519) >>> 0;
-  return WAVE_ELEMENTS[h % 4]!;
+  // murmur3 finalizer — a full avalanche, so neighbouring waves really differ
+  // (a bare multiplicative hash left its low bits in long runs of one element)
+  let h = (wave + 0x9e3779b9) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x85ebca6b) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35) >>> 0;
+  h ^= h >>> 16;
+  return WAVE_ELEMENTS[h >>> 30]!;
 }
 
 /** Damage multiplier for each tower type against a wave of `el` (1 everywhere when there is none). */

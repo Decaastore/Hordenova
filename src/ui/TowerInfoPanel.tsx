@@ -1,4 +1,4 @@
-import { ELEMENT_COLOR, FUSION_COLORS, FUSION_CRIT_SHARE, FUSION_DAMAGE_MULT, FUSION_MIN_LEVEL, getFusionId } from "@/config/towerFusion";
+import { ELEMENT_COLOR, FUSION_COLORS, FUSION_CRIT_SHARE, FUSION_DAMAGE_MULT, FUSION_MIN_LEVEL, getFusionId, type FusionPayment } from "@/config/towerFusion";
 import { getManaUpgradeCost, MANA_MAX, MANA_OVERCHARGE_MAX, MANA_UPGRADE_GAIN_PER_LEVEL, MANA_UPGRADE_MAX_LEVEL, manaGainMultiplier, SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
@@ -45,8 +45,9 @@ import type { DualGemPrice, GemCurrency } from "@/config/gemsEconomy";
 
 /** TORRES DE FUSÃO — what the panel needs to offer a fusion or a split. */
 export interface FusionPanelData {
-  candidates: readonly { tower: TowerInstance; blocker: string | null; cost: number }[];
-  onFuse: (partnerId: string) => void;
+  /** `blocker` is checked as if paying gold; "GOLD" alone still leaves the gem option open. */
+  candidates: readonly { tower: TowerInstance; blocker: string | null; cost: number; gemPrice: DualGemPrice }[];
+  onFuse: (partnerId: string, pay: FusionPayment) => void;
   onSplit: () => void;
 }
 
@@ -281,7 +282,7 @@ export function TowerInfoPanel({
         onUnlockSlot={onUnlockSlot}
       />
 
-      {fusion && <FusionSection tower={tower} gold={gold} theme={theme} t={t} fusion={fusion} />}
+      {fusion && <FusionSection tower={tower} gold={gold} freeGems={freeGems} purchasedGems={purchasedGems} theme={theme} t={t} fusion={fusion} />}
 
       <RepositionSection theme={theme} t={t} freeAvailable={repositionFreeAvailable} onStart={onStartReposition} />
     </div>
@@ -495,7 +496,23 @@ function fusionEffectLine(type: TowerType, level: number, t: Translate): string 
  * fusion becomes, what the other element adds, its gold cost, and what
  * still stands in the way.
  */
-function FusionSection({ tower, gold, theme, t, fusion }: { tower: TowerInstance; gold: number; theme: (typeof TOWER_THEME)[TowerType]; t: Translate; fusion: FusionPanelData }) {
+function FusionSection({
+  tower,
+  gold,
+  freeGems,
+  purchasedGems,
+  theme,
+  t,
+  fusion,
+}: {
+  tower: TowerInstance;
+  gold: number;
+  freeGems: number;
+  purchasedGems: number;
+  theme: (typeof TOWER_THEME)[TowerType];
+  t: Translate;
+  fusion: FusionPanelData;
+}) {
   const fused = tower.fusedWith;
   return (
     <>
@@ -516,10 +533,12 @@ function FusionSection({ tower, gold, theme, t, fusion }: { tower: TowerInstance
         <>
           <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 3, lineHeight: 1.35 }}>{t("towerInfo.fusion.lead")}</div>
           {fusion.candidates.length === 0 && <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 6 }}>{t("towerInfo.fusion.none")}</div>}
-          {fusion.candidates.map(({ tower: other, blocker, cost }) => {
+          {fusion.candidates.map(({ tower: other, blocker, cost, gemPrice }) => {
             const id = getFusionId(tower.type, other.type)!;
             const [c1, c2] = FUSION_COLORS[id];
             const ok = blocker === null && gold >= cost;
+            // gold short is not a dead end: the same fusion can be paid in gems
+            const gemsOpen = blocker === null || blocker === "GOLD";
             return (
               <div key={other.id} style={{ marginTop: 6, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c2}`, background: `linear-gradient(90deg, ${c1}22, ${c2}22)` }}>
                 <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t("towerInfo.fusion.result", { name: t(`towerInfo.fusion.names.${id}` as TranslationKey) })}</div>
@@ -530,9 +549,18 @@ function FusionSection({ tower, gold, theme, t, fusion }: { tower: TowerInstance
                 {blocker && blocker !== "GOLD" && (
                   <div style={{ fontSize: 10, color: "#ff8a7a", marginTop: 2 }}>{t(`towerInfo.fusion.blocked.${blocker}` as TranslationKey, { level: FUSION_MIN_LEVEL })}</div>
                 )}
-                <button onClick={() => fusion.onFuse(other.id)} disabled={!ok} style={{ ...upgradeButtonStyle, borderColor: c2, marginTop: 5, opacity: ok ? 1 : 0.5 }}>
+                <button onClick={() => fusion.onFuse(other.id, "GOLD")} disabled={!ok} style={{ ...upgradeButtonStyle, borderColor: c2, marginTop: 5, opacity: ok ? 1 : 0.5 }}>
                   <CostLabel label={t("towerInfo.fusion.fuse")} cost={<><CoinIcon size={11} color={PALETTE.gold} /> {cost}</>} />
                 </button>
+                <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 5, marginBottom: 3 }}>{t("towerInfo.fusion.orGems")}</div>
+                <DualGemPriceButtons
+                  price={gemPrice}
+                  freeBalance={freeGems}
+                  purchasedBalance={purchasedGems}
+                  disabled={!gemsOpen}
+                  compact
+                  onPay={(currency) => fusion.onFuse(other.id, currency)}
+                />
               </div>
             );
           })}

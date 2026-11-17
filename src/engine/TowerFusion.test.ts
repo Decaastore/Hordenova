@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
 import { loadSave, updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
-import { FUSION_DAMAGE_MULT, FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost, getFusionId } from "@/config/towerFusion";
+import { FUSION_DAMAGE_MULT, FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost, getFusionGemPrice, getFusionId } from "@/config/towerFusion";
 import { interestForWave, INTEREST_CAP_OF_WAVE_GOLD, INTEREST_RATE } from "@/config/goldInterest";
 import { getTowerStats } from "@/entities/Tower";
 import { MAX_TOWERS_PER_TYPE } from "@/data/mapLayouts";
@@ -15,11 +15,12 @@ function closePair() {
   throw new Error("no close pair of sites");
 }
 
-function startWith(levelA: number, levelB: number, gold = 999_999) {
+function startWith(levelA: number, levelB: number, gold = 999_999, gems: { freeGems?: number; purchasedGems?: number } = {}) {
   const [a, b] = closePair();
   updateSave({
     currentWave: 1,
     gold,
+    ...gems,
     towerLoadout: [
       { slotId: a.id, type: "INFERNO", level: levelA },
       { slotId: b.id, type: "FROSTBORN", level: levelB },
@@ -56,6 +57,25 @@ describe("Torres de fusão", () => {
     const { engine, inferno, frost } = startWith(FUSION_MIN_LEVEL, FUSION_MIN_LEVEL, 10);
     expect(engine.fusionBlocker(inferno.id, frost.id)).toBe("GOLD");
     expect(engine.fuseTowers(inferno.id, frost.id)).toBe(false);
+  });
+
+  it("can be paid in gems instead of gold, from either balance, at the player's choice", () => {
+    const price = getFusionGemPrice(FUSION_MIN_LEVEL, FUSION_MIN_LEVEL);
+    expect(price.free).toBeGreaterThan(price.purchased);
+    const free = startWith(FUSION_MIN_LEVEL, FUSION_MIN_LEVEL, 10, { freeGems: price.free, purchasedGems: 0 });
+    expect(free.engine.fusionBlocker(free.inferno.id, free.frost.id, "GOLD")).toBe("GOLD");
+    expect(free.engine.fusionBlocker(free.inferno.id, free.frost.id, "PURCHASED")).toBe("GEMS");
+    expect(free.engine.fuseTowers(free.inferno.id, free.frost.id, "FREE")).toBe(true);
+    const hud = free.engine.getHudSnapshot();
+    expect(hud.gold).toBe(10);
+    expect(hud.freeGems).toBe(0);
+
+    window.localStorage.clear();
+    const paid = startWith(FUSION_MIN_LEVEL, FUSION_MIN_LEVEL, 10, { freeGems: 0, purchasedGems: price.purchased + 5 });
+    expect(paid.engine.fuseTowers(paid.inferno.id, paid.frost.id, "FREE")).toBe(false);
+    expect(paid.engine.fuseTowers(paid.inferno.id, paid.frost.id, "PURCHASED")).toBe(true);
+    expect(paid.engine.getHudSnapshot().purchasedGems).toBe(5);
+    expect(paid.engine.getRenderSnapshot().towers[0]!.fusedWith?.type).toBe("FROSTBORN");
   });
 
   it("fuses: charges the cost, frees the partner's site, carries its element and hits harder", () => {

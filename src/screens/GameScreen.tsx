@@ -1,5 +1,6 @@
+import { BLESSING_WAVES, ELEMENT_OF_TOWER, type WaveElement } from "@/config/waveElements";
 import { BlessingCard } from "@/ui/BlessingCard";
-import { getFusionCost } from "@/config/towerFusion";
+import { getFusionCost, getFusionGemPrice } from "@/config/towerFusion";
 import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
 import { MomentOfferCard } from "@/ui/MomentOfferCard";
 import { EternalPanel } from "@/ui/EternalPanel";
@@ -537,7 +538,23 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           }}
         />
         <MapZoomControls mapRef={mapAreaRef} />
-        {hud.blessingOffered && <BlessingCard onChoose={(el) => engine.chooseBlessing(el)} />}
+        {hud.blessingOffered && (
+          <BlessingCard
+            onChoose={(el) => engine.chooseBlessing(el)}
+            upcoming={Array.from({ length: BLESSING_WAVES }, (_, i) => {
+              const wave = hud.wave + 1 + i;
+              return { wave, element: engine.waveElement(wave) };
+            })}
+            towerCounts={engine.getRenderSnapshot().towers.reduce(
+              (acc, tw) => {
+                acc[ELEMENT_OF_TOWER[tw.type]] += 1;
+                if (tw.fusedWith) acc[ELEMENT_OF_TOWER[tw.fusedWith.type]] += 1;
+                return acc;
+              },
+              { FIRE: 0, ICE: 0, STORM: 0, NATURE: 0 } as Record<WaveElement, number>,
+            )}
+          />
+        )}
         {hybridOn && (
           <Enemy3DErrorBoundary
             onError={() => {
@@ -657,8 +674,9 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
                 tower: other,
                 blocker: engine.fusionBlocker(selectedTower.id, other.id),
                 cost: getFusionCost(selectedTower.level, other.level),
+                gemPrice: getFusionGemPrice(selectedTower.level, other.level),
               })),
-              onFuse: (partnerId) => engine.fuseTowers(selectedTower.id, partnerId),
+              onFuse: (partnerId, pay) => engine.fuseTowers(selectedTower.id, partnerId, pay),
               onSplit: () => engine.splitTower(selectedTower.id),
             }}
             gold={hud.gold}

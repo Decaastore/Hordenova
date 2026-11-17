@@ -32,6 +32,18 @@ describe("Elemento da onda", () => {
     expect(seen.size).toBe(4);
   });
 
+  it("is well mixed: no element runs for long, and each one shows up often", () => {
+    const seq = Array.from({ length: 400 }, (_, i) => waveElementFor(ELEMENT_FIRST_WAVE + i)!);
+    let run = 1;
+    let longest = 1;
+    for (let i = 1; i < seq.length; i++) {
+      run = seq[i] === seq[i - 1] ? run + 1 : 1;
+      longest = Math.max(longest, run);
+    }
+    expect(longest).toBeLessThanOrEqual(6);
+    for (const el of ["FIRE", "ICE", "STORM", "NATURE"]) expect(seq.filter((x) => x === el).length).toBeGreaterThan(60);
+  });
+
   it("no element means no change", () => {
     expect(Object.values(elementMultipliers(null)).every((v) => v === 1)).toBe(true);
   });

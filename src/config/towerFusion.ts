@@ -1,4 +1,5 @@
 import type { TowerType } from "./towerStats";
+import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
 
 /**
  * TORRES DE FUSÃO — two towers of different elements standing close together
@@ -30,6 +31,19 @@ export const FUSION_CHAIN_FALLOFF = 0.55;
 export function getFusionCost(levelA: number, levelB: number): number {
   return 2000 + 150 * (levelA + levelB);
 }
+
+/**
+ * The same fusion paid in gems instead of gold — the player's choice. Free
+ * gems cost 1.5× the purchased price (the usual dual price); capped so a
+ * late fusion never turns into a gem wall.
+ */
+export const FUSION_GEM_PRICE_CAP = 600;
+export function getFusionGemPrice(levelA: number, levelB: number): DualGemPrice {
+  return dualGemPrice(Math.min(FUSION_GEM_PRICE_CAP, 200 + 5 * (levelA + levelB)));
+}
+
+/** How a fusion is paid: gold, or one of the two gem balances. */
+export type FusionPayment = "GOLD" | "FREE" | "PURCHASED";
 
 export type FusionId = "STEAM" | "PLASMA" | "HAIL" | "FIRE_ARROWS" | "FROST_ARROWS" | "THUNDER_ARROWS";
 

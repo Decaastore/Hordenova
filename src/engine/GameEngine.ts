@@ -1,5 +1,5 @@
 import { BLESSING_EVERY, BLESSING_MULT, BLESSING_WAVES, ELEMENT_OF_TOWER, elementMultipliers, waveElementFor, type Blessing, type WaveElement } from "@/config/waveElements";
-import { FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost } from "@/config/towerFusion";
+import { FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost, getFusionGemPrice, type FusionPayment } from "@/config/towerFusion";
 import { interestForWave } from "@/config/goldInterest";
 import { claimableMilestones, contractsForWeek, depthOfWave, depthReward, MERCHANT_OFFERS, milestoneReward, rollWeek, SHARD_POUCH_AMOUNT, type EternalState, type MerchantOfferId, createEternalState } from "@/config/eternal";
 import { ETERNAL_STORAGE_KEY } from "./SaveSystem";
@@ -1076,7 +1076,11 @@ export class GameEngine {
   // ---------------------------------------------------------------------
 
   /** Why `partnerId` can't be fused into `towerId` right now, or null when it can. */
-  fusionBlocker(towerId: string, partnerId: string): "LEVEL" | "DISTANCE" | "SAME_ELEMENT" | "ALREADY_FUSED" | "GOLD" | "LOCKED" | null {
+  fusionBlocker(
+    towerId: string,
+    partnerId: string,
+    pay: FusionPayment = "GOLD",
+  ): "LEVEL" | "DISTANCE" | "SAME_ELEMENT" | "ALREADY_FUSED" | "GOLD" | "GEMS" | "LOCKED" | null {
     const a = this.towers.find((t) => t.id === towerId);
     const b = this.towers.find((t) => t.id === partnerId);
     if (!a || !b || a === b || !this.canModifyLoadout()) return "LOCKED";
@@ -1084,7 +1088,9 @@ export class GameEngine {
     if (a.fusedWith || b.fusedWith) return "ALREADY_FUSED";
     if (a.level < FUSION_MIN_LEVEL || b.level < FUSION_MIN_LEVEL) return "LEVEL";
     if (Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) > FUSION_MAX_DISTANCE) return "DISTANCE";
-    if (this.gold < getFusionCost(a.level, b.level)) return "GOLD";
+    if (pay === "GOLD") {
+      if (this.gold < getFusionCost(a.level, b.level)) return "GOLD";
+    } else if (!this.canAffordGemsInCurrency(gemPriceForCurrency(getFusionGemPrice(a.level, b.level), pay), pay)) return "GEMS";
     return null;
   }
 
@@ -1098,11 +1104,12 @@ export class GameEngine {
   }
 
   /** Fuses `partnerId` into `towerId`: the partner leaves its site and rides inside the first tower, lending it its element. */
-  fuseTowers(towerId: string, partnerId: string): boolean {
-    if (this.fusionBlocker(towerId, partnerId) !== null) return false;
+  fuseTowers(towerId: string, partnerId: string, pay: FusionPayment = "GOLD"): boolean {
+    if (this.fusionBlocker(towerId, partnerId, pay) !== null) return false;
     const a = this.towers.find((t) => t.id === towerId)!;
     const b = this.towers.find((t) => t.id === partnerId)!;
-    this.gold -= getFusionCost(a.level, b.level);
+    if (pay === "GOLD") this.gold -= getFusionCost(a.level, b.level);
+    else this.spendGems(gemPriceForCurrency(getFusionGemPrice(a.level, b.level), pay), `fusion:${a.type}+${b.type}`, pay);
     // the partner's equipped items go back to the inventory rather than ride along unseen
     a.fusedWith = { ...this.loadoutEntryOf(b), slotId: "", fusedWith: null, equippedItemInstanceIds: Array(TOWER_ITEM_SLOT_COUNT).fill(null) };
     this.towers = this.towers.filter((t) => t !== b);
