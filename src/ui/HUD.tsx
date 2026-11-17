@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
+import { counterOf, type WaveElement } from "@/config/waveElements";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
@@ -150,6 +151,12 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               </span>
             </>
           )}
+          {(hud.waveElement || hud.nextWaveElement || hud.blessing) && (
+            <>
+              <span className="hh-sep" aria-hidden="true" />
+              <ElementLine hud={hud} t={t} />
+            </>
+          )}
         </div>
 
         <div className="hh-controls">
@@ -257,6 +264,25 @@ function statusLine(hud: HudSnapshot, t: Translate): { text: string; color: stri
 }
 
 /** What is coming: the mini-boss or the region's boss, with how many waves are left. */
+const ELEMENT_COLORS: Record<WaveElement, string> = { FIRE: "#ff7a2a", ICE: "#8fe6ff", STORM: "#c49bff", NATURE: "#9adf6a" };
+const ELEMENT_TOWER_NAME: Record<WaveElement, string> = { FIRE: "Inferno", ICE: "Frostborn", STORM: "Stormcaller", NATURE: "Ironwood" };
+
+/** ELEMENTO DA ONDA — this wave's element and which tower it favours, the next wave's, and any blessing. */
+function ElementLine({ hud, t }: { hud: HudSnapshot; t: Translate }) {
+  const name = (el: WaveElement) => t(`hud.element.names.${el}` as TranslationKey);
+  return (
+    <span className="hh-threat" style={{ display: "inline-flex", gap: 10 }}>
+      {hud.waveElement && (
+        <span style={{ color: ELEMENT_COLORS[hud.waveElement] }}>
+          {t("hud.element.wave", { el: name(hud.waveElement), tower: ELEMENT_TOWER_NAME[counterOf(hud.waveElement)] })}
+        </span>
+      )}
+      {!hud.waveElement && hud.nextWaveElement && <span style={{ color: ELEMENT_COLORS[hud.nextWaveElement] }}>{t("hud.element.next", { el: name(hud.nextWaveElement) })}</span>}
+      {hud.blessing && <span style={{ color: ELEMENT_COLORS[hud.blessing.element] }}>✦ {t("hud.element.blessed", { el: name(hud.blessing.element), wave: hud.blessing.untilWave })}</span>}
+    </span>
+  );
+}
+
 function threatLine(hud: HudSnapshot, t: Translate): { text: string; color: string } | null {
   if (hud.rift.active && hud.rift.active.wave === hud.wave) {
     return { text: t("rift.threat", { pct: riftRewardPct(hud.rift.active.mods) }), color: "#d5b3ff" };

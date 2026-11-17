@@ -23,6 +23,7 @@ export const CREATURE_FILES = {
   pumpkin: "/models/enemies/mixamo/pumpkin.glb",
   yaku: "/models/enemies/mixamo/yaku.glb",
   goblin: "/models/enemies/mixamo/goblin.glb",
+  mremireh: "/models/enemies/mixamo/mremireh.glb",
 } as const;
 export type CreatureId = keyof typeof CREATURE_FILES;
 /** Death animations (no mesh), shared by every creature through the common Mixamo skeleton. */
@@ -39,7 +40,7 @@ const IDS = Object.keys(CREATURE_FILES) as CreatureId[];
 const FOR_TYPE: Record<string, CreatureId> = {
   BRUTE: "warrok",
   CRAWLER: "parasite",
-  SWARMLING: "goblin",
+  SWARMLING: "mremireh",
   RUNNER: "goblin",
   DISABLER: "vampire",
   SHIELDBEARER: "brute2",
@@ -243,6 +244,10 @@ export class Creature {
   readonly feet: THREE.Object3D[];
   /** The head bone, for glowing eyes. Null when a model has none. */
   readonly head: THREE.Object3D | null;
+  /** The bone at the crown of the head (eyes sit between it and `head`). */
+  readonly headTop: THREE.Object3D | null;
+  /** Bones that armour hangs on (shoulders, upper back). */
+  readonly bones: { lArm: THREE.Object3D | null; rArm: THREE.Object3D | null; spine: THREE.Object3D | null; hips: THREE.Object3D | null };
   private fallT = -1;
   private fallDir = 1;
   private readonly deaths: THREE.AnimationClip[];
@@ -296,6 +301,9 @@ export class Creature {
     const right = body.getObjectByProperty("name", "mixamorigRightFoot") ?? body.getObjectByProperty("name", "mixamorig:RightFoot");
     this.feet = left && right ? [left, right] : [];
     this.head = body.getObjectByProperty("name", "mixamorigHead") ?? body.getObjectByProperty("name", "mixamorig:Head") ?? null;
+    this.headTop = body.getObjectByProperty("name", "mixamorigHeadTop_End") ?? body.getObjectByProperty("name", "mixamorig:HeadTop_End") ?? null;
+    const bone = (n: string) => body.getObjectByProperty("name", `mixamorig${n}`) ?? body.getObjectByProperty("name", `mixamorig:${n}`) ?? null;
+    this.bones = { lArm: bone("LeftArm"), rArm: bone("RightArm"), spine: bone("Spine2") ?? bone("Spine1"), hips: bone("Hips") };
   }
 
   /** Whether it can play `move` (the clip loaded). */

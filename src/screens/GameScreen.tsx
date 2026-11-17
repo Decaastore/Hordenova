@@ -1,3 +1,4 @@
+import { BlessingCard } from "@/ui/BlessingCard";
 import { getFusionCost } from "@/config/towerFusion";
 import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
 import { MomentOfferCard } from "@/ui/MomentOfferCard";
@@ -536,6 +537,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           }}
         />
         <MapZoomControls mapRef={mapAreaRef} />
+        {hud.blessingOffered && <BlessingCard onChoose={(el) => engine.chooseBlessing(el)} />}
         {hybridOn && (
           <Enemy3DErrorBoundary
             onError={() => {

@@ -761,6 +761,12 @@ export const en = {
       stopped: "The castle fell · upgrade your towers and try again",
       deploy: "Place your towers and confirm to begin",
     },
+    element: {
+      names: { FIRE: "Fire", ICE: "Ice", STORM: "Storm", NATURE: "Nature" },
+      wave: "{el} wave: {tower} +30%",
+      next: "Next: {el} wave",
+      blessed: "{el} blessed until wave {wave}",
+    },
     threat: {
       bossIn: "Region boss on wave {wave} ({n} to go)",
       bossNext: "Region boss next wave",
@@ -2581,6 +2587,12 @@ export const en = {
     explain: "The horde learns from the towers that hurt it most and toughens up against them, and leaves a gap against the one you use least. A mixed defense keeps it off balance.",
     changed: "The horde adapted to your {tower}!",
     plain: "Not adapted yet",
+  },
+  blessing: {
+    title: "Elemental blessing",
+    lead: "Pick an element: its towers hit 15% harder for the next 5 waves.",
+    later: "Later",
+    towers: { FIRE: "Inferno", ICE: "Frostborn", STORM: "Stormcaller", NATURE: "Ironwood" },
   },
   city: {
     interest: "+{amount} gold in interest for the gold you kept",

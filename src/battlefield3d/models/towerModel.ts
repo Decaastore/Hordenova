@@ -862,35 +862,49 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     };
 
     switch (SKIN) {
-      // ---- a moss-grown stone golem kneeling, holding the orb up in both hands ----
+      // ---- an ancient carved stone head sunk in a glacier, eyes burning with cold, the orb over its brow ----
       case "FROSTBORN_ANCIENT_GUARDIAN": {
-        const st = mat(stone(301, L.obelisk, 4, 4, true), 1, 1, { emissiveColor: L.rune, emissiveIntensity: 2.2 });
-        const moss = plainMat(L.snow, { rough: 1 });
-        const body = mesh(new THREE.BoxGeometry(10, 9, 7), st, 0, top + 6, -1.5);
-        body.rotation.x = 0.12;
-        mesh(new THREE.BoxGeometry(5, 4.4, 4.6), st, 0, top + 12.6, -0.6);
-        for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(1.4, 0.7, 0.4), glow(L.rune, 3), sx * 1.2, top + 13, 1.75);
-        // shoulders, raised arms and open hands under the orb
+        const stoneT = stone(301, L.obelisk, 6, 4, true);
+        const st = mat(stoneT, 1, 1.4, { emissiveColor: L.rune, emissiveIntensity: 2.2, bump: 2 });
+        const moss = plainMat("#4a6a3a", { rough: 1 });
+        const H = s >= 5 ? 1.15 : 1;
+        // the head: a long carved block, heavy brow, deep sockets, broad nose, set jaw
+        const head = mesh(new THREE.BoxGeometry(8.5 * H, 15 * H, 7 * H), st, 0, top + 8.5 * H, -0.5);
+        void head;
+        mesh(new THREE.BoxGeometry(9.4 * H, 2 * H, 2.2 * H), st, 0, top + 12.6 * H, 3.2 * H);
         for (const sx of [-1, 1]) {
-          mesh(new THREE.BoxGeometry(4, 4, 4.4), st, sx * 6.6, top + 9.5, -1);
-          const up = mesh(new THREE.BoxGeometry(3, 8, 3), st, sx * 6.2, top + 14.8, 0.4);
-          up.rotation.z = sx * 0.28;
-          mesh(new THREE.BoxGeometry(3.4, 1.6, 4), st, sx * 3.6, top + 19.2, 1);
+          mesh(new THREE.BoxGeometry(2.4 * H, 1.4 * H, 1), plainMat("#0a0e14", { rough: 1 }), sx * 2.2 * H, top + 11.1 * H, 3.1 * H);
+          mesh(new THREE.SphereGeometry(0.75 * H, 12, 8), glow(L.rune, 3.2), sx * 2.2 * H, top + 11.1 * H, 3.5 * H);
         }
-        // knees on the ground
-        for (const sx of [-1, 1]) mesh(new THREE.BoxGeometry(3.6, 3.4, 6), st, sx * 3.4, top + 1.7, 3);
-        for (let i = 0; i < 8; i++) {
-          const m = mesh(new THREE.SphereGeometry(1 + r(), 8, 6), moss, (r() - 0.5) * 10, top + 10.5 + r() * 2, -2 + (r() - 0.5) * 5);
-          m.scale.y = 0.35;
+        const nose = mesh(new THREE.BoxGeometry(2.2 * H, 5 * H, 2.4 * H), st, 0, top + 8.6 * H, 3.6 * H);
+        nose.rotation.x = 0.12;
+        mesh(new THREE.BoxGeometry(5.6 * H, 1 * H, 1.6 * H), st, 0, top + 5.2 * H, 3.3 * H);
+        mesh(new THREE.BoxGeometry(7.4 * H, 3 * H, 6.4 * H), st, 0, top + 2.6 * H, 0.2);
+        // runes cut down its cheeks, moss in the cracks
+        for (const sx of [-1, 1]) for (let k = 0; k < 3; k++) mesh(new THREE.BoxGeometry(0.4, 1.4, 0.3), glow(L.rune, 2.4), sx * 3.7 * H, top + (6 + k * 2.2) * H, 2.9 * H);
+        for (let i = 0; i < 6; i++) {
+          const m = mesh(new THREE.SphereGeometry(0.9 + r() * 0.7, 8, 6), moss, (r() - 0.5) * 8 * H, top + (14.5 + r()) * H, (r() - 0.5) * 5);
+          m.scale.y = 0.4;
         }
-        orb(0, top + 23, 1);
-        if (s >= 3) for (let i = 0; i < 4; i++) crystal(5 + r() * 3, 0.9, i % 2 ? ice : iceDeep, -6 + i * 4, top + 6, -5, -0.4, (r() - 0.5) * 0.4);
-        if (s >= 5) {
-          // vines of frost round its arms and a stone crown
-          for (let i = 0; i < 5; i++) mesh(new THREE.ConeGeometry(0.5, 2, 5), st, -2 + i, top + 15.6, -0.6);
+        // the glacier swallowing its shoulders
+        const n = s >= 3 ? 11 : 8;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + r() * 0.3;
+          const d = 4.6 + r() * 3;
+          crystal(5 + r() * (s >= 4 ? 9 : 6), 1.3 + r() * 1.1, i % 3 ? ice : iceDeep, Math.cos(a) * d, top - 0.6, Math.sin(a) * d * 0.9, Math.sin(a) * 0.35, -Math.cos(a) * 0.35);
         }
-        if (s >= 4) anchors.runeOrbit = new THREE.Vector3(0, top + 23, 1);
-        if (s >= 6) ring(6, top + 23, glow(L.rune, 2), 0.25, Math.PI / 2 - 0.4);
+        const sheet = new THREE.MeshPhysicalMaterial({ color: L.ice[0], emissive: L.ice[1], emissiveIntensity: 0.3, roughness: 0.1, transparent: true, opacity: 0.55, clearcoat: 1, depthWrite: false });
+        const shell = mesh(new THREE.CylinderGeometry(6.2, 8.4, 6, 9), sheet, 0, top + 3, 0);
+        shell.rotation.y = 0.3;
+        // the cold gathers in an orb over its brow, inside a ring of ice
+        orb(0, top + 20.5 * H, 0.6, 3);
+        ring(4.6, top + 20.5 * H, ice, 0.35, Math.PI / 2 - 0.3);
+        if (s >= 4) anchors.runeOrbit = new THREE.Vector3(0, top + 20.5 * H, 0.6);
+        if (s >= 5) for (let i = 0; i < 5; i++) {
+          const a = -0.9 + i * 0.45;
+          crystal(4 + (i === 2 ? 2.5 : 0), 0.7, ice, Math.sin(a) * 3.6 * H, top + 15.3 * H, -0.5 - Math.cos(a) * 1.2, -0.15, -a * 0.5);
+        }
+        if (s >= 6) ring(7, top + 20.5 * H, glow(L.rune, 2.4), 0.22, Math.PI / 2 - 0.3);
         return true;
       }
 
@@ -2172,7 +2186,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   const INF_OWN = new Set(["INFERNO_ASHEN_TYRANT", "INFERNO_VOLCANIC_COLOSSUS", "INFERNO_INDUSTRIAL_FORGE", "INFERNO_SOLAR_ASCENDANT", "INFERNO_PRESTIGE_ASCENDANT", "INFERNO_BLUE_FLAME", "INFERNO_COPPER", "INFERNO_EMERALD", "INFERNO_LEGEND"]);
-  const FROST_OWN = new Set(["FROSTBORN_ARCANE_CRYSTAL", "FROSTBORN_GLACIAL_WARLORD", "FROSTBORN_LEGEND", "FROSTBORN_CHAMPION", "FROSTBORN_CELESTIAL_ICE"]);
+  const FROST_OWN = new Set(["FROSTBORN_ANCIENT_GUARDIAN", "FROSTBORN_ARCANE_CRYSTAL", "FROSTBORN_GLACIAL_WARLORD", "FROSTBORN_LEGEND", "FROSTBORN_CHAMPION", "FROSTBORN_CELESTIAL_ICE"]);
   const STORM_OWN = new Set(["STORMCALLER_THUNDER", "STORMCALLER_VOID", "STORMCALLER_COPPER", "STORMCALLER_RUBY", "STORMCALLER_PRESTIGE_ASCENDANT", "STORMCALLER_LEGEND", "STORMCALLER_CHAMPION"]);
   const IRON_OWN = new Set(["IRONWOOD_ANCIENT_HUNTER", "IRONWOOD_AUTUMN", "IRONWOOD_BIRCH", "IRONWOOD_BLOODWOOD", "IRONWOOD_CELESTIAL_WARDEN", "IRONWOOD_CHAMPION", "IRONWOOD_FROSTPINE", "IRONWOOD_LEGEND", "IRONWOOD_PRESTIGE_ASCENDANT", "IRONWOOD_WARDEN_OF_THE_ABYSS"]);
 
@@ -2652,6 +2666,14 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
 
       // ---- a jade dragon rearing up, green fire in its jaws ----
       case "INFERNO_EMERALD": {
+        // the whole dragon a size up, so it rears over its platform
+        const dragon = new THREE.Group();
+        PARENT.add(dragon);
+        const outer = PARENT;
+        PARENT = dragon;
+        const DK = 1.3;
+        dragon.scale.setScalar(DK);
+        const lightsFrom = pointLights.length;
         const jadeT = stoneTex(251, "#4a8a5a", "#2a5a3a", "#143020", 6, 4);
         const jade = mat(jadeT, 1, 1, { rough: 0.35, metal: 0.15, bump: 0.8 });
         const gold = metal(L.brass, 0.3, 0.8);
@@ -2672,7 +2694,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         light(0, 18, 11);
         for (const sx of [-1, 1]) {
           mesh(new THREE.SphereGeometry(0.6, 10, 8), glow(L.fire, 3), sx * 1.9, 20.8, 5.2);
-          tube([new THREE.Vector3(sx * 1.8, 21.5, 1.5), new THREE.Vector3(sx * 3, 24, -1), new THREE.Vector3(sx * 3.6, 25.5, -4)], 0.45, gold, 12);
+          // horns swept back along the skull, a smaller pair below them
+          tube([new THREE.Vector3(sx * 1.8, 21.4, 1.8), new THREE.Vector3(sx * 3.2, 22.6, -1.2), new THREE.Vector3(sx * 3.6, 23.2, -4.6)], 0.55, gold, 12);
+          tube([new THREE.Vector3(sx * 2.4, 19.6, 2.2), new THREE.Vector3(sx * 3.8, 19.8, 0), new THREE.Vector3(sx * 4.4, 20.6, -2.2)], 0.32, gold, 10);
         }
         anchors.smoke1 = new THREE.Vector3(0, 21, 7.5);
         if (s >= 2) {
@@ -2695,6 +2719,31 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
           mesh(new THREE.SphereGeometry(1.5, 18, 14), plainMat("#f4fff0", { emissive: L.fire, ei: 0.8, rough: 0.1 }), 0, 26.5, 0);
           mesh(new THREE.TorusGeometry(2.2, 0.15, 6, 24), gold, 0, 26.5, 0);
         }
+        // great jade wings spread from its shoulders, ribbed in gold
+        const membrane = new THREE.MeshStandardMaterial({ color: "#3a8a52", emissive: L.fire, emissiveIntensity: 0.25, roughness: 0.5, transparent: true, opacity: 0.88, side: THREE.DoubleSide });
+        for (const sx of [-1, 1]) {
+          const wing = new THREE.Group();
+          wing.position.set(sx * 2.6, 13.5, -4.2);
+          wing.rotation.set(-0.25, sx > 0 ? -0.35 : Math.PI + 0.35, 0.45);
+          dragon.add(wing);
+          const shape = new THREE.Shape();
+          shape.moveTo(0, 0);
+          shape.lineTo(5, 7.5);
+          shape.lineTo(11, 9.5);
+          shape.lineTo(13.5, 4);
+          shape.quadraticCurveTo(11, 3.6, 10, 1.2);
+          shape.quadraticCurveTo(8, 2.2, 6.6, -0.8);
+          shape.quadraticCurveTo(4.6, 0.6, 3, -2.2);
+          shape.lineTo(0, 0);
+          mesh(new THREE.ShapeGeometry(shape, 12), membrane, 0, 0, 0, wing);
+          for (const [x, y] of [[11, 9.5], [13.5, 4], [10, 1.2], [6.6, -0.8], [3, -2.2]] as const)
+            mesh(new THREE.CylinderGeometry(0.16, 0.32, Math.hypot(x, y), 6), gold, x / 2, y / 2, 0.05, wing).rotation.z = Math.atan2(-x, y);
+          mesh(new THREE.ConeGeometry(0.35, 1.6, 6), gold, 11, 10.4, 0, wing);
+        }
+        PARENT = outer;
+        // its anchors and lights live in the turret's space: carry them up with the bigger dragon
+        for (const k of ["mouth", "smoke1", "smoke2"]) if (anchors[k]) anchors[k]!.multiplyScalar(DK);
+        for (let i = lightsFrom; i < pointLights.length; i++) pointLights[i]!.pos.multiplyScalar(DK);
         return true;
       }
 

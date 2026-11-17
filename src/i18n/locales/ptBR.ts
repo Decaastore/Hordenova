@@ -762,6 +762,12 @@ export const ptBR: TranslationSchema = {
       stopped: "O castelo caiu · melhore as torres e tente de novo",
       deploy: "Posicione suas torres e confirme para começar",
     },
+    element: {
+      names: { FIRE: "Fogo", ICE: "Gelo", STORM: "Tempestade", NATURE: "Natureza" },
+      wave: "Onda de {el}: {tower} +30%",
+      next: "Próxima: onda de {el}",
+      blessed: "Bênção de {el} até a onda {wave}",
+    },
     threat: {
       bossIn: "Chefe da região na onda {wave} (faltam {n})",
       bossNext: "Chefe da região na próxima onda",
@@ -2582,6 +2588,12 @@ export const ptBR: TranslationSchema = {
     explain: "A horda aprende com as torres que mais a ferem e fica mais resistente a elas, e abre uma brecha contra a que você menos usa. Uma defesa variada deixa ela sem saída.",
     changed: "A horda se adaptou ao seu {tower}!",
     plain: "Ainda não se adaptou",
+  },
+  blessing: {
+    title: "Bênção elemental",
+    lead: "Escolha um elemento: as torres dele causam 15% a mais de dano nas próximas 5 ondas.",
+    later: "Depois",
+    towers: { FIRE: "Inferno", ICE: "Frostborn", STORM: "Stormcaller", NATURE: "Ironwood" },
   },
   city: {
     interest: "+{amount} de ouro em juros pelo ouro guardado",

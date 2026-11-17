@@ -1,3 +1,4 @@
+import { PROPS_3D } from "@/hybrid3d/mapProps3d";
 import { drawSkinImpacts } from "@/rendering/skinShotFx";
 import { footprints } from "./footprints";
 import { getViewTransform, getZoom, panBy, zoomAt } from "./viewCamera";
@@ -474,13 +475,16 @@ export function CanvasRenderer({
       // light/shadow) replaces the live ground/road/scenery drawing for the
       // biomes that have one; the 3D terrain layer stands down for them too.
       const groundBake = getGroundBake(biome.id);
+      // the hybrid 3D layer builds the light towers and lava pools itself: leave the flat ones out
+      const with3dProps = (base: ReadonlySet<DecorationKind> | undefined) =>
+        PROPS_3D.active ? new Set<DecorationKind>([...(base ?? []), "TORCH", ...(biome.liquidGlows ? (["WATER"] as const) : [])]) : base;
       if (groundBake) {
         drawBakedGround(ctx, groundBake, biome, visibleBounds, timestamp);
-        drawDecorations(ctx, biome, timestamp, groundBake.skipKinds);
+        drawDecorations(ctx, biome, timestamp, with3dProps(groundBake.skipKinds));
       } else {
         const world3dTerrain = worldLayerOn && !hasGroundBake(biome.id);
         if (!world3dTerrain) drawBackground(ctx, biome, visibleBounds);
-        drawDecorations(ctx, biome, timestamp, world3dTerrain ? WORLD_LAYER_3D_DECORATION_KINDS : undefined);
+        drawDecorations(ctx, biome, timestamp, with3dProps(world3dTerrain ? WORLD_LAYER_3D_DECORATION_KINDS : undefined));
         drawPath(ctx, roadPath, biome, world3dTerrain);
       }
       // ROLLBACK NOTE — this used to pass `worldLayerOn` as `skipCastleBody`

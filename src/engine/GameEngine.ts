@@ -1,3 +1,4 @@
+import { BLESSING_EVERY, BLESSING_MULT, BLESSING_WAVES, ELEMENT_OF_TOWER, elementMultipliers, waveElementFor, type Blessing, type WaveElement } from "@/config/waveElements";
 import { FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost } from "@/config/towerFusion";
 import { interestForWave } from "@/config/goldInterest";
 import { claimableMilestones, contractsForWeek, depthOfWave, depthReward, MERCHANT_OFFERS, milestoneReward, rollWeek, SHARD_POUCH_AMOUNT, type EternalState, type MerchantOfferId, createEternalState } from "@/config/eternal";
@@ -267,6 +268,12 @@ export interface HudSnapshot {
   /** A HORDA QUE APRENDE — damage-taken multiplier per element for the current wave, plus a counter bumped on every change worth announcing. */
   horde: { multipliers: Readonly<Record<TowerType, number>>; changeSeq: number };
   /** O CASTELO VIRA CIDADE — burning buildings (clean waves left) and the latest city event (seq bumps on each). */
+  /** ELEMENTO DA ONDA — this wave's element and the next one's (null: none). */
+  waveElement?: WaveElement | null;
+  nextWaveElement?: WaveElement | null;
+  /** BÊNÇÃO ELEMENTAL — the blessed element and its last wave, and whether a new blessing is waiting to be chosen. */
+  blessing?: Blessing | null;
+  blessingOffered?: boolean;
   /** JUROS (config/goldInterest.ts) — the last interest paid at the end of a wave. */
   interest?: { seq: number; amount: number } | null;
   city: {
@@ -433,6 +440,11 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     TOWER_TYPES.every((type) => a.horde.multipliers[type] === b.horde.multipliers[type]) &&
     a.city.lastEvent?.seq === b.city.lastEvent?.seq &&
     a.interest?.seq === b.interest?.seq &&
+    a.waveElement === b.waveElement &&
+    a.nextWaveElement === b.nextWaveElement &&
+    a.blessing?.element === b.blessing?.element &&
+    a.blessing?.untilWave === b.blessing?.untilWave &&
+    a.blessingOffered === b.blessingOffered &&
     a.rift.charges === b.rift.charges &&
     a.talents.ranks === b.talents.ranks &&
     a.talents.free === b.talents.free &&
@@ -600,6 +612,9 @@ export class GameEngine {
   /** O CASTELO VIRA CIDADE — see config/city.ts. */
   private city: CityState = createCityState();
   private lastInterest: { seq: number; amount: number } | null = null;
+  /** BÊNÇÃO ELEMENTAL — the active blessing, and the wave a new one was offered at (null: none waiting). */
+  private blessing: Blessing | null = null;
+  private blessingOffer: number | null = null;
   private rift: RiftState = createRiftState();
   private talents: TalentRanks = {};
   private eternal: EternalState = createEternalState();
@@ -2892,7 +2907,7 @@ export class GameEngine {
     if (this.specialsHeld && (this.wave.currentWave !== this.specialsHeldWave || this.phase === "WAVE_TRANSITION")) {
       this.specialsHeld = false;
     }
-    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave, this.specialsHeld, this.hordeAdaptation.multipliers);
+    const { projectiles: newProjectiles, damageEvents } = tickCombat(this.towers, this.enemies, scaledDt, this.wave.currentWave, this.specialsHeld, this.combatMultipliers());
     this.projectiles.push(...newProjectiles);
     for (const e of damageEvents) this.waveDamageByType[e.towerType] += e.amount;
     recordDamageEvents(this.battleStats, damageEvents);
@@ -3148,9 +3163,37 @@ export class GameEngine {
       this.lastInterest = { seq: (this.lastInterest?.seq ?? 0) + 1, amount: interest };
     }
 
+    // BÊNÇÃO ELEMENTAL — every 5 waves cleared, a blessing is on offer (it waits; nothing blocks)
+    if (wave > 0 && wave % BLESSING_EVERY === 0) this.blessingOffer = wave;
+    if (this.blessing && wave >= this.blessing.untilWave) this.blessing = null;
+
     this.waveDamageByType = emptyShares();
     this.waveKillGold = 0;
     this.waveLeaked = false;
+  }
+
+  /** ELEMENTO DA ONDA — the element the wave `wave` carries (config/waveElements.ts). */
+  waveElement(wave: number): WaveElement | null {
+    return waveElementFor(wave, isBossMilestone(wave) || isMiniBossWave(wave));
+  }
+
+  /** Bless one element for the next waves, when a blessing is on offer. */
+  chooseBlessing(element: WaveElement): boolean {
+    if (this.blessingOffer === null) return false;
+    this.blessing = { element, untilWave: this.wave.currentWave + BLESSING_WAVES };
+    this.blessingOffer = null;
+    this.notify();
+    return true;
+  }
+
+  /** Damage multiplier per tower type right now: the horde's learned resistances × the wave's element × the blessing. */
+  private combatMultipliers(): Record<TowerType, number> {
+    const el = elementMultipliers(this.waveElement(this.wave.currentWave));
+    const out = { ...this.hordeAdaptation.multipliers } as Record<TowerType, number>;
+    for (const t of Object.keys(out) as TowerType[]) {
+      out[t] = out[t] * el[t] * (this.blessing && ELEMENT_OF_TOWER[t] === this.blessing.element ? BLESSING_MULT : 1);
+    }
+    return out;
   }
 
   /** Creatures reached the castle: the first breach of a wave sets a building alight, a main boss one more. */
@@ -3667,6 +3710,10 @@ export class GameEngine {
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
       horde: { multipliers: this.hordeAdaptation.multipliers, changeSeq: this.hordeChangeSeq },
       interest: this.lastInterest,
+      waveElement: this.waveElement(this.wave.currentWave),
+      nextWaveElement: this.waveElement(this.wave.currentWave + 1),
+      blessing: this.blessing,
+      blessingOffered: this.blessingOffer !== null,
       city: { burning: { ...this.city.burning }, goldShare: this.cityShare(), lastEvent: this.lastCityEvent },
       rift: { charges: this.rift.charges, armed: this.rift.armed, active: this.rift.active, lastResult: this.lastRiftResult },
       talents: { ranks: this.talents, free: talentPointsFree(this.talents, this.seasonBestWave) },

@@ -1,3 +1,5 @@
+import { buildLavaPool, buildTorch, PROPS_3D, type LiveProp } from "./mapProps3d";
+import { getMapDecorations } from "@/rendering/mapDecorations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { Component, Suspense, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import { Canvas, useFrame, useLoader, useThree } from "@react-three/fiber";
@@ -518,6 +520,69 @@ function auraTexture() {
 }
 
 const eyeTmp = new THREE.Vector3();
+const armorTmp = new THREE.Vector3();
+
+/** One piece of a boss's armour and the bone it rides (offsets as fractions of the creature's height). */
+interface ArmorPiece {
+  obj: THREE.Object3D;
+  bone: "head" | "lArm" | "rArm" | "spine";
+  up: number;
+  fwd: number;
+  side: number;
+}
+const armorIron = new THREE.MeshStandardMaterial({ color: "#5a5258", metalness: 0.8, roughness: 0.3 });
+const armorBone = new THREE.MeshStandardMaterial({ color: "#d8ccb0", roughness: 0.6 });
+/**
+ * Spiked iron armour for a Mini-Boss or Boss: pauldrons bristling with
+ * spikes, a pair of horns, a row of spikes down the back, trimmed in its
+ * rank's colour. Sizes follow the creature's height `h`.
+ */
+function buildArmor(h: number, rank: string, main: boolean): ArmorPiece[] {
+  const trim = new THREE.MeshStandardMaterial({ color: rank, emissive: rank, emissiveIntensity: 1.4, roughness: 0.4 });
+  const k = main ? 1.15 : 1;
+  const out: ArmorPiece[] = [];
+  for (const sx of [-1, 1]) {
+    const p = new THREE.Group();
+    const shell = new THREE.Mesh(new THREE.SphereGeometry(0.06 * h * k, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), armorIron);
+    shell.scale.set(1, 0.5, 1.15);
+    p.add(shell);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.06 * h * k, 0.007 * h, 6, 20), trim);
+    rim.rotation.x = Math.PI / 2;
+    rim.position.y = 0.004 * h;
+    p.add(rim);
+    for (let i = 0; i < 3; i++) {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.013 * h * k, 0.07 * h * k, 6), armorBone);
+      sp.position.set(sx * (0.01 + i * 0.018) * h, 0.04 * h * k, (i - 1) * 0.026 * h);
+      sp.rotation.z = -sx * (0.35 + i * 0.2);
+      p.add(sp);
+    }
+    out.push({ obj: p, bone: sx < 0 ? "lArm" : "rArm", up: 0.02, fwd: 0, side: 0 });
+  }
+  // horns curling up and forward from the head
+  const horns = new THREE.Group();
+  for (const sx of [-1, 1]) {
+    const pts = [new THREE.Vector3(sx * 0.03, 0, 0), new THREE.Vector3(sx * 0.07, 0.05, -0.01), new THREE.Vector3(sx * 0.085, 0.11, 0.03), new THREE.Vector3(sx * 0.06, 0.15, 0.07)].map((v) => v.multiplyScalar(h * k));
+    horns.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 16, 0.012 * h * k, 6, false), armorBone));
+  }
+  out.push({ obj: horns, bone: "head", up: 0.05, fwd: 0.01, side: 0 });
+  // spikes down the back
+  if (main) {
+    const back = new THREE.Group();
+    for (let i = 0; i < 4; i++) {
+      const sp = new THREE.Mesh(new THREE.ConeGeometry(0.02 * h, 0.09 * h * (1 - i * 0.12), 6), i % 2 ? armorIron : trim);
+      sp.position.set(0, 0.04 * h - i * 0.045 * h, -0.02 * h);
+      sp.rotation.x = -1.0;
+      back.add(sp);
+    }
+    out.push({ obj: back, bone: "spine", up: 0.02, fwd: -0.07, side: 0 });
+  }
+  for (const a of out)
+    a.obj.traverse((o) => {
+      (o as THREE.Mesh).castShadow = true;
+    });
+  return out;
+}
+const eyeTop = new THREE.Vector3();
 
 function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean, kind: PrintKind = "foot") {
   const wx = WORLD_SIZE.width / 2 - x;
@@ -558,6 +623,8 @@ interface Live {
   approachFrom: THREE.Vector3 | null;
   /** World height it was scaled to. */
   h: number;
+  /** Bosses' spiked iron armour (pauldrons, horns, back spikes), placed on the bones every frame. */
+  armor: ArmorPiece[];
   /** Gate blows already thrown as punches. */
   punches: number;
   /** A boss roars once, as it steps out of the rift. */
@@ -630,18 +697,40 @@ function Creatures({
     if (head) {
       head.getWorldPosition(eyeTmp);
       g.worldToLocal(eyeTmp);
+      // the eyes sit partway up the head, between the neck joint and the crown
+      if (e.c.headTop) {
+        e.c.headTop.getWorldPosition(eyeTop);
+        g.worldToLocal(eyeTop);
+        eyeTmp.lerp(eyeTop, 0.4);
+      }
       const yaw = e.obj.rotation.y;
       const fx_ = Math.sin(yaw), fz = Math.cos(yaw);
       const flicker = 0.85 + 0.15 * Math.sin(t * 17 + e.h);
       for (let k = 0; k < 2; k++) {
         const side = (k ? 1 : -1) * e.h * 0.028;
         const sp = e.eyes[k]!;
-        sp.position.set(eyeTmp.x + fx_ * e.h * 0.06 + fz * side, eyeTmp.y + e.h * 0.012, eyeTmp.z + fz * e.h * 0.06 - fx_ * side);
+        sp.position.set(eyeTmp.x + fx_ * e.h * 0.07 + fz * side, eyeTmp.y, eyeTmp.z + fz * e.h * 0.07 - fx_ * side);
         sp.material.color.set(col);
         sp.scale.setScalar(e.h * (enraged ? 0.1 : 0.075) * flicker);
         sp.visible = e.born >= 1;
       }
     } else for (const sp of e.eyes) sp.visible = false;
+    // the armour rides its bones, turned with the body; it melts away with it in the castle
+    const melting = e.enterT >= 0 && e.smashes >= (e.boss === "main" ? 3 : 2);
+    for (const a of e.armor) {
+      const b = a.bone === "head" ? e.c.head : e.c.bones[a.bone];
+      if (!b || melting || e.born < 1) {
+        a.obj.visible = false;
+        continue;
+      }
+      b.getWorldPosition(armorTmp);
+      g.worldToLocal(armorTmp);
+      const yaw = e.obj.rotation.y;
+      const fwd = a.fwd * e.h, side = a.side * e.h;
+      a.obj.position.set(armorTmp.x + Math.sin(yaw) * fwd + Math.cos(yaw) * side, armorTmp.y + a.up * e.h, armorTmp.z + Math.cos(yaw) * fwd - Math.sin(yaw) * side);
+      a.obj.rotation.set(0, yaw, 0);
+      a.obj.visible = true;
+    }
     if (enraged && Math.random() < 0.35) {
       const p = e.obj.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * e.h * 0.3, e.h * (0.3 + Math.random() * 0.5), (Math.random() - 0.5) * e.h * 0.3));
       fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: col, size: 1.6, life: 0.6, speed: 12, up: 14, drag: 1, radius: 1 });
@@ -803,7 +892,9 @@ function Creatures({
         aura.renderOrder = 2;
         g.add(obj, shadow, aura, ...eyes);
         if (fresh && en.boss) fx.rings.ring(portal3.clone(), rank, 10, en.boss.isMainBoss ? 160 : 110, 0.9);
-        e = { c, obj, scale, eyes, aura, rank, punches: 0, roared: !en.boss || !fresh, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
+        const armor = en.boss ? buildArmor(h, rank, !!en.boss.isMainBoss) : [];
+        for (const a of armor) g.add(a.obj);
+        e = { c, obj, scale, eyes, aura, rank, armor, punches: 0, roared: !en.boss || !fresh, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -902,6 +993,7 @@ function Creatures({
           e.mode = "dying";
           e.aura.visible = false;
           for (const sp of e.eyes) sp.visible = false;
+          for (const a of e.armor) a.obj.visible = false;
           fx.death(e.obj.position.clone().add(new THREE.Vector3(0, ENEMY_HEIGHT * 0.4, 0)), !!e.last?.boss);
           e.c.fall();
         }
@@ -925,7 +1017,7 @@ function Creatures({
       }
 
     function remove(id: string, e: Live) {
-      g!.remove(e.obj, e.shadow, e.aura, ...e.eyes);
+      g!.remove(e.obj, e.shadow, e.aura, ...e.eyes, ...e.armor.map((a) => a.obj));
       (e.aura.material as THREE.Material).dispose();
       for (const sp of e.eyes) sp.material.dispose();
       for (const m of e.fading) m.dispose();
@@ -1411,6 +1503,47 @@ function Foundations({ engine, ui }: { engine: GameEngine; ui?: React.MutableRef
   );
 }
 
+/**
+ * The map's light towers and lava pools as real 3D pieces (hybrid3d/mapProps3d.ts).
+ * While mounted, the 2D map leaves its own drawings of them out.
+ */
+function MapProps({ engine, fx }: { engine: GameEngine; fx: Effects }) {
+  const [biomeId, setBiomeId] = useState(engine.getRenderSnapshot().biomeId);
+  const props = useMemo(() => {
+    const biome = getBiome(biomeId);
+    const out: LiveProp[] = [];
+    for (const deco of getMapDecorations(biome)) {
+      let p: LiveProp | null = null;
+      if (deco.kind === "TORCH") p = buildTorch(deco, biome);
+      else if (deco.kind === "WATER" && biome.liquidGlows) p = buildLavaPool(deco, biome);
+      if (!p) continue;
+      p.group.position.copy(loc(deco.position));
+      out.push(p);
+    }
+    return out;
+  }, [biomeId]);
+  useEffect(() => {
+    PROPS_3D.active = true;
+    return () => {
+      PROPS_3D.active = false;
+    };
+  }, []);
+  const same = (v: THREE.Vector3) => v;
+  useFrame(({ clock }, dt) => {
+    const id = engine.getRenderSnapshot().biomeId;
+    if (id !== biomeId) setBiomeId(id);
+    const t = clock.elapsedTime;
+    for (const p of props) p.update(t, Math.min(dt, 0.1), fx, same);
+  });
+  return (
+    <>
+      {props.map((p, i) => (
+        <primitive key={`${biomeId}-${i}`} object={p.group} />
+      ))}
+    </>
+  );
+}
+
 // ----------------------------------------------------------------- root
 class LayerBoundary extends Component<{ children: ReactNode; onError: () => void }, { failed: boolean }> {
   state = { failed: false };
@@ -1471,6 +1604,7 @@ function Scene({ engine, hiddenIds, hiddenTowerIds, ui }: { engine: GameEngine; 
       {TOWERS_3D_PREVIEW && <Foundations engine={engine} ui={ui} />}
       {TOWERS_3D_PREVIEW && hiddenTowerIds && <Towers3D engine={engine} hiddenIds={hiddenTowerIds} fx={fx} />}
       {TOWERS_3D_PREVIEW && <EnvLight intensity={0.55} />}
+      <MapProps engine={engine} fx={fx} />
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
