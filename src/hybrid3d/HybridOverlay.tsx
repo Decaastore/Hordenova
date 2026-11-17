@@ -20,7 +20,7 @@ import { getTowerStats, type TowerInstance } from "@/entities/Tower";
 import { MANA_MAX } from "@/config/towerMana";
 import { castleDressingFor } from "@/rendering/castleSprites";
 import { getActiveCastleSkin } from "@/rendering/castleSkinFx";
-import { footprints } from "@/rendering/footprints";
+import { footprints, type PrintKind } from "@/rendering/footprints";
 import { TILT_COS } from "@/rendering3d/enemyProjection";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures, rankScale } from "@/battlefield3d/creatures";
@@ -465,12 +465,12 @@ function Castle({
  */
 const ENEMY_HEIGHT = 39;
 /** A print from the 3D layer's ground space (x, z and a yaw around +Y) into world units for the 2D ground. */
-function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean) {
+function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean, kind: PrintKind = "foot") {
   const wx = WORLD_SIZE.width / 2 - x;
   const wy = WORLD_SIZE.height / 2 - z * TILT_COS;
   const dx = -Math.sin(yaw);
   const dy = -Math.cos(yaw) * TILT_COS;
-  footprints.stamp(wx, wy, Math.atan2(dy, dx), length, left);
+  footprints.stamp(wx, wy, Math.atan2(dy, dx), length, left, kind);
 }
 
 /** Footprint length (world units) of each ordinary 2D enemy, roughly its foot size. */
@@ -734,7 +734,7 @@ function Creatures({
           st.min = Math.min(st.min + dt * e.h * 0.02, y);
           if (!st.down && y < st.min + e.h * 0.03) {
             st.down = true;
-            stampLocal(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0);
+            stampLocal(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0, e.boss ? "boss" : "claw");
             if (e.heavy) fx.smoke.emit(footTmp.clone().setY(1), { count: 3, color: "#6a5a48", colorEnd: "#2a241e", size: e.h * 0.1, life: 0.9, speed: 10, up: 6, grow: 2.2, alpha: 0.35, drag: 2 });
           } else if (st.down && y > st.min + e.h * 0.07) st.down = false;
         }
