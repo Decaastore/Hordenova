@@ -888,11 +888,12 @@ function Creatures({
       e.gone += dt;
       e.c.update(dt);
       if (e.mode === "dying") {
-        if (e.gone > 1.4) {
-          e.obj.position.y -= dt * 10;
+        // let the death play out on the ground, then the body sinks away
+        if (e.gone > 4.5) {
+          e.obj.position.y -= dt * 12;
           e.shadow.scale.multiplyScalar(1 - dt * 1.5);
         }
-        if (e.gone > 2.4) remove(id, e);
+        if (e.gone > 5.5) remove(id, e);
       }
     }
 

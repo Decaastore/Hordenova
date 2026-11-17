@@ -9,7 +9,9 @@ import { castleDressingFor } from "@/rendering/castleSprites";
  * Mixamo character shares the same skeleton, so one walk cycle drives them
  * all; a character that came with its own walk uses it.
  *
- * There is no death clip yet, so a kill is a procedural fall (see `Creature.fall`).
+ * Kills play one of the Mixamo death clips (DEATH_FILES — animation only, no
+ * mesh), picked at random so a pile of dead monsters doesn't fall in step;
+ * a model without them falls procedurally (see `Creature.fall`).
  */
 
 export const CREATURE_FILES = {
@@ -18,25 +20,31 @@ export const CREATURE_FILES = {
   vampire: "/models/enemies/mixamo/vampire.glb",
   mutant: "/models/enemies/mixamo/mutant.glb",
   brute2: "/models/enemies/mixamo/brute2.glb",
+  pumpkin: "/models/enemies/mixamo/pumpkin.glb",
+  yaku: "/models/enemies/mixamo/yaku.glb",
+  goblin: "/models/enemies/mixamo/goblin.glb",
 } as const;
 export type CreatureId = keyof typeof CREATURE_FILES;
-export const CREATURE_URLS = Object.values(CREATURE_FILES);
+/** Death animations (no mesh), shared by every creature through the common Mixamo skeleton. */
+const DEATH_FILES = ["/models/enemies/mixamo/death1.glb", "/models/enemies/mixamo/death2.glb"];
+/** Everything the creature layer loads: the characters first, then the death clips. */
+export const CREATURE_URLS = [...Object.values(CREATURE_FILES), ...DEATH_FILES];
 const IDS = Object.keys(CREATURE_FILES) as CreatureId[];
 
-/** Which creature plays each enemy type (a Boss is the Mutant, a Mini-Boss the dark brute, both bigger). */
+/** Which creature plays each enemy type (a Boss is the Mutant, a Mini-Boss the Pumpkin Hulk, both bigger). */
 const FOR_TYPE: Record<string, CreatureId> = {
   BRUTE: "warrok",
   CRAWLER: "parasite",
-  SWARMLING: "parasite",
-  RUNNER: "vampire",
+  SWARMLING: "goblin",
+  RUNNER: "goblin",
   DISABLER: "vampire",
-  SHIELDBEARER: "mutant",
+  SHIELDBEARER: "brute2",
   IRONCLAD: "mutant",
-  REGENERATOR: "brute2",
+  REGENERATOR: "yaku",
 };
 
 export function creatureFor(type: string, boss: boolean, mainBoss = false): CreatureId {
-  if (boss) return mainBoss ? "mutant" : "brute2";
+  if (boss) return mainBoss ? "mutant" : "pumpkin";
   return FOR_TYPE[type] ?? IDS[(type.charCodeAt(0) + type.length) % IDS.length]!;
 }
 
@@ -68,6 +76,8 @@ export interface CreatureKit {
   scene: THREE.Object3D;
   height: number;
   walk: THREE.AnimationClip;
+  /** Death clips to pick from when it dies (empty: a procedural fall). */
+  deaths: THREE.AnimationClip[];
 }
 
 /** A walk that stays in place: the hips keep their height and sway but never travel forward. */
@@ -86,9 +96,32 @@ function inPlace(clip: THREE.AnimationClip): THREE.AnimationClip {
   return c;
 }
 
+/**
+ * A death clip was recorded on a character of another size: its hip
+ * positions are rescaled to this body's own hip height, so the fall lands
+ * where the creature stands instead of flinging it away.
+ */
+function fitHips(clip: THREE.AnimationClip, scene: THREE.Object3D): THREE.AnimationClip {
+  const hips = scene.getObjectByName("mixamorigHips") ?? scene.getObjectByName("mixamorig:Hips");
+  const c = clip.clone();
+  for (const t of c.tracks) {
+    if (!/Hips\.position$/.test(t.name) || !hips) continue;
+    const v = t.values;
+    const k = Math.abs(v[1]!) > 1e-6 ? hips.position.y / v[1]! : 1;
+    const x0 = v[0]!, z0 = v[2]!;
+    for (let i = 0; i < v.length; i += 3) {
+      v[i] = hips.position.x + (v[i]! - x0) * k;
+      v[i + 1] = v[i + 1]! * k;
+      v[i + 2] = hips.position.z + (v[i + 2]! - z0) * k;
+    }
+  }
+  return c;
+}
+
 export function prepareCreatures(gltfs: readonly GLTF[]): Record<CreatureId, CreatureKit> {
   const byId = Object.fromEntries(IDS.map((id, i) => [id, gltfs[i]!])) as Record<CreatureId, GLTF>;
   const sharedWalk = byId.warrok.animations.find((a) => a.name === "Walk") ?? byId.warrok.animations[0]!;
+  const deaths = gltfs.slice(IDS.length).flatMap((g) => g.animations.slice(0, 1));
   const out = {} as Record<CreatureId, CreatureKit>;
   for (const id of IDS) {
     const g = byId[id];
@@ -103,7 +136,7 @@ export function prepareCreatures(gltfs: readonly GLTF[]): Record<CreatureId, Cre
     g.scene.updateMatrixWorld(true);
     const box = new THREE.Box3().setFromObject(g.scene);
     const walk = g.animations.find((a) => a.name === "Walk") ?? sharedWalk;
-    out[id] = { scene: g.scene, height: Math.max(0.01, box.max.y - box.min.y), walk: inPlace(walk) };
+    out[id] = { scene: g.scene, height: Math.max(0.01, box.max.y - box.min.y), walk: inPlace(walk), deaths: deaths.map((d) => fitHips(d, g.scene)) };
   }
   return out;
 }
@@ -200,6 +233,9 @@ export class Creature {
   readonly head: THREE.Object3D | null;
   private fallT = -1;
   private fallDir = 1;
+  private readonly deaths: THREE.AnimationClip[];
+  /** Playing a real death clip (rather than the procedural tip-over). */
+  private clipDeath = false;
 
   constructor(kit: CreatureKit, worldHeight: number, tint?: { id: CreatureId; biomeId: string }, opts: { outline?: boolean } = {}) {
     // the model sits inside a pivot so a fall can tip it over its feet
@@ -213,6 +249,7 @@ export class Creature {
     this.obj = new THREE.Group();
     this.obj.add(body);
     this.mixer = new THREE.AnimationMixer(body);
+    this.deaths = kit.deaths ?? [];
     this.walk = this.mixer.clipAction(kit.walk);
     this.walk.time = Math.random() * kit.walk.duration;
     this.walk.play();
@@ -231,6 +268,15 @@ export class Creature {
     if (this.fallT >= 0) return;
     this.fallT = 0;
     this.fallDir = Math.random() < 0.5 ? 1 : -1;
+    if (this.deaths.length) {
+      const die = this.mixer.clipAction(this.deaths[Math.floor(Math.random() * this.deaths.length)]!);
+      die.setLoop(THREE.LoopOnce, 1);
+      die.clampWhenFinished = true;
+      die.reset().play();
+      this.walk.crossFadeTo(die, 0.18, false);
+      this.clipDeath = true;
+      return;
+    }
     this.walk.fadeOut(0.25);
   }
 
@@ -240,7 +286,7 @@ export class Creature {
 
   update(dt: number) {
     this.mixer.update(dt);
-    if (this.fallT >= 0) {
+    if (this.fallT >= 0 && !this.clipDeath) {
       this.fallT += dt;
       const k = Math.min(1, this.fallT / 0.55);
       const e = k * k * (3 - 2 * k);
