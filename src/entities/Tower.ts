@@ -16,6 +16,7 @@ import {
   type SpecializationId,
 } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { FUSION_DAMAGE_MULT } from "@/config/towerFusion";
 import { MANA_MAX, MANA_OVERCHARGE_MAX, manaGainMultiplier, overchargeMultiplier } from "@/config/towerMana";
 import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
 import { getTowerSurvivalDefinition } from "@/config/towerSurvival";
@@ -60,6 +61,8 @@ export interface TowerInstance {
   specializationLevel: number;
   /** Progression 2.0 — cosmetic-only equipped skin id, or null for the default look. Never read by combat code. */
   equippedSkinId: string | null;
+  /** TORRES DE FUSÃO (config/towerFusion.ts) — the tower of another element fused into this one, kept whole so it can be split back out. Null for an ordinary tower. */
+  fusedWith?: TowerLoadoutEntry | null;
   /** Master Implementation Pass spec section 4-6 — TOWER MASTERY: an uncapped, independent gold-sink track past MAX_TOWER_LEVEL. HORDENOVA Season/Progression v1.0: this is now purely the SEASON-scoped level (resets to 0 every Season) — see `masteryUnlocked` below for the permanent ownership half. See config/towerMastery.ts for the bonus/cost formulas. */
   masteryLevel: number;
   /** HORDENOVA Season/Progression v1.0 — permanent, account-wide-by-type Mastery OWNERSHIP (the one-time Gold purchase, FASE 6 — see config/towerMastery.ts's getMasteryUnlockGoldCost), denormalized onto each tower instance exactly like `masteryLevel` is, kept in sync by GameEngine whenever it changes. Gates whether `masteryLevel` can be raised with Gold at all — see `canUpgradeMastery`. Never reset by a Season boundary. */
@@ -120,6 +123,8 @@ export interface TowerLoadoutEntry {
   masteryLevel?: number;
   /** Optional for the same reason — self-heals to an all-empty (TOWER_ITEM_SLOT_COUNT nulls) array on load for a save written before Item Slots existed. */
   equippedItemInstanceIds?: (string | null)[];
+  /** TORRES DE FUSÃO — the tower fused into this one (one level deep, never itself fused). Absent/null on an ordinary tower. */
+  fusedWith?: TowerLoadoutEntry | null;
 }
 
 let nextTowerId = 1;
@@ -158,6 +163,7 @@ export function createTowerInstance(
     masteryUnlocked,
     equippedItemInstanceIds,
     unlockedItemSlots,
+    fusedWith: null,
     ...survivalStatsForFreshTower(type),
   };
 }
@@ -275,6 +281,9 @@ export function getTowerStats(tower: TowerInstance): TowerLevelStats {
     attackSpeed *= 1 + tower.itemBonus.attackSpeedPct / 100;
     range *= 1 + tower.itemBonus.rangePct / 100;
   }
+
+  // a fused tower carries the power of both towers in one
+  if (tower.fusedWith) damage *= FUSION_DAMAGE_MULT;
 
   const skinEffect = tower.equippedSkinId ? getTowerSkinDefinition(tower.equippedSkinId)?.gameplayEffect : undefined;
   if (skinEffect) {

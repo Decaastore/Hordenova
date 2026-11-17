@@ -885,11 +885,11 @@ function towerFx(type: string, skinId: string | null | undefined): TowerFx {
 }
 
 const towerKits = new Map<string, TowerModel>();
-function towerKit(type: string, stage: number, skin: string) {
-  const key = `${type}|${stage}|${skin}`;
+function towerKit(type: string, stage: number, skin: string, fused: string | null = null) {
+  const key = `${type}|${stage}|${skin}|${fused ?? ""}`;
   let m = towerKits.get(key);
   if (!m) {
-    m = buildTowerModel(type, stage, skin);
+    m = buildTowerModel(type, stage, skin, fused);
     m.root.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (mesh.isMesh) mesh.castShadow = mesh.receiveShadow = true;
@@ -918,6 +918,8 @@ interface LiveTower {
   rune: THREE.Mesh | null;
   /** Its skin's effect colours and idle particle behaviour. */
   fxc: TowerFx;
+  /** Fused tower: time to the next spark at its storm core. */
+  fusionT?: number;
   type: string;
   boltT: number;
 }
@@ -977,6 +979,21 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
     }
     if (e.stage >= 6 && Math.random() < 0.3) fx.mote(e.obj.position.clone().setY(4), col, 14, 22);
     skinAura(e, dt);
+    // a fused tower keeps its second element alive at the core on its shoulder
+    const fc = tw.fusedWith ? anchorAt(e, "fusion") : null;
+    if (fc && tw.fusedWith) {
+      const ft = tw.fusedWith.type;
+      if (ft === "INFERNO" && Math.random() < 0.6) fx.flame(fc, 0.3, "#ff7a2a");
+      else if (ft === "FROSTBORN" && Math.random() < 0.2) fx.mote(fc, "#bfeeff", 5, -4);
+      else if (ft === "IRONWOOD" && Math.random() < 0.12) fx.mote(fc, "#ffd27a", 4, 8);
+      else if (ft === "STORMCALLER") {
+        e.fusionT = (e.fusionT ?? 0) - dt;
+        if (e.fusionT <= 0) {
+          e.fusionT = 0.3 + Math.random() * 0.8;
+          fx.bolts.bolt(fc, fc.clone().add(new THREE.Vector3((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 10)), "#c49bff", 0.1, 1.5);
+        }
+      }
+    }
   };
   /** Each skin's own ambient effect around the tower — embers, wisps, snow, sparks, leaves, bubbles… */
   const skinAura = (e: LiveTower, dt: number) => {
@@ -1046,12 +1063,13 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       seen.add(tw.id);
       const stage = getTowerVisualStage(tw.level);
       const skin = tw.equippedSkinId ?? "base";
-      const key = `${tw.type}|${stage}|${skin}`;
+      const fusedType = tw.fusedWith?.type ?? null;
+      const key = `${tw.type}|${stage}|${skin}|${fusedType ?? ""}`;
       let e = live.current.get(tw.id);
       if (!e || e.key !== key) {
         const upgraded = !!e && stage > e.stage;
         if (e) g.remove(e.obj);
-        const kit = towerKit(tw.type, stage, skin);
+        const kit = towerKit(tw.type, stage, skin, fusedType);
         const obj = kit.root.clone(true);
         const turret = obj.children[kit.root.children.indexOf(kit.turret)] ?? null;
         // its own copies of the glowing materials, so its crystals can flare when it fires

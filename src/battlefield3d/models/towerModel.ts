@@ -15,7 +15,7 @@ export interface TowerModel {
   turretTilt: number;
 }
 
-export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): TowerModel {
+export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED: string | null = null): TowerModel {
   // ---------------------------------------------------------------------------
   function rng(seed: number) {
     let a = seed;
@@ -3534,10 +3534,70 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string): Towe
   }
 
   // ---------------------------------------------------------------------------
+  // TORRES DE FUSÃO — the absorbed element, built onto the tower: a ring of
+  // its colour round the foot, a stone pillar at the tower's shoulder and on
+  // it that element's living core (a brazier of fire, a cluster of ice, a
+  // caged storm orb, or a rack of glowing arrows). `fusion` is where the
+  // game keeps its flames / frost / sparks going.
+  // ---------------------------------------------------------------------------
+  function buildFusionCore(F: string) {
+    const col = ({ IRONWOOD: "#ffd27a", INFERNO: "#ff7a2a", FROSTBORN: "#9ae6ff", STORMCALLER: "#c49bff" } as Record<string, string>)[F] ?? "#ffffff";
+    PARENT = root;
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const H = Math.max(14, box.max.y);
+    const glowM = (c: string, ei = 2.4) => plainMat(c, { emissive: c, ei, rough: 0.3 });
+    const stone = mat(stoneTex(901, "#6a6460", "#3a3632", "#1a1816", 3, 2), 0.6, 1.2);
+    // a ring of the absorbed element round the foot
+    mesh(new THREE.TorusGeometry(15.5, 0.45, 8, 56), glowM(col, 1.8), 0, 0.7, 0).rotation.x = Math.PI / 2;
+    // the pillar at the tower's back-right shoulder
+    const X = 11.5, Z = -6.5;
+    const PY = Math.min(H * 0.55, 18);
+    mesh(new THREE.CylinderGeometry(1.5, 2.2, PY, 8), stone, X, PY / 2, Z);
+    mesh(new THREE.CylinderGeometry(2.6, 1.8, 1.4, 8), stone, X, PY + 0.7, Z);
+    const cy = PY + 4;
+    if (F === "INFERNO") {
+      const bowl = mesh(new THREE.CylinderGeometry(3, 1.8, 2.2, 14, 1, true), plainMat("#2a2220", { metal: 0.6, rough: 0.4 }), X, PY + 2.4, Z);
+      (bowl.material as THREE.Material).side = THREE.DoubleSide;
+      mesh(new THREE.SphereGeometry(2.2, 18, 14), glowM("#ff7a2a", 2.8), X, PY + 3.2, Z);
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        mesh(new THREE.ConeGeometry(0.9, 4.5, 8), new THREE.MeshBasicMaterial({ color: i % 2 ? "#ffd27a" : "#ff6a1a", transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false }), X + Math.cos(a) * 0.9, PY + 5.4, Z + Math.sin(a) * 0.9);
+      }
+    } else if (F === "FROSTBORN") {
+      const ice = new THREE.MeshPhysicalMaterial({ color: "#c8f0ff", emissive: "#3ab8ff", emissiveIntensity: 0.6, roughness: 0.08, transparent: true, opacity: 0.9, clearcoat: 1 });
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const c = mesh(new THREE.OctahedronGeometry(1.2 + (i % 2) * 0.4, 0), ice, X + Math.cos(a) * 1.4, cy + (i % 2), Z + Math.sin(a) * 1.4);
+        c.scale.y = 2.4;
+        c.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4);
+      }
+      mesh(new THREE.OctahedronGeometry(1.6, 0), glowM("#9ae6ff", 2.6), X, cy + 1, Z).scale.y = 2;
+    } else if (F === "STORMCALLER") {
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        tube([new THREE.Vector3(X + Math.cos(a) * 2.2, PY + 1.4, Z + Math.sin(a) * 2.2), new THREE.Vector3(X + Math.cos(a) * 3, cy, Z + Math.sin(a) * 3), new THREE.Vector3(X + Math.cos(a) * 1.4, cy + 3.6, Z + Math.sin(a) * 1.4)], 0.22, plainMat("#c87a3a", { metal: 0.85, rough: 0.3 }), 10);
+      }
+      mesh(new THREE.SphereGeometry(2, 20, 16), plainMat("#d8b8ff", { emissive: "#8a4aff", ei: 1.2, rough: 0.2 }), X, cy, Z);
+    } else {
+      // a rack of arrows with glowing heads
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        const ar = mesh(new THREE.CylinderGeometry(0.15, 0.15, 7, 5), plainMat("#8a6a42"), X + Math.cos(a) * 0.8, cy, Z + Math.sin(a) * 0.8);
+        ar.rotation.set(Math.sin(a) * 0.15, 0, -Math.cos(a) * 0.15);
+        mesh(new THREE.ConeGeometry(0.5, 1.4, 4), glowM("#ffd27a", 2.4), X + Math.cos(a) * 1.3, cy + 3.9, Z + Math.sin(a) * 1.3);
+      }
+    }
+    anchors.fusion = new THREE.Vector3(X, cy + 1.5, Z);
+    pointLights.push({ pos: new THREE.Vector3(X, cy, Z + 2), color: col, intensity: 200, dist: 22 });
+  }
+
+  // ---------------------------------------------------------------------------
   if (TYPE === "FROSTBORN") buildFrostborn();
   else if (TYPE === "IRONWOOD") buildIronwood();
   else if (TYPE === "INFERNO") buildInferno();
   else if (TYPE === "STORMCALLER") buildStormcaller();
+  if (FUSED && FUSED !== TYPE) buildFusionCore(FUSED);
   if (TURRET_PIVOT_Y) {
     for (const ch of turret.children) ch.position.y -= TURRET_PIVOT_Y;
     turret.position.y = TURRET_PIVOT_Y;

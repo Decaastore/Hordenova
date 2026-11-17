@@ -1,3 +1,4 @@
+import { getFusionCost } from "@/config/towerFusion";
 import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
 import { MomentOfferCard } from "@/ui/MomentOfferCard";
 import { EternalPanel } from "@/ui/EternalPanel";
@@ -238,6 +239,18 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
     return () => window.clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityEvent?.seq]);
+  // JUROS — a short notice when the banked gold earns interest at the end of a wave.
+  const interestEvent = hud.interest;
+  const lastInterestSeqRef = useRef<number>(interestEvent?.seq ?? 0);
+  useEffect(() => {
+    if (!interestEvent || interestEvent.seq === lastInterestSeqRef.current) return;
+    lastInterestSeqRef.current = interestEvent.seq;
+    setCityNotice(t("city.interest", { amount: interestEvent.amount }));
+    const timer = window.setTimeout(() => setCityNotice(null), 3600);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interestEvent?.seq]);
+
   // MODO ETERNO — a short notice when a depth or a wave milestone pays out.
   const eternalEvent = hud.eternal.lastEvent;
   const lastEternalSeqRef = useRef<number>(eternalEvent?.seq ?? 0);
@@ -637,6 +650,15 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
         {selectedTower && (
           <TowerInfoPanel
             tower={selectedTower}
+            fusion={{
+              candidates: engine.fusionCandidates(selectedTower.id).map((other) => ({
+                tower: other,
+                blocker: engine.fusionBlocker(selectedTower.id, other.id),
+                cost: getFusionCost(selectedTower.level, other.level),
+              })),
+              onFuse: (partnerId) => engine.fuseTowers(selectedTower.id, partnerId),
+              onSplit: () => engine.splitTower(selectedTower.id),
+            }}
             gold={hud.gold}
             freeGems={hud.freeGems}
             purchasedGems={hud.purchasedGems}

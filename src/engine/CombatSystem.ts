@@ -28,6 +28,7 @@ import { applyMasteryToSpecial } from "@/config/towerMastery";
 import { ENEMY_DEFINITIONS } from "@/config/enemyStats";
 import { FROSTBORN_SPECIAL, INFERNO_SPECIAL, IRONWOOD_SPECIAL, STORMCALLER_SPECIAL } from "@/config/towerSpecials";
 import { MANA_PER_KILL, manaForAttack } from "@/config/towerMana";
+import { FUSION_BURN_SHARE, FUSION_CHAIN_FALLOFF, FUSION_CHAIN_TARGETS, FUSION_CRIT_SHARE, FUSION_SLOW_SHARE } from "@/config/towerFusion";
 import { distance, type Vector2 } from "@/utils/geometry";
 
 /**
@@ -333,7 +334,52 @@ function resolveNormalAttack(
       );
     }
   }
+  if (tower.fusedWith) applyFusedElement(tower, tower.fusedWith, target, stats.damage, stats.range, enemies, dealDamage, projectiles, muzzle);
   return true;
+}
+
+/**
+ * TORRES DE FUSÃO — the absorbed tower's element rides on every normal hit
+ * of the fused tower: its burn, its chill, its lightning jumping on, or its
+ * critical shot — at a share of that tower's own special at its own level
+ * (config/towerFusion.ts). A second shot of that element flies alongside
+ * the tower's own, so both elements read on screen.
+ */
+function applyFusedElement(
+  tower: TowerInstance,
+  fused: { type: TowerType; level: number },
+  target: EnemyInstance,
+  damage: number,
+  range: number,
+  enemies: readonly EnemyInstance[],
+  dealDamage: (tower: TowerInstance, enemy: EnemyInstance, rawDamage: number, armorPenetration?: number, isCrit?: boolean) => DamageEvent,
+  projectiles: ProjectileInstance[],
+  muzzle: Vector2,
+): void {
+  if (isEnemyDead(target) && fused.type !== "STORMCALLER") return;
+  const sp = getTowerSpecialAtLevel(fused.type, fused.level);
+  const chain: Vector2[] = [];
+  if (sp.type === "INFERNO") {
+    applyBurn(target, sp.burnDamagePerSecond * FUSION_BURN_SHARE, sp.burnDurationMs, 1);
+  } else if (sp.type === "FROSTBORN") {
+    applySlow(target, sp.slowPercent * FUSION_SLOW_SHARE, sp.slowDurationMs);
+  } else if (sp.type === "IRONWOOD") {
+    if (!isEnemyDead(target) && Math.random() < sp.critChance * FUSION_CRIT_SHARE) dealDamage(tower, target, damage * (sp.critMultiplier - 1), 0, true);
+  } else if (sp.type === "STORMCALLER") {
+    const hit = new Set<string>([target.id]);
+    let from = target;
+    let jump = damage;
+    for (let i = 0; i < FUSION_CHAIN_TARGETS; i++) {
+      jump *= FUSION_CHAIN_FALLOFF;
+      const next = findNearestUnhit(from.position, range * 0.6, enemies, hit);
+      if (!next) break;
+      dealDamage(tower, next, jump, sp.armorPenetration);
+      chain.push(next.position);
+      hit.add(next.id);
+      from = next;
+    }
+  }
+  projectiles.push(createProjectile(fused.type, muzzle, target.position, chain, false));
 }
 
 /**

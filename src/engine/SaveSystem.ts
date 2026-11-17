@@ -18,7 +18,7 @@ import { RUN_START, SAVE_STORAGE_KEY } from "@/config/gameBalance";
 import { parseDailyMissionsState, type DailyMissionsState } from "@/config/dailyMissions";
 import { parseSeasonPassState, type SeasonPassState } from "@/config/seasonPass";
 import { parseBossRecords, parseBossSiegeState, type BossRecords, type BossSiegeState } from "@/config/bossAssault";
-import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
+import { MAX_TOWER_LEVEL, TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { ENEMY_TYPES, type EnemyType } from "@/config/enemyStats";
 import { SPECIALIZATIONS_BY_TOWER, type SpecializationId } from "@/config/specializations";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
@@ -495,10 +495,31 @@ function parseTowerLoadout(raw: unknown, validItemInstanceIds: ReadonlySet<strin
         equippedSkinId: skinDef && skinDef.towerType === entry.type ? skinDef.id : null,
         masteryLevel: typeof entry.masteryLevel === "number" && entry.masteryLevel >= 0 ? entry.masteryLevel : 0,
         equippedItemInstanceIds,
+        fusedWith: parseFusedPart(entry.fusedWith, entry.type),
       });
     }
   }
   return entries;
+}
+
+/** TORRES DE FUSÃO — the tower riding inside a fused one: another element, one level deep, no items. Anything malformed self-heals to "not fused". */
+function parseFusedPart(raw: unknown, hostType: TowerType): TowerLoadoutEntry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Partial<TowerLoadoutEntry>;
+  if (!e.type || !TOWER_TYPES.includes(e.type) || e.type === hostType || typeof e.level !== "number" || e.level < 1) return null;
+  const validSpecIds = new Set<SpecializationId>(SPECIALIZATIONS_BY_TOWER[e.type].map((sp) => sp.id));
+  const specializationId = typeof e.specializationId === "string" && validSpecIds.has(e.specializationId) ? e.specializationId : null;
+  return {
+    slotId: "",
+    type: e.type,
+    level: Math.min(Math.floor(e.level), MAX_TOWER_LEVEL),
+    specializationId,
+    specializationLevel: specializationId && typeof e.specializationLevel === "number" ? e.specializationLevel : 0,
+    equippedSkinId: null,
+    masteryLevel: 0,
+    equippedItemInstanceIds: Array(TOWER_ITEM_SLOT_COUNT).fill(null),
+    fusedWith: null,
+  };
 }
 
 function parseDiscoveredEnemyTypes(raw: unknown): EnemyType[] {

@@ -41,6 +41,8 @@ describe("SaveSystem", () => {
         equippedSkinId: null,
         masteryLevel: 0,
         equippedItemInstanceIds: [null, null, null],
+        // TORRES DE FUSÃO — an entry with no fused tower self-heals to "not fused"
+        fusedWith: null,
       },
     ]);
   });

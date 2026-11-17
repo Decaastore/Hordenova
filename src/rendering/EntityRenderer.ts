@@ -1,3 +1,4 @@
+import { drawFusionOver, drawFusionUnder } from "./fusionFx";
 import { drawSkinTrail } from "./skinShotFx";
 import { lookSkinId } from "./duelLooks";
 import { MANA_MAX, MANA_OVERCHARGE_MAX } from "@/config/towerMana";
@@ -325,6 +326,7 @@ export function drawTower(
     drawEclipseUnder(ctx, timeMs);
     drawMasteryUnder(ctx, tower.masteryLevel, theme.accent, timeMs);
   }
+  if (!bodyOnly && tower.fusedWith) drawFusionUnder(ctx, tower.type, tower.fusedWith.type, timeMs);
   if (hudOnly) {
     // body drawn elsewhere
   } else if (sprite) {
@@ -353,6 +355,7 @@ export function drawTower(
     // the Eclipse sits above the Mastery halo/crown when both are on
     drawEclipseOver(ctx, timeMs, MASTERY_TOP_Y[tower.type] - (tower.masteryLevel >= 60 ? 22 : 0));
   }
+  if (!bodyOnly && !hudOnly && tower.fusedWith) drawFusionOver(ctx, tower.fusedWith.type, MASTERY_TOP_Y[tower.type], timeMs);
 
   ctx.restore();
 

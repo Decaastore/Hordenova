@@ -1,3 +1,5 @@
+import { FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost } from "@/config/towerFusion";
+import { interestForWave } from "@/config/goldInterest";
 import { claimableMilestones, contractsForWeek, depthOfWave, depthReward, MERCHANT_OFFERS, milestoneReward, rollWeek, SHARD_POUCH_AMOUNT, type EternalState, type MerchantOfferId, createEternalState } from "@/config/eternal";
 import { ETERNAL_STORAGE_KEY } from "./SaveSystem";
 import { bestiaryStats, reachedAchievements, type AchievementId, type AchievementStats, type BestiaryKills } from "@/config/achievements";
@@ -265,6 +267,8 @@ export interface HudSnapshot {
   /** A HORDA QUE APRENDE — damage-taken multiplier per element for the current wave, plus a counter bumped on every change worth announcing. */
   horde: { multipliers: Readonly<Record<TowerType, number>>; changeSeq: number };
   /** O CASTELO VIRA CIDADE — burning buildings (clean waves left) and the latest city event (seq bumps on each). */
+  /** JUROS (config/goldInterest.ts) — the last interest paid at the end of a wave. */
+  interest?: { seq: number; amount: number } | null;
   city: {
     burning: Readonly<Partial<Record<CityBuildingId, number>>>;
     goldShare: number;
@@ -428,6 +432,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.horde.changeSeq === b.horde.changeSeq &&
     TOWER_TYPES.every((type) => a.horde.multipliers[type] === b.horde.multipliers[type]) &&
     a.city.lastEvent?.seq === b.city.lastEvent?.seq &&
+    a.interest?.seq === b.interest?.seq &&
     a.rift.charges === b.rift.charges &&
     a.talents.ranks === b.talents.ranks &&
     a.talents.free === b.talents.free &&
@@ -594,6 +599,7 @@ export class GameEngine {
   private hordeChangeSeq = 0;
   /** O CASTELO VIRA CIDADE — see config/city.ts. */
   private city: CityState = createCityState();
+  private lastInterest: { seq: number; amount: number } | null = null;
   private rift: RiftState = createRiftState();
   private talents: TalentRanks = {};
   private eternal: EternalState = createEternalState();
@@ -998,7 +1004,7 @@ export class GameEngine {
   getAvailableSlotIds(): string[] {
     const occupied = new Set(this.towers.map((t) => t.slotId));
     // Nothing is buildable once the map already holds MAX_TOWERS_ON_MAP towers.
-    if (this.towers.length + this.deployBench.length >= MAX_TOWERS_ON_MAP) return [];
+    if (this.ownedTowerCount() >= MAX_TOWERS_ON_MAP) return [];
     return this.layout.sites.filter((slot) => !occupied.has(slot.id)).map((slot) => slot.id);
   }
 
@@ -1046,7 +1052,65 @@ export class GameEngine {
       this.towerManaLevels[entry.type] ?? 0,
     );
     tower.siteTrait = slot?.trait ?? "NONE";
+    tower.fusedWith = entry.fusedWith && entry.fusedWith.type !== entry.type ? { ...entry.fusedWith, slotId: "", fusedWith: null } : null;
     return tower;
+  }
+
+  // ---------------------------------------------------------------------
+  // TORRES DE FUSÃO (config/towerFusion.ts)
+  // ---------------------------------------------------------------------
+
+  /** Why `partnerId` can't be fused into `towerId` right now, or null when it can. */
+  fusionBlocker(towerId: string, partnerId: string): "LEVEL" | "DISTANCE" | "SAME_ELEMENT" | "ALREADY_FUSED" | "GOLD" | "LOCKED" | null {
+    const a = this.towers.find((t) => t.id === towerId);
+    const b = this.towers.find((t) => t.id === partnerId);
+    if (!a || !b || a === b || !this.canModifyLoadout()) return "LOCKED";
+    if (a.type === b.type) return "SAME_ELEMENT";
+    if (a.fusedWith || b.fusedWith) return "ALREADY_FUSED";
+    if (a.level < FUSION_MIN_LEVEL || b.level < FUSION_MIN_LEVEL) return "LEVEL";
+    if (Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) > FUSION_MAX_DISTANCE) return "DISTANCE";
+    if (this.gold < getFusionCost(a.level, b.level)) return "GOLD";
+    return null;
+  }
+
+  /** The towers on the map that could be fused into `towerId` (other element, close enough), whatever else still stands in the way. */
+  fusionCandidates(towerId: string): readonly TowerInstance[] {
+    const a = this.towers.find((t) => t.id === towerId);
+    if (!a || a.fusedWith) return [];
+    return this.towers.filter(
+      (b) => b !== a && b.type !== a.type && !b.fusedWith && Math.hypot(a.position.x - b.position.x, a.position.y - b.position.y) <= FUSION_MAX_DISTANCE,
+    );
+  }
+
+  /** Fuses `partnerId` into `towerId`: the partner leaves its site and rides inside the first tower, lending it its element. */
+  fuseTowers(towerId: string, partnerId: string): boolean {
+    if (this.fusionBlocker(towerId, partnerId) !== null) return false;
+    const a = this.towers.find((t) => t.id === towerId)!;
+    const b = this.towers.find((t) => t.id === partnerId)!;
+    this.gold -= getFusionCost(a.level, b.level);
+    // the partner's equipped items go back to the inventory rather than ride along unseen
+    a.fusedWith = { ...this.loadoutEntryOf(b), slotId: "", fusedWith: null, equippedItemInstanceIds: Array(TOWER_ITEM_SLOT_COUNT).fill(null) };
+    this.towers = this.towers.filter((t) => t !== b);
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** Splits a fused tower back into two: the absorbed tower comes back, at its own level, on the free site nearest to it. Free. */
+  splitTower(towerId: string): boolean {
+    if (!this.canModifyLoadout()) return false;
+    const a = this.towers.find((t) => t.id === towerId);
+    if (!a?.fusedWith) return false;
+    const taken = new Set(this.towers.map((t) => t.slotId));
+    const free = this.layout.sites.filter((s) => !taken.has(s.id));
+    if (!free.length) return false;
+    free.sort((p, q) => Math.hypot(p.position.x - a.position.x, p.position.y - a.position.y) - Math.hypot(q.position.x - a.position.x, q.position.y - a.position.y));
+    const back = this.instantiateTowerFromLoadout({ ...a.fusedWith, slotId: free[0]!.id, fusedWith: null });
+    a.fusedWith = null;
+    this.towers.push(back);
+    this.persist();
+    this.notify();
+    return true;
   }
 
   /** Towers of `type` on the map plus on the deploy bench — what MAX_TOWERS_PER_TYPE counts. */
@@ -1054,13 +1118,22 @@ export class GameEngine {
     let n = 0;
     for (const t of this.towers) if (t.type === type) n++;
     for (const t of this.deployBench) if (t.type === type) n++;
+    // a tower fused into another still counts as one of its type
+    for (const t of [...this.towers, ...this.deployBench]) if (t.fusedWith?.type === type) n++;
+    return n;
+  }
+
+  /** Every tower the player owns, counting each one fused into another (what MAX_TOWERS_ON_MAP counts). */
+  private ownedTowerCount(): number {
+    let n = this.towers.length + this.deployBench.length;
+    for (const t of [...this.towers, ...this.deployBench]) if (t.fusedWith) n++;
     return n;
   }
 
   placeTower(slotId: string, type: TowerType): boolean {
     if (!this.canModifyLoadout()) return false;
     if (this.towers.some((t) => t.slotId === slotId)) return false;
-    if (this.towers.length + this.deployBench.length >= MAX_TOWERS_ON_MAP) return false;
+    if (this.ownedTowerCount() >= MAX_TOWERS_ON_MAP) return false;
     if (this.countTowersOfType(type) >= MAX_TOWERS_PER_TYPE) return false;
 
     const slot = getSite(this.layout, slotId);
@@ -1289,6 +1362,7 @@ export class GameEngine {
       equippedSkinId: t.equippedSkinId,
       masteryLevel: t.masteryLevel,
       equippedItemInstanceIds: t.equippedItemInstanceIds,
+      fusedWith: t.fusedWith ?? null,
     };
   }
 
@@ -3067,6 +3141,13 @@ export class GameEngine {
       this.pushCityEvent("INCOME", [], income);
     }
 
+    // JUROS — the gold kept in the bank grows a little, capped by what this wave's kills paid
+    const interest = interestForWave(this.gold, this.waveKillGold);
+    if (interest > 0) {
+      this.gold += interest;
+      this.lastInterest = { seq: (this.lastInterest?.seq ?? 0) + 1, amount: interest };
+    }
+
     this.waveDamageByType = emptyShares();
     this.waveKillGold = 0;
     this.waveLeaked = false;
@@ -3585,6 +3666,7 @@ export class GameEngine {
       missionsKey: this.missionsKey(),
       missionsClaimable: this.getDailyMissions().filter((m) => !m.claimed && m.progress >= m.target).length,
       horde: { multipliers: this.hordeAdaptation.multipliers, changeSeq: this.hordeChangeSeq },
+      interest: this.lastInterest,
       city: { burning: { ...this.city.burning }, goldShare: this.cityShare(), lastEvent: this.lastCityEvent },
       rift: { charges: this.rift.charges, armed: this.rift.armed, active: this.rift.active, lastResult: this.lastRiftResult },
       talents: { ranks: this.talents, free: talentPointsFree(this.talents, this.seasonBestWave) },

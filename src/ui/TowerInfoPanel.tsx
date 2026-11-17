@@ -1,3 +1,4 @@
+import { ELEMENT_COLOR, FUSION_COLORS, FUSION_CRIT_SHARE, FUSION_DAMAGE_MULT, FUSION_MIN_LEVEL, getFusionId } from "@/config/towerFusion";
 import { getManaUpgradeCost, MANA_MAX, MANA_OVERCHARGE_MAX, MANA_UPGRADE_GAIN_PER_LEVEL, MANA_UPGRADE_MAX_LEVEL, manaGainMultiplier, SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
@@ -42,8 +43,17 @@ import { ItemGlyph } from "./ItemGlyph";
 import { DualGemPriceButtons } from "./DualGemPriceButtons";
 import type { DualGemPrice, GemCurrency } from "@/config/gemsEconomy";
 
+/** TORRES DE FUSÃO — what the panel needs to offer a fusion or a split. */
+export interface FusionPanelData {
+  candidates: readonly { tower: TowerInstance; blocker: string | null; cost: number }[];
+  onFuse: (partnerId: string) => void;
+  onSplit: () => void;
+}
+
 interface TowerInfoPanelProps {
   tower: TowerInstance;
+  /** Optional so older test fixtures still render. */
+  fusion?: FusionPanelData;
   gold: number;
   freeGems: number;
   purchasedGems: number;
@@ -98,6 +108,7 @@ type Translate = ReturnType<typeof useLanguage>["t"];
  */
 export function TowerInfoPanel({
   tower,
+  fusion,
   gold,
   freeGems,
   purchasedGems,
@@ -132,7 +143,9 @@ export function TowerInfoPanel({
   const upgradeCost = getTowerUpgradeCost(tower);
   const canAfford = upgradeCost !== null && gold >= upgradeCost;
   const nextLevel = upgradeCost !== null ? tower.level + 1 : null;
-  const nextStats = nextLevel !== null ? getTowerLevelStats(tower.type, nextLevel) : null;
+  const rawNext = nextLevel !== null ? getTowerLevelStats(tower.type, nextLevel) : null;
+  // a fused tower keeps its fusion bonus at the next level too
+  const nextStats = rawNext && tower.fusedWith ? { ...rawNext, damage: rawNext.damage * FUSION_DAMAGE_MULT } : rawNext;
   const unlock = nextLevel !== null ? getMilestoneUnlockForLevel(tower.type, nextLevel) : null;
 
   return (
@@ -141,7 +154,7 @@ export function TowerInfoPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ ...dotStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
           <strong style={{ fontSize: 14, color: PALETTE.uiText, letterSpacing: 0.5 }}>
-            {t(`towers.${tower.type}.name`)}
+            {tower.fusedWith ? t(`towerInfo.fusion.names.${getFusionId(tower.type, tower.fusedWith.type)}` as TranslationKey) : t(`towers.${tower.type}.name`)}
           </strong>
         </div>
         <button onClick={onClose} style={closeButtonStyle}>
@@ -267,6 +280,8 @@ export function TowerInfoPanel({
         canUnlockSlot={canUnlockSlot}
         onUnlockSlot={onUnlockSlot}
       />
+
+      {fusion && <FusionSection tower={tower} gold={gold} theme={theme} t={t} fusion={fusion} />}
 
       <RepositionSection theme={theme} t={t} freeAvailable={repositionFreeAvailable} onStart={onStartReposition} />
     </div>
@@ -467,6 +482,66 @@ function EquipmentPicker({
  * ui/RepositioningOverlay.tsx own the click-a-slot + confirm/insufficient-
  * Gems steps that follow.
  */
+/** What the absorbed element adds to every hit, in words. */
+function fusionEffectLine(type: TowerType, level: number, t: Translate): string {
+  const sp = getTowerSpecialAtLevel(type, level);
+  const pct = sp.type === "IRONWOOD" ? Math.round(sp.critChance * FUSION_CRIT_SHARE * 100) : 0;
+  return t(`towerInfo.fusion.effect.${type}` as TranslationKey, { pct });
+}
+
+/**
+ * TORRES DE FUSÃO — fuse a nearby tower of another element into this one,
+ * or split a fused tower back into two. Each candidate shows what the
+ * fusion becomes, what the other element adds, its gold cost, and what
+ * still stands in the way.
+ */
+function FusionSection({ tower, gold, theme, t, fusion }: { tower: TowerInstance; gold: number; theme: (typeof TOWER_THEME)[TowerType]; t: Translate; fusion: FusionPanelData }) {
+  const fused = tower.fusedWith;
+  return (
+    <>
+      <div style={dividerStyle} />
+      <div style={sectionLabelStyle}>{t("towerInfo.fusion.title")}</div>
+      {fused ? (
+        <>
+          <div style={{ fontSize: 11, color: PALETTE.uiText, marginTop: 4 }}>
+            {t("towerInfo.fusion.fusedWith", { name: t(`towers.${fused.type}.name`), level: fused.level })}
+          </div>
+          <div style={{ fontSize: 10.5, color: ELEMENT_COLOR[fused.type], marginTop: 2 }}>+ {fusionEffectLine(fused.type, fused.level, t)}</div>
+          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 3, lineHeight: 1.35 }}>{t("towerInfo.fusion.splitHint", { name: t(`towers.${fused.type}.name`) })}</div>
+          <button onClick={fusion.onSplit} style={{ ...upgradeButtonStyle, borderColor: theme.primary, marginTop: 6 }}>
+            {t("towerInfo.fusion.split")}
+          </button>
+        </>
+      ) : (
+        <>
+          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, marginTop: 3, lineHeight: 1.35 }}>{t("towerInfo.fusion.lead")}</div>
+          {fusion.candidates.length === 0 && <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 6 }}>{t("towerInfo.fusion.none")}</div>}
+          {fusion.candidates.map(({ tower: other, blocker, cost }) => {
+            const id = getFusionId(tower.type, other.type)!;
+            const [c1, c2] = FUSION_COLORS[id];
+            const ok = blocker === null && gold >= cost;
+            return (
+              <div key={other.id} style={{ marginTop: 6, padding: "6px 8px", borderRadius: 6, border: `1px solid ${c2}`, background: `linear-gradient(90deg, ${c1}22, ${c2}22)` }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>{t("towerInfo.fusion.result", { name: t(`towerInfo.fusion.names.${id}` as TranslationKey) })}</div>
+                <div style={{ fontSize: 10, color: PALETTE.uiTextDim, marginTop: 1 }}>
+                  {t(`towers.${other.type}.name`)} · {t("towerInfo.level", { level: other.level, max: MAX_TOWER_LEVEL })}
+                </div>
+                <div style={{ fontSize: 10.5, color: ELEMENT_COLOR[other.type], marginTop: 2 }}>+ {fusionEffectLine(other.type, other.level, t)}</div>
+                {blocker && blocker !== "GOLD" && (
+                  <div style={{ fontSize: 10, color: "#ff8a7a", marginTop: 2 }}>{t(`towerInfo.fusion.blocked.${blocker}` as TranslationKey, { level: FUSION_MIN_LEVEL })}</div>
+                )}
+                <button onClick={() => fusion.onFuse(other.id)} disabled={!ok} style={{ ...upgradeButtonStyle, borderColor: c2, marginTop: 5, opacity: ok ? 1 : 0.5 }}>
+                  <CostLabel label={t("towerInfo.fusion.fuse")} cost={<><CoinIcon size={11} color={PALETTE.gold} /> {cost}</>} />
+                </button>
+              </div>
+            );
+          })}
+        </>
+      )}
+    </>
+  );
+}
+
 function RepositionSection({
   theme,
   t,
