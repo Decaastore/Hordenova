@@ -123,6 +123,8 @@ function Lights() {
       <directionalLight color="#8fb0d8" intensity={0.6} position={[400, 200, 500]} />
       {/* soft fill from the viewer's side, so faces turned to the camera are never black */}
       <directionalLight color="#ffe8cc" intensity={1.5} position={[-120, 300, -600]} />
+      {/* a warm rim from behind, so the monsters' silhouettes stand out of the map with real volume */}
+      <directionalLight color="#ffd0a0" intensity={1.1} position={[60, 240, 700]} />
       {/* an invisible floor that only shows the shadows the 3D things cast onto the 2D map */}
       <mesh rotation-x={-Math.PI / 2} position-y={0.05} receiveShadow>
         <planeGeometry args={[1400, 1200]} />
@@ -465,6 +467,58 @@ function Castle({
  */
 const ENEMY_HEIGHT = 39;
 /** A print from the 3D layer's ground space (x, z and a yaw around +Y) into world units for the 2D ground. */
+/** Elites, Mini-Bosses and Bosses stand this much taller than the 2D sprites' ratio, so they dominate the road. */
+const RANKED_SIZE = 1.3;
+/** The colour of each rank's menace — eyes, ground ring, enrage. */
+const RANK_COLOR = { elite: "#ff3a2a", mini: "#ff8a1a", main: "#c05aff" } as const;
+const auraGeo = new THREE.CircleGeometry(1, 48);
+let eyeTex: THREE.Texture | null = null;
+function eyeTexture() {
+  if (eyeTex) return eyeTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const g = c.getContext("2d")!;
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, "rgba(255,255,255,1)");
+  gr.addColorStop(0.18, "rgba(255,255,255,0.95)");
+  gr.addColorStop(0.4, "rgba(255,255,255,0.35)");
+  gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  eyeTex = new THREE.CanvasTexture(c);
+  return eyeTex;
+}
+let auraTex: THREE.Texture | null = null;
+/** A ring of menace on the ground: bright edge, a few cracks of light running in, clear in the middle. */
+function auraTexture() {
+  if (auraTex) return auraTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const g = c.getContext("2d")!;
+  const gr = g.createRadialGradient(128, 128, 40, 128, 128, 128);
+  gr.addColorStop(0, "rgba(255,255,255,0)");
+  gr.addColorStop(0.62, "rgba(255,255,255,0.12)");
+  gr.addColorStop(0.86, "rgba(255,255,255,0.75)");
+  gr.addColorStop(0.92, "rgba(255,255,255,0.35)");
+  gr.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = "rgba(255,255,255,0.5)";
+  g.lineWidth = 2;
+  for (let i = 0; i < 9; i++) {
+    const a = (i / 9) * Math.PI * 2 + 0.3;
+    g.beginPath();
+    g.moveTo(128 + Math.cos(a) * 118, 128 + Math.sin(a) * 118);
+    g.lineTo(128 + Math.cos(a + 0.12) * 92, 128 + Math.sin(a + 0.12) * 92);
+    g.lineTo(128 + Math.cos(a - 0.05) * 74, 128 + Math.sin(a - 0.05) * 74);
+    g.stroke();
+  }
+  auraTex = new THREE.CanvasTexture(c);
+  return auraTex;
+}
+
+const eyeTmp = new THREE.Vector3();
+
 function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean, kind: PrintKind = "foot") {
   const wx = WORLD_SIZE.width / 2 - x;
   const wy = WORLD_SIZE.height / 2 - z * TILT_COS;
@@ -504,6 +558,10 @@ interface Live {
   approachFrom: THREE.Vector3 | null;
   /** World height it was scaled to. */
   h: number;
+  /** Menace: glowing eyes and a pulsing ring of its rank's colour round its feet. */
+  eyes: THREE.Sprite[];
+  aura: THREE.Mesh;
+  rank: string;
   heavy: boolean;
   /** Per foot: lowest height seen lately and whether it is planted. */
   feet: { min: number; down: boolean }[];
@@ -543,6 +601,39 @@ function Creatures({
 
   /** Where a creature stands before the gate: further out the bigger it is. */
   const standPoint = (gate: CastleState, h: number) => gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 4 + h * 0.22).setY(0);
+
+  /** The menace of an Elite / Mini-Boss / Boss: glowing eyes, a ring of its rank's colour pulsing under it, and — badly hurt or enraged — it burns red and throws sparks. */
+  const menace = (e: Live, en: EnemyInstance, dt: number, g: THREE.Group) => {
+    const t = performance.now() / 1000;
+    const enraged = !!en.boss?.enraged || en.hp < en.maxHp * 0.3;
+    const col = enraged ? "#ff1a0a" : e.rank;
+    const auraMat = e.aura.material as THREE.MeshBasicMaterial;
+    e.aura.position.set(e.obj.position.x, 0.4, e.obj.position.z);
+    e.aura.scale.setScalar(e.h * 0.42 * (1 + 0.08 * Math.sin(t * (enraged ? 9 : 3))));
+    e.aura.rotation.z += dt * (enraged ? 1.6 : 0.4);
+    auraMat.color.set(col);
+    auraMat.opacity = (enraged ? 0.95 : 0.6) * Math.min(1, e.born);
+    const head = e.c.head;
+    if (head) {
+      head.getWorldPosition(eyeTmp);
+      g.worldToLocal(eyeTmp);
+      const yaw = e.obj.rotation.y;
+      const fx_ = Math.sin(yaw), fz = Math.cos(yaw);
+      const flicker = 0.85 + 0.15 * Math.sin(t * 17 + e.h);
+      for (let k = 0; k < 2; k++) {
+        const side = (k ? 1 : -1) * e.h * 0.028;
+        const sp = e.eyes[k]!;
+        sp.position.set(eyeTmp.x + fx_ * e.h * 0.06 + fz * side, eyeTmp.y + e.h * 0.012, eyeTmp.z + fz * e.h * 0.06 - fx_ * side);
+        sp.material.color.set(col);
+        sp.scale.setScalar(e.h * (enraged ? 0.1 : 0.075) * flicker);
+        sp.visible = e.born >= 1;
+      }
+    } else for (const sp of e.eyes) sp.visible = false;
+    if (enraged && Math.random() < 0.35) {
+      const p = e.obj.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * e.h * 0.3, e.h * (0.3 + Math.random() * 0.5), (Math.random() - 0.5) * e.h * 0.3));
+      fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: col, size: 1.6, life: 0.6, speed: 12, up: 14, drag: 1, radius: 1 });
+    }
+  };
 
   const startEntry = (e: Live) => {
     if (e.enterT >= 0) return;
@@ -669,16 +760,29 @@ function Creatures({
       if (!e) {
         if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
         const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss);
-        const h = ENEMY_HEIGHT * tier * heightFactor(en.type);
-        const c = new Creature(kits[cid], h, { id: cid, biomeId: snap.biomeId });
+        const h = ENEMY_HEIGHT * tier * RANKED_SIZE * heightFactor(en.type);
+        const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
+        // no ink outline: lit and shaded, these read as solid 3D monsters, not drawings
+        const c = new Creature(kits[cid], h, { id: cid, biomeId: snap.biomeId }, { outline: false });
         const obj = c.obj;
         const scale = c.scale;
         const shadow = new THREE.Mesh(blobGeo, blobMat);
-        shadow.scale.setScalar(9 * tier);
+        shadow.scale.setScalar(9 * tier * RANKED_SIZE);
         shadow.renderOrder = 1;
-        g.add(obj, shadow);
-        const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
-        e = { c, obj, scale, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
+        const rank = en.boss ? (en.boss.isMainBoss ? RANK_COLOR.main : RANK_COLOR.mini) : RANK_COLOR.elite;
+        const eyes = [0, 1].map(() => {
+          const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: eyeTexture(), color: rank, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true }));
+          sp.scale.setScalar(h * 0.075);
+          sp.renderOrder = 6;
+          return sp;
+        });
+        const aura = new THREE.Mesh(auraGeo, new THREE.MeshBasicMaterial({ map: auraTexture(), color: rank, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, opacity: 0.7 }));
+        aura.rotation.x = -Math.PI / 2;
+        aura.scale.setScalar(h * 0.42);
+        aura.renderOrder = 2;
+        g.add(obj, shadow, aura, ...eyes);
+        if (fresh && en.boss) fx.rings.ring(portal3.clone(), rank, 10, en.boss.isMainBoss ? 160 : 110, 0.9);
+        e = { c, obj, scale, eyes, aura, rank, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -740,6 +844,7 @@ function Creatures({
         }
       }
       if (en.burn && Math.random() < 0.4) fx.flame(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, ENEMY_HEIGHT * 0.5, 0)), 0.5, "#ff4a0a");
+      menace(e, en, dt, g);
     }
     for (const [id, st] of strides.current)
       if (!strideSeen.has(id)) {
@@ -774,6 +879,8 @@ function Creatures({
         e.gone = 0;
         {
           e.mode = "dying";
+          e.aura.visible = false;
+          for (const sp of e.eyes) sp.visible = false;
           fx.death(e.obj.position.clone().add(new THREE.Vector3(0, ENEMY_HEIGHT * 0.4, 0)), !!e.last?.boss);
           e.c.fall();
         }
@@ -796,7 +903,9 @@ function Creatures({
       }
 
     function remove(id: string, e: Live) {
-      g!.remove(e.obj, e.shadow);
+      g!.remove(e.obj, e.shadow, e.aura, ...e.eyes);
+      (e.aura.material as THREE.Material).dispose();
+      for (const sp of e.eyes) sp.material.dispose();
       for (const m of e.fading) m.dispose();
       live.current.delete(id);
       if (e.enterT >= 0 && seen.has(id)) entered.current.add(id);

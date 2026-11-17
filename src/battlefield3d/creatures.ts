@@ -196,10 +196,12 @@ export class Creature {
   readonly scale: number;
   /** The ankle bones (left, right), for footprints. Empty when a model has none. */
   readonly feet: THREE.Object3D[];
+  /** The head bone, for glowing eyes. Null when a model has none. */
+  readonly head: THREE.Object3D | null;
   private fallT = -1;
   private fallDir = 1;
 
-  constructor(kit: CreatureKit, worldHeight: number, tint?: { id: CreatureId; biomeId: string }) {
+  constructor(kit: CreatureKit, worldHeight: number, tint?: { id: CreatureId; biomeId: string }, opts: { outline?: boolean } = {}) {
     // the model sits inside a pivot so a fall can tip it over its feet
     const body = cloneSkinned(kit.scene);
     if (tint)
@@ -217,10 +219,11 @@ export class Creature {
     this.scale = worldHeight / kit.height;
     this.obj.scale.setScalar(this.scale);
     // the same dark ink outline the 2D creature sprites have, so 3D and 2D read as one style
-    addOutline(body, 0.012);
+    if (opts.outline !== false) addOutline(body, 0.012);
     const left = body.getObjectByProperty("name", "mixamorigLeftFoot") ?? body.getObjectByProperty("name", "mixamorig:LeftFoot");
     const right = body.getObjectByProperty("name", "mixamorigRightFoot") ?? body.getObjectByProperty("name", "mixamorig:RightFoot");
     this.feet = left && right ? [left, right] : [];
+    this.head = body.getObjectByProperty("name", "mixamorigHead") ?? body.getObjectByProperty("name", "mixamorig:Head") ?? null;
   }
 
   /** Start the death fall (tips over backwards or sideways, then lies still). */
