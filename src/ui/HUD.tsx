@@ -12,7 +12,8 @@ import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config
 import { riftRewardPct } from "@/config/rifts";
 import { romanDepth } from "@/config/eternal";
 import { BrandLogo } from "./BrandLogo";
-import { BestiaryGlyph, CityGlyph, EternalGlyph, ExpeditionGlyph, ForgeGlyph, HudEmblem, InventoryGlyph, MissionsGlyph, RiftGlyph, TalentGlyph } from "./hudIcons";
+import { HudEmblem } from "./hudIcons";
+import { GameIcon } from "./gameIcons";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
 import { BoltIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
 
@@ -172,61 +173,61 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           </div>
           {onToggleMissions && (
             <button onClick={onToggleMissions} className={`hh-btn${hud.missionsClaimable > 0 ? " is-live" : ""}`} data-testid="missions-button" title={t("hud.missionsTooltip")}>
-              <HudEmblem tone="missions"><MissionsGlyph /></HudEmblem>
+              <HudEmblem tone="missions"><GameIcon name="scroll" /></HudEmblem>
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
             </button>
           )}
           {onToggleExpeditions && (
             <button onClick={onToggleExpeditions} className={`hh-btn${hud.expeditions.ready > 0 ? " is-live" : ""}`} data-testid="expeditions-button" title={t("expeditions.tooltip")}>
-              <HudEmblem tone="expeditions"><ExpeditionGlyph /></HudEmblem>
+              <HudEmblem tone="expeditions"><GameIcon name="compass" /></HudEmblem>
               <span className="hh-btn-txt">{t("expeditions.button")}</span>
               {hud.expeditions.ready > 0 && <span className="hh-badge">{hud.expeditions.ready}</span>}
             </button>
           )}
           {onToggleForge && (
             <button onClick={onToggleForge} className={`hh-btn${hud.expeditions.forgeReady ? " is-live" : ""}`} data-testid="forge-button" title={t("expeditions.forgeTooltip")}>
-              <HudEmblem tone="forge"><ForgeGlyph /></HudEmblem>
+              <HudEmblem tone="forge"><GameIcon name="anvil" /></HudEmblem>
               <span className="hh-btn-txt">{t("expeditions.forgeButton")}</span>
               {hud.expeditions.forgeReady && <span className="hh-badge">1</span>}
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (
             <button onClick={onToggleEternal} className="hh-btn hh-rift hh-eternal-btn" data-testid="eternal-button" title={t("eternal.tooltip")}>
-              <HudEmblem tone="eternal"><EternalGlyph /></HudEmblem>
+              <HudEmblem tone="eternal"><GameIcon name="hourglass" /></HudEmblem>
               <span className="hh-btn-txt">{t("eternal.button")}</span>
               {hud.eternal.contractsReady > 0 && <span className="hh-badge is-rift">{hud.eternal.contractsReady}</span>}
             </button>
           )}
           {onToggleTalents && (
             <button onClick={onToggleTalents} className={`hh-btn${hud.talents.free > 0 ? " is-live" : ""}`} data-testid="talents-button" title={t("talents.tooltip")}>
-              <HudEmblem tone="talents"><TalentGlyph /></HudEmblem>
+              <HudEmblem tone="talents"><GameIcon name="sparkle" /></HudEmblem>
               <span className="hh-btn-txt">{t("talents.button")}</span>
               {hud.talents.free > 0 && <span className="hh-badge">{hud.talents.free}</span>}
             </button>
           )}
           {onToggleRift && (
             <button onClick={onToggleRift} className={`hh-btn hh-rift${hud.rift.charges > 0 && !hud.rift.armed && !hud.rift.active ? " is-ready is-live" : ""}`} data-testid="rift-button" title={t("rift.tooltip")}>
-              <HudEmblem tone="rift"><RiftGlyph /></HudEmblem>
+              <HudEmblem tone="rift"><GameIcon name="vortex" /></HudEmblem>
               <span className="hh-btn-txt">{t("rift.button")}</span>
               {hud.rift.charges > 0 && <span className="hh-badge is-rift">{hud.rift.charges}</span>}
             </button>
           )}
           {onToggleCity && (
             <button onClick={onToggleCity} className={`hh-btn${Object.keys(hud.city.burning).length > 0 ? " is-live is-alarm" : ""}`} data-testid="city-button" title={t("hud.cityTooltip")}>
-              <HudEmblem tone="city"><CityGlyph /></HudEmblem>
+              <HudEmblem tone="city"><GameIcon name="castle" /></HudEmblem>
               <span className="hh-btn-txt">{t("city.button")}</span>
               {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
             </button>
           )}
           {onToggleBestiary && (
             <button onClick={onToggleBestiary} className="hh-btn" data-testid="bestiary-button" title={t("bestiary.tooltip")}>
-              <HudEmblem tone="bestiary"><BestiaryGlyph /></HudEmblem>
+              <HudEmblem tone="bestiary"><GameIcon name="skull" /></HudEmblem>
               <span className="hh-btn-txt">{t("bestiary.button")}</span>
             </button>
           )}
           <button onClick={onOpenInventory} className="hh-btn" title={t("hud.inventoryTooltip")}>
-            <HudEmblem tone="inventory"><InventoryGlyph /></HudEmblem>
+            <HudEmblem tone="inventory"><GameIcon name="pouch" /></HudEmblem>
             <span className="hh-btn-txt">{t("inventory.button")}</span>
           </button>
           <span className="hh-divider" aria-hidden="true" />
@@ -588,6 +589,9 @@ div.hh-brand { cursor: default; }
 /* moving parts of the icons */
 .hh-emb-svg * { transform-box: fill-box; }
 .hni-flag { transform-origin: 0% 50%; }
+.hni-needle { transform-origin: 50% 50%; transform-box: view-box !important; }
+.hh-btn:hover .hni-needle, .hh-btn.is-live .hni-needle { animation: hni-seek 1.4s cubic-bezier(.4,0,.2,1) infinite; }
+@keyframes hni-seek { 0%,100% { transform: rotate(0); } 25% { transform: rotate(38deg); } 55% { transform: rotate(-24deg); } 80% { transform: rotate(10deg); } }
 .hh-btn:hover .hni-flag, .hh-btn.is-live .hni-flag { animation: hni-wave 0.8s ease-in-out infinite; }
 @keyframes hni-wave { 0%,100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-8deg) scaleX(0.88); } }
 .hni-hammer { transform-origin: 100% 0%; }
