@@ -70,6 +70,161 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v155",
+    dateIso: "2026-11-18",
+    category: "INTERFACE",
+    title: {
+      en: "New Store, Season Pass Page and Animations Everywhere",
+      ptBR: "Loja Nova, Página do Passe Nova e Animações em Tudo",
+    },
+    description: {
+      en: "The Store and the Season Pass page were redesigned, the buttons at the top of the game got proper emblems, and the game and the website now move: panels, cards, buttons and pages all have their own animations.",
+      ptBR: "A Loja e a página do Passe da Season foram redesenhadas, os botões do topo do jogo ganharam emblemas de verdade, e o jogo e o site agora se mexem: janelas, cartas, botões e páginas têm animações próprias.",
+    },
+    highlights: [
+      {
+        en: "Store: gem balances in their own plates, the daily gift as a treasure chest, offer cards on a lit stage with discount ribbons, gem prices as pills (Free or Purchased), gem packs as piles that grow with the pack, and featured cards for the Starter Pack (with what's inside, item by item) and the VIP (violet and gold, with a crown).",
+        ptBR: "Loja: saldos de gemas em plaquinhas próprias, o presente do dia como um baú, ofertas num palco iluminado com faixa de desconto, preços em gemas Grátis ou Compradas, pacotes de gemas como montes que crescem com o tamanho, e cards em destaque para o Pacote Inicial (com o que vem, item por item) e o VIP (violeta e dourado, com coroa).",
+      },
+      {
+        en: "Season Pass page: your level in a medallion with a progress ring, your XP and the next reward up front, the Free, Premium and Supreme passes side by side (Premium shows this Season's two skins), and a new reward track with a picture for every reward, a gold rail up to your level, and ready rewards glowing.",
+        ptBR: "Página do Passe: seu nível num medalhão com anel de progresso, seu XP e a próxima recompensa logo no topo, os passes Grátis, Premium e Supremo lado a lado (o Premium mostra as duas skins desta Season), e uma trilha nova com imagem para cada recompensa, um trilho dourado até o seu nível e as recompensas prontas brilhando.",
+      },
+      {
+        en: "The top bar buttons (Missions, Expeditions, Forge, Talents, Rift, Eternal, City, Bestiary, Inventory) now carry a coloured emblem whose icon moves on hover, with a turning ring of light when something is waiting for you.",
+        ptBR: "Os botões do topo (Missões, Expedições, Forja, Talentos, Fenda, Eterno, Cidade, Bestiário, Inventário) agora têm um emblema colorido cujo ícone se mexe ao passar o mouse, com um anel de luz girando quando tem algo esperando por você.",
+      },
+      {
+        en: "Duel cards: forged metal frames by card type, they are dealt into your hand with a flip, playable cards sway and catch a glint, and a card you can't afford yet fills up with mana as it charges.",
+        ptBR: "Cartas do Duelo: molduras de metal forjado por tipo de carta, elas chegam à mão virando, as cartas jogáveis balançam e ganham um reflexo, e a carta que você ainda não pode pagar vai se enchendo de mana.",
+      },
+      {
+        en: "Panels open with an entrance and their lists arrive one by one; the elemental blessing card shows the elements of the coming waves; the website's pages, menu and sections animate too. Everything stays still if your system is set to reduce motion.",
+        ptBR: "As janelas abrem com animação e as listas aparecem uma a uma; o card da bênção mostra os elementos das próximas ondas; as páginas, o menu e as seções do site também ganharam animação. Tudo fica parado se o seu sistema estiver com \"reduzir movimento\" ligado.",
+      },
+      {
+        en: "The Warden Fragment and the Ancient Core have their own art, and item pictures now show in the Forge recipes, on the item being forged, in profiles and in drop tables.",
+        ptBR: "O Fragmento do Guardião e o Núcleo Ancestral ganharam arte própria, e as imagens dos itens agora aparecem nas receitas da Forja, no item sendo forjado, nos perfis e nas tabelas de drop.",
+      },
+    ],
+  },
+  {
+    id: "v154",
+    dateIso: "2026-11-18",
+    category: "BOSSES",
+    title: {
+      en: "Fiercer 3D Bosses, Frozen Bodies and a Castle That Fights Back",
+      ptBR: "Chefes 3D Mais Ferozes, Corpos Congelados e um Castelo que Revida",
+    },
+    description: {
+      en: "Elites, Mini-Bosses and Bosses are now solid 3D monsters with real animations, new creatures join them, they leave footprints pressed into the ground, the ice tower's freeze traps them in ice, and the castle reacts to every blow of a Boss.",
+      ptBR: "Elites, Mini-Chefes e Chefes agora são monstros 3D de verdade, com animações reais, chegam criaturas novas, eles deixam pegadas marcadas no chão, o congelamento da torre de gelo prende o corpo no gelo, e o castelo reage a cada golpe do Chefe.",
+    },
+    highlights: [
+      {
+        en: "Bigger and more menacing: glowing eyes, an aura in their rank's colour, armour (pauldrons, horns, back spikes on the Boss), and a red enraged glow when badly hurt.",
+        ptBR: "Maiores e mais ameaçadores: olhos brilhando, aura na cor da patente, armadura (ombreiras, chifres e espinhos nas costas do Chefe) e um brilho vermelho de fúria quando estão muito feridos.",
+      },
+      {
+        en: "Real animations: bosses roar as they step out of the rift, punch the castle gate, break into a run when enraged, and fall with real death animations; their bodies stay on the ground a moment before sinking away.",
+        ptBR: "Animações de verdade: os chefes rugem ao sair da fenda, socam o portão do castelo, correm quando enfurecidos e caem com animações reais de morte; o corpo fica um tempo no chão antes de afundar.",
+      },
+      {
+        en: "New creatures: the Pumpkin Hulk mini-boss, plus Yaku zombie, goblin and Mremireh elites. Creatures on the ice maps are no longer drawn as black silhouettes.",
+        ptBR: "Criaturas novas: o mini-chefe Pumpkin Hulk e os elites zumbi Yaku, goblin e Mremireh. As criaturas dos mapas de gelo não aparecem mais como silhuetas pretas.",
+      },
+      {
+        en: "Footprints are pressed into the ground and stay where they were made, following every step; bosses crack the ground round theirs.",
+        ptBR: "As pegadas ficam marcadas no chão, no lugar onde foram feitas, acompanhando cada passo; os chefes racham o chão em volta das deles.",
+      },
+      {
+        en: "When the ice tower freezes a 3D monster, its body is wrapped in clear ice with crystals bursting out and it stands still; the ice shatters when it thaws.",
+        ptBR: "Quando a torre de gelo congela um monstro 3D, o corpo fica envolto em gelo transparente com cristais saindo e ele fica parado; o gelo estilhaça quando derrete.",
+      },
+      {
+        en: "Each Boss blow on the gate: the castle rocks, stones break off the gatehouse, cracks spread round the arch, its crystal strikes back with lightning and the defenders pour burning oil on the attacker. These are visual only and do no damage; Mini-Boss blows get a lighter version.",
+        ptBR: "A cada golpe do Chefe no portão: o castelo balança, pedras se soltam da guarita, rachaduras se espalham em volta do arco, o cristal revida com raios e os defensores despejam óleo fervendo no atacante. Isso é só visual e não causa dano; os golpes do Mini-Chefe têm uma versão mais leve.",
+      },
+    ],
+  },
+  {
+    id: "v153",
+    dateIso: "2026-11-18",
+    category: "TOWERS",
+    title: {
+      en: "3D Towers on the Map",
+      ptBR: "Torres em 3D no Mapa",
+    },
+    description: {
+      en: "Towers are now built in 3D on the battlefield, standing on stone foundations, changing shape as they evolve, and every skin has its own model and its own shot effects.",
+      ptBR: "As torres agora são construídas em 3D no campo de batalha, firmes em fundações de pedra, mudando de forma conforme evoluem, e cada skin tem o seu próprio modelo e os seus próprios efeitos de tiro.",
+    },
+    highlights: [
+      {
+        en: "Each tower visibly evolves at every stage, with a rune circle at the highest stages.",
+        ptBR: "Cada torre evolui de forma visível a cada estágio, com um círculo rúnico nos estágios mais altos.",
+      },
+      {
+        en: "Skins in their element's theme get their own 3D body (including the jade dragon and the Ancient Guardian carved in a glacier); the rest keep the standard tower. Every skin has its own shot trail, impact and aura in its colours.",
+        ptBR: "As skins no tema do seu elemento ganham corpo 3D próprio (incluindo o dragão de jade e o Guardião Ancestral esculpido numa geleira); as outras usam a torre padrão. Toda skin tem rastro de tiro, impacto e aura próprios, nas suas cores.",
+      },
+      {
+        en: "Prefer the flat towers? Open the game with ?towers=2d at the end of the address.",
+        ptBR: "Prefere as torres planas? Abra o jogo com ?towers=2d no fim do endereço.",
+      },
+    ],
+  },
+  {
+    id: "v152",
+    dateIso: "2026-11-18",
+    category: "CONTENT",
+    title: {
+      en: "Living Light Towers and Real Lava Pits",
+      ptBR: "Torres de Luz Vivas e Poços de Lava de Verdade",
+    },
+    description: {
+      en: "The braziers along the road and the lava pools of the volcanic map are now 3D: the braziers burn and light the ground, and the old painted lava gave way to real molten pits.",
+      ptBR: "Os braseiros na beira da estrada e as poças de lava do mapa vulcânico agora são 3D: os braseiros queimam e iluminam o chão, e a lava pintada antiga deu lugar a poços de lava derretida de verdade.",
+    },
+    highlights: [
+      {
+        en: "Lava pits sink below the ground, ringed by jagged black rock that glows where it meets the melt; crust plates drift on glowing seams, bubbles swell and burst, small flames lick up with smoke rolling off, and the pit lights the ground round it.",
+        ptBR: "Os poços de lava ficam abaixo do chão, cercados de rocha preta irregular que brilha onde encosta na lava; placas de crosta flutuam sobre rachaduras em brasa, bolhas crescem e estouram, chamas pequenas sobem soltando fumaça e o poço ilumina o chão em volta.",
+      },
+    ],
+  },
+  {
+    id: "v151",
+    dateIso: "2026-11-18",
+    category: "SYSTEMS",
+    title: {
+      en: "Tower Fusion, Gold Interest and Elemental Waves",
+      ptBR: "Fusão de Torres, Juros de Ouro e Ondas Elementais",
+    },
+    description: {
+      en: "Three new ways to plan a run: fuse two towers of different elements into one stronger tower, earn interest on the gold you save, and read each wave's element to pick the right towers, with a blessing to choose every 5 waves.",
+      ptBR: "Três jeitos novos de planejar a partida: fundir duas torres de elementos diferentes numa torre mais forte, ganhar juros sobre o ouro guardado e ler o elemento de cada onda para escolher as torres certas, com uma bênção para escolher a cada 5 ondas.",
+    },
+    highlights: [
+      {
+        en: "Fusion: two towers at level 10 or more, close to each other and of different elements, become one — 6 combinations, like Steam, Plasma or Fire Arrows. The fused tower deals 50% more damage and adds part of its partner's effect (burn, slow, crit or chain). Pay in gold, or in Free or Purchased gems, as you prefer; you can split it back at any time.",
+        ptBR: "Fusão: duas torres no nível 10 ou mais, perto uma da outra e de elementos diferentes, viram uma só — 6 combinações, como Vapor, Plasma ou Flechas em Chamas. A torre fundida causa 50% mais dano e ganha parte do efeito da parceira (queimadura, lentidão, crítico ou corrente). Pague em ouro ou em gemas Grátis ou Compradas, como preferir; dá para separar a qualquer momento.",
+      },
+      {
+        en: "Interest: at the end of each wave, your banked gold earns 2%, never more than half of the gold that wave's kills paid.",
+        ptBR: "Juros: no fim de cada onda, o ouro guardado rende 2%, nunca mais que metade do ouro que os abates daquela onda deram.",
+      },
+      {
+        en: "Elemental waves: from wave 6, ordinary waves carry an element (Fire, Ice, Storm or Nature), shown ahead of time. The tower that beats it deals 30% more damage, the same element 25% less. Boss waves have no element.",
+        ptBR: "Ondas elementais: a partir da onda 6, as ondas comuns trazem um elemento (Fogo, Gelo, Tempestade ou Natureza), mostrado com antecedência. A torre que vence o elemento causa 30% mais dano, a do mesmo elemento 25% menos. Ondas de chefe não têm elemento.",
+      },
+      {
+        en: "Blessing: every 5 waves you pick an element and its towers deal 15% more damage for the next 5 waves. The card shows the coming waves' elements and how many towers of each element you have.",
+        ptBR: "Bênção: a cada 5 ondas você escolhe um elemento e as torres dele causam 15% mais dano pelas próximas 5 ondas. O card mostra os elementos das próximas ondas e quantas torres de cada elemento você tem.",
+      },
+    ],
+  },
+  {
     id: "v150",
     dateIso: "2026-11-16",
     category: "FIXES",

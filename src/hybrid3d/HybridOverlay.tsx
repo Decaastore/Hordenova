@@ -1313,9 +1313,9 @@ function Creatures({
 }
 
 
-// ----------------------------------------------------------------- towers (prévia: ?towers=3d)
-/** PRÉVIA — live 3D towers on the 2D map; only with `?towers=3d`, never on by default. */
-export const TOWERS_3D_PREVIEW = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("towers") === "3d";
+// ----------------------------------------------------------------- towers
+/** Live 3D towers on the map — on by default; `?towers=2d` keeps the flat 2D towers. */
+export const TOWERS_3D_PREVIEW = typeof window !== "undefined" && new URLSearchParams(window.location.search).get("towers") !== "2d";
 /** The point each tower fires from (an anchor on its turret). */
 const MUZZLE: Record<string, string[]> = { IRONWOOD: ["boltTip", "eyes"], INFERNO: ["mouth"], FROSTBORN: ["orb"], STORMCALLER: ["orb", "rod0"] };
 
