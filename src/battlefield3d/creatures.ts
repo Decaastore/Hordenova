@@ -233,6 +233,32 @@ function addOutline(body: THREE.Object3D, relative: number) {
   }
 }
 
+/**
+ * Ice shell material: a glassy, pale-blue skin pushed a little out along the normals,
+ * brightest at the silhouette (fresnel) like light caught in ice. One per creature, so
+ * each freezes and thaws on its own.
+ */
+function iceMaterial(thick: number) {
+  const m = new THREE.MeshStandardMaterial({ color: "#9fd8ff", emissive: "#2a78c0", emissiveIntensity: 0.25, roughness: 0.05, metalness: 0.25, transparent: true, opacity: 0, depthWrite: false });
+  const uniforms = { uThick: { value: thick }, uRim: { value: 1 } };
+  m.userData.uniforms = uniforms;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uThick = uniforms.uThick;
+    sh.uniforms.uRim = uniforms.uRim;
+    sh.vertexShader = sh.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform float uThick;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\n  transformed += normalize(objectNormal) * uThick;");
+    sh.fragmentShader = sh.fragmentShader
+      .replace("#include <common>", "#include <common>\nuniform float uRim;")
+      .replace(
+        "#include <dithering_fragment>",
+        "#include <dithering_fragment>\n  float fr = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.2);\n  gl_FragColor.rgb += fr * vec3(0.7, 0.92, 1.0) * uRim * 1.3;\n  gl_FragColor.a = clamp(gl_FragColor.a * (0.22 + fr * 1.1), 0.0, 1.0);",
+      );
+  };
+  m.customProgramCacheKey = () => "ice-shell";
+  return m;
+}
+
 /** One live creature on the field. */
 export class Creature {
   readonly obj: THREE.Object3D;
@@ -258,6 +284,9 @@ export class Creature {
   private oneOff: THREE.AnimationAction | null = null;
   /** Playing a real death clip (rather than the procedural tip-over). */
   private clipDeath = false;
+  /** The ice shell (built the first time it freezes). */
+  private ice: { mat: THREE.MeshStandardMaterial; meshes: THREE.SkinnedMesh[] } | null = null;
+  private frost = 0;
 
   constructor(kit: CreatureKit, worldHeight: number, tint?: { id: CreatureId; biomeId: string }, opts: { outline?: boolean } = {}) {
     // the model sits inside a pivot so a fall can tip it over its feet
@@ -352,6 +381,50 @@ export class Creature {
       return;
     }
     (this.oneOff ?? this.gait).fadeOut(0.25);
+  }
+
+  /**
+   * Frost on the body, 0..1: from a light rime (slowed) to a full ice shell (frozen). The
+   * animation slows to a stop as it freezes, so the creature stands caught in the ice.
+   */
+  setFrost(k: number) {
+    this.frost = k;
+    if (k <= 0.002 && !this.ice) return;
+    if (!this.ice) {
+      const body = this.obj.children[0]!;
+      const skinned: THREE.SkinnedMesh[] = [];
+      body.traverse((o) => {
+        const m = o as THREE.SkinnedMesh;
+        if (m.isSkinnedMesh && !m.userData.outline && !m.userData.ice) skinned.push(m);
+      });
+      let tall = 1;
+      for (const m of skinned) {
+        if (!m.geometry.boundingBox) m.geometry.computeBoundingBox();
+        const bb = m.geometry.boundingBox!;
+        tall = Math.max(tall, bb.max.y - bb.min.y, bb.max.x - bb.min.x, bb.max.z - bb.min.z);
+      }
+      const mat = iceMaterial(tall * 0.012);
+      const meshes = skinned.map((m) => {
+        const shell = new THREE.SkinnedMesh(m.geometry, mat);
+        shell.bind(m.skeleton, m.bindMatrix);
+        shell.position.copy(m.position);
+        shell.quaternion.copy(m.quaternion);
+        shell.scale.copy(m.scale);
+        shell.frustumCulled = false;
+        shell.renderOrder = 2;
+        shell.userData.ice = true;
+        m.parent?.add(shell);
+        return shell;
+      });
+      this.ice = { mat, meshes };
+    }
+    this.ice.mat.opacity = Math.min(1, k);
+    for (const m of this.ice.meshes) m.visible = k > 0.01;
+    this.mixer.timeScale = 1 - 0.97 * Math.min(1, Math.max(0, (k - 0.35) / 0.5));
+  }
+
+  get frozenAmount() {
+    return this.frost;
   }
 
   get falling() {

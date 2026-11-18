@@ -177,8 +177,13 @@ export interface CastleState {
   open: number;
   /** Requests: the gate stays up while this is in the future. */
   holdOpenUntil: number;
-  /** A creature just got in: shake + flash. */
-  struck: () => void;
+  /**
+   * A blow on the gate: "light" for a creature getting in (shake + flash), "mini" for a
+   * Mini-Boss blow (harder, a few stones fall), "main" for a Boss blow — the whole castle
+   * reacts: it rocks, stones break off the gatehouse, cracks spread round the arch and the
+   * defenders pour burning oil on the attacker from the machicolations.
+   */
+  struck: (kind?: "light" | "mini" | "main", target?: THREE.Vector3, targetH?: number) => void;
 }
 
 function Castle({
@@ -206,6 +211,18 @@ function Castle({
   const coreLight = useRef<THREE.PointLight>(null);
   const shake = useRef(0);
   const hpT = useRef(0);
+  /** the castle rocking back from a blow: a damped spring on its tilt */
+  const rock = useRef({ a: 0, v: 0 });
+  /** cracks round the gate arch (0..1; they slowly knit back), and how hot they glow right after a blow */
+  const cracks = useRef(0);
+  const crackGlow = useRef(0);
+  const coreFlare = useRef(0);
+  /** seconds of burning oil still pouring from the machicolations */
+  const oil = useRef(0);
+  /** where the attacker stands (and how tall it is), so the oil lands on it */
+  const oilAt = useRef<{ at: THREE.Vector3; h: number } | null>(null);
+  const debrisGroup = useRef<THREE.Group>(null);
+  const debris = useRef<{ m: THREE.Mesh; v: THREE.Vector3; w: THREE.Vector3; life: number; rest: boolean }[]>([]);
   const anchor = loc(fortress);
   // the gate (the model's +Z) faces back along the road the horde comes in on, turned towards
   // the viewer so the castle still shows its face rather than a flank or its back
@@ -358,6 +375,78 @@ function Castle({
     return group.current.parent ? group.current.parent.worldToLocal(w) : w;
   };
 
+  const stoneMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#8a7f70", roughness: 0.95, transparent: true }), []);
+  const stoneGeos = useMemo(() => [new THREE.BoxGeometry(1, 0.8, 0.9), new THREE.DodecahedronGeometry(0.6, 0), new THREE.BoxGeometry(1.3, 0.6, 0.7)], []);
+  /** stones breaking off the top of the gatehouse and tumbling down in front of it */
+  const spawnDebris = (n: number, power: number) => {
+    const dg = debrisGroup.current;
+    const top = at("gate");
+    if (!dg || !top) return;
+    const fwd = new THREE.Vector3(Math.sin(YAW), 0, Math.cos(YAW));
+    const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    for (let i = 0; i < n; i++) {
+      let d = debris.current.find((x) => x.life <= 0);
+      if (!d) {
+        if (debris.current.length >= 48) break;
+        const m = new THREE.Mesh(stoneGeos[i % stoneGeos.length]!, stoneMat.clone());
+        m.castShadow = true;
+        dg.add(m);
+        d = { m, v: new THREE.Vector3(), w: new THREE.Vector3(), life: 0, rest: false };
+        debris.current.push(d);
+      }
+      const sz = (2.6 + Math.random() * 3.6) * scale * (0.7 + power * 0.5);
+      d.m.scale.setScalar(sz);
+      d.m.position.copy(top).addScaledVector(side, (Math.random() - 0.5) * 18 * scale).add(new THREE.Vector3(0, (18 + Math.random() * 12) * scale, 0)).addScaledVector(fwd, 2 * scale);
+      d.m.rotation.set(Math.random() * 6, Math.random() * 6, Math.random() * 6);
+      d.v.copy(fwd).multiplyScalar(30 + Math.random() * 70 * power).addScaledVector(side, (Math.random() - 0.5) * 90).setY(40 + Math.random() * 70 * power);
+      d.w.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+      d.life = 3.5 + Math.random();
+      d.rest = false;
+      d.m.visible = true;
+      (d.m.material as THREE.MeshStandardMaterial).opacity = 1;
+    }
+  };
+  /** the crack web round the arch: a canvas texture, glowing ember-orange right after a blow */
+  const crackMat = useMemo(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d")!;
+    let seed = 7;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const branch = (x: number, y: number, a: number, len: number, w: number) => {
+      g.lineWidth = w;
+      g.beginPath();
+      g.moveTo(x, y);
+      let cx = x, cy = y;
+      const steps = 6 + Math.floor(rnd() * 5);
+      for (let i = 0; i < steps; i++) {
+        a += (rnd() - 0.5) * 0.9;
+        cx += Math.cos(a) * (len / steps);
+        cy += Math.sin(a) * (len / steps);
+        g.lineTo(cx, cy);
+        if (w > 1.2 && rnd() < 0.3) {
+          g.stroke();
+          branch(cx, cy, a + (rnd() < 0.5 ? -1 : 1) * (0.5 + rnd() * 0.6), len * 0.5, w * 0.6);
+          g.lineWidth = w;
+          g.beginPath();
+          g.moveTo(cx, cy);
+        }
+      }
+      g.stroke();
+    };
+    g.strokeStyle = "#fff";
+    g.lineCap = "round";
+    g.lineJoin = "round";
+    // from the arch's crown and shoulders out across the stone
+    for (let i = 0; i < 9; i++) {
+      const a = -Math.PI * (0.05 + (i / 8) * 0.9);
+      const r = 62;
+      branch(128 + Math.cos(a) * r, 150 + Math.sin(a) * r, a + (rnd() - 0.5) * 0.4, 70 + rnd() * 50, 3.2);
+    }
+    const tex = new THREE.CanvasTexture(c);
+    return new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0, depthWrite: false, color: "#1a120c", polygonOffset: true, polygonOffsetFactor: -2 });
+  }, []);
+
   // publish the gate geometry for the creatures
   useFrame(() => {
     const gl = at("gate");
@@ -374,10 +463,31 @@ function Castle({
         gatePlane: new THREE.Plane().setFromNormalAndCoplanarPoint(fwd.clone(), planePoint),
         open: 0,
         holdOpenUntil: 0,
-        struck: () => {
-          shake.current = 0.35;
+        struck: (kind = "light", target, targetH = 60) => {
+          shake.current = kind === "main" ? 0.7 : kind === "mini" ? 0.5 : 0.35;
+          if (kind === "light") return;
+          const p = kind === "main" ? 1 : 0.55;
+          rock.current.v += 0.42 * p;
+          cracks.current = Math.min(1, cracks.current + (kind === "main" ? 0.36 : 0.18));
+          crackGlow.current = 1;
+          coreFlare.current = 1;
+          spawnDebris(kind === "main" ? 18 : 8, p);
+          if (target) oilAt.current = { at: target.clone(), h: targetH };
+          if (kind === "main") {
+            oil.current = 1.4;
+            // the castle strikes back: its crystal core lashes the attacker with lightning
+            const core = at("core");
+            if (core && target) {
+              const hit = target.clone().setY(targetH * 0.55);
+              for (let i = 0; i < 3; i++) fx.bolts.bolt(core.clone(), hit.clone().add(new THREE.Vector3((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 10, (Math.random() - 0.5) * 8)), i ? model.core : "#ffffff", 0.32, 14);
+              fx.glow.emit(hit, { count: 40, color: "#ffffff", colorEnd: model.core, size: 3.2, life: 0.6, speed: 70, up: 10, drag: 2, radius: 6 });
+              fx.glow.emit(core.clone(), { count: 24, color: "#ffffff", colorEnd: model.core, size: 2.6, life: 0.5, speed: 40, drag: 2 });
+              fx.rings.ring(target.clone().setY(0.6), model.core, 6, targetH * 1.1, 0.6);
+            }
+          }
         },
       };
+      if (import.meta.env.DEV) (window as unknown as { __castle?: { state: CastleState; debris: unknown[] } }).__castle = { state: state.current, debris: debris.current };
     } else {
       state.current.gateInside.copy(inside);
       state.current.gateFront.copy(front.setY(0));
@@ -439,8 +549,74 @@ function Castle({
         const k = Math.max(0, shake.current) * 4;
         group.current.position.set(anchor.x + (Math.random() - 0.5) * k, 0, anchor.z + (Math.random() - 0.5) * k * 0.5);
       } else group.current.position.set(anchor.x, 0, anchor.z);
+      // rock back from the blow and settle (a damped spring, tilting away from the gate)
+      const r = rock.current;
+      const sdt = Math.min(dt, 1 / 30);
+      r.v += (-r.a * 90 - r.v * 9) * sdt;
+      r.a += r.v * sdt;
+      group.current.rotation.order = "YXZ";
+      group.current.rotation.x = -r.a * 0.7;
+      if (parts.portcullis) parts.portcullis.position.z = Math.max(0, r.a) * 25;
     }
     if (flash.current) flash.current.intensity = Math.max(0, shake.current) * 1500;
+    // the crack web: dark lines that glow ember-hot right after a blow, knitting back slowly
+    cracks.current = Math.max(0, cracks.current - dt * 0.012);
+    crackGlow.current = Math.max(0, crackGlow.current - dt * 0.8);
+    crackMat.opacity = Math.min(0.95, cracks.current * 1.4);
+    crackMat.color.setRGB(0.1 + crackGlow.current * 1.0, 0.07 + crackGlow.current * 0.38, 0.05 + crackGlow.current * 0.05);
+    // the crystal core flares as the castle takes the hit
+    coreFlare.current = Math.max(0, coreFlare.current - dt * 1.6);
+    if (parts.core && coreFlare.current > 0) (parts.core.material as THREE.MeshStandardMaterial).emissiveIntensity += coreFlare.current * 6;
+    if (coreLight.current) coreLight.current.intensity += coreFlare.current * 500;
+    // burning oil poured from the machicolations onto whoever is at the gate
+    if (oil.current > 0) {
+      oil.current -= dt;
+      const gp = at("gate");
+      const tgt = oilAt.current;
+      if (gp) {
+        const fwd = new THREE.Vector3(Math.sin(YAW), 0, Math.cos(YAW));
+        const side = new THREE.Vector3(fwd.z, 0, -fwd.x);
+        for (const sx of [-1, 1]) {
+          const lip = gp.clone().add(new THREE.Vector3(0, 24 * scale, 0)).addScaledVector(fwd, 3 * scale).addScaledVector(side, sx * 5 * scale);
+          // aimed at the attacker's head and shoulders, arcing out from the wall
+          const land = tgt ? tgt.at.clone().setY(tgt.h * 0.85).addScaledVector(side, sx * tgt.h * 0.08) : lip.clone().addScaledVector(fwd, 14 * scale).setY(4);
+          const dir = land.clone().sub(lip);
+          const dist = dir.length();
+          dir.normalize();
+          fx.glow.emit(lip, { count: 5, color: "#ffe08a", colorEnd: "#d04a08", size: 3.4 * scale, life: 0.55, speed: dist * 1.6, dir, spread: 0.06, gravity: 60, radius: 1.5 * scale });
+          if (tgt) {
+            // it splashes and burns down the body
+            const body = tgt.at.clone().setY(tgt.h * (0.2 + Math.random() * 0.7)).add(new THREE.Vector3((Math.random() - 0.5) * tgt.h * 0.3, 0, (Math.random() - 0.5) * tgt.h * 0.3));
+            fx.flame(body, 1.6, Math.random() < 0.5 ? "#ff6a1a" : "#ffb030");
+            if (Math.random() < 0.5) fx.smoke.emit(body, { count: 1, color: "#4a3a30", colorEnd: "#140e0a", size: tgt.h * 0.12, life: 1.2, speed: 8, up: 30, grow: 2.4, alpha: 0.35 });
+            if (Math.random() < 0.4) fx.glow.emit(tgt.at.clone().setY(2), { count: 3, color: "#ffb030", colorEnd: "#5a1a04", size: 2.4, life: 0.6, speed: 30, up: 14, gravity: 120, radius: tgt.h * 0.2 });
+          }
+        }
+      }
+    }
+    // stones: fall, bounce once, lie a moment, then fade
+    for (const d of debris.current) {
+      if (d.life <= 0) continue;
+      d.life -= dt;
+      if (!d.rest) {
+        d.v.y -= 260 * dt;
+        d.m.position.addScaledVector(d.v, dt);
+        d.m.rotation.x += d.w.x * dt;
+        d.m.rotation.y += d.w.y * dt;
+        d.m.rotation.z += d.w.z * dt;
+        const floor = d.m.scale.x * 0.35;
+        if (d.m.position.y < floor) {
+          d.m.position.y = floor;
+          if (Math.abs(d.v.y) > 40) {
+            d.v.set(d.v.x * 0.45, -d.v.y * 0.28, d.v.z * 0.45);
+            d.w.multiplyScalar(0.5);
+            fx.smoke.emit(d.m.position.clone(), { count: 2, color: "#7a7064", colorEnd: "#2a2622", size: d.m.scale.x * 1.4, life: 0.8, speed: 12, up: 6, grow: 2, alpha: 0.4 });
+          } else d.rest = true;
+        }
+      }
+      (d.m.material as THREE.MeshStandardMaterial).opacity = Math.min(1, d.life / 0.8);
+      if (d.life <= 0) d.m.visible = false;
+    }
   });
 
   return (
@@ -456,7 +632,11 @@ function Castle({
       <pointLight ref={torch} color="#ffa050" intensity={260} distance={60} decay={1.6} position={[0, 18, 34]} />
       <pointLight ref={coreLight} color={model.core} intensity={120} distance={40} decay={1.6} position={[0, 30, 30]} />
       <pointLight ref={flash} color="#ff3a1a" intensity={0} distance={90} decay={1.4} position={[0, 12, 40]} />
+      <mesh position={[model.anchors.gate?.x ?? 0, (model.anchors.gate?.y ?? 8) + 9, (model.anchors.gate?.z ?? 14.7) + 0.25]} material={crackMat} renderOrder={3}>
+        <planeGeometry args={[30, 30]} />
+      </mesh>
     </group>
+    <group ref={debrisGroup} />
     </>
   );
 }
@@ -525,7 +705,7 @@ const armorTmp = new THREE.Vector3();
 /** One piece of a boss's armour and the bone it rides (offsets as fractions of the creature's height). */
 interface ArmorPiece {
   obj: THREE.Object3D;
-  bone: "head" | "lArm" | "rArm" | "spine";
+  bone: "head" | "lArm" | "rArm" | "spine" | "hips";
   up: number;
   fwd: number;
   side: number;
@@ -584,6 +764,32 @@ function buildArmor(h: number, rank: string, main: boolean): ArmorPiece[] {
 }
 const eyeTop = new THREE.Vector3();
 
+const iceCrystalMat = new THREE.MeshStandardMaterial({ color: "#e6f8ff", emissive: "#5ab8ff", emissiveIntensity: 0.6, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.88 });
+/** Clusters of ice crystals that burst out on the shoulders, back, head and hips of a frozen creature. */
+function buildIce(h: number): ArmorPiece[] {
+  const spots: { bone: ArmorPiece["bone"]; up: number; fwd: number; side: number; n: number; size: number }[] = [
+    { bone: "head", up: 0.04, fwd: 0, side: 0, n: 4, size: 0.07 },
+    { bone: "lArm", up: 0.02, fwd: 0, side: 0, n: 3, size: 0.06 },
+    { bone: "rArm", up: 0.02, fwd: 0, side: 0, n: 3, size: 0.06 },
+    { bone: "spine", up: 0.03, fwd: -0.05, side: 0, n: 5, size: 0.08 },
+    { bone: "hips", up: 0, fwd: 0, side: 0, n: 4, size: 0.06 },
+  ];
+  return spots.map((sp) => {
+    const grp = new THREE.Group();
+    for (let i = 0; i < sp.n; i++) {
+      const len = sp.size * h * (0.6 + Math.random() * 0.8);
+      const cone = new THREE.Mesh(new THREE.ConeGeometry(len * 0.22, len, 5), iceCrystalMat);
+      cone.geometry.translate(0, len / 2, 0);
+      const a = (i / sp.n) * Math.PI * 2 + Math.random() * 0.6;
+      cone.rotation.set(Math.cos(a) * (0.5 + Math.random() * 0.5), 0, Math.sin(a) * (0.5 + Math.random() * 0.5));
+      cone.position.set(Math.cos(a) * sp.size * h * 0.25, 0, Math.sin(a) * sp.size * h * 0.25);
+      grp.add(cone);
+    }
+    grp.visible = false;
+    return { obj: grp, bone: sp.bone, up: sp.up, fwd: sp.fwd, side: sp.side };
+  });
+}
+
 function stampLocal(x: number, z: number, yaw: number, length: number, left: boolean, kind: PrintKind = "foot") {
   const wx = WORLD_SIZE.width / 2 - x;
   const wy = WORLD_SIZE.height / 2 - z * TILT_COS;
@@ -635,7 +841,12 @@ interface Live {
   rank: string;
   heavy: boolean;
   /** Per foot: lowest height seen lately and whether it is planted. */
-  feet: { min: number; down: boolean }[];
+  /** per foot: running low/high of its height (they slowly forget, so they follow the walk), whether it is planted, and where it last printed */
+  feet: { min: number; max: number; down: boolean; lx: number; lz: number }[];
+  /** frost on the body (0 none → 1 frozen solid), whether it was frozen last frame, and its ice crystals (built on first freeze) */
+  frost: number;
+  frozen: boolean;
+  ice: ArmorPiece[] | null;
 }
 
 function Creatures({
@@ -662,6 +873,8 @@ function Creatures({
   const kits = useMemo(() => prepareCreatures(gltfs), [gltfs]);
   const group = useRef<THREE.Group>(null);
   const live = useRef(new Map<string, Live>());
+  // dev-only handle for browser checks of the 3D creatures
+  if (import.meta.env.DEV) (window as unknown as { __live3d?: Map<string, Live> }).__live3d = live.current;
   const blobMat = useMemo(() => new THREE.MeshBasicMaterial({ map: blobTexture(), color: "#000", transparent: true, opacity: 0.5, depthWrite: false }), []);
   const blobGeo = useMemo(() => new THREE.CircleGeometry(1, 20).rotateX(-Math.PI / 2), []);
   const portal3 = useMemo(() => loc(portal, 3), [portal]);
@@ -793,7 +1006,7 @@ function Creatures({
       e.c.update(dt);
       if (n >= e.smashes && ph > 0.92) {
         e.smashes = n + 1;
-        gate.struck();
+        gate.struck(e.boss === "main" ? "main" : e.boss === "mini" ? "mini" : "light", e.obj.position, e.h);
         const at = gate.gateFront.clone().setY(10);
         fx.smoke.emit(at, { count: 14, color: "#7a7064", colorEnd: "#2a2622", size: 10, life: 1.1, speed: 40, up: 18, grow: 2, alpha: 0.6, radius: 6 });
         fx.glow.emit(at, { count: 30, color: "#fff0c0", colorEnd: "#ff4a1a", size: 2.8, life: 0.7, speed: 80, up: 30, gravity: 120 });
@@ -894,7 +1107,7 @@ function Creatures({
         if (fresh && en.boss) fx.rings.ring(portal3.clone(), rank, 10, en.boss.isMainBoss ? 160 : 110, 0.9);
         const armor = en.boss ? buildArmor(h, rank, !!en.boss.isMainBoss) : [];
         for (const a of armor) g.add(a.obj);
-        e = { c, obj, scale, eyes, aura, rank, armor, punches: 0, roared: !en.boss || !fresh, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, down: true }, { min: 1e9, down: true }] };
+        e = { c, obj, scale, eyes, aura, rank, armor, punches: 0, roared: !en.boss || !fresh, born: fresh ? 0 : 1, gone: -1, mode: "alive", shadow, last: null, speed: 40, enterT: -1, smashes: 0, fading: [], boss: en.boss ? (en.boss.isMainBoss ? "main" : "mini") : null, inside: false, approachFrom: null, h, heavy: !!en.boss || en.type === "BRUTE" || en.type === "IRONCLAD", feet: [{ min: 1e9, max: -1e9, down: true, lx: 1e9, lz: 1e9 }, { min: 1e9, max: -1e9, down: true, lx: 1e9, lz: 1e9 }], frost: 0, frozen: false, ice: null };
         live.current.set(en.id, e);
         hidden.add(en.id);
         if (fresh) fx.glow.emit(portal3.clone(), { count: en.boss ? 50 : 12, color: "#ffffff", colorEnd: "#9a4aff", size: 5, life: 0.7, speed: 50, up: 30, drag: 2, radius: 8 });
@@ -939,6 +1152,51 @@ function Creatures({
         e.c.walk.timeScale = en.slow ? 0.55 : 1.0;
         e.c.update(dt);
       }
+      // frost: the ice tower's freeze wraps the body in an ice shell with crystals bursting out, and it stands caught in it
+      {
+        const pct = en.slow?.percent ?? 0;
+        const target = pct >= 0.75 ? 1 : pct > 0 ? 0.22 : 0;
+        e.frost += (target - e.frost) * Math.min(1, dt * (target > e.frost ? 7 : 2.2));
+        if (e.frost < 0.003) e.frost = 0;
+        e.c.setFrost(e.mode === "alive" ? e.frost : 0);
+        const solid = e.frost > 0.6;
+        const centre = e.obj.position.clone().setY(e.h * 0.45);
+        if (solid && !e.frozen) {
+          // the freeze takes hold: a cold burst and a ring of frost on the ground
+          fx.glow.emit(centre, { count: 26, color: "#ffffff", colorEnd: "#5ab8ff", size: 2.2, life: 0.6, speed: 50, up: 10, drag: 2, radius: e.h * 0.25 });
+          fx.smoke.emit(e.obj.position.clone().setY(2), { count: 8, color: "#e8f6ff", colorEnd: "#8ab8d8", size: e.h * 0.14, life: 1.2, speed: 18, up: 4, grow: 2.4, alpha: 0.35, radius: e.h * 0.2 });
+          fx.rings.ring(e.obj.position.clone().setY(0.6), "#bfe8ff", 4, e.h * 0.9, 0.7);
+          if (!e.ice) {
+            e.ice = buildIce(e.h);
+            for (const a of e.ice) g.add(a.obj);
+          }
+        } else if (!solid && e.frozen) {
+          // the ice gives: it shatters into glittering shards
+          fx.glow.emit(centre, { count: 34, color: "#ffffff", colorEnd: "#6ac8ff", size: 2.6, life: 0.9, speed: 70, up: 30, gravity: 160, radius: e.h * 0.25 });
+          fx.smoke.emit(centre, { count: 5, color: "#dff2ff", colorEnd: "#7aa8c8", size: e.h * 0.1, life: 0.8, speed: 20, up: 6, grow: 2, alpha: 0.3 });
+        }
+        e.frozen = solid;
+        if (solid && Math.random() < 0.25) fx.glow.emit(centre.clone().add(new THREE.Vector3((Math.random() - 0.5) * e.h * 0.4, (Math.random() - 0.3) * e.h * 0.5, (Math.random() - 0.5) * e.h * 0.4)), { count: 1, color: "#ffffff", colorEnd: "#9ad8ff", size: 1.4, life: 0.5, speed: 4, up: -6, drag: 1 });
+        if (e.ice) {
+          const k = Math.max(0, Math.min(1, (e.frost - 0.45) / 0.4));
+          for (const a of e.ice) {
+            const b = a.bone === "head" ? e.c.head : e.c.bones[a.bone];
+            if (!b || k <= 0 || e.mode !== "alive") {
+              a.obj.visible = false;
+              continue;
+            }
+            b.getWorldPosition(armorTmp);
+            g.worldToLocal(armorTmp);
+            const yaw = e.obj.rotation.y;
+            const fwd = a.fwd * e.h;
+            a.obj.position.set(armorTmp.x + Math.sin(yaw) * fwd, armorTmp.y + a.up * e.h, armorTmp.z + Math.cos(yaw) * fwd);
+            a.obj.rotation.set(0, yaw, 0);
+            // crystals grow out with a little overshoot
+            a.obj.scale.setScalar(k < 1 ? k * (1 + 0.25 * Math.sin(k * Math.PI)) : 1);
+            a.obj.visible = true;
+          }
+        }
+      }
       // footprints: a print wherever a foot comes down (not while climbing out of the rift or once through the gate)
       if (e.born >= 1 && e.enterT < 0 && e.c.feet.length === 2 && g.parent) {
         e.obj.updateMatrixWorld(true);
@@ -947,12 +1205,27 @@ function Creatures({
           e.c.feet[k]!.getWorldPosition(footTmp);
           g.parent.worldToLocal(footTmp);
           const y = footTmp.y;
-          st.min = Math.min(st.min + dt * e.h * 0.02, y);
-          if (!st.down && y < st.min + e.h * 0.03) {
+          // the band this foot moves in, forgetting slowly so it adapts to each body and gait
+          const forget = dt * e.h * 0.05;
+          st.min = Math.min(st.min + forget, y);
+          st.max = Math.max(st.max - forget, y);
+          const lift = Math.max(st.max - st.min, e.h * 0.004);
+          const moved = Math.hypot(footTmp.x - st.lx, footTmp.z - st.lz);
+          const stride = e.h * 0.22;
+          // planted: back near the bottom of its band (and it has actually moved on since the last print)
+          if (!st.down && y < st.min + lift * 0.28 && moved > stride * 0.5) {
             st.down = true;
+            st.lx = footTmp.x;
+            st.lz = footTmp.z;
             stampLocal(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0, e.boss ? "boss" : "claw");
-            if (e.heavy) fx.smoke.emit(footTmp.clone().setY(1), { count: 3, color: "#6a5a48", colorEnd: "#2a241e", size: e.h * 0.1, life: 0.9, speed: 10, up: 6, grow: 2.2, alpha: 0.35, drag: 2 });
-          } else if (st.down && y > st.min + e.h * 0.07) st.down = false;
+            if (e.heavy) fx.smoke.emit(footTmp.clone().setY(1), { count: e.boss ? 5 : 3, color: "#6a5a48", colorEnd: "#2a241e", size: e.h * 0.1, life: 0.9, speed: 10, up: 6, grow: 2.2, alpha: 0.35, drag: 2 });
+          } else if (st.down && y > st.min + lift * 0.6) st.down = false;
+          // a gait whose foot barely lifts still leaves a trail: print once it has gone a full stride
+          else if (moved > stride * 1.6 && y < st.min + lift * 0.5) {
+            st.lx = footTmp.x;
+            st.lz = footTmp.z;
+            stampLocal(footTmp.x, footTmp.z, e.obj.rotation.y, e.h * 0.2, k === 0, e.boss ? "boss" : "claw");
+          }
         }
       }
       if (en.burn && Math.random() < 0.4) fx.flame(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, ENEMY_HEIGHT * 0.5, 0)), 0.5, "#ff4a0a");
@@ -1017,7 +1290,7 @@ function Creatures({
       }
 
     function remove(id: string, e: Live) {
-      g!.remove(e.obj, e.shadow, e.aura, ...e.eyes, ...e.armor.map((a) => a.obj));
+      g!.remove(e.obj, e.shadow, e.aura, ...e.eyes, ...e.armor.map((a) => a.obj), ...(e.ice ?? []).map((a) => a.obj));
       (e.aura.material as THREE.Material).dispose();
       for (const sp of e.eyes) sp.material.dispose();
       for (const m of e.fading) m.dispose();
