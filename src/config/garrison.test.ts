@@ -19,7 +19,7 @@ describe("garrison", () => {
   it("hits a share of the boss's life, halved in a hunt", () => {
     expect(garrisonVolleyDamage(0, 1000)).toBe(0);
     const full = garrisonVolleyDamage(10, 100000);
-    expect(full).toBeCloseTo(100000 * 0.015 * 0.9, 6);
+    expect(full).toBeCloseTo(100000 * 0.04 * 0.9, 6);
     expect(garrisonVolleyDamage(10, 100000, true)).toBeCloseTo(full / 2, 6);
   });
   it("sanitizes", () => {

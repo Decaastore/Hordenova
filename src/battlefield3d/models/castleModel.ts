@@ -761,7 +761,10 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
           post.position.set(tx + Math.cos(a) * (br - 0.2), by + 1.3, tz + Math.sin(a) * (br - 0.2));
           root.add(post);
         }
-        anchors[`postTower${side}`] = new THREE.Vector3(tx, by + 0.7, tz + (rear ? -1 : 1) * (tr + 1.4));
+        // front towers: the side facing the road; back towers: their outer front corner, so the keep never hides them
+        anchors[`postTower${side}`] = rear
+          ? new THREE.Vector3(tx + sx * (tr + 1.4) * 0.72, by + 0.7, tz + (tr + 1.4) * 0.72)
+          : new THREE.Vector3(tx, by + 0.7, tz + (tr + 1.4));
       }
       if (broken) {
         // Jagged broken top: irregular stone chunks, no roof.

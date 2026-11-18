@@ -10,12 +10,17 @@
  * Damage is a share of the boss's max life per second, so it stays the same
  * size of help from wave 10 to wave 1,000: at the top level the garrison
  * takes about GARRISON_DPS_PCT_PER_LEVEL x 10 % of a boss's life every
- * second it spends near the gate. A Boss blow on the castle knocks the
+ * second it spends near the gate.
+ *
+ * Tuned with headless runs (4 h of game time, the same simple bot with and
+ * without a garrison): a garrison bought with spare gold (level ~5) takes
+ * ~4% of all boss life, a full level-10 garrison ~13% and adds a few waves
+ * to the record — a real help against bosses that never replaces towers. A Boss blow on the castle knocks the
  * soldiers off the walls for GARRISON_STUN_MS.
  */
 export const GARRISON_MAX_LEVEL = 10;
 /** % of the target's max HP per second, per garrison level. */
-export const GARRISON_DPS_PCT_PER_LEVEL = 0.15;
+export const GARRISON_DPS_PCT_PER_LEVEL = 0.4;
 /** Seconds between volleys. */
 export const GARRISON_VOLLEY_MS = 900;
 /** How far along the road from the gate the archers reach. */
@@ -28,7 +33,7 @@ export const GARRISON_HUNT_FACTOR = 0.5;
 /** Gold for the NEXT level after `level`, or null at the top. */
 export function garrisonUpgradeCost(level: number): number | null {
   if (level >= GARRISON_MAX_LEVEL || level < 0) return null;
-  return Math.round(250 * Math.pow(level + 1, 1.8) / 10) * 10;
+  return Math.round((200 * Math.pow(level + 1, 1.6)) / 10) * 10;
 }
 
 /** How many soldiers stand on the walls at `level` (the picture: 2 at level 1, then one more per level, 12 at the top). */

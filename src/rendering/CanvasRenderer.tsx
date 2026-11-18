@@ -25,6 +25,7 @@ import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
+import { drawGarrison2D } from "./garrison2d";
 import { getActiveMapLayout } from "@/data/mapLayouts";
 import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools, withoutRoadPastGate } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
@@ -651,6 +652,8 @@ export function CanvasRenderer({
         // real `enemy.boss.enraged` flag the damage math uses.
         if (enemy.boss?.enraged) drawEnrageShieldRing(ctx, enemy, timestamp);
       }
+      // GUARNIÇÃO — the castle's archers and their arrows (the 3D castle has its own)
+      if (!hideCastleRef.current) drawGarrison2D(ctx, getFortressAnchor(roadPath).position, getCastleHpTier(castleHpPercent), snapshot, timestamp);
       for (const projectile of snapshot.projectiles) drawProjectile(ctx, projectile);
       drawSkinImpacts(ctx);
       combatFx.drawSolid(ctx);
