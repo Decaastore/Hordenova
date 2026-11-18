@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
  * GAME ICONS — one coherent set for the emblems (the game's top bar and the Ranking page):
@@ -188,6 +188,96 @@ export function GameIcon({ name, size = 16 }: { name: GameIconName; size?: numbe
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" className="hh-emb-svg" aria-hidden="true">
       {ICONS[name]}
+    </svg>
+  );
+}
+
+/**
+ * MEDALLION — the full emblem drawn as a small piece of game art: a cast-bronze ring with four
+ * studs (north, east, south, west) and rivets, a glossy enamel disc in the function's colour, and
+ * the icon raised from it in relief (lit from the top left, shadowed below). The `hn-med-*` classes
+ * let the CSS animate it: a light sweeping across the enamel, the relief glowing, sparks.
+ */
+export function Medallion({ name, color, size = 28, className }: { name: GameIconName; color: string; size?: number; className?: string }) {
+  const uid = useId().replace(/:/g, "");
+  const id = (k: string) => `${k}-${uid}`;
+  const studs = [0, 90, 180, 270];
+  const rivets = [45, 135, 225, 315];
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" className={`hn-med${className ? " " + className : ""}`} aria-hidden="true">
+      <defs>
+        <linearGradient id={id("rim")} x1="0.15" y1="0.05" x2="0.85" y2="0.95">
+          <stop offset="0" stopColor="#ffe7a8" />
+          <stop offset="0.28" stopColor="#c08a3a" />
+          <stop offset="0.55" stopColor="#6a4214" />
+          <stop offset="0.8" stopColor="#b07a30" />
+          <stop offset="1" stopColor="#3a2208" />
+        </linearGradient>
+        <linearGradient id={id("rimIn")} x1="0.85" y1="0.95" x2="0.15" y2="0.05">
+          <stop offset="0" stopColor="#ffe0a0" />
+          <stop offset="0.5" stopColor="#8a5a1e" />
+          <stop offset="1" stopColor="#2a1806" />
+        </linearGradient>
+        <radialGradient id={id("enamel")} cx="0.38" cy="0.3" r="0.8">
+          <stop offset="0" stopColor={`color-mix(in srgb, ${color} 45%, #fff)`} />
+          <stop offset="0.35" stopColor={color} />
+          <stop offset="1" stopColor={`color-mix(in srgb, ${color} 35%, #000)`} />
+        </radialGradient>
+        <linearGradient id={id("gloss")} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+        </linearGradient>
+        <linearGradient id={id("stud")} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#fff2c8" />
+          <stop offset="0.5" stopColor="#b8823a" />
+          <stop offset="1" stopColor="#4a2c0c" />
+        </linearGradient>
+        {/* relief: the icon lit from the top left with a soft drop shadow */}
+        <filter id={id("relief")} x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur in="SourceAlpha" stdDeviation="0.9" result="b" />
+          <feSpecularLighting in="b" surfaceScale="2.4" specularConstant="0.9" specularExponent="18" lightingColor="#fff" result="spec">
+            <feDistantLight azimuth="225" elevation="42" />
+          </feSpecularLighting>
+          <feComposite in="spec" in2="SourceAlpha" operator="in" result="specIn" />
+          <feComposite in="SourceGraphic" in2="specIn" operator="arithmetic" k1="0" k2="1" k3="0.7" k4="0" result="lit" />
+          <feOffset in="SourceAlpha" dx="0.9" dy="1.6" result="off" />
+          <feGaussianBlur in="off" stdDeviation="1.1" result="sh" />
+          <feColorMatrix in="sh" values="0 0 0 0 0.05  0 0 0 0 0.02  0 0 0 0 0  0 0 0 0.75 0" result="shadow" />
+          <feMerge>
+            <feMergeNode in="shadow" />
+            <feMergeNode in="lit" />
+          </feMerge>
+        </filter>
+        <clipPath id={id("disc")}>
+          <circle cx="50" cy="50" r="35" />
+        </clipPath>
+      </defs>
+      {/* the bronze ring, its four studs and rivets */}
+      <circle cx="50" cy="50" r="46" fill={`url(#${id("rim")})`} />
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#2a1806" strokeWidth="1.2" />
+      {studs.map((a) => (
+        <g key={a} transform={`rotate(${a} 50 50)`}>
+          <path d="M50 1.5 54.5 8 50 12.5 45.5 8Z" fill={`url(#${id("stud")})`} stroke="#2a1806" strokeWidth="0.8" />
+        </g>
+      ))}
+      {rivets.map((a) => (
+        <circle key={a} cx={50 + Math.cos((a * Math.PI) / 180) * 41} cy={50 + Math.sin((a * Math.PI) / 180) * 41} r="1.8" fill={`url(#${id("stud")})`} stroke="#2a1806" strokeWidth="0.5" />
+      ))}
+      <circle cx="50" cy="50" r="37.5" fill={`url(#${id("rimIn")})`} />
+      {/* the enamel */}
+      <circle cx="50" cy="50" r="35" fill={`url(#${id("enamel")})`} />
+      <g clipPath={`url(#${id("disc")})`}>
+        <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="5" />
+        <ellipse cx="44" cy="28" rx="24" ry="13" fill={`url(#${id("gloss")})`} opacity="0.55" />
+        {/* the light that sweeps across on hover */}
+        <rect className="hn-med-sweep" x="-40" y="0" width="22" height="100" fill="#fff" opacity="0" transform="skewX(-18)" />
+      </g>
+      {/* the raised icon */}
+      <g className="hn-med-icon" filter={`url(#${id("relief")})`}>
+        <svg x="21" y="21" width="58" height="58" viewBox="0 0 24 24" overflow="visible" className="hn-med-glyph">
+          {ICONS[name]}
+        </svg>
+      </g>
     </svg>
   );
 }

@@ -1,4 +1,5 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
+import { Medallion, type GameIconName } from "./gameIcons";
 
 /**
  * TOP BAR EMBLEMS — every button in the in-game top bar carries a small
@@ -11,21 +12,33 @@ import type { CSSProperties, ReactNode } from "react";
 export type EmblemTone = "missions" | "expeditions" | "forge" | "talents" | "rift" | "eternal" | "city" | "bestiary" | "inventory";
 
 export const EMBLEM_COLOR: Record<EmblemTone, string> = {
-  missions: "#e8b45a",
-  expeditions: "#62b85a",
+  missions: "#e89a2a",
+  expeditions: "#2f8a4a",
   forge: "#ff6a22",
-  talents: "#ffc93a",
-  rift: "#a96bff",
-  eternal: "#58d2c8",
-  city: "#6aa6ff",
-  bestiary: "#ff3f35",
-  inventory: "#c98a4e",
+  talents: "#f0b020",
+  rift: "#8a4ae0",
+  eternal: "#2ab0a8",
+  city: "#3a7ae0",
+  bestiary: "#d0242a",
+  inventory: "#a8683a",
 };
 
-export function HudEmblem({ tone, children }: { tone: EmblemTone; children: ReactNode }) {
+const EMBLEM_ICON: Record<EmblemTone, GameIconName> = {
+  missions: "scroll",
+  expeditions: "compass",
+  forge: "anvil",
+  talents: "sparkle",
+  rift: "vortex",
+  eternal: "hourglass",
+  city: "castle",
+  bestiary: "skull",
+  inventory: "pouch",
+};
+
+export function HudEmblem({ tone }: { tone: EmblemTone }) {
   return (
     <span className={`hh-emb hh-emb-${tone}`} style={{ ["--emb" as string]: EMBLEM_COLOR[tone] } as CSSProperties} aria-hidden="true">
-      <span className="hh-emb-disc">{children}</span>
+      <Medallion name={EMBLEM_ICON[tone]} color={EMBLEM_COLOR[tone]} size={30} />
     </span>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { PlayerProfilePanel } from "@/ui/PlayerProfilePanel";
 import { getProfileService, type LeaderboardEntry } from "@/profile/profileService";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -14,7 +14,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { EMBLEM_COLOR } from "@/ui/hudIcons";
-import { GameIcon } from "@/ui/gameIcons";
+import { Medallion, type GameIconName } from "@/ui/gameIcons";
 import { CrownArt } from "@/ui/StoreArt";
 
 interface RankingScreenProps {
@@ -29,11 +29,11 @@ const ROMAN = ["", "I", "II", "III"];
 
 type BoardId = "SEASON" | "ETERNAL" | "DUEL" | "COLOSSUS" | "RECORD" | "PRESTIGE" | "BOSSES" | "BESTIARY" | "ACHIEVEMENTS";
 
-/** A coloured enamel emblem (the same look as the game's top bar) for a ranking. */
-function Emblem({ color, children, big }: { color: string; children: ReactNode; big?: boolean }) {
+/** A bronze-and-enamel medallion (the same art as the game's top bar) for a ranking. */
+function Emblem({ color, icon, big }: { color: string; icon: GameIconName; big?: boolean }) {
   return (
-    <span className={`rk-emb${big ? " is-big" : ""}`} style={{ ["--emb" as string]: color } as CSSProperties} aria-hidden="true">
-      <span className="rk-emb-disc">{children}</span>
+    <span className={`rk-emb${big ? " is-big" : ""}`} aria-hidden="true">
+      <Medallion name={icon} color={color} size={big ? 64 : 32} />
     </span>
   );
 }
@@ -98,66 +98,66 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
   const myTier = tierOf(save.prestigeLevel);
 
   /** Every board: how it is measured, the player's own value, and a detail line. */
-  const BOARDS: Record<BoardId, { color: string; glyph: ReactNode; value: string; has: boolean; detail: string }> = {
+  const BOARDS: Record<BoardId, { color: string; glyph: GameIconName; value: string; has: boolean; detail: string }> = {
     SEASON: {
       color: "#e8b45a",
-      glyph: <GameIcon name="trophy" />,
+      glyph: "trophy" as GameIconName,
       value: status.hasParticipated ? waveLabel(status.seasonBestWave) : "—",
       has: status.hasParticipated,
       detail: status.hasParticipated ? t("ranking.scoreBasis") : t("season.notYetParticipating"),
     },
     ETERNAL: {
       color: EMBLEM_COLOR.eternal,
-      glyph: <GameIcon name="hourglass" />,
+      glyph: "hourglass" as GameIconName,
       value: eternal.seasonBestWave > 0 ? t("ranking.boards.waveN", { n: num.format(eternal.seasonBestWave) }) : "—",
       has: eternal.seasonBestWave > 0,
       detail: t("ranking.boards.ETERNAL.detail"),
     },
     DUEL: {
       color: "#e2313f",
-      glyph: <GameIcon name="swords" />,
+      glyph: "swords" as GameIconName,
       value: t("ranking.boards.trophiesN", { n: num.format(save.duel.trophies) }),
       has: save.duel.wins + save.duel.losses > 0,
       detail: t("ranking.boards.DUEL.detail", { rank: duelName, best: num.format(save.duel.bestTrophies), wins: num.format(save.duel.wins), losses: num.format(save.duel.losses) }),
     },
     COLOSSUS: {
       color: "#8a3ad0",
-      glyph: <GameIcon name="eye" />,
+      glyph: "eye" as GameIconName,
       value: save.colossus.bestDamage > 0 ? num.format(Math.round(save.colossus.bestDamage)) : "—",
       has: save.colossus.bestDamage > 0,
       detail: t("ranking.boards.COLOSSUS.detail", { week: num.format(Math.round(save.colossus.weekDamage)) }),
     },
     RECORD: {
       color: EMBLEM_COLOR.city,
-      glyph: <GameIcon name="summit" />,
+      glyph: "summit" as GameIconName,
       value: save.bestWave > 0 ? waveLabel(save.bestWave) : "—",
       has: save.bestWave > 0,
       detail: t("ranking.boards.RECORD.detail"),
     },
     PRESTIGE: {
       color: "#b07cff",
-      glyph: <GameIcon name="crown" />,
+      glyph: "crown" as GameIconName,
       value: t("ranking.boards.levelN", { n: num.format(save.prestigeLevel) }),
       has: save.prestigeLevel > 0,
       detail: myTier.name,
     },
     BOSSES: {
       color: EMBLEM_COLOR.bestiary,
-      glyph: <GameIcon name="skull" />,
+      glyph: "skull" as GameIconName,
       value: num.format(save.bossesDefeatedTotal),
       has: save.bossesDefeatedTotal > 0,
       detail: t("ranking.boards.BOSSES.detail"),
     },
     BESTIARY: {
       color: EMBLEM_COLOR.expeditions,
-      glyph: <GameIcon name="book" />,
+      glyph: "book" as GameIconName,
       value: `${best.met} / ${ENEMY_TYPES.length}`,
       has: best.total > 0,
       detail: t("ranking.boards.BESTIARY.detail", { kills: num.format(best.total), stars: best.goldStars }),
     },
     ACHIEVEMENTS: {
       color: EMBLEM_COLOR.talents,
-      glyph: <GameIcon name="medal" />,
+      glyph: "medal" as GameIconName,
       value: `${save.achievements.length} / ${ACHIEVEMENTS.length}`,
       has: save.achievements.length > 0,
       detail: save.equippedTitle ? t("ranking.boards.ACHIEVEMENTS.detailTitle", { title: t(`achievements.list.${save.equippedTitle}.title` as TranslationKey) }) : t("ranking.boards.ACHIEVEMENTS.detail"),
@@ -200,7 +200,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
             <div className="rk-highlights">
               {(["SEASON", "DUEL", "ETERNAL"] as BoardId[]).map((b) => (
                 <button key={b} className="rk-hl" onClick={() => pick(b)}>
-                  <Emblem color={BOARDS[b].color}>{BOARDS[b].glyph}</Emblem>
+                  <Emblem color={BOARDS[b].color} icon={BOARDS[b].glyph} />
                   <span>
                     <small>{boardName(b)}</small>
                     <b>{BOARDS[b].value}</b>
@@ -215,7 +215,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
           <nav className="rk-tabs" aria-label={t("ranking.pageTitle")}>
             {ORDER.map((b) => (
               <button key={b} className={`rk-tab${board === b ? " is-on" : ""}`} onClick={() => pick(b)} data-testid={`ranking-tab-${b}`}>
-                <Emblem color={BOARDS[b].color}>{BOARDS[b].glyph}</Emblem>
+                <Emblem color={BOARDS[b].color} icon={BOARDS[b].glyph} />
                 <span>{boardName(b)}</span>
               </button>
             ))}
@@ -224,9 +224,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
           <div className="rk-grid" key={board}>
             <section className="rk-main">
               <div className="rk-board-head" style={{ ["--emb" as string]: cur.color } as CSSProperties}>
-                <Emblem color={cur.color} big>
-                  {cur.glyph}
-                </Emblem>
+                <Emblem color={cur.color} icon={cur.glyph} big />
                 <div>
                   <h2>{boardName(board)}</h2>
                   <p>{t(`ranking.boards.${board}.how` as TranslationKey)}</p>
@@ -338,15 +336,11 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
 }
 
 const RANKING_CSS = `
-/* emblem (same enamel look as the game's top bar) */
-.rk-emb { position: relative; flex: none; width: 28px; height: 28px; border-radius: 50%; padding: 2px;
-  background: linear-gradient(160deg, #f6d48a 0%, #a8742e 45%, #5a3812 100%); box-shadow: 0 1px 2px rgba(0,0,0,0.7); }
-.rk-emb.is-big { width: 54px; height: 54px; padding: 3px; }
-.rk-emb-disc { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%;
-  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--emb) 55%, #fff) 0%, var(--emb) 38%, color-mix(in srgb, var(--emb) 45%, #000) 100%);
-  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.45), inset 0 1px 1px rgba(255,255,255,0.45); }
-.rk-emb .hh-emb-svg { width: 17px; height: 17px; filter: drop-shadow(0 1px 0.6px rgba(0,0,0,0.65)); }
-.rk-emb.is-big .hh-emb-svg { width: 30px; height: 30px; }
+/* medallion emblems */
+.rk-emb { flex: none; display: inline-flex; line-height: 0; margin: -2px 0; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)); transition: transform 240ms var(--hn-ease-back); }
+.rk-emb.is-big { filter: drop-shadow(0 4px 10px rgba(0,0,0,0.6)); }
+.rk-tab:hover .rk-emb, .rk-hl:hover .rk-emb { transform: scale(1.12) rotate(-6deg); }
+.rk-tab.is-on .rk-emb { transform: scale(1.08); }
 
 /* hero */
 .rk-hero-inner { align-items: center; gap: 28px; }

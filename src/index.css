@@ -210,3 +210,32 @@ nav.tn .tn-play:hover::after, .pg-btn:hover::after, .hn-play:hover::after { anim
   nav.tn .tn-play::after, .pg-btn::after, .hn-play::after { animation: none !important; }
   nav.tn .tn-link::before, .tn-brand img, .hn-tower-stage, .hn-news-item, .pg-btn-ghost, .hn-ghost { transition: none !important; transform: none !important; }
 }
+
+/*
+ * MEDALLIONS (src/ui/gameIcons.tsx) — a band of light sweeps across the
+ * enamel when its button is hovered or focused; a live button's medallion
+ * catches the light on its own every few seconds and breathes a soft glow.
+ */
+.hn-med-sweep { transform: skewX(-18deg); }
+@keyframes hn-med-sweep {
+  0% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+  20% { opacity: 0.55; }
+  100% { transform: translateX(170px) skewX(-18deg); opacity: 0; }
+}
+@keyframes hn-med-sweep-idle {
+  0%, 78% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+  82% { opacity: 0.45; }
+  100% { transform: translateX(170px) skewX(-18deg); opacity: 0; }
+}
+@keyframes hn-med-breathe {
+  0%, 100% { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)) drop-shadow(0 0 2px var(--emb, #f0b020)); }
+  50% { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.7)) drop-shadow(0 0 8px var(--emb, #f0b020)); }
+}
+.hh-btn:hover .hn-med-sweep, .hh-btn:focus-visible .hn-med-sweep,
+.rk-tab:hover .hn-med-sweep, .rk-tab:focus-visible .hn-med-sweep,
+.rk-hl:hover .hn-med-sweep, .rk-hl:focus-visible .hn-med-sweep { animation: hn-med-sweep 700ms ease-out; }
+.hh-btn.is-live .hn-med-sweep, .rk-emb.is-big .hn-med-sweep { animation: hn-med-sweep-idle 5.5s ease-in-out infinite; }
+.hh-btn.is-live .hh-emb { animation: hn-med-breathe 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hn-med-sweep, .hh-btn.is-live .hh-emb { animation: none !important; }
+}
