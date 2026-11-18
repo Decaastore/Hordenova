@@ -12,9 +12,9 @@ import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config
 import { riftRewardPct } from "@/config/rifts";
 import { romanDepth } from "@/config/eternal";
 import { BrandLogo } from "./BrandLogo";
-import { BestiaryIcon, EternalIcon, ExpeditionIcon, ForgeIcon, RiftIcon, TalentIcon } from "./hudIcons";
+import { BestiaryGlyph, CityGlyph, EternalGlyph, ExpeditionGlyph, ForgeGlyph, HudEmblem, InventoryGlyph, MissionsGlyph, RiftGlyph, TalentGlyph } from "./hudIcons";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
-import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
+import { BoltIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
 
 interface HUDProps {
   hud: HudSnapshot;
@@ -172,61 +172,61 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
           </div>
           {onToggleMissions && (
             <button onClick={onToggleMissions} className={`hh-btn${hud.missionsClaimable > 0 ? " is-live" : ""}`} data-testid="missions-button" title={t("hud.missionsTooltip")}>
-              <span className="hh-ico hh-ico-scroll"><ScrollIcon size={14} /></span>
+              <HudEmblem tone="missions"><MissionsGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
             </button>
           )}
           {onToggleExpeditions && (
             <button onClick={onToggleExpeditions} className={`hh-btn${hud.expeditions.ready > 0 ? " is-live" : ""}`} data-testid="expeditions-button" title={t("expeditions.tooltip")}>
-              <span className="hh-ico"><ExpeditionIcon size={14} color={PALETTE.uiAccentBright} /></span>
+              <HudEmblem tone="expeditions"><ExpeditionGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("expeditions.button")}</span>
               {hud.expeditions.ready > 0 && <span className="hh-badge">{hud.expeditions.ready}</span>}
             </button>
           )}
           {onToggleForge && (
             <button onClick={onToggleForge} className={`hh-btn${hud.expeditions.forgeReady ? " is-live" : ""}`} data-testid="forge-button" title={t("expeditions.forgeTooltip")}>
-              <span className="hh-ico"><ForgeIcon size={14} color={PALETTE.uiAccentBright} /></span>
+              <HudEmblem tone="forge"><ForgeGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("expeditions.forgeButton")}</span>
               {hud.expeditions.forgeReady && <span className="hh-badge">1</span>}
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (
             <button onClick={onToggleEternal} className="hh-btn hh-rift hh-eternal-btn" data-testid="eternal-button" title={t("eternal.tooltip")}>
-              <span className="hh-ico"><EternalIcon size={14} color="#c99cff" /></span>
+              <HudEmblem tone="eternal"><EternalGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("eternal.button")}</span>
               {hud.eternal.contractsReady > 0 && <span className="hh-badge is-rift">{hud.eternal.contractsReady}</span>}
             </button>
           )}
           {onToggleTalents && (
             <button onClick={onToggleTalents} className={`hh-btn${hud.talents.free > 0 ? " is-live" : ""}`} data-testid="talents-button" title={t("talents.tooltip")}>
-              <span className="hh-ico"><TalentIcon size={14} color={PALETTE.uiAccentBright} /></span>
+              <HudEmblem tone="talents"><TalentGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("talents.button")}</span>
               {hud.talents.free > 0 && <span className="hh-badge">{hud.talents.free}</span>}
             </button>
           )}
           {onToggleRift && (
             <button onClick={onToggleRift} className={`hh-btn hh-rift${hud.rift.charges > 0 && !hud.rift.armed && !hud.rift.active ? " is-ready is-live" : ""}`} data-testid="rift-button" title={t("rift.tooltip")}>
-              <span className="hh-ico"><RiftIcon size={14} color="#c99cff" /></span>
+              <HudEmblem tone="rift"><RiftGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("rift.button")}</span>
               {hud.rift.charges > 0 && <span className="hh-badge is-rift">{hud.rift.charges}</span>}
             </button>
           )}
           {onToggleCity && (
-            <button onClick={onToggleCity} className="hh-btn" data-testid="city-button" title={t("hud.cityTooltip")}>
-              <span className="hh-ico hh-ico-castle"><CastleIcon size={14} /></span>
+            <button onClick={onToggleCity} className={`hh-btn${Object.keys(hud.city.burning).length > 0 ? " is-live is-alarm" : ""}`} data-testid="city-button" title={t("hud.cityTooltip")}>
+              <HudEmblem tone="city"><CityGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("city.button")}</span>
               {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
             </button>
           )}
           {onToggleBestiary && (
             <button onClick={onToggleBestiary} className="hh-btn" data-testid="bestiary-button" title={t("bestiary.tooltip")}>
-              <span className="hh-ico"><BestiaryIcon size={14} color={PALETTE.uiAccentBright} /></span>
+              <HudEmblem tone="bestiary"><BestiaryGlyph /></HudEmblem>
               <span className="hh-btn-txt">{t("bestiary.button")}</span>
             </button>
           )}
           <button onClick={onOpenInventory} className="hh-btn" title={t("hud.inventoryTooltip")}>
-            <span className="hh-ico hh-ico-bag"><BagIcon size={14} /></span>
+            <HudEmblem tone="inventory"><InventoryGlyph /></HudEmblem>
             <span className="hh-btn-txt">{t("inventory.button")}</span>
           </button>
           <span className="hh-divider" aria-hidden="true" />
@@ -544,60 +544,92 @@ div.hh-brand { cursor: default; }
   color: ${PALETTE.uiTextDim}; font-weight: 700; font-size: 11.5px; cursor: pointer; transition: background 120ms ease, color 120ms ease; }
 .hh-speed-btn:hover { color: ${PALETTE.uiText}; }
 .hh-speed-btn.is-on { background: rgba(255,210,87,0.18); border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; }
-.hh-btn { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px;
-  border: 1px solid ${PALETTE.uiPanelBorder}; background: linear-gradient(180deg, #3d2c1a, #2e2013);
-  color: ${PALETTE.uiText}; font-weight: 700; font-size: 10.5px; letter-spacing: 0.5px; cursor: pointer; white-space: nowrap;
-  transition: border-color 140ms ease, color 140ms ease, transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease; }
-.hh-btn:hover { border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; transform: translateY(-1.5px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 0 10px rgba(255,200,90,0.18); }
-.hh-btn:active { transform: translateY(0) scale(0.96); transition-duration: 60ms; }
+.hh-btn { position: relative; display: flex; align-items: center; gap: 7px; height: 30px; padding: 0 12px 0 4px; border-radius: 16px 7px 7px 16px;
+  border: 1px solid rgba(214,168,92,0.55);
+  background:
+    linear-gradient(180deg, rgba(255,226,170,0.10) 0%, rgba(255,226,170,0) 42%),
+    linear-gradient(180deg, #3e2b18 0%, #2a1c0f 55%, #1f150b 100%);
+  box-shadow: inset 0 1px 0 rgba(255,232,180,0.22), inset 0 -1px 0 rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.45);
+  color: #f1dfb8; font-weight: 800; font-size: 10.5px; letter-spacing: 0.9px; text-transform: uppercase; cursor: pointer; white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.7);
+  transition: border-color 160ms ease, color 160ms ease, transform 180ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, background 220ms ease; }
+.hh-btn:not(:has(.hh-emb)) { padding: 0 10px; border-radius: 7px; }
+.hh-btn:hover { transform: translateY(-2px); color: #fff3d2; border-color: color-mix(in srgb, var(--btn-tone, #e8b04b) 80%, #ffe2a0);
+  box-shadow: inset 0 1px 0 rgba(255,232,180,0.3), inset 0 -1px 0 rgba(0,0,0,0.5), 0 6px 14px rgba(0,0,0,0.5), 0 0 14px color-mix(in srgb, var(--btn-tone, #e8b04b) 35%, transparent); }
+.hh-btn:active { transform: translateY(0) scale(0.97); transition-duration: 60ms; }
 .hh-btn::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
-  background: linear-gradient(105deg, transparent 30%, rgba(255,235,190,0.22) 50%, transparent 70%); background-size: 250% 100%; background-position: 120% 0; }
-.hh-btn:hover::after { opacity: 1; animation: hh-sweep 650ms ease-out; }
-@keyframes hh-sweep { from { background-position: 120% 0; } to { background-position: -40% 0; } }
+  background: linear-gradient(105deg, transparent 35%, rgba(255,240,205,0.28) 50%, transparent 65%); background-size: 260% 100%; background-position: 130% 0; }
+.hh-btn:hover::after { opacity: 1; animation: hh-sweep 700ms ease-out; }
+@keyframes hh-sweep { from { background-position: 130% 0; } to { background-position: -40% 0; } }
+.hh-btn:has(.hh-emb-missions) { --btn-tone: #e8b45a; } .hh-btn:has(.hh-emb-expeditions) { --btn-tone: #62b85a; }
+.hh-btn:has(.hh-emb-forge) { --btn-tone: #ff6a22; } .hh-btn:has(.hh-emb-talents) { --btn-tone: #ffc93a; }
+.hh-btn:has(.hh-emb-rift) { --btn-tone: #a96bff; } .hh-btn:has(.hh-emb-eternal) { --btn-tone: #58d2c8; }
+.hh-btn:has(.hh-emb-city) { --btn-tone: #6aa6ff; } .hh-btn:has(.hh-emb-bestiary) { --btn-tone: #ff3f35; }
+.hh-btn:has(.hh-emb-inventory) { --btn-tone: #c98a4e; }
 
-/* the drawn icons: each has a part that moves on hover, and keeps moving while something is ready */
-.hh-ico { display: inline-flex; line-height: 0; transition: transform 200ms cubic-bezier(.34,1.56,.64,1); }
-.hh-btn:hover .hh-ico { transform: scale(1.18) rotate(-4deg); }
-.hh-ico svg * { transform-box: fill-box; }
+/* the emblem: an enamel disc in the function's colour, in a bronze rim */
+.hh-emb { position: relative; flex: none; width: 26px; height: 26px; margin-left: -1px; border-radius: 50%; padding: 2px;
+  background: linear-gradient(160deg, #f6d48a 0%, #a8742e 45%, #5a3812 100%);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.7), inset 0 0 0 0.5px rgba(255,240,200,0.6);
+  transition: transform 260ms cubic-bezier(.34,1.56,.64,1), box-shadow 220ms ease; }
+.hh-emb-disc { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--emb) 55%, #fff) 0%, var(--emb) 38%, color-mix(in srgb, var(--emb) 45%, #000) 100%);
+  box-shadow: inset 0 -2px 3px rgba(0,0,0,0.45), inset 0 1px 1px rgba(255,255,255,0.45); }
+.hh-emb-svg { width: 17px; height: 17px; overflow: visible; filter: drop-shadow(0 1px 0.6px rgba(0,0,0,0.65)); }
+.hh-btn:hover .hh-emb { transform: scale(1.14) rotate(-6deg); box-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 10px var(--emb), inset 0 0 0 0.5px rgba(255,240,200,0.6); }
+/* something waiting: a ring of light turns around the emblem */
+.hh-emb::before { content: ""; position: absolute; inset: -3px; border-radius: 50%; opacity: 0; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 55%, var(--emb) 75%, #fff6d8 82%, transparent 90%);
+  -webkit-mask: radial-gradient(circle, transparent 12.5px, #000 13px); mask: radial-gradient(circle, transparent 12.5px, #000 13px); }
+.hh-btn.is-live .hh-emb::before { opacity: 1; animation: hni-turn 1.6s linear infinite; }
+.hh-btn.is-live .hh-emb { box-shadow: 0 1px 2px rgba(0,0,0,0.7), 0 0 9px var(--emb); }
+.hh-btn.is-alarm { border-color: rgba(255,90,70,0.8); }
+
+/* moving parts of the icons */
+.hh-emb-svg * { transform-box: fill-box; }
 .hni-flag { transform-origin: 0% 50%; }
-.hh-btn:hover .hni-flag, .hh-btn.is-live .hni-flag { animation: hni-wave 0.9s ease-in-out infinite; }
-@keyframes hni-wave { 0%,100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-7deg) scaleX(0.9); } }
+.hh-btn:hover .hni-flag, .hh-btn.is-live .hni-flag { animation: hni-wave 0.8s ease-in-out infinite; }
+@keyframes hni-wave { 0%,100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-8deg) scaleX(0.88); } }
 .hni-hammer { transform-origin: 100% 0%; }
-.hh-btn:hover .hni-hammer, .hh-btn.is-live .hni-hammer { animation: hni-strike 0.7s cubic-bezier(.5,0,.75,0) infinite; }
-@keyframes hni-strike { 0%,100% { transform: rotate(-22deg); } 55% { transform: rotate(14deg); } 65% { transform: rotate(8deg); } }
+.hh-btn:hover .hni-hammer, .hh-btn.is-live .hni-hammer { animation: hni-strike 0.62s cubic-bezier(.55,0,.75,0) infinite; }
+@keyframes hni-strike { 0%,100% { transform: rotate(-30deg); } 55% { transform: rotate(10deg); } 64% { transform: rotate(4deg); } }
 .hni-sparks { opacity: 0; transform-origin: 50% 100%; }
-.hh-btn:hover .hni-sparks, .hh-btn.is-live .hni-sparks { animation: hni-spark 0.7s ease-out infinite; }
-@keyframes hni-spark { 0%,50% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.4) translateY(-2px); } }
+.hh-btn:hover .hni-sparks, .hh-btn.is-live .hni-sparks { animation: hni-spark 0.62s ease-out infinite; }
+@keyframes hni-spark { 0%,52% { opacity: 0; transform: scale(0.3) translateY(2px); } 60% { opacity: 1; transform: scale(1.1); } 100% { opacity: 0; transform: scale(1.5) translateY(-3px); } }
 .hni-star { transform-origin: 50% 50%; }
-.hh-btn:hover .hni-star, .hh-btn.is-live .hni-star { animation: hni-twinkle 1.2s ease-in-out infinite; }
-.hni-star-b { animation-delay: 0.25s !important; }
-.hni-star-c { animation-delay: 0.5s !important; }
-@keyframes hni-twinkle { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.55; } }
-.hni-spin { transform-origin: 50% 50%; transform-box: view-box !important; animation: hni-turn 9s linear infinite; }
-.hh-btn:hover .hni-spin, .hh-btn.is-live .hni-spin { animation-duration: 1.6s; }
+.hh-btn:hover .hni-star, .hh-btn.is-live .hni-star { animation: hni-twinkle 1.1s ease-in-out infinite; }
+.hh-btn:hover .hni-star-a, .hh-btn.is-live .hni-star-a { animation-name: hni-twinkle-big; animation-duration: 2.2s; }
+.hni-star-b { animation-delay: 0.2s !important; } .hni-star-c { animation-delay: 0.45s !important; }
+@keyframes hni-twinkle { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.45); opacity: 0.4; } }
+@keyframes hni-twinkle-big { 0% { transform: rotate(0) scale(1); } 50% { transform: rotate(90deg) scale(0.86); } 100% { transform: rotate(180deg) scale(1); } }
+.hni-spin { transform-origin: 50% 50%; transform-box: view-box !important; animation: hni-turn 8s linear infinite; }
+.hh-btn:hover .hni-spin, .hh-btn.is-live .hni-spin { animation-duration: 1.3s; }
 @keyframes hni-turn { to { transform: rotate(360deg); } }
 .hni-core { transform-origin: 50% 50%; }
-.hh-btn.is-live .hni-core, .hh-btn:hover .hni-core { animation: hni-twinkle 1.1s ease-in-out infinite; }
+.hh-btn:hover .hni-core, .hh-btn.is-live .hni-core { animation: hni-twinkle 1s ease-in-out infinite; }
 .hni-flip { transform-origin: 50% 50%; transform-box: view-box !important; }
-.hh-btn:hover .hni-flip { animation: hni-hourglass 1.4s cubic-bezier(.65,0,.35,1) infinite; }
-@keyframes hni-hourglass { 0%,40% { transform: rotate(0); } 60%,100% { transform: rotate(180deg); } }
-.hh-btn:hover .hni-eye { animation: hni-eyes 0.9s ease-in-out infinite; }
-@keyframes hni-eyes { 0%,100% { fill: currentColor; filter: none; } 50% { fill: #ff4a2a; stroke: #ff4a2a; filter: drop-shadow(0 0 2px #ff4a2a); } }
-.hh-ico-scroll, .hh-ico-bag, .hh-ico-castle { transform-origin: 50% 100%; }
-.hh-btn:hover .hh-ico-scroll, .hh-btn.is-live .hh-ico-scroll { animation: hni-unroll 0.8s ease-in-out infinite; }
-@keyframes hni-unroll { 0%,100% { transform: scale(1.15) rotate(-6deg); } 50% { transform: scale(1.15) rotate(6deg); } }
-.hh-btn:hover .hh-ico-bag { animation: hni-bounce 0.6s cubic-bezier(.34,1.56,.64,1) infinite alternate; }
-@keyframes hni-bounce { from { transform: scale(1.1) translateY(0); } to { transform: scale(1.18, 1.05) translateY(-2px); } }
-.hh-btn:hover .hh-ico-castle { animation: hni-bounce 0.7s ease-in-out infinite alternate; }
+.hh-btn:hover .hni-flip, .hh-btn.is-live .hni-flip { animation: hni-hourglass 1.6s cubic-bezier(.65,0,.35,1) infinite; }
+@keyframes hni-hourglass { 0%,45% { transform: rotate(0); } 60%,100% { transform: rotate(180deg); } }
+.hh-btn:hover .hni-eye, .hh-btn.is-live .hni-eye { animation: hni-eyes 0.9s ease-in-out infinite; }
+@keyframes hni-eyes { 0%,100% { fill: #c4140c; } 50% { fill: #ffd04a; filter: drop-shadow(0 0 1.5px #ff6a2a); } }
+.hni-scroll { transform-origin: 50% 50%; transform-box: view-box !important; }
+.hh-btn:hover .hni-scroll, .hh-btn.is-live .hni-scroll { animation: hni-rock 0.9s ease-in-out infinite; }
+@keyframes hni-rock { 0%,100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg) translateY(-1px); } }
+.hni-seal { transform-origin: 50% 50%; }
+.hh-btn.is-live .hni-seal { animation: hni-twinkle 1.2s ease-in-out infinite; }
+.hni-pennant { transform-origin: 0% 50%; }
+.hh-btn:hover .hni-pennant, .hh-btn.is-live .hni-pennant { animation: hni-wave 0.6s ease-in-out infinite; }
+.hni-bag { transform-origin: 50% 100%; transform-box: view-box !important; }
+.hh-btn:hover .hni-bag { animation: hni-bounce 0.55s cubic-bezier(.34,1.56,.64,1) infinite alternate; }
+@keyframes hni-bounce { from { transform: scale(1, 1); } to { transform: scale(1.06, 0.92) translateY(1px); } }
 
 /* a badge means "something waiting for you": it breathes */
-.hh-badge { animation: hh-badge-pulse 1.8s ease-in-out infinite; }
-@keyframes hh-badge-pulse { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,200,90,0.6); } 50% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(255,200,90,0); } }
+.hh-badge { z-index: 1; box-shadow: 0 1px 3px rgba(0,0,0,0.6); animation: hh-badge-pulse 1.8s ease-in-out infinite; }
+@keyframes hh-badge-pulse { 0%,100% { transform: scale(1); box-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 0 0 0 rgba(255,200,90,0.6); } 50% { transform: scale(1.15); box-shadow: 0 1px 3px rgba(0,0,0,0.6), 0 0 0 5px rgba(255,200,90,0); } }
 .hh-badge.is-rift { animation-name: hh-badge-pulse-rift; }
 @keyframes hh-badge-pulse-rift { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(180,124,255,0.6); } 50% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(180,124,255,0); } }
 .hh-rift.is-ready { animation: hh-rift-glow 2.2s ease-in-out infinite; }
-@keyframes hh-rift-glow { 0%,100% { box-shadow: 0 0 6px rgba(180,124,255,0.3); } 50% { box-shadow: 0 0 16px rgba(180,124,255,0.65); } }
+@keyframes hh-rift-glow { 0%,100% { box-shadow: inset 0 1px 0 rgba(255,232,180,0.22), 0 0 6px rgba(169,107,255,0.3); } 50% { box-shadow: inset 0 1px 0 rgba(255,232,180,0.22), 0 0 16px rgba(169,107,255,0.65); } }
 .hh-btn-icon { padding: 5px 7px; }
 .hh-pair { display: flex; gap: 3px; }
 .hh-divider { width: 1px; height: 18px; background: rgba(255,214,140,0.18); margin: 0 4px; }
@@ -631,7 +663,7 @@ div.hh-brand { cursor: default; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hh-castle-fill, .hh-tick, .hh-speed-btn, .hh-btn { transition: none; }
-  .hh-btn, .hh-btn:hover, .hh-ico, .hh-btn:hover .hh-ico { transform: none !important; }
-  .hh-btn::after, .hh-badge, .hh-rift.is-ready, .hh-ico, .hh-ico *, .hni-spin { animation: none !important; }
+  .hh-btn, .hh-btn:hover, .hh-emb, .hh-btn:hover .hh-emb { transform: none !important; }
+  .hh-btn::after, .hh-badge, .hh-rift.is-ready, .hh-emb::before, .hh-emb-svg *, .hni-spin { animation: none !important; }
 }
 `;

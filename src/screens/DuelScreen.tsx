@@ -1267,7 +1267,9 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
       </div>
       <div className="dm-hand">
         <div className="dm-mana" aria-label={t("duel.mana")}>
-          <span>{Math.floor(me.mana)}</span>
+          <span key={Math.floor(me.mana)} className="dm-mana-orb">
+            <b>{Math.floor(me.mana)}</b>
+          </span>
           <div className="dm-mana-bar">
             {Array.from({ length: DUEL_MAX_MANA }, (_, i) => (
               <i key={i} className={i < me.mana ? "on" : ""} />
@@ -1278,15 +1280,30 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
           {me.hand.map((id, i) => {
             const card = getDuelCard(id)!;
             const can = me.mana >= card.cost && !snap.over && !introRunning;
+            // how far the mana is towards this card: drawn as a filling veil while it's not yet playable
+            const fill = Math.min(1, me.mana / card.cost);
             return (
-              <button key={`${id}-${i}`} className={`dm-card${picked === id ? " is-picked" : ""}`} disabled={!can} onClick={() => onCard(id)} title={t(`duel.card.${id}.desc` as TranslationKey)} data-testid={`hand-${id}`}>
-                <CardFace id={id} dim={!can} />
+              <button
+                key={`${id}-${i}`}
+                className={`dm-card is-${card.kind}${picked === id ? " is-picked" : ""}${can ? " is-ready" : ""}`}
+                style={{ ["--i" as string]: i, ["--fill" as string]: fill } as CSSProperties}
+                disabled={!can}
+                onClick={() => onCard(id)}
+                title={t(`duel.card.${id}.desc` as TranslationKey)}
+                data-testid={`hand-${id}`}
+              >
+                <span className="dm-card-body">
+                  <CardFace id={id} dim={!can} />
+                  {me.mana < card.cost && !snap.over && <span className="dm-card-charge" aria-hidden="true" />}
+                </span>
               </button>
             );
           })}
           <div className="dm-next">
             <small>{t("duel.next")}</small>
-            <CardFace id={me.next} small />
+            <span key={me.next} className="dm-next-card">
+              <CardFace id={me.next} small />
+            </span>
           </div>
         </div>
         <EmoteButton />
@@ -1986,5 +2003,85 @@ const MATCH_CSS = `
   .dm-next { padding-left: 0; }
   .dm-emote { font-size: 13px; padding: 6px 10px; }
   .dm-emote-ico { font-size: 18px; }
+}
+
+/* ---------------- CARDS IN MOTION ----------------
+ * A new card is dealt into its slot (flies up and flips face-up); playable
+ * cards breathe and catch a foil glint; a card not yet affordable shows the
+ * mana filling it up from below and flashes when it becomes playable; hover
+ * lifts and tilts toward you; the picked card floats with a turning ring of
+ * light. The mana orb holds a moving liquid and pops each time it grows. */
+.dm-cards { perspective: 900px; }
+.dm-card { position: relative; transition: transform 220ms cubic-bezier(.2,.8,.2,1), filter 200ms ease; transform-style: preserve-3d;
+  --tone: #e8b04b; }
+.dm-card.is-TOWER { --tone: #7fb0ff; } .dm-card.is-SPELL { --tone: #ffd56a; } .dm-card.is-SEND { --tone: #ff8a5a; }
+.dm-card-body { position: relative; display: block; border-radius: 12px; transform-style: preserve-3d;
+  animation: dcDeal 560ms cubic-bezier(.2,.9,.25,1.15) backwards, dcBob 3.2s ease-in-out infinite;
+  animation-delay: calc(var(--i, 0) * 70ms), calc(var(--i, 0) * -0.7s); animation-play-state: running, paused; }
+@keyframes dcDeal {
+  0% { opacity: 0; transform: translate(110px, 60px) rotate(18deg) rotateY(90deg) scale(0.6); }
+  55% { opacity: 1; transform: translate(0, -14px) rotate(-3deg) rotateY(0) scale(1.04); }
+  100% { transform: none; }
+}
+/* only the play-state changes when a card becomes playable, so the deal never replays */
+.dm-card.is-ready .dm-card-body { animation-play-state: running, running; }
+@keyframes dcBob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(calc((var(--i, 0) - 1.5) * 0.6deg)); } }
+/* foil glint over playable cards */
+.dm-card.is-ready .dm-card-body::after { content: ""; position: absolute; inset: 0; border-radius: 12px; pointer-events: none; z-index: 1; mix-blend-mode: screen;
+  background: linear-gradient(105deg, transparent 38%, rgba(255,250,230,0.34) 48%, rgba(255,215,140,0.14) 54%, transparent 62%) no-repeat;
+  background-size: 320% 100%; background-position: 130% 0; animation: dcFoil 4.5s ease-in-out infinite; animation-delay: calc(var(--i, 0) * 0.9s + 0.6s); }
+@keyframes dcFoil { 0%, 68% { background-position: 130% 0; } 100% { background-position: -40% 0; } }
+/* playable: a soft glow in the card's own colour; the cost gem pulses */
+.dm-card.is-ready .dc-face { box-shadow: inset 0 1px 0 rgba(255,230,180,0.15), 0 6px 14px rgba(0,0,0,0.5), 0 0 12px color-mix(in srgb, var(--tone) 40%, transparent); animation: dcReady 520ms ease-out; }
+@keyframes dcReady { 0% { filter: brightness(1.9); box-shadow: 0 0 0 3px var(--tone), 0 0 30px var(--tone); } 100% { filter: none; } }
+.dm-card.is-ready .dc-cost { animation: dcGem 1.6s ease-in-out infinite; }
+@keyframes dcGem { 0%,100% { box-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 0 0 rgba(211,139,255,0.7); } 50% { box-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 0 5px rgba(211,139,255,0); } }
+/* not yet: the mana fills the card from below */
+.dm-card-charge { position: absolute; inset: 2px; border-radius: 10px; pointer-events: none; overflow: hidden; }
+.dm-card-charge::before { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: calc(var(--fill, 0) * 100%);
+  background: linear-gradient(0deg, rgba(160,90,255,0.3), rgba(200,150,255,0.06)); border-top: 2px solid rgba(230,200,255,0.85);
+  box-shadow: 0 -4px 10px rgba(200,150,255,0.45); transition: height 260ms linear; }
+.dm-card-charge::after { content: ""; position: absolute; left: -20%; right: -20%; height: 8px; bottom: calc(var(--fill, 0) * 100% - 4px);
+  background: radial-gradient(ellipse at 50% 0%, rgba(240,220,255,0.6), transparent 70%); animation: dcRipple 1.4s ease-in-out infinite alternate; transition: bottom 260ms linear; }
+@keyframes dcRipple { from { transform: translateX(-8%) scaleY(0.7); } to { transform: translateX(8%) scaleY(1.2); } }
+/* hand: hover lifts and tilts, picked floats in a ring of light */
+.dm-card:not(:disabled):hover { transform: translateY(-14px) rotateX(10deg) scale(1.07); z-index: 2; filter: brightness(1.08); }
+.dm-card:not(:disabled):hover .dc-face { box-shadow: 0 16px 26px rgba(0,0,0,0.6), 0 0 22px color-mix(in srgb, var(--tone) 65%, transparent); }
+.dm-card:not(:disabled):hover .dc-art { animation: dcArt 1.2s ease-in-out infinite alternate; }
+@keyframes dcArt { from { transform: scale(1); } to { transform: scale(1.08) translateY(-2px); } }
+.dm-card:not(:disabled):active { transform: translateY(-6px) scale(0.97); transition-duration: 70ms; }
+.dm-card.is-picked { transform: translateY(-18px) scale(1.08); z-index: 3; }
+.dm-card.is-picked .dc-face { animation: dcPicked 1.1s ease-in-out infinite; }
+@keyframes dcPicked { 0%,100% { box-shadow: 0 0 0 2px #ffd56a, 0 0 18px rgba(255,213,106,0.5), 0 14px 24px rgba(0,0,0,0.55); } 50% { box-shadow: 0 0 0 3px #fff0b8, 0 0 34px rgba(255,213,106,0.85), 0 14px 24px rgba(0,0,0,0.55); } }
+.dm-card.is-picked .dm-card-body::before { content: ""; position: absolute; inset: -5px; border-radius: 15px; pointer-events: none; z-index: -1;
+  background: conic-gradient(from var(--a, 0deg), transparent 0 60%, #ffd56a 78%, #fff8d8 84%, transparent 92%); animation: dcRing 1.4s linear infinite; }
+@property --a { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+@keyframes dcRing { to { --a: 360deg; } }
+/* the next card waits, gently floating; it slides in when it changes */
+.dm-next-card { display: block; animation: dcNext 420ms cubic-bezier(.2,.9,.25,1.2) backwards, dcFloat 2.6s ease-in-out 420ms infinite; }
+@keyframes dcNext { from { opacity: 0; transform: translateX(26px) rotate(12deg) scale(0.7); } }
+@keyframes dcFloat { 0%,100% { transform: translateY(0) rotate(-2deg); } 50% { transform: translateY(-3px) rotate(2deg); } }
+/* the mana orb: liquid inside, pops when it grows */
+.dm-mana > .dm-mana-orb { position: relative; overflow: hidden; animation: dcOrbPop 360ms cubic-bezier(.34,1.56,.64,1); }
+.dm-mana-orb b { position: relative; z-index: 1; text-shadow: 0 1px 3px rgba(40,0,80,0.8); }
+.dm-mana-orb::before, .dm-mana-orb::after { content: ""; position: absolute; left: -50%; width: 200%; height: 200%; top: 48%; border-radius: 42%;
+  background: rgba(240,200,255,0.28); animation: dcLiquid 5s linear infinite; }
+.dm-mana-orb::after { top: 54%; border-radius: 45%; background: rgba(120,40,200,0.45); animation-duration: 7s; animation-direction: reverse; }
+@keyframes dcLiquid { to { transform: rotate(360deg); } }
+@keyframes dcOrbPop { 0% { transform: scale(1.22); box-shadow: 0 0 30px rgba(220,160,255,0.95); } 100% { transform: scale(1); } }
+.dm-mana-bar i { transition: background 200ms ease, box-shadow 200ms ease, transform 200ms ease; }
+.dm-mana-bar i.on { animation: dcPip 340ms cubic-bezier(.34,1.56,.64,1); }
+@keyframes dcPip { from { transform: scaleY(0.2); } }
+/* lobby: deck/collection/draft cards */
+.du-cardbtn { transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease, border-color 200ms ease; transform-style: preserve-3d; }
+.du-cardbtn:not(.is-locked):hover { transform: translateY(-6px) rotateX(6deg); box-shadow: 0 14px 24px rgba(0,0,0,0.5), 0 0 18px rgba(232,176,75,0.25); }
+.du-cardbtn:not(.is-locked):hover .dc-art { animation: dcArt 1.2s ease-in-out infinite alternate; }
+.du-cardbtn:not(.is-locked):active { transform: translateY(-2px) scale(0.97); transition-duration: 70ms; }
+.du-draft-opt { animation: dcDeal 620ms cubic-bezier(.2,.9,.25,1.15) backwards; }
+.du-draft-opt:nth-child(2) { animation-delay: 110ms; } .du-draft-opt:nth-child(3) { animation-delay: 220ms; }
+@media (prefers-reduced-motion: reduce) {
+  .dm-card, .dm-card-body, .dm-card .dc-face, .dm-card-body::after, .dm-card .dc-cost, .dm-card .dc-art, .dm-card-charge::after, .dm-card.is-picked .dm-card-body::before,
+  .dm-next-card, .dm-mana > .dm-mana-orb, .dm-mana-orb::before, .dm-mana-orb::after, .dm-mana-bar i.on, .du-cardbtn, .du-draft-opt { animation: none !important; transition: none !important; }
+  .dm-card:not(:disabled):hover, .dm-card.is-picked, .du-cardbtn:hover { transform: none !important; }
 }
 `;
