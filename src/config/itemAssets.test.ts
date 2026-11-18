@@ -8,7 +8,7 @@ import { ITEM_DEFINITIONS } from "./itemDefinitions";
  * entry is ever faked as "real art" — all 3 amulets' and the MYTHIC item's
  * imageSrc below are real artwork the user supplied directly (matted to
  * transparency, see itemAssets.ts's own comment); the still-empty entries
- * warden_fragment and ancient_core use drawn vector art (SVG).
+ * warden_fragment and ancient_core have painted art made in Canva.
  */
 describe("itemAssets — ITEM_VISUAL_ASSETS registry", () => {
   it("has a registry entry for every real item in the catalog", () => {
@@ -25,12 +25,12 @@ describe("itemAssets — ITEM_VISUAL_ASSETS registry", () => {
     expect(getItemVisualAsset("mosswood_charm")).toBe(ITEM_VISUAL_ASSETS.mosswood_charm);
   });
 
-  it("every item has artwork: the amulets and the MYTHIC item supplied renders, the fragment and the core drawn vector art", () => {
+  it("every item has artwork: the amulets and the MYTHIC item supplied renders, the fragment and the core painted in Canva", () => {
     expect(getItemVisualAsset("mosswood_charm").imageSrc).toBe("/items/amulets/mosswood_charm.png");
     expect(getItemVisualAsset("hollow_sigil").imageSrc).toBe("/items/amulets/hollow_sigil.png");
     expect(getItemVisualAsset("wardens_eye").imageSrc).toBe("/items/amulets/wardens_eye.png");
     expect(getItemVisualAsset("crown_of_the_hollow_king").imageSrc).toBe("/items/artifacts/crown_of_the_hollow_king.png");
-    expect(getItemVisualAsset("warden_fragment").imageSrc).toBe("/items/materials/warden_fragment.svg");
-    expect(getItemVisualAsset("ancient_core").imageSrc).toBe("/items/runes/ancient_core.svg");
+    expect(getItemVisualAsset("warden_fragment").imageSrc).toBe("/items/materials/warden_fragment.png");
+    expect(getItemVisualAsset("ancient_core").imageSrc).toBe("/items/runes/ancient_core.png");
   });
 });
