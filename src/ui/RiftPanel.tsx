@@ -36,7 +36,7 @@ export function RiftPanel({ charges, armed, active, onOpen, onCancel, onClose }:
   const locked = !!armed || !!active;
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("rift.title")} data-testid="rift-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("rift.title")} data-testid="rift-panel">
       <button onClick={onClose} style={closeStyle} aria-label={t("rift.close")}>
         ×
       </button>
@@ -54,7 +54,7 @@ export function RiftPanel({ charges, armed, active, onOpen, onCancel, onClose }:
       <div style={{ ...subStyle, marginTop: 4 }}>{t("rift.chargeRule", { n: RIFT_CHARGE_EVERY, max: MAX_RIFT_CHARGES })}</div>
 
       <div style={sectionLabel}>{t("rift.curses")}</div>
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="hn-stagger" style={{ display: "grid", gap: 6 }}>
         {RIFT_MODS.map((m) => {
           const on = mods.includes(m.id);
           return (

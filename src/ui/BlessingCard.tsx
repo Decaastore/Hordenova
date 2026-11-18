@@ -13,12 +13,14 @@ export interface UpcomingWave {
   element: WaveElement | null;
 }
 
-function Badge({ el, size = 22 }: { el: WaveElement; size?: number }) {
+function Badge({ el, size = 22, live = false }: { el: WaveElement; size?: number; live?: boolean }) {
   const c = ELEMENT_UI_COLOR[el];
   return (
     <span
       aria-hidden="true"
+      className={live ? "hn-glow" : undefined}
       style={{
+        ["--hn-glow" as string]: `${c}cc`,
         width: size,
         height: size,
         flex: "none",
@@ -61,19 +63,21 @@ export function BlessingCard({
 
   if (folded)
     return (
-      <button type="button" onClick={() => setFolded(false)} style={{ ...wrap, padding: "6px 12px", cursor: "pointer", color: PALETTE.uiText, fontWeight: 700, fontSize: 12 }}>
+      <button type="button" className="hn-pop hn-press hn-sheen" onClick={() => setFolded(false)} style={{ ...wrap, padding: "6px 12px", cursor: "pointer", color: PALETTE.uiText, fontWeight: 700, fontSize: 12 }}>
         ✦ {t("blessing.title")}
       </button>
     );
 
   return (
-    <div style={{ ...wrap, padding: "10px 12px", width: 330 }} data-testid="blessing-card">
-      <div style={{ fontSize: 13, fontWeight: 800, color: PALETTE.uiText }}>✦ {t("blessing.title")}</div>
+    <div className="hn-pop" style={{ ...wrap, padding: "10px 12px", width: 330 }} data-testid="blessing-card">
+      <div style={{ fontSize: 13, fontWeight: 800, color: PALETTE.uiText }}>
+        <span className="hn-glow" style={{ display: "inline-block", color: PALETTE.uiAccentBright }}>✦</span> {t("blessing.title")}
+      </div>
       <div style={{ fontSize: 11, color: PALETTE.uiTextDim, marginTop: 3, lineHeight: 1.35 }}>{t("blessing.lead")}</div>
 
       {/* the coming waves, so the player sees which element they will face */}
       <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 8 }}>{t("blessing.upcoming")}</div>
-      <div style={{ display: "flex", gap: 4, marginTop: 4 }} data-testid="blessing-upcoming">
+      <div className="hn-stagger" style={{ display: "flex", gap: 4, marginTop: 4 }} data-testid="blessing-upcoming">
         {upcoming.map(({ wave, element }) => (
           <div
             key={wave}
@@ -91,7 +95,7 @@ export function BlessingCard({
             }}
           >
             {element ? (
-              <Badge el={element} size={20} />
+              <Badge el={element} size={20} live />
             ) : (
               <span style={{ width: 20, height: 20, display: "inline-flex", alignItems: "center", justifyContent: "center", color: PALETTE.uiTextDim, fontSize: 11 }}>—</span>
             )}
@@ -111,7 +115,7 @@ export function BlessingCard({
         <span style={{ marginLeft: 4 }}>{t("blessing.cycleShort")}</span>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
+      <div className="hn-stagger" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
         {WAVE_ELEMENTS.map((el) => {
           const strong = upcoming.filter((u) => u.element && counterOf(u.element) === el).length;
           const owned = towerCounts[el] ?? 0;
@@ -121,6 +125,7 @@ export function BlessingCard({
               type="button"
               onClick={() => onChoose(el)}
               data-element={el}
+              className={`hn-press${strong > 0 ? " hn-sheen" : ""}`}
               style={{
                 padding: "7px 7px",
                 borderRadius: 6,
@@ -134,7 +139,7 @@ export function BlessingCard({
                 alignItems: "flex-start",
               }}
             >
-              <Badge el={el} />
+              <Badge el={el} live={strong > 0} />
               <span style={{ minWidth: 0 }}>
                 <span style={{ display: "block", fontWeight: 800, fontSize: 12, color: ELEMENT_UI_COLOR[el] }}>{name(el)}</span>
                 <span style={{ display: "block", fontSize: 10.5, color: PALETTE.uiText }}>

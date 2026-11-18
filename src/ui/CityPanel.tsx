@@ -16,7 +16,7 @@ interface CityPanelProps {
 export function CityPanel({ seasonBestWave, burning, goldShare, onClose }: CityPanelProps) {
   const { t } = useLanguage();
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("city.title")} data-testid="city-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("city.title")} data-testid="city-panel">
       <button onClick={onClose} style={closeStyle} aria-label={t("city.close")}>
         ×
       </button>
@@ -26,7 +26,7 @@ export function CityPanel({ seasonBestWave, burning, goldShare, onClose }: CityP
         <CoinIcon size={12} color={PALETTE.gold} />
         {t("city.income", { pct: Math.round(goldShare * 100) })}
       </div>
-      <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+      <div className="hn-stagger" style={{ display: "grid", gap: 6, marginTop: 10 }}>
         {CITY_BUILDINGS.map((b) => {
           const built = seasonBestWave >= b.unlockWave;
           const fire = burning[b.id] ?? 0;

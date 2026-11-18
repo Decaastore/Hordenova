@@ -49,15 +49,16 @@ export interface ItemVisualAsset {
 }
 
 export const ITEM_VISUAL_ASSETS: Record<string, ItemVisualAsset> = {
-  warden_fragment: {},
+  warden_fragment: { imageSrc: "/items/materials/warden_fragment.svg" },
   // AMULETOS + MÍTICO — IDENTIDADE VISUAL DEFINITIVA. All 3 confirmed
   // amulets and the game's single MYTHIC item now have their own real
   // artwork, supplied by the user and matted to a transparent background
   // (every source render had an opaque near-black backdrop baked in, not
-  // real alpha) before landing here. Only ancient_core (a RUNE) and
-  // warden_fragment (a MATERIAL) still fall back to the generic icon.
+  // real alpha) before landing here. ancient_core (a RUNE) and warden_fragment
+  // (a MATERIAL) use drawn vector art (public/items/runes, /materials) —
+  // a painted render can replace either one by changing its path here.
   mosswood_charm: { imageSrc: "/items/amulets/mosswood_charm.png" },
-  ancient_core: {},
+  ancient_core: { imageSrc: "/items/runes/ancient_core.svg" },
   hollow_sigil: { imageSrc: "/items/amulets/hollow_sigil.png" },
   wardens_eye: { imageSrc: "/items/amulets/wardens_eye.png" },
   crown_of_the_hollow_king: { imageSrc: "/items/artifacts/crown_of_the_hollow_king.png" },

@@ -64,14 +64,17 @@ export function ItemGlyph({ itemDefinitionId, size = 56 }: ItemGlyphProps) {
     overflow: "hidden",
   };
 
+  // the item breathes in its frame; the rarest ones also catch a passing glint
+  const shines = def.rarity === "LEGENDARY" || def.rarity === "MYTHIC";
   return (
-    <div style={wrapperStyle}>
+    <div style={wrapperStyle} className={shines ? "hn-sheen" : undefined}>
       {showRealArt ? (
         <img
           src={asset.imageSrc}
           alt=""
           draggable={false}
           onError={() => setImageFailed(true)}
+          className="hn-float"
           style={{ width: size * 0.82, height: size * 0.82, objectFit: "contain" }}
         />
       ) : (

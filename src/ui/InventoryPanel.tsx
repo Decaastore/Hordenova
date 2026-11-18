@@ -313,9 +313,9 @@ export function InventoryPanel({
   const showAside = !narrow || fusionMode;
 
   const panel = (
-    <div className="inv-overlay" onClick={onClose}>
+    <div className="inv-overlay hn-page" onClick={onClose}>
       <style>{CSS}</style>
-      <div className="inv-card" role="dialog" aria-modal="true" aria-label={t("inventory.title")} onClick={(e) => e.stopPropagation()}>
+      <div className="inv-card hn-pop" role="dialog" aria-modal="true" aria-label={t("inventory.title")} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} className="inv-close" aria-label={t("inventory.close")}>
           ×
         </button>
@@ -390,7 +390,7 @@ export function InventoryPanel({
               ) : shownItems.length === 0 ? (
                 <div className="inv-empty">{t("inventory.noItemsInCategory")}</div>
               ) : (
-                <div className="inv-grid">
+                <div className="inv-grid hn-stagger">
                   {shownItems.map((item) => {
                     const picked = fusionSelectedIds.includes(item.instanceId);
                     const blocked = fusionMode && !picked && (!fusable(item) || (fusionRarity !== null && rarityOf(item) !== fusionRarity) || fusionSelectedIds.length >= FUSION_ITEM_COUNT);
@@ -419,7 +419,7 @@ export function InventoryPanel({
                     {t("inventory.overflowTitle")}
                   </div>
                   <div className="inv-hint">{t("inventory.overflowHint")}</div>
-                  <div className="inv-grid">
+                  <div className="inv-grid hn-stagger">
                     {overflowInventory.map((item) => (
                       <OverflowItemTile key={item.instanceId} item={item} onClaim={() => onClaimOverflowItem(item.instanceId)} />
                     ))}

@@ -24,18 +24,19 @@ function render(itemDefinitionId: string, size?: number): { container: HTMLDivEl
  * hand-drawn category icon is the graceful fallback when it isn't (or the
  * file fails to load) — nothing ever renders broken or blank.
  *
- * All 3 amulets and the MYTHIC item have real supplied artwork registered
- * by default (see itemAssets.ts); ancient_core is still honestly empty, so
- * the manually-injected-registry scenarios below use it to stay
- * independent of whether any given item currently has real art.
+ * Every item now has art registered (see itemAssets.ts). The scenarios
+ * below change ancient_core's registry entry by hand — and put it back
+ * after each test — so they stay independent of which items have art.
  */
+const ANCIENT_CORE_ART = ITEM_VISUAL_ASSETS.ancient_core!.imageSrc;
 describe("ui/ItemGlyph — real-art vs fallback-icon contract", () => {
   afterEach(() => {
     // Never leak a test-only imageSrc into another test — the registry is a shared module singleton.
-    delete ITEM_VISUAL_ASSETS.ancient_core!.imageSrc;
+    ITEM_VISUAL_ASSETS.ancient_core!.imageSrc = ANCIENT_CORE_ART;
   });
 
   it("renders the fallback hand-drawn icon (no <img>) for an item with no real art registered", () => {
+    delete ITEM_VISUAL_ASSETS.ancient_core!.imageSrc;
     const { container } = render("ancient_core");
     expect(container.querySelector("img")).toBeNull();
     expect(container.querySelector("svg")).not.toBeNull();

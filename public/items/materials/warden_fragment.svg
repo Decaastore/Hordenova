@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bone" x1="0.2" y1="0" x2="0.8" y2="1">
+      <stop offset="0" stop-color="#f3e7cc"/>
+      <stop offset="0.45" stop-color="#cdb98f"/>
+      <stop offset="1" stop-color="#6e5a3c"/>
+    </linearGradient>
+    <linearGradient id="bark" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6b4a2c"/>
+      <stop offset="1" stop-color="#2a1a0e"/>
+    </linearGradient>
+    <radialGradient id="ember" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0.95"/>
+      <stop offset="0.45" stop-color="#ff8a2a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ff5a1a" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="6"/></filter>
+  </defs>
+  <!-- warm glow from inside the break -->
+  <ellipse cx="150" cy="96" rx="58" ry="40" fill="url(#ember)" filter="url(#soft)"/>
+  <!-- the shard: bone body -->
+  <path d="M74 226 L58 168 L70 116 L96 70 L122 30 L134 58 L160 44 L176 76 L196 70 L188 112 L170 150 L150 196 L118 232 Z"
+        fill="url(#bone)" stroke="#2a1d10" stroke-width="5" stroke-linejoin="round"/>
+  <!-- bark that has grown over one side -->
+  <path d="M74 226 L58 168 L70 116 L96 70 L104 96 L94 132 L100 176 L118 232 Z" fill="url(#bark)" stroke="#1b1008" stroke-width="4" stroke-linejoin="round"/>
+  <g stroke="#1b1008" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.85">
+    <path d="M70 160 C78 150 76 136 86 124"/>
+    <path d="M80 204 C86 188 84 170 92 158"/>
+    <path d="M86 112 C92 104 92 94 98 86"/>
+  </g>
+  <!-- bone grain -->
+  <g stroke="#8a744e" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8">
+    <path d="M118 210 C126 180 128 150 140 120"/>
+    <path d="M136 196 C146 170 150 140 162 112"/>
+    <path d="M124 90 C130 76 134 66 136 60"/>
+  </g>
+  <!-- the jagged break, still faintly warm -->
+  <path d="M122 30 L134 58 L160 44 L176 76 L196 70" fill="none" stroke="#ffb35a" stroke-width="4" stroke-linejoin="round" opacity="0.9"/>
+  <path d="M140 64 L150 82 M168 80 L172 96" stroke="#ff9a3a" stroke-width="3" stroke-linecap="round" opacity="0.75"/>
+  <!-- highlights -->
+  <path d="M112 78 L128 48" stroke="#fff8e6" stroke-width="4" stroke-linecap="round" opacity="0.7"/>
+  <path d="M164 104 L176 84" stroke="#fff8e6" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
+  <!-- moss flecks -->
+  <g fill="#7fae4a" opacity="0.9">
+    <circle cx="96" cy="214" r="5"/><circle cx="106" cy="222" r="3.5"/><circle cx="66" cy="176" r="3.5"/>
+  </g>
+</svg>

@@ -44,7 +44,7 @@ export function EternalPanel({ marks, record, currentWave, contracts, milestones
   const nextDepth = depthOfWave(Math.max(1, record)) + 1;
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("eternal.panelTitle")} data-testid="eternal-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("eternal.panelTitle")} data-testid="eternal-panel">
       <button onClick={onClose} style={closeStyle} aria-label={t("bestiary.close")}>
         ×
       </button>
@@ -63,7 +63,7 @@ export function EternalPanel({ marks, record, currentWave, contracts, milestones
       {tab === "contracts" && (
         <>
           <div style={subStyle}>{t("eternal.contractsLead")}</div>
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+          <div className="hn-stagger" style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {contracts.map((c) => {
               const text = t(`eternal.contract.${c.kind}` as TranslationKey, {
                 target: fmt(c.target),
@@ -118,7 +118,7 @@ export function EternalPanel({ marks, record, currentWave, contracts, milestones
       {tab === "merchant" && (
         <>
           <div style={subStyle}>{t("eternal.merchantLead")}</div>
-          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+          <div className="hn-stagger" style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {MERCHANT_OFFERS.map((o) => {
               const can = marks >= o.price;
               return (

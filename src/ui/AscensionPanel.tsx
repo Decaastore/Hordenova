@@ -36,8 +36,8 @@ export function AscensionPanel({ onClose }: AscensionPanelProps) {
   const historyDesc = [...save.ascensionHistory].sort((a, b) => b.seasonNumber - a.seasonNumber);
 
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()}>
+    <div className="hn-page" style={overlayStyle} onClick={onClose}>
+      <div className="hn-pop" style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <button onClick={onClose} style={closeButtonStyle}>
           ×
         </button>

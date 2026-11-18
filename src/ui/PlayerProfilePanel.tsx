@@ -11,6 +11,7 @@ import { getPrestigeTier } from "@/config/prestige";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { countOwnedSkins, TOTAL_TOWER_SKINS, DISPLAY_NAME_MAX, type PublicPlayerProfile, type PublicTowerSnapshot } from "@/profile/playerProfile";
 import { getProfileService, setMyDisplayName } from "@/profile/profileService";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface PlayerProfilePanelProps {
   playerId: string;
@@ -58,8 +59,8 @@ export function PlayerProfilePanel({ playerId, onClose }: PlayerProfilePanelProp
   };
 
   return (
-    <div style={overlayStyle} onClick={onClose} role="dialog" aria-modal="true">
-      <div style={panelStyle} onClick={(e) => e.stopPropagation()}>
+    <div className="hn-page" style={overlayStyle} onClick={onClose} role="dialog" aria-modal="true">
+      <div className="hn-pop" style={panelStyle} onClick={(e) => e.stopPropagation()}>
         <button style={closeStyle} onClick={onClose} aria-label={t("profile.close")}>
           ×
         </button>
@@ -195,7 +196,8 @@ function TowerCard({ tower }: { tower: PublicTowerSnapshot }) {
             if (!def) return null;
             const rarity = getRarityDefinition(def.rarity);
             return (
-              <span key={`${id}-${i}`} style={{ ...chipStyle, borderColor: rarity.color, color: rarity.color }}>
+              <span key={`${id}-${i}`} style={{ ...chipStyle, borderColor: rarity.color, color: rarity.color, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <ItemGlyph itemDefinitionId={def.id} size={22} />
                 {t(`items.${def.i18nKey}.name` as TranslationKey)}
               </span>
             );

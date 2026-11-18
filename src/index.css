@@ -27,3 +27,186 @@ button {
   font-family: inherit;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------------
+ * MOTION — the shared animation vocabulary of the game and the site.
+ * One quick, decided entrance for things that open (panels, cards,
+ * pages), a short stagger for their lists, and small living touches
+ * (badges that pulse when something is ready, items that breathe).
+ * Everything here switches off under prefers-reduced-motion.
+ * ------------------------------------------------------------------ */
+:root {
+  --hn-ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --hn-ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes hn-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.965); }
+}
+@keyframes hn-rise {
+  from { opacity: 0; transform: translateY(8px); }
+}
+@keyframes hn-fade { from { opacity: 0; } }
+@keyframes hn-slide-left {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+@keyframes hn-badge-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 200, 90, 0.55); }
+  50% { transform: scale(1.14); box-shadow: 0 0 0 5px rgba(255, 200, 90, 0); }
+}
+@keyframes hn-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-2.5px); }
+}
+@keyframes hn-sheen {
+  0% { transform: translateX(-130%) skewX(-18deg); }
+  60%, 100% { transform: translateX(230%) skewX(-18deg); }
+}
+@keyframes hn-glow {
+  0%, 100% { filter: drop-shadow(0 0 2px var(--hn-glow, rgba(255, 200, 90, 0.35))); }
+  50% { filter: drop-shadow(0 0 7px var(--hn-glow, rgba(255, 200, 90, 0.75))); }
+}
+@keyframes hn-spin { to { transform: rotate(360deg); } }
+
+/* things that open (keyframes give only the start: they land on the element's own opacity/transform) */
+.hn-pop { animation: hn-pop 260ms var(--hn-ease-out) backwards; }
+.hn-page { animation: hn-fade 320ms ease-out backwards; }
+.hn-slide-left { animation: hn-slide-left 300ms var(--hn-ease-out) backwards; }
+
+/* lists inside them arrive one after another */
+.hn-stagger > * { animation: hn-rise 300ms var(--hn-ease-out) backwards; }
+.hn-stagger > *:nth-child(1) { animation-delay: 40ms; }
+.hn-stagger > *:nth-child(2) { animation-delay: 80ms; }
+.hn-stagger > *:nth-child(3) { animation-delay: 120ms; }
+.hn-stagger > *:nth-child(4) { animation-delay: 160ms; }
+.hn-stagger > *:nth-child(5) { animation-delay: 200ms; }
+.hn-stagger > *:nth-child(6) { animation-delay: 240ms; }
+.hn-stagger > *:nth-child(7) { animation-delay: 280ms; }
+.hn-stagger > *:nth-child(8) { animation-delay: 320ms; }
+.hn-stagger > *:nth-child(n + 9) { animation-delay: 360ms; }
+
+/* small living touches */
+.hn-float { animation: hn-float 3.2s ease-in-out infinite; }
+.hn-glow { animation: hn-glow 2.4s ease-in-out infinite; }
+.hn-sheen { position: relative; overflow: hidden; }
+.hn-sheen::after {
+  content: "";
+  position: absolute;
+  inset: -20% auto -20% 0;
+  width: 38%;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: hn-sheen 3.8s ease-in-out infinite;
+}
+
+/* buttons answer the hand */
+.hn-press { transition: transform 140ms var(--hn-ease-out), box-shadow 180ms ease, border-color 180ms ease, background-color 180ms ease, filter 180ms ease; }
+.hn-press:hover:not(:disabled) { transform: translateY(-1.5px); filter: brightness(1.08); }
+.hn-press:active:not(:disabled) { transform: translateY(0) scale(0.97); transition-duration: 60ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .hn-pop, .hn-page, .hn-slide-left, .hn-stagger > *, .hn-float, .hn-glow, .hn-sheen::after { animation: none !important; }
+  .hn-press, .hn-press:hover, .hn-press:active { transform: none !important; transition: none !important; }
+}
+
+/* every button inside an opened panel answers hover and press */
+.hn-pop button:not(:disabled),
+.hn-page button:not(:disabled) {
+  transition: transform 140ms var(--hn-ease-out), filter 160ms ease, box-shadow 180ms ease, border-color 160ms ease, background-color 160ms ease;
+}
+.hn-pop button:not(:disabled):hover,
+.hn-page button:not(:disabled):hover { filter: brightness(1.12); }
+.hn-pop button:not(:disabled):active,
+.hn-page button:not(:disabled):active { transform: scale(0.97); transition-duration: 60ms; }
+@media (prefers-reduced-motion: reduce) {
+  .hn-pop button, .hn-page button { transition: none !important; transform: none !important; }
+}
+
+/* ------------------------------------------------------------------
+ * SITE MOTION — the website screens (Home, Season, Ranking, Wiki,
+ * Novidades, Store, Pass, Account, Duel) and the top navigation.
+ * Pages open with their hero rising in; sections, cards and rows rise
+ * into place as they scroll into view (browsers with scroll-driven
+ * animations; elsewhere they simply show); links and the play button
+ * answer hover. All off under prefers-reduced-motion.
+ * ------------------------------------------------------------------ */
+@keyframes hn-zoom-slow { from { transform: scale(1); } to { transform: scale(1.07); } }
+@keyframes hn-grow-x { from { transform: scaleX(0); } }
+@keyframes hn-breathe {
+  0%, 100% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 18px rgba(226,49,63,0.4), 0 2px 0 #3d0508; }
+  50% { box-shadow: inset 0 1px 0 rgba(255,255,255,0.28), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 32px rgba(226,49,63,0.75), 0 2px 0 #3d0508; }
+}
+@keyframes hn-diamond { 0%, 100% { box-shadow: 0 0 10px rgba(247,220,156,0.8), 0 0 0 3px #140e07; } 50% { box-shadow: 0 0 20px rgba(247,220,156,1), 0 0 0 3px #140e07; } }
+
+/* top navigation */
+nav.tn .tn-link::before {
+  content: ""; position: absolute; left: 8px; right: 8px; bottom: 16px; height: 1px;
+  background: linear-gradient(90deg, transparent, #f7dc9c, transparent);
+  transform: scaleX(0); transition: transform 240ms var(--hn-ease-out);
+}
+nav.tn .tn-link:hover::before { transform: scaleX(1); }
+nav.tn .tn-link.is-active::after { animation: hn-pop 320ms var(--hn-ease-back) backwards; }
+nav.tn .tn-play { animation: hn-breathe 2.8s ease-in-out infinite; overflow: hidden; }
+nav.tn .tn-play::after, .pg-btn::after, .hn-play::after {
+  content: ""; position: absolute; top: -20%; bottom: -20%; left: 0; width: 34%; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,240,200,0.35), transparent);
+  transform: translateX(-140%) skewX(-18deg);
+}
+nav.tn .tn-play { position: relative; }
+nav.tn .tn-play:hover::after, .pg-btn:hover::after, .hn-play:hover::after { animation: hn-sheen 900ms ease-out; }
+.pg-btn, .hn-play { overflow: hidden; }
+.tn-dot { animation: hn-badge-pulse 1.8s ease-in-out infinite; }
+.tn-rule::after { animation: hn-diamond 3s ease-in-out infinite; }
+.tn-brand img { transition: transform 260ms var(--hn-ease-back), filter 260ms ease; }
+.tn-brand:hover img { transform: scale(1.04); filter: drop-shadow(0 0 8px rgba(247,220,156,0.55)); }
+
+/* page heroes rise in, their art drifts slowly */
+.pg-hero-inner > * { animation: hn-rise 520ms var(--hn-ease-out) backwards; }
+.pg-hero-inner > *:nth-child(2) { animation-delay: 110ms; }
+.pg-hero-inner > *:nth-child(n + 3) { animation-delay: 200ms; }
+.pg-h1 { animation: hn-slide-left 620ms var(--hn-ease-out) backwards; }
+.pg-hero-art { animation: hn-zoom-slow 26s ease-in-out infinite alternate; }
+.pg-progress-fill { transform-origin: left; animation: hn-grow-x 900ms var(--hn-ease-out) 200ms backwards; }
+.pg-figures > div { animation: hn-rise 420ms var(--hn-ease-out) backwards; }
+.pg-figures > div:nth-child(2) { animation-delay: 70ms; }
+.pg-figures > div:nth-child(3) { animation-delay: 140ms; }
+.pg-figures > div:nth-child(n + 4) { animation-delay: 210ms; }
+.pg-table tbody tr { transition: background-color 160ms ease; }
+.pg-table tbody tr:hover { background-color: rgba(232,176,75,0.06); }
+.pg-btn-ghost, .hn-ghost, .pg-link { transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 140ms var(--hn-ease-out); }
+.pg-btn-ghost:hover, .hn-ghost:hover { transform: translateY(-1px); }
+.pg-btn:active, .pg-btn-ghost:active, .hn-ghost:active { transform: translateY(1px) scale(0.98); }
+
+/* home hero */
+.hn-wordmark { animation: hn-pop 700ms var(--hn-ease-out) backwards; }
+.hn-tagline { animation: hn-rise 520ms var(--hn-ease-out) 160ms backwards; }
+.hn-pitch { animation: hn-rise 520ms var(--hn-ease-out) 260ms backwards; }
+.hn-play { animation: hn-rise 520ms var(--hn-ease-out) 360ms backwards, hn-breathe 2.8s ease-in-out 1s infinite; }
+.hn-stats > div { animation: hn-rise 480ms var(--hn-ease-out) backwards; }
+.hn-stats > div:nth-child(1) { animation-delay: 440ms; }
+.hn-stats > div:nth-child(2) { animation-delay: 510ms; }
+.hn-stats > div:nth-child(n + 3) { animation-delay: 580ms; }
+.hn-tower-stage { transition: transform 320ms var(--hn-ease-back); }
+.hn-tower:hover .hn-tower-stage, .hn-tower:focus-visible .hn-tower-stage { transform: translateY(-6px); }
+.hn-news-item { transition: transform 200ms var(--hn-ease-out); }
+.hn-news-item:hover { transform: translateX(4px); }
+
+/* sections, cards and rows rise as they scroll into view */
+@supports (animation-timeline: view()) {
+  .hn-section, .hn-tower, .hn-world, .hn-news-item,
+  .pg-section, .pg-block, .pg-table tbody tr,
+  .wk-block, .wk-row, .wk-group {
+    animation: hn-rise linear backwards;
+    animation-timeline: view();
+    animation-range: entry 0% entry 35%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  nav.tn .tn-play, .tn-dot, .tn-rule::after, nav.tn .tn-link.is-active::after,
+  .pg-hero-inner > *, .pg-h1, .pg-hero-art, .pg-progress-fill, .pg-figures > div,
+  .hn-wordmark, .hn-tagline, .hn-pitch, .hn-play, .hn-stats > div,
+  .hn-section, .hn-tower, .hn-world, .hn-news-item, .pg-section, .pg-block, .pg-table tbody tr, .wk-block, .wk-row, .wk-group,
+  nav.tn .tn-play::after, .pg-btn::after, .hn-play::after { animation: none !important; }
+  nav.tn .tn-link::before, .tn-brand img, .hn-tower-stage, .hn-news-item, .pg-btn-ghost, .hn-ghost { transition: none !important; transform: none !important; }
+}

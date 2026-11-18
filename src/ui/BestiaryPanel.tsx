@@ -34,7 +34,7 @@ export function BestiaryPanel({ kills, stats, unlocked, title, onEquipTitle, onC
   const b = bestiaryStats(kills);
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("bestiary.title")} data-testid="bestiary-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("bestiary.title")} data-testid="bestiary-panel">
       <style>{`.hn-walk-trigger:hover .hn-creature, .hn-walk-trigger:focus-visible .hn-creature { animation-play-state: running; }`}</style>
       <button onClick={onClose} style={closeStyle} aria-label={t("bestiary.close")}>
         ×
@@ -55,7 +55,7 @@ export function BestiaryPanel({ kills, stats, unlocked, title, onEquipTitle, onC
             <span>{t("bestiary.totalKills", { n: fmt(b.total) })}</span>
             <span>{t("bestiary.goldStars", { n: b.goldStars })}</span>
           </div>
-          <div style={gridStyle}>
+          <div className="hn-stagger" style={gridStyle}>
             {[...ENEMY_TYPES]
               .sort((x, y) => (kills[y] ?? 0) - (kills[x] ?? 0))
               .map((type) => {
@@ -100,7 +100,7 @@ export function BestiaryPanel({ kills, stats, unlocked, title, onEquipTitle, onC
               </button>
             )}
           </div>
-          <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+          <div className="hn-stagger" style={{ display: "grid", gap: 6, marginTop: 8 }}>
             {ACHIEVEMENTS.map((a) => {
               const done = unlocked.includes(a.id);
               const [cur, target] = a.progress(stats);

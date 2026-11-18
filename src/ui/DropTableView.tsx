@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import type { DropTable } from "@/config/dropTables";
 import { itemDefinitionForEntry } from "@/config/dropTables";
 import { RarityBadge } from "./RarityBadge";
+import { ItemGlyph } from "./ItemGlyph";
 
 interface DropTableViewProps {
   table: DropTable;
@@ -31,6 +32,7 @@ export function DropTableView({ table }: DropTableViewProps) {
           return (
             <div key={entry.itemId} style={rowStyle}>
               <div style={nameCellStyle}>
+                <ItemGlyph itemDefinitionId={def.id} size={28} />
                 <span>{t(`items.${def.i18nKey}.name` as TranslationKey)}</span>
                 <RarityBadge rarity={def.rarity} />
               </div>

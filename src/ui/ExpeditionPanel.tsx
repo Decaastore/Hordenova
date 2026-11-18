@@ -5,6 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { ITEM_DEFINITIONS } from "@/config/itemDefinitions";
 import { MaterialIcon, type MaterialKind } from "./MaterialIcon";
+import { ItemGlyph } from "./ItemGlyph";
 import {
   ESSENCE_RARITIES,
   EXPEDITION_HOURS,
@@ -109,7 +110,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
   };
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t(tab === "forge" ? "expeditions.tabForge" : "expeditions.tabTrips")} data-testid={tab === "forge" ? "forge-panel" : "expedition-panel"}>
+    <div key={tab} className="hn-pop" style={panelStyle} role="dialog" aria-label={t(tab === "forge" ? "expeditions.tabForge" : "expeditions.tabTrips")} data-testid={tab === "forge" ? "forge-panel" : "expedition-panel"}>
       <button onClick={p.onClose} style={closeStyle} aria-label={t("bestiary.close")}>
         ×
       </button>
@@ -120,7 +121,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
           <div style={subStyle}>{t("expeditions.lead")}</div>
           <div style={{ ...subStyle, color: PALETTE.uiText, fontWeight: 700 }}>{t("expeditions.groups", { used: s.active.length, total: p.groupsNow })}</div>
 
-          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+          <div className="hn-stagger" style={{ display: "grid", gap: 8, marginTop: 8 }}>
             {s.active.map((e, i) => {
               const left = e.endsAt - now;
               const done = left <= 0;
@@ -219,6 +220,9 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
 
           {s.forging && (
             <div style={{ ...rowStyle, marginTop: 8, borderColor: "#e8c06a" }} data-testid="forge-active">
+              <span className={s.forging.endsAt <= now ? "hn-glow" : undefined} style={{ display: "inline-flex" }}>
+                <ItemGlyph itemDefinitionId={s.forging.itemId} size={44} />
+              </span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700 }}>{t("expeditions.forging", { item: t(`items.${ITEM_DEFINITIONS[s.forging.itemId].i18nKey}.name` as TranslationKey) })}</div>
                 <div style={{ fontSize: 10.5, color: s.forging.endsAt <= now ? "#9be37a" : PALETTE.uiTextDim }}>
@@ -235,7 +239,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
             </div>
           )}
 
-          <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+          <div className="hn-stagger" style={{ display: "grid", gap: 8, marginTop: 8 }}>
             {FORGE_RECIPES.map((r) => {
               const rarity = recipeRarity(r);
               const missing = [
@@ -245,6 +249,7 @@ export function ExpeditionPanel(p: ExpeditionPanelProps) {
               const can = missing.length === 0 && !s.forging;
               return (
                 <div key={r.itemId} style={{ ...rowStyle, borderColor: `${RARITY_COLOR[rarity]}66` }} data-testid={`recipe-${r.itemId}`}>
+                  <ItemGlyph itemDefinitionId={r.itemId} size={44} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12.5, fontWeight: 700, color: RARITY_COLOR[rarity] }}>{t(`items.${ITEM_DEFINITIONS[r.itemId].i18nKey}.name` as TranslationKey)}</div>
                     <div style={{ fontSize: 10.5, color: PALETTE.uiTextDim, marginTop: 3, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>

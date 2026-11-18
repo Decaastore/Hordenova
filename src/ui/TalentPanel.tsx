@@ -41,7 +41,7 @@ export function TalentPanel({ ranks, free, seasonBestWave, onRaise, onReset, onC
   const nextAt = (Math.floor(seasonBestWave / WAVES_PER_TALENT_POINT) + 1) * WAVES_PER_TALENT_POINT;
 
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("talents.title")} data-testid="talent-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("talents.title")} data-testid="talent-panel">
       <button onClick={onClose} style={closeStyle} aria-label={t("talents.close")}>
         ×
       </button>
@@ -56,7 +56,7 @@ export function TalentPanel({ ranks, free, seasonBestWave, onRaise, onReset, onC
         </button>
       </div>
 
-      <div style={gridStyle}>
+      <div className="hn-stagger" style={gridStyle}>
         {TALENT_BRANCHES.map((branch) => (
           <div key={branch} style={columnStyle}>
             <div style={{ ...branchTitle, color: BRANCH_COLOR[branch] }}>{t(`talents.branches.${branch}` as TranslationKey)}</div>

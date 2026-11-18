@@ -23,8 +23,8 @@ interface ItemDetailsModalProps {
 /** Item Details — Item System spec sections 8/13/22: rarity, category, lore, effects (declarative, see itemDefinitions.ts header), source, tradable/soulbound, and full trade history for this exact instance. */
 export function ItemDetailsModal({ item, onClose, gemShards, onReroll, equippedOn }: ItemDetailsModalProps) {
   return (
-    <div style={overlayStyle} onClick={onClose}>
-      <div style={cardStyle} onClick={(e) => e.stopPropagation()} className="hn-item-details-card">
+    <div className="hn-page" style={overlayStyle} onClick={onClose}>
+      <div style={cardStyle} onClick={(e) => e.stopPropagation()} className="hn-item-details-card hn-pop">
         <button onClick={onClose} style={closeButtonStyle} aria-label="×">
           ×
         </button>

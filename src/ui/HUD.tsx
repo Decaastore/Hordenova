@@ -3,6 +3,7 @@ import { GAME_SPEEDS, type GameSpeed } from "@/config/gameBalance";
 import type { HudSnapshot } from "@/engine/GameEngine";
 import { PALETTE } from "@/rendering/theme";
 import { counterOf, type WaveElement } from "@/config/waveElements";
+import { ELEMENT_GLYPH } from "./BlessingCard";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getSfxVolume, isSfxMuted, setSfxVolume, SFX_VOLUME_STEPS, toggleSfxMuted } from "@/audio/audioSettings";
@@ -11,6 +12,7 @@ import { getPhaseForWave, isMainBossWave, isMiniBossWaveInPhase } from "@/config
 import { riftRewardPct } from "@/config/rifts";
 import { romanDepth } from "@/config/eternal";
 import { BrandLogo } from "./BrandLogo";
+import { BestiaryIcon, EternalIcon, ExpeditionIcon, ForgeIcon, RiftIcon, TalentIcon } from "./hudIcons";
 import { cycleMapBrightness, getMapBrightness } from "@/rendering/mapBrightness";
 import { BagIcon, BoltIcon, CastleIcon, ScrollIcon, CoinIcon, GemIcon, GemShardIcon, ShieldIcon, SpeakerIcon } from "./icons";
 
@@ -169,62 +171,62 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
             ))}
           </div>
           {onToggleMissions && (
-            <button onClick={onToggleMissions} className="hh-btn" data-testid="missions-button" title={t("hud.missionsTooltip")}>
-              <ScrollIcon size={13} />
+            <button onClick={onToggleMissions} className={`hh-btn${hud.missionsClaimable > 0 ? " is-live" : ""}`} data-testid="missions-button" title={t("hud.missionsTooltip")}>
+              <span className="hh-ico hh-ico-scroll"><ScrollIcon size={14} /></span>
               <span className="hh-btn-txt">{t("missions.button")}</span>
               {hud.missionsClaimable > 0 && <span className="hh-badge">{hud.missionsClaimable}</span>}
             </button>
           )}
           {onToggleExpeditions && (
-            <button onClick={onToggleExpeditions} className="hh-btn" data-testid="expeditions-button" title={t("expeditions.tooltip")}>
-              <span aria-hidden="true" className="hh-talent-glyph">⚑</span>
+            <button onClick={onToggleExpeditions} className={`hh-btn${hud.expeditions.ready > 0 ? " is-live" : ""}`} data-testid="expeditions-button" title={t("expeditions.tooltip")}>
+              <span className="hh-ico"><ExpeditionIcon size={14} color={PALETTE.uiAccentBright} /></span>
               <span className="hh-btn-txt">{t("expeditions.button")}</span>
               {hud.expeditions.ready > 0 && <span className="hh-badge">{hud.expeditions.ready}</span>}
             </button>
           )}
           {onToggleForge && (
-            <button onClick={onToggleForge} className="hh-btn" data-testid="forge-button" title={t("expeditions.forgeTooltip")}>
-              <span aria-hidden="true" className="hh-talent-glyph">⚒</span>
+            <button onClick={onToggleForge} className={`hh-btn${hud.expeditions.forgeReady ? " is-live" : ""}`} data-testid="forge-button" title={t("expeditions.forgeTooltip")}>
+              <span className="hh-ico"><ForgeIcon size={14} color={PALETTE.uiAccentBright} /></span>
               <span className="hh-btn-txt">{t("expeditions.forgeButton")}</span>
               {hud.expeditions.forgeReady && <span className="hh-badge">1</span>}
             </button>
           )}
           {onToggleEternal && hud.eternal.active && (
             <button onClick={onToggleEternal} className="hh-btn hh-rift hh-eternal-btn" data-testid="eternal-button" title={t("eternal.tooltip")}>
-              <span aria-hidden="true" className="hh-rift-glyph">◆</span>
+              <span className="hh-ico"><EternalIcon size={14} color="#c99cff" /></span>
               <span className="hh-btn-txt">{t("eternal.button")}</span>
               {hud.eternal.contractsReady > 0 && <span className="hh-badge is-rift">{hud.eternal.contractsReady}</span>}
             </button>
           )}
           {onToggleTalents && (
-            <button onClick={onToggleTalents} className="hh-btn" data-testid="talents-button" title={t("talents.tooltip")}>
-              <span aria-hidden="true" className="hh-talent-glyph">✦</span>
+            <button onClick={onToggleTalents} className={`hh-btn${hud.talents.free > 0 ? " is-live" : ""}`} data-testid="talents-button" title={t("talents.tooltip")}>
+              <span className="hh-ico"><TalentIcon size={14} color={PALETTE.uiAccentBright} /></span>
               <span className="hh-btn-txt">{t("talents.button")}</span>
               {hud.talents.free > 0 && <span className="hh-badge">{hud.talents.free}</span>}
             </button>
           )}
           {onToggleRift && (
-            <button onClick={onToggleRift} className={`hh-btn hh-rift${hud.rift.charges > 0 && !hud.rift.armed && !hud.rift.active ? " is-ready" : ""}`} data-testid="rift-button" title={t("rift.tooltip")}>
-              <span aria-hidden="true" className="hh-rift-glyph">◈</span>
+            <button onClick={onToggleRift} className={`hh-btn hh-rift${hud.rift.charges > 0 && !hud.rift.armed && !hud.rift.active ? " is-ready is-live" : ""}`} data-testid="rift-button" title={t("rift.tooltip")}>
+              <span className="hh-ico"><RiftIcon size={14} color="#c99cff" /></span>
               <span className="hh-btn-txt">{t("rift.button")}</span>
               {hud.rift.charges > 0 && <span className="hh-badge is-rift">{hud.rift.charges}</span>}
             </button>
           )}
           {onToggleCity && (
             <button onClick={onToggleCity} className="hh-btn" data-testid="city-button" title={t("hud.cityTooltip")}>
-              <CastleIcon size={13} />
+              <span className="hh-ico hh-ico-castle"><CastleIcon size={14} /></span>
               <span className="hh-btn-txt">{t("city.button")}</span>
               {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
             </button>
           )}
           {onToggleBestiary && (
             <button onClick={onToggleBestiary} className="hh-btn" data-testid="bestiary-button" title={t("bestiary.tooltip")}>
-              <span aria-hidden="true" className="hh-talent-glyph">♛</span>
+              <span className="hh-ico"><BestiaryIcon size={14} color={PALETTE.uiAccentBright} /></span>
               <span className="hh-btn-txt">{t("bestiary.button")}</span>
             </button>
           )}
           <button onClick={onOpenInventory} className="hh-btn" title={t("hud.inventoryTooltip")}>
-            <BagIcon size={13} />
+            <span className="hh-ico hh-ico-bag"><BagIcon size={14} /></span>
             <span className="hh-btn-txt">{t("inventory.button")}</span>
           </button>
           <span className="hh-divider" aria-hidden="true" />
@@ -268,17 +270,31 @@ const ELEMENT_COLORS: Record<WaveElement, string> = { FIRE: "#ff7a2a", ICE: "#8f
 const ELEMENT_TOWER_NAME: Record<WaveElement, string> = { FIRE: "Inferno", ICE: "Frostborn", STORM: "Stormcaller", NATURE: "Ironwood" };
 
 /** ELEMENTO DA ONDA — this wave's element and which tower it favours, the next wave's, and any blessing. */
+/** The element's symbol in a small glowing coin, before its name in the HUD. */
+function ElementDot({ el }: { el: WaveElement }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="hn-glow"
+      style={{ display: "inline-block", marginRight: 4, fontSize: 11, ["--hn-glow" as string]: ELEMENT_COLORS[el] }}
+    >
+      {ELEMENT_GLYPH[el]}
+    </span>
+  );
+}
+
 function ElementLine({ hud, t }: { hud: HudSnapshot; t: Translate }) {
   const name = (el: WaveElement) => t(`hud.element.names.${el}` as TranslationKey);
   return (
     <span className="hh-threat" style={{ display: "inline-flex", gap: 10 }}>
       {hud.waveElement && (
-        <span style={{ color: ELEMENT_COLORS[hud.waveElement] }}>
+        <span key={`w${hud.wave}`} className="hn-pop" style={{ color: ELEMENT_COLORS[hud.waveElement] }}>
+          <ElementDot el={hud.waveElement} />
           {t("hud.element.wave", { el: name(hud.waveElement), tower: ELEMENT_TOWER_NAME[counterOf(hud.waveElement)] })}
         </span>
       )}
-      {!hud.waveElement && hud.nextWaveElement && <span style={{ color: ELEMENT_COLORS[hud.nextWaveElement] }}>{t("hud.element.next", { el: name(hud.nextWaveElement) })}</span>}
-      {hud.blessing && <span style={{ color: ELEMENT_COLORS[hud.blessing.element] }}>✦ {t("hud.element.blessed", { el: name(hud.blessing.element), wave: hud.blessing.untilWave })}</span>}
+      {!hud.waveElement && hud.nextWaveElement && <span key={`n${hud.wave}`} className="hn-pop" style={{ color: ELEMENT_COLORS[hud.nextWaveElement] }}><ElementDot el={hud.nextWaveElement} />{t("hud.element.next", { el: name(hud.nextWaveElement) })}</span>}
+      {hud.blessing && <span key={`b${hud.blessing.element}${hud.blessing.untilWave}`} className="hn-pop" style={{ color: ELEMENT_COLORS[hud.blessing.element] }}><span className="hn-glow" style={{ display: "inline-block", ["--hn-glow" as string]: ELEMENT_COLORS[hud.blessing.element] }}>✦</span> {t("hud.element.blessed", { el: name(hud.blessing.element), wave: hud.blessing.untilWave })}</span>}
     </span>
   );
 }
@@ -531,8 +547,57 @@ div.hh-brand { cursor: default; }
 .hh-btn { position: relative; display: flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 6px;
   border: 1px solid ${PALETTE.uiPanelBorder}; background: linear-gradient(180deg, #3d2c1a, #2e2013);
   color: ${PALETTE.uiText}; font-weight: 700; font-size: 10.5px; letter-spacing: 0.5px; cursor: pointer; white-space: nowrap;
-  transition: border-color 120ms ease, color 120ms ease; }
-.hh-btn:hover { border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; }
+  transition: border-color 140ms ease, color 140ms ease, transform 160ms cubic-bezier(.2,.8,.2,1), box-shadow 180ms ease; }
+.hh-btn:hover { border-color: ${PALETTE.uiAccent}; color: ${PALETTE.uiAccentBright}; transform: translateY(-1.5px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35), 0 0 10px rgba(255,200,90,0.18); }
+.hh-btn:active { transform: translateY(0) scale(0.96); transition-duration: 60ms; }
+.hh-btn::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; opacity: 0;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,235,190,0.22) 50%, transparent 70%); background-size: 250% 100%; background-position: 120% 0; }
+.hh-btn:hover::after { opacity: 1; animation: hh-sweep 650ms ease-out; }
+@keyframes hh-sweep { from { background-position: 120% 0; } to { background-position: -40% 0; } }
+
+/* the drawn icons: each has a part that moves on hover, and keeps moving while something is ready */
+.hh-ico { display: inline-flex; line-height: 0; transition: transform 200ms cubic-bezier(.34,1.56,.64,1); }
+.hh-btn:hover .hh-ico { transform: scale(1.18) rotate(-4deg); }
+.hh-ico svg * { transform-box: fill-box; }
+.hni-flag { transform-origin: 0% 50%; }
+.hh-btn:hover .hni-flag, .hh-btn.is-live .hni-flag { animation: hni-wave 0.9s ease-in-out infinite; }
+@keyframes hni-wave { 0%,100% { transform: skewY(0) scaleX(1); } 50% { transform: skewY(-7deg) scaleX(0.9); } }
+.hni-hammer { transform-origin: 100% 0%; }
+.hh-btn:hover .hni-hammer, .hh-btn.is-live .hni-hammer { animation: hni-strike 0.7s cubic-bezier(.5,0,.75,0) infinite; }
+@keyframes hni-strike { 0%,100% { transform: rotate(-22deg); } 55% { transform: rotate(14deg); } 65% { transform: rotate(8deg); } }
+.hni-sparks { opacity: 0; transform-origin: 50% 100%; }
+.hh-btn:hover .hni-sparks, .hh-btn.is-live .hni-sparks { animation: hni-spark 0.7s ease-out infinite; }
+@keyframes hni-spark { 0%,50% { opacity: 0; transform: scale(0.4); } 60% { opacity: 1; transform: scale(1); } 100% { opacity: 0; transform: scale(1.4) translateY(-2px); } }
+.hni-star { transform-origin: 50% 50%; }
+.hh-btn:hover .hni-star, .hh-btn.is-live .hni-star { animation: hni-twinkle 1.2s ease-in-out infinite; }
+.hni-star-b { animation-delay: 0.25s !important; }
+.hni-star-c { animation-delay: 0.5s !important; }
+@keyframes hni-twinkle { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.55; } }
+.hni-spin { transform-origin: 50% 50%; transform-box: view-box !important; animation: hni-turn 9s linear infinite; }
+.hh-btn:hover .hni-spin, .hh-btn.is-live .hni-spin { animation-duration: 1.6s; }
+@keyframes hni-turn { to { transform: rotate(360deg); } }
+.hni-core { transform-origin: 50% 50%; }
+.hh-btn.is-live .hni-core, .hh-btn:hover .hni-core { animation: hni-twinkle 1.1s ease-in-out infinite; }
+.hni-flip { transform-origin: 50% 50%; transform-box: view-box !important; }
+.hh-btn:hover .hni-flip { animation: hni-hourglass 1.4s cubic-bezier(.65,0,.35,1) infinite; }
+@keyframes hni-hourglass { 0%,40% { transform: rotate(0); } 60%,100% { transform: rotate(180deg); } }
+.hh-btn:hover .hni-eye { animation: hni-eyes 0.9s ease-in-out infinite; }
+@keyframes hni-eyes { 0%,100% { fill: currentColor; filter: none; } 50% { fill: #ff4a2a; stroke: #ff4a2a; filter: drop-shadow(0 0 2px #ff4a2a); } }
+.hh-ico-scroll, .hh-ico-bag, .hh-ico-castle { transform-origin: 50% 100%; }
+.hh-btn:hover .hh-ico-scroll, .hh-btn.is-live .hh-ico-scroll { animation: hni-unroll 0.8s ease-in-out infinite; }
+@keyframes hni-unroll { 0%,100% { transform: scale(1.15) rotate(-6deg); } 50% { transform: scale(1.15) rotate(6deg); } }
+.hh-btn:hover .hh-ico-bag { animation: hni-bounce 0.6s cubic-bezier(.34,1.56,.64,1) infinite alternate; }
+@keyframes hni-bounce { from { transform: scale(1.1) translateY(0); } to { transform: scale(1.18, 1.05) translateY(-2px); } }
+.hh-btn:hover .hh-ico-castle { animation: hni-bounce 0.7s ease-in-out infinite alternate; }
+
+/* a badge means "something waiting for you": it breathes */
+.hh-badge { animation: hh-badge-pulse 1.8s ease-in-out infinite; }
+@keyframes hh-badge-pulse { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,200,90,0.6); } 50% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(255,200,90,0); } }
+.hh-badge.is-rift { animation-name: hh-badge-pulse-rift; }
+@keyframes hh-badge-pulse-rift { 0%,100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(180,124,255,0.6); } 50% { transform: scale(1.15); box-shadow: 0 0 0 5px rgba(180,124,255,0); } }
+.hh-rift.is-ready { animation: hh-rift-glow 2.2s ease-in-out infinite; }
+@keyframes hh-rift-glow { 0%,100% { box-shadow: 0 0 6px rgba(180,124,255,0.3); } 50% { box-shadow: 0 0 16px rgba(180,124,255,0.65); } }
 .hh-btn-icon { padding: 5px 7px; }
 .hh-pair { display: flex; gap: 3px; }
 .hh-divider { width: 1px; height: 18px; background: rgba(255,214,140,0.18); margin: 0 4px; }
@@ -566,5 +631,7 @@ div.hh-brand { cursor: default; }
 }
 @media (prefers-reduced-motion: reduce) {
   .hh-castle-fill, .hh-tick, .hh-speed-btn, .hh-btn { transition: none; }
+  .hh-btn, .hh-btn:hover, .hh-ico, .hh-btn:hover .hh-ico { transform: none !important; }
+  .hh-btn::after, .hh-badge, .hh-rift.is-ready, .hh-ico, .hh-ico *, .hni-spin { animation: none !important; }
 }
 `;

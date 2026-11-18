@@ -15,13 +15,13 @@ interface DailyMissionsPanelProps {
 export function DailyMissionsPanel({ missions, onClaim, onClose }: DailyMissionsPanelProps) {
   const { t } = useLanguage();
   return (
-    <div style={panelStyle} role="dialog" aria-label={t("missions.title")} data-testid="missions-panel">
+    <div className="hn-pop" style={panelStyle} role="dialog" aria-label={t("missions.title")} data-testid="missions-panel">
       <button onClick={onClose} style={closeStyle} aria-label={t("missions.close")}>
         ×
       </button>
       <div style={titleStyle}>{t("missions.title")}</div>
       <div style={subStyle}>{t("missions.resets")}</div>
-      <div style={{ display: "grid", gap: 10, marginTop: 12 }}>
+      <div className="hn-stagger" style={{ display: "grid", gap: 10, marginTop: 12 }}>
         {missions.map((m, i) => {
           const done = m.progress >= m.target;
           return (
