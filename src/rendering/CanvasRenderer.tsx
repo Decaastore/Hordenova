@@ -25,7 +25,7 @@ import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
-import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake } from "./groundBakes";
+import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
 import { pruneTowerAims, steerTowerAim } from "./towerSprites";
@@ -474,7 +474,9 @@ export function CanvasRenderer({
       // Baked ground (terrain + road + static scenery pre-rendered with real
       // light/shadow) replaces the live ground/road/scenery drawing for the
       // biomes that have one; the 3D terrain layer stands down for them too.
-      const groundBake = getGroundBake(biome.id);
+      const rawBake = getGroundBake(biome.id);
+      // with the 3D lava pools showing, the painted ones come out of the ground image
+      const groundBake = rawBake && PROPS_3D.active && biome.liquidGlows ? withoutLavaPools(rawBake, biome) : rawBake;
       // the hybrid 3D layer builds the light towers and lava pools itself: leave the flat ones out
       const with3dProps = (base: ReadonlySet<DecorationKind> | undefined) =>
         PROPS_3D.active ? new Set<DecorationKind>([...(base ?? []), "TORCH", ...(biome.liquidGlows ? (["WATER"] as const) : [])]) : base;

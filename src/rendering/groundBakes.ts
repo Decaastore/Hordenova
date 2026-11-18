@@ -70,9 +70,101 @@ const GROUND_BAKES: Record<string, GroundBakeDef> = {
 
 export interface LoadedGroundBake {
   def: GroundBakeDef;
-  ground: HTMLImageElement;
-  emissive: HTMLImageElement | null;
+  ground: HTMLImageElement | HTMLCanvasElement;
+  emissive: HTMLImageElement | HTMLCanvasElement | null;
   skipKinds: ReadonlySet<DecorationKind>;
+}
+
+const imgW = (i: HTMLImageElement | HTMLCanvasElement) => ("naturalWidth" in i ? i.naturalWidth : i.width);
+const imgH = (i: HTMLImageElement | HTMLCanvasElement) => ("naturalHeight" in i ? i.naturalHeight : i.height);
+
+const poolless = new Map<string, LoadedGroundBake>();
+/**
+ * The same baked ground with its painted lava pools taken out — used while the hybrid 3D layer
+ * builds the pools itself, so the 3D pool never sits on top of the old painted one. Each pool is
+ * covered with a patch of the ground right next to it (blended in with a soft round edge), and its
+ * glow is erased from the emissive layer. Made once per map.
+ */
+export function withoutLavaPools(bake: LoadedGroundBake, biome: BiomeDefinition): LoadedGroundBake {
+  const hit = poolless.get(biome.id);
+  if (hit) return hit;
+  const { def } = bake;
+  const pools = getMapDecorations(biome).filter((d) => d.kind === "WATER");
+  if (!pools.length || typeof document === "undefined") return bake;
+  const W = def.x1 - def.x0, H = def.y1 - def.y0;
+  const gw = imgW(bake.ground), gh = imgH(bake.ground);
+  const kx = gw / W, ky = gh / H;
+  const ground = document.createElement("canvas");
+  ground.width = gw;
+  ground.height = gh;
+  const g = ground.getContext("2d")!;
+  g.drawImage(bake.ground, 0, 0);
+  const road = getMapLayout(biome.id).path;
+  const nearRoad = (x: number, y: number, r: number) => {
+    for (let i = 1; i < road.length; i++) {
+      const a = road[i - 1]!, b = road[i]!;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(a.x + dx * t - x, a.y + dy * t - y) < r + 34) return true;
+    }
+    return false;
+  };
+  const tmp = document.createElement("canvas");
+  for (const d of pools) {
+    const R = 34 * 1.55 * d.scale;
+    // a donor patch of plain ground beside the pool: clear of the road and of other pools
+    let best: { x: number; y: number } | null = null;
+    for (let i = 0; i < 16 && !best; i++) {
+      const a = (i / 16) * Math.PI * 2;
+      const x = d.position.x + Math.cos(a) * R * 2.3, y = d.position.y + Math.sin(a) * R * 2.3;
+      if (x - R < def.x0 || y - R < def.y0 || x + R > def.x1 || y + R > def.y1) continue;
+      if (nearRoad(x, y, R)) continue;
+      if (pools.some((o) => o !== d && Math.hypot(o.position.x - x, o.position.y - y) < R + 34 * 1.55 * o.scale)) continue;
+      best = { x, y };
+    }
+    if (!best) best = { x: d.position.x + R * 2.3, y: d.position.y };
+    const pw = Math.ceil(R * 2 * kx), ph = Math.ceil(R * 2 * ky);
+    tmp.width = pw;
+    tmp.height = ph;
+    const t = tmp.getContext("2d")!;
+    t.clearRect(0, 0, pw, ph);
+    t.drawImage(bake.ground, (best.x - R - def.x0) * kx, (best.y - R - def.y0) * ky, pw, ph, 0, 0, pw, ph);
+    // soft round edge so the patch melts into what is round it
+    t.globalCompositeOperation = "destination-in";
+    const gr = t.createRadialGradient(pw / 2, ph / 2, Math.min(pw, ph) * 0.3, pw / 2, ph / 2, Math.min(pw, ph) / 2);
+    gr.addColorStop(0, "rgba(0,0,0,1)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    t.fillStyle = gr;
+    t.fillRect(0, 0, pw, ph);
+    t.globalCompositeOperation = "source-over";
+    g.save();
+    g.translate((d.position.x - def.x0) * kx, (d.position.y - def.y0) * ky);
+    g.drawImage(tmp, -pw / 2, -ph / 2);
+    g.restore();
+  }
+  let emissive: HTMLCanvasElement | null = null;
+  if (bake.emissive) {
+    const ew = imgW(bake.emissive), eh = imgH(bake.emissive);
+    emissive = document.createElement("canvas");
+    emissive.width = ew;
+    emissive.height = eh;
+    const e = emissive.getContext("2d")!;
+    e.drawImage(bake.emissive, 0, 0);
+    e.globalCompositeOperation = "destination-out";
+    const ex = ew / W, ey = eh / H;
+    for (const d of pools) {
+      const R = 34 * 1.7 * d.scale;
+      const cx = (d.position.x - def.x0) * ex, cy = (d.position.y - def.y0) * ey;
+      const gr = e.createRadialGradient(cx, cy, R * ex * 0.55, cx, cy, R * ex);
+      gr.addColorStop(0, "rgba(0,0,0,1)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      e.fillStyle = gr;
+      e.fillRect(cx - R * ex, cy - R * ey, R * 2 * ex, R * 2 * ey);
+    }
+  }
+  const out: LoadedGroundBake = { def, ground, emissive, skipKinds: bake.skipKinds };
+  poolless.set(biome.id, out);
+  return out;
 }
 
 const cache = new Map<string, { ground: HTMLImageElement; emissive: HTMLImageElement | null; ready: boolean; skip: ReadonlySet<DecorationKind> }>();
@@ -164,8 +256,8 @@ export function drawGroundEmissive(ctx: CanvasRenderingContext2D, bake: LoadedGr
   if (!emissive || gain <= 0) return;
   const w = def.x1 - def.x0;
   const h = def.y1 - def.y0;
-  const sx = emissive.naturalWidth / w;
-  const sy = emissive.naturalHeight / h;
+  const sx = imgW(emissive) / w;
+  const sy = imgH(emissive) / h;
   ctx.save();
   ctx.globalCompositeOperation = "lighter";
   if (def.glow === "global") {

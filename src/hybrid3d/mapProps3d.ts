@@ -48,73 +48,7 @@ function halo() {
   return haloTex;
 }
 
-/** Molten rock: hot swirls, darker cooling veins. Tiles, so it can flow. */
-let lavaTex: THREE.CanvasTexture | null = null;
-function lavaTexture() {
-  if (lavaTex) return lavaTex;
-  const c = document.createElement("canvas");
-  c.width = c.height = 256;
-  const g = c.getContext("2d")!;
-  g.fillStyle = "#c83a08";
-  g.fillRect(0, 0, 256, 256);
-  const r = rng(77);
-  for (let i = 0; i < 140; i++) {
-    const x = r() * 256, y = r() * 256, rad = 8 + r() * 30;
-    for (const [dx, dy] of [[0, 0], [256, 0], [-256, 0], [0, 256], [0, -256]] as const) {
-      const gr = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, rad);
-      const hot = r() < 0.5 ? "255,220,120" : "255,140,40";
-      gr.addColorStop(0, `rgba(${hot},0.8)`);
-      gr.addColorStop(1, "rgba(255,90,20,0)");
-      g.fillStyle = gr;
-      g.fillRect(x + dx - rad, y + dy - rad, rad * 2, rad * 2);
-    }
-  }
-  lavaTex = new THREE.CanvasTexture(c);
-  lavaTex.wrapS = lavaTex.wrapT = THREE.RepeatWrapping;
-  lavaTex.colorSpace = THREE.SRGBColorSpace;
-  return lavaTex;
-}
 
-/** Dark cooling crust plates with bright cracks between them (transparent where the lava shows). */
-let crustTex: THREE.CanvasTexture | null = null;
-function crustTexture() {
-  if (crustTex) return crustTex;
-  const c = document.createElement("canvas");
-  c.width = c.height = 256;
-  const g = c.getContext("2d")!;
-  const r = rng(91);
-  // thin cooling veins first, then a few drifting plates of crust
-  g.lineCap = "round";
-  for (let i = 0; i < 22; i++) {
-    g.strokeStyle = `rgba(40,16,8,${0.35 + r() * 0.3})`;
-    g.lineWidth = 2 + r() * 3;
-    g.beginPath();
-    let x = r() * 256, y = r() * 256;
-    g.moveTo(x, y);
-    for (let k = 0; k < 4; k++) {
-      x += (r() - 0.5) * 60;
-      y += (r() - 0.5) * 60;
-      g.lineTo(x, y);
-    }
-    g.stroke();
-  }
-  for (let i = 0; i < 9; i++) {
-    const x = r() * 256, y = r() * 256, rad = 8 + r() * 14;
-    g.fillStyle = `rgba(${50 + r() * 20},${26 + r() * 10},${16},${0.45 + r() * 0.2})`;
-    g.beginPath();
-    for (let k = 0; k < 7; k++) {
-      const a = (k / 7) * Math.PI * 2;
-      const rr = rad * (0.6 + r() * 0.5);
-      g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr);
-    }
-    g.closePath();
-    g.fill();
-  }
-  crustTex = new THREE.CanvasTexture(c);
-  crustTex.wrapS = crustTex.wrapT = THREE.RepeatWrapping;
-  crustTex.colorSpace = THREE.SRGBColorSpace;
-  return crustTex;
-}
 
 const std = (color: THREE.ColorRepresentation, rough = 0.85, metal = 0, emissive?: THREE.ColorRepresentation, ei = 0) =>
   new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: metal, emissive: emissive ?? "#000000", emissiveIntensity: ei });
@@ -222,84 +156,292 @@ export function buildTorch(deco: Decoration, biome: BiomeDefinition): LiveProp {
 }
 
 /** A sunken pool of molten rock, its crust drifting, ringed in black rock, heat and embers rising. */
+/** The molten surface: drifting crust plates (cellular noise) with white-hot seams, hotter towards the middle. */
+const LAVA_VERT = /* glsl */ `
+uniform float uTime;
+uniform float uSeed;
+varying vec2 vP;
+varying float vR;
+void main() {
+  vP = position.xz + uSeed;
+  vR = uv.x;
+  vec3 p = position;
+  // a slow, heavy swell
+  p.y += (sin(position.x * 0.09 + uTime * 0.7 + uSeed) * cos(position.z * 0.11 - uTime * 0.5)) * 0.35 * (1.0 - uv.x);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+}`;
+const LAVA_FRAG = /* glsl */ `
+uniform float uTime;
+varying vec2 vP;
+varying float vR;
+vec2 hash2(vec2 p) {
+  p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+  return fract(sin(p) * 43758.5453);
+}
+float hash1(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+float noise(vec2 p) {
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash1(i), hash1(i + vec2(1, 0)), u.x), mix(hash1(i + vec2(0, 1)), hash1(i + vec2(1, 1)), u.x), u.y);
+}
+float fbm(vec2 p) {
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * noise(p); p *= 2.03; a *= 0.5; }
+  return v;
+}
+// distance to the nearest seam between cells, and the cell's own random value
+vec2 voronoi(vec2 x, float t) {
+  vec2 n = floor(x), f = fract(x);
+  vec2 mg, mr;
+  float md = 8.0;
+  for (int j = -1; j <= 1; j++)
+    for (int i = -1; i <= 1; i++) {
+      vec2 g = vec2(float(i), float(j));
+      vec2 o = hash2(n + g);
+      o = 0.5 + 0.42 * sin(t * 0.35 + 6.2831 * o);
+      vec2 r = g + o - f;
+      float d = dot(r, r);
+      if (d < md) { md = d; mr = r; mg = g; }
+    }
+  md = 8.0;
+  for (int j = -2; j <= 2; j++)
+    for (int i = -2; i <= 2; i++) {
+      vec2 g = mg + vec2(float(i), float(j));
+      vec2 o = hash2(n + g);
+      o = 0.5 + 0.42 * sin(t * 0.35 + 6.2831 * o);
+      vec2 r = g + o - f;
+      if (dot(mr - r, mr - r) > 0.00001) md = min(md, dot(0.5 * (mr + r), normalize(r - mr)));
+    }
+  return vec2(md, hash1(n + mg));
+}
+void main() {
+  float t = uTime;
+  vec2 p = vP * 0.075;
+  // the whole surface creeps and swirls
+  vec2 warp = vec2(fbm(p * 1.3 + vec2(t * 0.05, 0.0)), fbm(p * 1.3 + vec2(0.0, -t * 0.04) + 7.0));
+  vec2 q = p + (warp - 0.5) * 1.1 + vec2(t * 0.02, t * 0.012);
+  vec2 v = voronoi(q * 1.6, t);
+  float seam = 1.0 - smoothstep(0.0, 0.11 + 0.05 * sin(t * 1.3 + v.y * 6.0), v.x);
+  // plates cool towards the bank and break up towards the middle
+  float cool = smoothstep(0.2, 0.9, vR) * 0.45 + 0.55 + 0.3 * (fbm(q * 3.0) - 0.5);
+  float plate = smoothstep(0.045, 0.13, v.x) * clamp(cool + (v.y - 0.5) * 0.7, 0.0, 1.0);
+  float heat = clamp(1.0 - plate, 0.0, 1.0);
+  heat = max(heat, seam);
+  float flick = 0.88 + 0.12 * sin(t * 2.1 + vP.x * 0.05) * sin(t * 1.7 - vP.y * 0.04);
+  vec3 crust = mix(vec3(0.05, 0.025, 0.02), vec3(0.17, 0.06, 0.03), fbm(q * 6.0));
+  // the crust still glows dull red where it is thin, near the seams
+  crust += vec3(0.35, 0.06, 0.0) * smoothstep(0.22, 0.05, v.x) * plate;
+  vec3 molten = mix(vec3(0.85, 0.16, 0.02), vec3(1.0, 0.5, 0.08), smoothstep(0.4, 1.0, heat));
+  molten = mix(molten, vec3(1.0, 0.82, 0.4), smoothstep(0.95, 1.0, seam) * (1.0 - vR * 0.7) * 0.8);
+  vec3 col = mix(crust, molten * flick, heat);
+  // embers glinting in the crust
+  col += vec3(1.0, 0.45, 0.1) * step(0.985, hash1(floor(vP * 1.4))) * plate * (0.5 + 0.5 * sin(t * 3.0 + vP.x));
+  gl_FragColor = vec4(col, 1.0);
+  #include <colorspace_fragment>
+}`;
+
+/**
+ * A lava pool: an irregular pit ringed with a raised lip of black basalt, its rim glowing where it
+ * meets the melt; the surface itself is crust plates drifting on white-hot seams; bubbles swell
+ * and burst; little flames lick up off the hot spots with smoke rolling away; and its light falls
+ * warm on the ground round it.
+ */
 export function buildLavaPool(deco: Decoration, biome: BiomeDefinition): LiveProp {
   const g = new THREE.Group();
   const rx = 34 * deco.scale;
   const rz = 20 * deco.scale;
   const r = rng(deco.variant * 17 + Math.round(deco.position.y));
-  const rockDark = std(biome.palette.rockDark, 0.95);
-  const rock = std(biome.palette.rock, 0.95);
-  // the dark crusted bank all round
-  const bank = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 8, 48), rock);
-  bank.rotation.x = Math.PI / 2;
-  bank.scale.set(rx + 1.5, rz + 1.5, 10);
-  bank.position.y = 0.4;
-  g.add(bank);
-  const n = Math.round((rx + rz) * 0.55);
-  for (let i = 0; i < n; i++) {
-    const a = (i / n) * Math.PI * 2 + r() * 0.2;
-    const k = 1.02 + r() * 0.12;
-    const st = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + r() * 1.8, 0), r() < 0.4 ? rockDark : rock);
-    st.position.set(Math.cos(a) * (rx + 2) * k, 0.8 + r() * 0.8, Math.sin(a) * (rz + 2) * k);
-    st.scale.y = 0.55 + r() * 0.4;
+  const seed = r() * 100;
+  // an organic outline (not an ellipse): a few slow lobes round it
+  const ph = [r() * 6.28, r() * 6.28, r() * 6.28];
+  const edge = (a: number) => 1 + 0.11 * Math.sin(3 * a + ph[0]!) + 0.07 * Math.sin(5 * a + ph[1]!) + 0.04 * Math.sin(9 * a + ph[2]!);
+  const SEG = 96;
+  const sc = Math.max(0.7, deco.scale);
+  /** the melt sits down in the pit, below the ground; the bank's inner wall climbs out of it */
+  const LAVA_Y = -2.6 * sc;
+
+  // ---- the molten surface: a polar grid out to the outline (uv.x = 0 centre → 1 bank)
+  {
+    const RINGS = 14;
+    const pos: number[] = [];
+    const uv: number[] = [];
+    const idx: number[] = [];
+    pos.push(0, 0, 0);
+    uv.push(0, 0);
+    for (let k = 1; k <= RINGS; k++) {
+      const f = k / RINGS;
+      for (let i = 0; i < SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const e = edge(a);
+        pos.push(Math.cos(a) * rx * e * f, 0, Math.sin(a) * rz * e * f);
+        uv.push(f, i / SEG);
+      }
+    }
+    for (let i = 0; i < SEG; i++) idx.push(0, 1 + ((i + 1) % SEG), 1 + i);
+    for (let k = 1; k < RINGS; k++) {
+      const a0 = 1 + (k - 1) * SEG, a1 = 1 + k * SEG;
+      for (let i = 0; i < SEG; i++) {
+        const i1 = (i + 1) % SEG;
+        idx.push(a0 + i, a0 + i1, a1 + i, a0 + i1, a1 + i1, a1 + i);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+    geo.setIndex(idx);
+    const mat = new THREE.ShaderMaterial({ vertexShader: LAVA_VERT, fragmentShader: LAVA_FRAG, uniforms: { uTime: { value: 0 }, uSeed: { value: seed } } });
+    const lava = new THREE.Mesh(geo, mat);
+    lava.position.y = LAVA_Y;
+    lava.name = "lavaSurface";
+    g.add(lava);
+  }
+
+  // ---- the basalt lip: a raised, lumpy bank from the melt's edge outwards, glowing at its inner edge
+  const glowCol = new THREE.Color("#ff5a14");
+  const rockA = new THREE.Color(biome.palette.rockDark);
+  const rockB = new THREE.Color(biome.palette.rock);
+  {
+    const BANDS = 11;
+    const pos: number[] = [];
+    const col: number[] = [];
+    const idx: number[] = [];
+    for (let k = 0; k <= BANDS; k++) {
+      const u = k / BANDS;
+      for (let i = 0; i < SEG; i++) {
+        const a = (i / SEG) * Math.PI * 2;
+        const e = edge(a);
+        const lump = 0.75 + 0.5 * Math.sin(a * 13 + ph[1]! * 3) * Math.sin(a * 7 + ph[2]!) + 0.25 * Math.sin(a * 29 + ph[0]! * 2) * Math.sin(a * 41);
+        // broken, jagged stone: every vertex nudged a little
+        const jag = (r() - 0.5) * (u > 0.04 ? 1 : 0);
+        const rad = 0.95 + u * (0.5 + 0.08 * Math.sin(a * 4 + ph[0]!));
+        // inner wall from under the melt up to a lumpy crest, then a long slope down to the ground
+        const crest = (2.6 + 2.2 * lump) * sc;
+        const CU = 0.3;
+        const hgt = u < CU ? LAVA_Y - 0.4 + (crest - LAVA_Y + 0.4) * Math.sin((u / CU) * Math.PI * 0.5) : 0.1 + (crest - 0.1) * (1 - ((u - CU) / (1 - CU)) ** 0.8);
+        const rj = rad + jag * 0.03;
+        pos.push(Math.cos(a) * rx * e * rj, hgt + jag * 1.4 * sc * Math.sin(Math.min(1, u * 2) * Math.PI * 0.5), Math.sin(a) * rz * e * rj);
+        // glowing where it meets the melt, dark basalt beyond, a little lighter on the crest
+        const c = rockA.clone().lerp(rockB, Math.max(0, Math.sin(u * Math.PI)) * 0.55 * lump).multiplyScalar(0.7 + r() * 0.55);
+        // the inner wall glows hot near the melt and fades up to the crest
+        c.lerp(glowCol, Math.max(0, 1 - u / 0.22) ** 1.5 * 0.95);
+        col.push(c.r, c.g, c.b);
+      }
+    }
+    for (let k = 0; k < BANDS; k++) {
+      const a0 = k * SEG, a1 = (k + 1) * SEG;
+      for (let i = 0; i < SEG; i++) {
+        const i1 = (i + 1) % SEG;
+        idx.push(a0 + i, a1 + i, a0 + i1, a0 + i1, a1 + i, a1 + i1);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const bankMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0.05, emissive: "#ff3a08", emissiveIntensity: 0, side: THREE.DoubleSide });
+    // the inner glow is emissive (it lights itself), the rest takes the scene light
+    bankMat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <emissivemap_fragment>",
+        "#include <emissivemap_fragment>\n  totalEmissiveRadiance += max(vec3(0.0), vColor.rgb - vec3(0.32, 0.2, 0.16)) * vec3(2.2, 1.1, 0.5);",
+      );
+    };
+    const bank = new THREE.Mesh(geo, bankMat);
+    bank.castShadow = true;
+    bank.receiveShadow = true;
+    g.add(bank);
+  }
+  // a few fallen boulders on the bank
+  const boulderMat = std(biome.palette.rockDark, 0.95);
+  const nb = 8 + Math.floor(r() * 6);
+  for (let i = 0; i < nb; i++) {
+    const a = r() * Math.PI * 2;
+    const e = edge(a) * (1.06 + r() * 0.12);
+    const st = new THREE.Mesh(new THREE.DodecahedronGeometry((1.2 + r() * 2.6) * Math.max(0.7, deco.scale), 0), boulderMat);
+    st.position.set(Math.cos(a) * rx * e, (3 + r() * 2.5) * sc, Math.sin(a) * rz * e);
+    st.scale.y = 0.5 + r() * 0.4;
     st.rotation.set(r() * 3, r() * 3, r() * 3);
+    st.castShadow = true;
     g.add(st);
   }
-  // the molten surface, a little below the bank
-  const lavaMat = new THREE.MeshStandardMaterial({ color: "#ff6a1a", map: lavaTexture().clone(), emissive: "#ff5a10", emissiveMap: lavaTexture().clone(), emissiveIntensity: 1.6, roughness: 0.55 });
-  for (const tex of [lavaMat.map!, lavaMat.emissiveMap!]) {
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.repeat.set(rx / 30, rz / 30);
-    tex.needsUpdate = true;
-  }
-  const lava = new THREE.Mesh(new THREE.CircleGeometry(1, 48), lavaMat);
-  lava.rotation.x = -Math.PI / 2;
-  lava.scale.set(rx, rz, 1);
-  lava.position.y = 0.35;
-  g.add(lava);
-  // drifting crust plates on top of it
-  const crustMat = new THREE.MeshStandardMaterial({ map: crustTexture().clone(), transparent: true, roughness: 0.9, depthWrite: false });
-  crustMat.map!.wrapS = crustMat.map!.wrapT = THREE.RepeatWrapping;
-  crustMat.map!.repeat.set(rx / 26, rz / 26);
-  crustMat.map!.needsUpdate = true;
-  const crust = new THREE.Mesh(new THREE.CircleGeometry(0.97, 48), crustMat);
-  crust.rotation.x = -Math.PI / 2;
-  crust.scale.set(rx, rz, 1);
-  crust.position.y = 0.45;
-  g.add(crust);
-  // heat glow spilling over the bank onto the ground
-  const heat = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ map: halo(), color: "#ff6a1a", transparent: true, opacity: 0.45, blending: THREE.AdditiveBlending, depthWrite: false }));
+  // heat spilling over onto the ground, and the pool's own warm light
+  const heat = new THREE.Mesh(new THREE.CircleGeometry(1, 40), new THREE.MeshBasicMaterial({ map: halo(), color: "#ff5a14", transparent: true, opacity: 0.4, blending: THREE.AdditiveBlending, depthWrite: false }));
   heat.rotation.x = -Math.PI / 2;
-  heat.scale.set(rx * 1.9, rz * 2.1, 1);
-  heat.position.y = 0.2;
+  heat.scale.set(rx * 2.1, rz * 2.3, 1);
+  heat.position.y = 0.25;
   g.add(heat);
-  g.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (m.isMesh && m.material === rock) m.castShadow = true;
+  const light = new THREE.PointLight("#ff6a1a", 900, Math.max(rx, rz) * 3.2, 1.6);
+  light.position.set(0, Math.max(rx, rz) * 0.55, 0);
+  g.add(light);
+
+  // ---- bubbles: domes of melt that swell, wobble and burst
+  const bubbleMat = new THREE.MeshStandardMaterial({ color: "#3a1206", emissive: "#ff4a08", emissiveIntensity: 0.9, roughness: 0.3, metalness: 0.2 });
+  const bubbleGeo = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2);
+  const bubbles = Array.from({ length: 6 }, () => {
+    const m = new THREE.Mesh(bubbleGeo, bubbleMat);
+    m.visible = false;
+    g.add(m);
+    return { m, t: -r() * 2, life: 1, size: 1 };
   });
-  const seed = r() * 100;
-  let bubbleT = 0;
-  const local = new THREE.Vector3();
+  const lavaMesh = g.getObjectByName("lavaSurface") as THREE.Mesh;
+  const lavaMat = lavaMesh.material as THREE.ShaderMaterial;
+  const insidePoint = (spread = 0.75) => {
+    const a = r() * Math.PI * 2, d = Math.sqrt(r()) * spread * edge(a);
+    return new THREE.Vector3(Math.cos(a) * rx * d, LAVA_Y + 0.3, Math.sin(a) * rz * d);
+  };
+  let smokeT = 0;
+  let flameT = 0;
+  const hot = Array.from({ length: 3 + Math.floor(r() * 3) }, () => insidePoint(0.6));
+  const world = (v: THREE.Vector3, at: (l: THREE.Vector3) => THREE.Vector3) => at(v.clone().applyEuler(g.rotation).add(g.position));
+
   return {
     group: g,
     update(t, dt, fx, at) {
-      // the molten rock flows and breathes, the crust drifts the other way
-      lavaMat.map!.offset.set(t * 0.012, t * 0.007);
-      lavaMat.emissiveMap!.offset.copy(lavaMat.map!.offset);
-      crustMat.map!.offset.set(-t * 0.006, t * 0.004);
-      lavaMat.emissiveIntensity = 1.4 + 0.35 * Math.sin(t * 0.9 + seed);
-      (heat.material as THREE.MeshBasicMaterial).opacity = 0.38 + 0.1 * Math.sin(t * 0.9 + seed);
-      bubbleT -= dt;
-      if (bubbleT <= 0) {
-        bubbleT = 0.25 + r() * 0.6;
-        const a = r() * Math.PI * 2, d = Math.sqrt(r()) * 0.8;
-        local.set(Math.cos(a) * rx * d, 1, Math.sin(a) * rz * d).applyEuler(g.rotation);
-        local.add(g.position);
-        const p = at(local);
-        // a bubble bursts: a pop of molten spray, embers lifting off, a breath of heat haze
-        fx.glow.emit(p, { count: 6, color: "#ffe08a", colorEnd: "#ff3a0a", size: 1.4, life: 0.7, speed: 18, up: 14, gravity: 40, drag: 1, radius: 1 });
-        if (r() < 0.5) fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: "#ff4a0a", size: 1.2, life: 1.8, speed: 3, up: 18, drag: 0.3, radius: 2 });
-        if (r() < 0.25) fx.smoke.emit(p, { count: 1, color: "#5a4a40", colorEnd: "#1e1814", size: 6, life: 2.2, speed: 2, up: 10, grow: 2.6, alpha: 0.18, radius: 3 });
+      lavaMat.uniforms.uTime!.value = t;
+      const breathe = 0.5 + 0.5 * Math.sin(t * 0.9 + seed);
+      (heat.material as THREE.MeshBasicMaterial).opacity = 0.32 + 0.14 * breathe;
+      light.intensity = 760 + 260 * breathe + 120 * Math.sin(t * 7.3 + seed) * Math.sin(t * 3.1);
+      for (const b of bubbles) {
+        b.t += dt;
+        if (b.t < 0) continue;
+        if (!b.m.visible) {
+          const p = insidePoint(0.72);
+          b.m.position.set(p.x, LAVA_Y, p.z);
+          b.size = (1.6 + r() * 2.8) * Math.max(0.7, deco.scale);
+          b.life = 0.9 + r() * 1.2;
+          b.m.visible = true;
+        }
+        const k = b.t / b.life;
+        if (k >= 1) {
+          // it bursts: a ring of molten spray, a puff of smoke, embers lifting
+          const p = world(b.m.position.clone().setY(LAVA_Y + 1.2), at);
+          fx.glow.emit(p, { count: 14, color: "#fff0b0", colorEnd: "#ff3a0a", size: 1.6, life: 0.7, speed: 26 + b.size * 4, up: 22, gravity: 70, drag: 1, radius: b.size * 0.5 });
+          fx.smoke.emit(p, { count: 2, color: "#4a3a32", colorEnd: "#16100c", size: b.size * 2.4, life: 2.4, speed: 4, up: 14, grow: 2.8, alpha: 0.32, radius: b.size * 0.4 });
+          fx.rings.ring(p.clone().setY(LAVA_Y + 0.5), "#ffb050", b.size * 0.6, b.size * 2.4, 0.35);
+          b.m.visible = false;
+          b.t = -(0.2 + r() * 1.4);
+          continue;
+        }
+        // swells (with a wobble), stretching up just before it goes
+        const s = b.size * Math.pow(k, 0.6) * (1 + 0.08 * Math.sin(b.t * 18));
+        b.m.scale.set(s, s * (0.55 + 0.45 * k * k), s);
+      }
+      // smoke rolling up off the melt, darker and heavier over the hot spots
+      smokeT -= dt;
+      if (smokeT <= 0) {
+        smokeT = 0.09 + r() * 0.12;
+        const p = world(r() < 0.6 ? hot[Math.floor(r() * hot.length)]!.clone().add(new THREE.Vector3((r() - 0.5) * 6, 0, (r() - 0.5) * 6)) : insidePoint(0.85), at);
+        fx.smoke.emit(p.setY(LAVA_Y + 3), { count: 1, color: r() < 0.5 ? "#6a5a50" : "#463a32", colorEnd: "#16120f", size: (8 + r() * 7) * sc, life: 3.4 + r() * 1.6, speed: 3, up: 18 + r() * 10, grow: 3.4, alpha: 0.34, drag: 0.2, radius: 2 });
+      }
+      // little flames licking up off the hottest spots, embers drifting away
+      flameT -= dt;
+      if (flameT <= 0) {
+        flameT = 0.05 + r() * 0.06;
+        const h = hot[Math.floor(r() * hot.length)]!;
+        const p = world(h.clone().add(new THREE.Vector3((r() - 0.5) * 7, 0.4, (r() - 0.5) * 5)), at);
+        fx.flame(p, 0.7 + r() * 0.7, r() < 0.4 ? "#ffcf5a" : "#ff6a1a");
+        if (r() < 0.25) fx.glow.emit(p, { count: 1, color: "#ffd27a", colorEnd: "#ff4a0a", size: 1.1, life: 2, speed: 3, up: 20, drag: 0.3, radius: 2 });
       }
     },
   };
