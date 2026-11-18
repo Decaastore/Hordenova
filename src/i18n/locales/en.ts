@@ -1779,6 +1779,11 @@ export const en = {
     },
   },
   store: {
+    featuredTitle: "Featured",
+    oneTime: "Once per account",
+    contents: "What's inside",
+    vipActive: "Active",
+    vipDays: "{days} days",
     castleTitle: "Castle skins",
     castleSub: "Each skin swaps the whole castle for a different building, with a living effect around it. Purely visual: never changes life, damage or resistance. Shows in the Season and the Eternal castle.",
     castleDefault: "The region's castle",

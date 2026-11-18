@@ -1780,6 +1780,11 @@ export const ptBR: TranslationSchema = {
     },
   },
   store: {
+    featuredTitle: "Destaques",
+    oneTime: "Uma vez por conta",
+    contents: "O que vem",
+    vipActive: "Ativo",
+    vipDays: "{days} dias",
     castleTitle: "Skins de castelo",
     castleSub: "Cada skin troca o castelo inteiro por outra construção, com efeito vivo em volta. Puramente visual: nunca muda vida, dano ou resistência. Aparece na Season e no Eterno.",
     castleDefault: "Castelo da região",
