@@ -11,6 +11,10 @@ export interface CastleModel {
   lava: boolean;
 }
 
+/** Painted surfaces are expensive (1024px + normal maps): kept across rebuilds (tier changes, remounts). */
+const STONE_SET_CACHE = new Map<string, any>();
+const ROOF_SET_CACHE = new Map<string, any>();
+
 export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): CastleModel {
 
   // ---------------------------------------------------------------------------
@@ -107,120 +111,248 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
   interface TexSet {
     map: THREE.CanvasTexture;
     bump: THREE.CanvasTexture;
+    normal?: THREE.CanvasTexture;
+    rough?: THREE.CanvasTexture;
   }
+
+  // ---------------------------------------------------------------------------
+  // REALISTIC SURFACES — every stone and slate texture is painted at 1024px
+  // with irregular cut blocks, per-block colour drift, multi-octave grain,
+  // chipped edges and recessed mortar; its height field becomes a real
+  // tangent-space normal map and a roughness map, so light rakes across the
+  // relief instead of over a flat picture.
+  // ---------------------------------------------------------------------------
+  /** Multi-octave value noise painted over a canvas (soft, tileable enough at these repeats). */
+  function paintGrain(g: CanvasRenderingContext2D, S: number, r: () => number, alpha: number, octaves = [8, 24, 64, 160]) {
+    const n = document.createElement("canvas");
+    for (const o of octaves) {
+      n.width = n.height = o;
+      const ng = n.getContext("2d")!;
+      const img = ng.createImageData(o, o);
+      for (let i = 0; i < o * o; i++) {
+        const v = Math.round(r() * 255);
+        img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = v;
+        img.data[i * 4 + 3] = 255;
+      }
+      ng.putImageData(img, 0, 0);
+      g.save();
+      g.globalAlpha = alpha * (o <= 24 ? 0.9 : 0.55);
+      g.globalCompositeOperation = "overlay";
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(n, 0, 0, S, S);
+      g.restore();
+    }
+  }
+  /** A tangent-space normal map from a greyscale height canvas (Sobel). */
+  function normalFromHeight(h: HTMLCanvasElement, strength: number): THREE.CanvasTexture {
+    const S = h.width;
+    const src = h.getContext("2d")!.getImageData(0, 0, S, S).data;
+    const out = document.createElement("canvas");
+    out.width = out.height = S;
+    const og = out.getContext("2d")!;
+    const img = og.createImageData(S, S);
+    const H = (x: number, y: number) => src[(((y + S) % S) * S + ((x + S) % S)) * 4] / 255;
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const dx = (H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1) - H(x - 1, y - 1) - 2 * H(x - 1, y) - H(x - 1, y + 1)) * strength;
+        const dy = (H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1) - H(x - 1, y - 1) - 2 * H(x, y - 1) - H(x + 1, y - 1)) * strength;
+        const len = Math.hypot(dx, dy, 1);
+        const i = (y * S + x) * 4;
+        img.data[i] = Math.round((-dx / len) * 127 + 128);
+        img.data[i + 1] = Math.round((dy / len) * 127 + 128);
+        img.data[i + 2] = Math.round((1 / len) * 127 + 128);
+        img.data[i + 3] = 255;
+      }
+    }
+    og.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(out);
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+    return t;
+  }
+  function desat(c: [number, number, number], k: number): [number, number, number] {
+    const l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+    return [c[0] + (l - c[0]) * k, c[1] + (l - c[1]) * k, c[2] + (l - c[2]) * k];
+  }
+
   function stoneTexture(seed: number, opts: { rows: number; cols: number; mossy?: number; cracks?: number; lava?: boolean }): TexSet {
-    const S = 512;
+    const S = 1024;
     const c = document.createElement("canvas");
     c.width = c.height = S;
     const g = c.getContext("2d")!;
     const b = document.createElement("canvas");
     b.width = b.height = S;
     const h = b.getContext("2d")!;
+    const rc = document.createElement("canvas");
+    rc.width = rc.height = S;
+    const rg = rc.getContext("2d")!;
     const r = rng(seed);
-    const A = hexRgb(D.stoneA);
-    const B = hexRgb(D.stoneB);
-    g.fillStyle = D.mortar;
+    // real stone is greyer and browner than a game palette: pull the colours towards a weathered grey
+    const A = desat(hexRgb(D.stoneA), 0.35);
+    const B = desat(hexRgb(D.stoneB), 0.25);
+    const M = hexRgb(D.mortar);
+    g.fillStyle = `rgb(${M[0]},${M[1]},${M[2]})`;
     g.fillRect(0, 0, S, S);
-    h.fillStyle = "#202020";
+    paintGrain(g, S, r, 0.5, [32, 96, 256]);
+    h.fillStyle = "#1a1a1a";
     h.fillRect(0, 0, S, S);
-    const rh = S / opts.rows;
+    rg.fillStyle = "#f2f2f2";
+    rg.fillRect(0, 0, S, S);
+    // courses of slightly different heights, blocks of different lengths (ashlar, not bricks)
+    const courses: number[] = [];
+    let total = 0;
+    for (let i = 0; i < opts.rows; i++) {
+      const v = 0.8 + r() * 0.45;
+      courses.push(v);
+      total += v;
+    }
+    let y = 0;
     for (let row = 0; row < opts.rows; row++) {
-      const offset = (row % 2) * 0.5;
-      const cw = S / opts.cols;
-      for (let col = -1; col <= opts.cols; col++) {
-        const w = cw * (0.85 + r() * 0.3);
-        const x = (col + offset) * cw + (r() - 0.5) * 4;
-        const y = row * rh;
-        const pad = 3;
-        const t = r();
-        g.fillStyle = mix(A, B, 0.15 + t * 0.65);
-        const rad = 4;
-        const rx = x + pad, ry = y + pad, rw = w - pad * 2, rhh = rh - pad * 2;
-        g.beginPath();
-        g.roundRect(rx, ry, rw, rhh, rad);
-        g.fill();
-        // Light top edge / dark bottom edge for chiselled depth.
-        g.fillStyle = "rgba(255,255,255,0.08)";
-        g.fillRect(rx + 2, ry + 1, rw - 4, 3);
-        g.fillStyle = "rgba(0,0,0,0.18)";
-        g.fillRect(rx + 2, ry + rhh - 4, rw - 4, 3);
-        // Speckle texture inside the stone.
-        for (let k = 0; k < 40; k++) {
-          g.fillStyle = r() < 0.5 ? "rgba(0,0,0,0.08)" : "rgba(255,255,255,0.06)";
-          g.fillRect(rx + r() * rw, ry + r() * rhh, 2 + r() * 3, 2 + r() * 2);
+      const rh = (courses[row]! / total) * S;
+      let x = -r() * (S / opts.cols);
+      while (x < S) {
+        const w = (S / opts.cols) * (0.6 + r() * 0.85);
+        const gap = 5 + r() * 3;
+        const rx = x + gap / 2, ry = y + gap / 2, rw = w - gap, rhh = rh - gap;
+        const t = 0.3 + r() * 0.35;
+        const base = [A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t];
+        // a warm or cool drift per block, like stone from different parts of the quarry
+        const drift = (r() - 0.5) * 10;
+        const col = `rgb(${Math.round(base[0] + drift)},${Math.round(base[1] + drift * 0.8)},${Math.round(base[2] + drift * 0.5)})`;
+        const rad = 6 + r() * 8;
+        // chipped outline: a rounded block whose corners lose bits
+        const shape = () => {
+          const p = new Path2D();
+          const jit = () => (r() - 0.5) * 3.5;
+          p.moveTo(rx + rad, ry + jit());
+          p.lineTo(rx + rw * 0.5, ry + jit());
+          p.lineTo(rx + rw - rad, ry + jit());
+          p.quadraticCurveTo(rx + rw + jit(), ry + jit(), rx + rw + jit(), ry + rad);
+          p.lineTo(rx + rw + jit(), ry + rhh * 0.5);
+          p.lineTo(rx + rw + jit(), ry + rhh - rad);
+          p.quadraticCurveTo(rx + rw + jit(), ry + rhh + jit(), rx + rw - rad, ry + rhh + jit());
+          p.lineTo(rx + rw * 0.5, ry + rhh + jit());
+          p.lineTo(rx + rad, ry + rhh + jit());
+          p.quadraticCurveTo(rx + jit(), ry + rhh + jit(), rx + jit(), ry + rhh - rad);
+          p.lineTo(rx + jit(), ry + rhh * 0.5);
+          p.lineTo(rx + jit(), ry + rad);
+          p.quadraticCurveTo(rx + jit(), ry + jit(), rx + rad, ry + jit());
+          p.closePath();
+          return p;
+        };
+        const path = shape();
+        g.fillStyle = col;
+        g.fill(path);
+        // height: a bevelled face — darker at the edges, rising into a slightly uneven top
+        const hv = 120 + Math.round(r() * 50);
+        for (let k = 0; k < 5; k++) {
+          const inset = k * 2.2;
+          h.fillStyle = `rgb(${hv + k * 14},${hv + k * 14},${hv + k * 14})`;
+          h.beginPath();
+          h.roundRect(rx + inset, ry + inset, Math.max(2, rw - inset * 2), Math.max(2, rhh - inset * 2), Math.max(1, rad - inset));
+          h.fill();
         }
-        // Height: raised stone with a slightly domed face.
-        const hg = h.createLinearGradient(rx, ry, rx, ry + rhh);
-        const hv = 150 + Math.round(r() * 60);
-        hg.addColorStop(0, `rgb(${hv},${hv},${hv})`);
-        hg.addColorStop(0.5, `rgb(${hv + 30},${hv + 30},${hv + 30})`);
-        hg.addColorStop(1, `rgb(${hv - 20},${hv - 20},${hv - 20})`);
-        h.fillStyle = hg;
-        h.beginPath();
-        h.roundRect(rx, ry, rw, rhh, rad);
-        h.fill();
+        // a slight tilt of each block's face catches the light differently
+        const tilt = h.createLinearGradient(rx, ry, rx + rw * (r() - 0.5), ry + rhh);
+        tilt.addColorStop(0, `rgba(255,255,255,${0.05 + r() * 0.08})`);
+        tilt.addColorStop(1, `rgba(0,0,0,${0.05 + r() * 0.08})`);
+        h.fillStyle = tilt;
+        h.fill(path);
+        // roughness: worn faces a touch smoother than the mortar
+        const rv = 200 + Math.round(r() * 40);
+        rg.fillStyle = `rgb(${rv},${rv},${rv})`;
+        rg.fill(path);
+        // edge shading on the colour: darker rim, a lighter worn top edge
+        g.save();
+        g.clip(path);
+        const eg = g.createLinearGradient(0, ry, 0, ry + rhh);
+        eg.addColorStop(0, "rgba(255,255,255,0.10)");
+        eg.addColorStop(0.15, "rgba(255,255,255,0)");
+        eg.addColorStop(0.8, "rgba(0,0,0,0)");
+        eg.addColorStop(1, "rgba(0,0,0,0.28)");
+        g.fillStyle = eg;
+        g.fillRect(rx - 4, ry - 4, rw + 8, rhh + 8);
+        // pits and lichen specks
+        for (let k = 0; k < 26; k++) {
+          const px = rx + r() * rw, py = ry + r() * rhh, pr = 0.8 + r() * 2.6;
+          g.fillStyle = r() < 0.75 ? `rgba(0,0,0,${0.06 + r() * 0.1})` : `rgba(210,200,170,${0.05 + r() * 0.06})`;
+          g.beginPath();
+          g.arc(px, py, pr, 0, Math.PI * 2);
+          g.fill();
+          h.fillStyle = `rgba(0,0,0,${0.3 + r() * 0.3})`;
+          h.beginPath();
+          h.arc(px, py, pr * 0.8, 0, Math.PI * 2);
+          h.fill();
+        }
+        g.restore();
+        x += w;
       }
+      y += rh;
     }
-    // Moss creeping up from the bottom.
+    // fine grain over everything (colour and height)
+    paintGrain(g, S, r, 0.22, [8, 24, 64]);
+    paintGrain(h, S, r, 0.3, [48, 120]);
+    // moss and lichen creeping up from the bottom, thickest in the joints
     if (opts.mossy && D.moss) {
-      const M = hexRgb(D.moss);
-      for (let k = 0; k < 220 * opts.mossy; k++) {
+      const Mo = hexRgb(D.moss);
+      for (let k = 0; k < 520 * opts.mossy; k++) {
         const x = r() * S;
-        const y = S - Math.pow(r(), 1.8) * S * 0.7;
-        g.fillStyle = `rgba(${M[0]},${M[1]},${M[2]},${0.25 + r() * 0.4})`;
+        const yy = S - Math.pow(r(), 2.2) * S * 0.75;
+        g.fillStyle = `rgba(${Mo[0]},${Mo[1]},${Mo[2]},${0.12 + r() * 0.28})`;
         g.beginPath();
-        g.arc(x, y, 3 + r() * 9, 0, Math.PI * 2);
+        g.arc(x, yy, 2 + r() * 10, 0, Math.PI * 2);
         g.fill();
       }
     }
-    // Grime / water streaks.
-    for (let k = 0; k < 14; k++) {
+    // rain streaks running down from the joints
+    for (let k = 0; k < 40; k++) {
       const x = r() * S;
-      const grd = g.createLinearGradient(x, 0, x, S);
-      grd.addColorStop(0, "rgba(0,0,0,0)");
-      grd.addColorStop(1, `rgba(0,0,0,${0.06 + r() * 0.08})`);
+      const y0 = r() * S;
+      const len = 80 + r() * 300;
+      const grd = g.createLinearGradient(x, y0, x, y0 + len);
+      grd.addColorStop(0, `rgba(20,16,12,${0.12 + r() * 0.12})`);
+      grd.addColorStop(1, "rgba(20,16,12,0)");
       g.fillStyle = grd;
-      g.fillRect(x, 0, 6 + r() * 14, S);
+      g.fillRect(x, y0, 2 + r() * 5, len);
     }
-    // Damage cracks.
+    // damage cracks
     if (opts.cracks) {
-      g.lineCap = "round";
-      h.lineCap = "round";
+      g.lineCap = h.lineCap = "round";
       for (let k = 0; k < opts.cracks; k++) {
         let x = r() * S;
-        let y = r() * S * 0.6;
+        let yy = r() * S * 0.6;
         g.strokeStyle = "rgba(10,8,6,0.85)";
         h.strokeStyle = "#000";
-        g.lineWidth = 3;
-        h.lineWidth = 4;
+        g.lineWidth = 2.5;
+        h.lineWidth = 5;
         g.beginPath();
         h.beginPath();
-        g.moveTo(x, y);
-        h.moveTo(x, y);
-        for (let s = 0; s < 9; s++) {
-          x += (r() - 0.5) * 40;
-          y += 18 + r() * 22;
-          g.lineTo(x, y);
-          h.lineTo(x, y);
+        g.moveTo(x, yy);
+        h.moveTo(x, yy);
+        for (let st = 0; st < 12; st++) {
+          x += (r() - 0.5) * 50;
+          yy += 22 + r() * 30;
+          g.lineTo(x, yy);
+          h.lineTo(x, yy);
         }
         g.stroke();
         h.stroke();
       }
     }
-    // Lava seams glowing in the mortar.
     if (opts.lava) {
       g.globalCompositeOperation = "lighter";
-      for (let k = 0; k < 6; k++) {
+      for (let k = 0; k < 8; k++) {
         let x = r() * S;
-        let y = S * (0.55 + r() * 0.45);
-        g.strokeStyle = "rgba(255,110,30,0.55)";
-        g.lineWidth = 2.5;
+        let yy = S * (0.55 + r() * 0.45);
+        g.strokeStyle = "rgba(255,110,30,0.5)";
+        g.lineWidth = 3;
         g.beginPath();
-        g.moveTo(x, y);
-        for (let s = 0; s < 6; s++) {
-          x += (r() - 0.5) * 50;
-          y -= 10 + r() * 18;
-          g.lineTo(x, y);
+        g.moveTo(x, yy);
+        for (let st = 0; st < 7; st++) {
+          x += (r() - 0.5) * 60;
+          yy -= 14 + r() * 24;
+          g.lineTo(x, yy);
         }
         g.stroke();
       }
@@ -232,11 +364,13 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     map.anisotropy = 8;
     const bump = new THREE.CanvasTexture(b);
     bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    return { map, bump };
+    const rough = new THREE.CanvasTexture(rc);
+    rough.wrapS = rough.wrapT = THREE.RepeatWrapping;
+    return { map, bump, normal: normalFromHeight(b, 2.6), rough };
   }
 
   function roofTexture(seed: number): TexSet {
-    const S = 512;
+    const S = 1024;
     const c = document.createElement("canvas");
     c.width = c.height = S;
     const g = c.getContext("2d")!;
@@ -244,43 +378,123 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     b.width = b.height = S;
     const h = b.getContext("2d")!;
     const r = rng(seed);
-    const A = hexRgb(D.roof);
-    const B = hexRgb(D.roofDark);
-    g.fillStyle = D.roofDark;
+    // weathered: the skin's roof colour, aged towards slate grey and soot
+    const A = desat(hexRgb(D.roof), D.roofMetal ? 0.1 : 0.42);
+    const Bc = desat(hexRgb(D.roofDark), 0.3);
+    g.fillStyle = `rgb(${Bc[0]},${Bc[1]},${Bc[2]})`;
     g.fillRect(0, 0, S, S);
     h.fillStyle = "#000";
     h.fillRect(0, 0, S, S);
-    const rows = 14;
+    const rows = 22;
     const rh = S / rows;
     for (let row = 0; row < rows; row++) {
-      const cols = 12;
+      const cols = 16;
       const cw = S / cols;
       for (let col = -1; col <= cols; col++) {
-        const x = (col + (row % 2) * 0.5) * cw;
-        const y = row * rh;
-        g.fillStyle = mix(A, B, 0.1 + r() * 0.6);
-        g.beginPath();
-        g.moveTo(x + 2, y);
-        g.lineTo(x + cw - 2, y);
-        g.lineTo(x + cw - 4, y + rh * 1.1);
-        g.quadraticCurveTo(x + cw / 2, y + rh * 1.35, x + 4, y + rh * 1.1);
-        g.closePath();
-        g.fill();
-        g.fillStyle = "rgba(255,255,255,0.07)";
-        g.fillRect(x + 4, y + 2, cw - 8, 2);
-        const hg = h.createLinearGradient(0, y, 0, y + rh * 1.2);
-        hg.addColorStop(0, "#606060");
-        hg.addColorStop(1, "#e0e0e0");
+        const x = (col + (row % 2) * 0.5) * cw + (r() - 0.5) * 3;
+        const yy = row * rh;
+        const t = r();
+        const drift = (r() - 0.5) * 22;
+        const base = [A[0] + (Bc[0] - A[0]) * t * 0.7 + drift, A[1] + (Bc[1] - A[1]) * t * 0.7 + drift * 0.7, A[2] + (Bc[2] - A[2]) * t * 0.7 + drift * 0.6];
+        const w = cw * (0.92 + r() * 0.1);
+        const tail = rh * (1.25 + r() * 0.2);
+        const p = new Path2D();
+        p.moveTo(x + 2, yy);
+        p.lineTo(x + w - 2, yy);
+        p.lineTo(x + w - 3, yy + tail * 0.8);
+        p.quadraticCurveTo(x + w / 2, yy + tail * (1.0 + (r() - 0.5) * 0.12), x + 3, yy + tail * 0.8);
+        p.closePath();
+        g.fillStyle = `rgb(${Math.round(base[0])},${Math.round(base[1])},${Math.round(base[2])})`;
+        g.fill(p);
+        // each tile's lower lip catches light, its upper part sits in the shadow of the row above
+        g.save();
+        g.clip(p);
+        const sg = g.createLinearGradient(0, yy, 0, yy + tail);
+        sg.addColorStop(0, "rgba(0,0,0,0.45)");
+        sg.addColorStop(0.35, "rgba(0,0,0,0.05)");
+        sg.addColorStop(0.92, "rgba(255,255,255,0.08)");
+        sg.addColorStop(1, "rgba(0,0,0,0.3)");
+        g.fillStyle = sg;
+        g.fillRect(x, yy, w, tail);
+        g.restore();
+        const hg = h.createLinearGradient(0, yy, 0, yy + tail);
+        hg.addColorStop(0, "#303030");
+        hg.addColorStop(0.85, "#e8e8e8");
+        hg.addColorStop(1, "#a0a0a0");
         h.fillStyle = hg;
-        h.fillRect(x + 2, y, cw - 4, rh * 1.15);
+        h.fill(p);
+        // lichen and a few broken corners
+        if (r() < 0.12) {
+          g.fillStyle = `rgba(${150 + r() * 40},${150 + r() * 30},${90 + r() * 30},0.35)`;
+          g.beginPath();
+          g.arc(x + r() * w, yy + rh * (0.5 + r() * 0.5), 3 + r() * 6, 0, Math.PI * 2);
+          g.fill();
+        }
       }
+    }
+    paintGrain(g, S, r, 0.18, [8, 24, 64]);
+    // soot and rain darkening down the slope
+    for (let k = 0; k < 30; k++) {
+      const x = r() * S;
+      const grd = g.createLinearGradient(x, 0, x, S);
+      grd.addColorStop(0, "rgba(0,0,0,0)");
+      grd.addColorStop(1, `rgba(10,8,6,${0.08 + r() * 0.1})`);
+      g.fillStyle = grd;
+      g.fillRect(x, 0, 8 + r() * 24, S);
     }
     const map = new THREE.CanvasTexture(c);
     map.colorSpace = THREE.SRGBColorSpace;
     map.wrapS = map.wrapT = THREE.RepeatWrapping;
+    map.anisotropy = 8;
     const bump = new THREE.CanvasTexture(b);
     bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    return { map, bump };
+    return { map, bump, normal: normalFromHeight(b, 3.2) };
+  }
+
+  /**
+   * WEATHERING — patched into every stone and roof material: grime and damp
+   * darkening the lowest courses, moss tint at the foot of the walls, and
+   * broad, soft patches of lighter and darker stone across whole walls so no
+   * two stretches repeat the same tile.
+   */
+  function weather(mat: THREE.MeshStandardMaterial, kind: "stone" | "roof"): void {
+    const moss = new THREE.Color(D.moss ?? D.ground);
+    mat.onBeforeCompile = (sh) => {
+      sh.uniforms.uMoss = { value: moss };
+      sh.vertexShader = sh.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vWPos;")
+        .replace("#include <worldpos_vertex>", "#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;");
+      sh.fragmentShader = sh.fragmentShader
+        .replace(
+          "#include <common>",
+          `#include <common>
+varying vec3 vWPos;
+uniform vec3 uMoss;
+float wh(vec3 p){ return fract(sin(dot(p, vec3(12.9898,78.233,37.719))) * 43758.5453); }
+float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
+  return mix(mix(mix(wh(i),wh(i+vec3(1,0,0)),f.x),mix(wh(i+vec3(0,1,0)),wh(i+vec3(1,1,0)),f.x),f.y),
+             mix(mix(wh(i+vec3(0,0,1)),wh(i+vec3(1,0,1)),f.x),mix(wh(i+vec3(0,1,1)),wh(i+vec3(1,1,1)),f.x),f.y),f.z); }`,
+        )
+        .replace(
+          "#include <map_fragment>",
+          `#include <map_fragment>
+{
+  vec3 q = vWPos * 0.045;
+  float big = wn(q) * 0.6 + wn(q * 2.7) * 0.4;
+  diffuseColor.rgb *= mix(0.72, 1.12, big);
+  ${kind === "stone" ? `
+  float low = 1.0 - smoothstep(0.0, 40.0, vWPos.y);
+  float m = low * smoothstep(0.35, 0.75, wn(vWPos * 0.12));
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 0.55, low * 0.6);
+  diffuseColor.rgb = mix(diffuseColor.rgb, uMoss * 0.8, m * 0.45);
+  float streak = smoothstep(0.62, 0.9, wn(vec3(vWPos.x * 0.35, vWPos.y * 0.02, vWPos.z * 0.35)));
+  diffuseColor.rgb *= 1.0 - streak * 0.18;` : `
+  float soot = smoothstep(0.55, 0.85, wn(vWPos * 0.08));
+  diffuseColor.rgb *= 1.0 - soot * 0.25;`}
+}`,
+        );
+    };
+    mat.customProgramCacheKey = () => `castle-weather-${kind}`;
   }
 
   function woodTexture(): TexSet {
@@ -336,10 +550,10 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     return { map, bump };
   }
 
-  const stoneSets = new Map<string, TexSet>();
+  const stoneSets = STONE_SET_CACHE;
   function stoneMat(key: string, repeatX: number, repeatY: number, opts: { rows?: number; cols?: number; mossy?: number } = {}): THREE.MeshStandardMaterial {
     const cracks = TIER >= 2 ? (TIER - 1) * 3 : 0;
-    const setKey = `${key}:${opts.rows ?? 10}:${opts.cols ?? 5}:${opts.mossy ?? 0}`;
+    const setKey = `${BIOME}|${SKIN}|${TIER}|${key}:${opts.rows ?? 10}:${opts.cols ?? 5}:${opts.mossy ?? 0}`;
     let set = stoneSets.get(setKey);
     if (!set) {
       set = stoneTexture(key.length * 31 + (opts.rows ?? 10), { rows: opts.rows ?? 10, cols: opts.cols ?? 5, mossy: opts.mossy, cracks, lava: D.lava });
@@ -351,19 +565,38 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const bump = set.bump.clone();
     bump.repeat.set(repeatX, repeatY);
     bump.needsUpdate = true;
-    const mat = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 2.2, roughness: 0.92, metalness: 0.02 });
+    const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0.0 });
+    if (set.normal) {
+      const nm = set.normal.clone();
+      nm.repeat.set(repeatX, repeatY);
+      nm.needsUpdate = true;
+      mat.normalMap = nm;
+      mat.normalScale = new THREE.Vector2(1.15, 1.15);
+    } else {
+      mat.bumpMap = bump;
+      mat.bumpScale = 2.2;
+    }
+    if (set.rough) {
+      const rm = set.rough.clone();
+      rm.repeat.set(repeatX, repeatY);
+      rm.needsUpdate = true;
+      mat.roughnessMap = rm;
+    }
+    weather(mat, "stone");
     if (ARCH.wall === "ice") {
       mat.roughness = 0.18;
+      mat.roughnessMap = null;
       mat.metalness = 0.15;
       mat.emissive = new THREE.Color("#4a8ac8");
       mat.emissiveIntensity = 0.22;
     } else if (ARCH.wall === "glass") {
-      mat.roughness = 0.22;
-      mat.metalness = 0.55;
-      mat.bumpScale = 3.2;
+      mat.roughness = 0.3;
+      mat.metalness = 0.45;
+      mat.roughnessMap = null;
     } else if (ARCH.wall === "marble") {
-      mat.roughness = 0.35;
-      mat.bumpScale = 0.8;
+      mat.roughness = 0.45;
+      mat.roughnessMap = null;
+      mat.normalScale = new THREE.Vector2(0.5, 0.5);
     } else if (ARCH.wall === "wood") {
       const w = woodSet ?? (woodSet = woodTexture());
       const wm = w.map.clone();
@@ -372,6 +605,8 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       wm.needsUpdate = true;
       mat.map = wm;
       mat.bumpMap = null;
+      mat.normalMap = null;
+      mat.roughnessMap = null;
       mat.roughness = 0.85;
     }
     return mat;
@@ -400,6 +635,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const total = n * merlonW + (n - 1) * gap;
     const start = (x0 + x1) / 2 - total / 2;
     const mat = stoneMat("merlon", 0.5, 0.5, { rows: 4, cols: 3 });
+    mat.color.setScalar(0.78);
     for (let i = 0; i < n; i++) {
       if (broken.has(i)) continue;
       const mx = start + i * (merlonW + gap) + merlonW / 2;
@@ -413,6 +649,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
   /** Ring of merlons around a round tower top. */
   function battlementRing(cx: number, y: number, cz: number, radius: number, count: number, broken: Set<number> = new Set()) {
     const mat = stoneMat("merlon", 0.5, 0.5, { rows: 4, cols: 3 });
+    mat.color.setScalar(0.78);
     for (let i = 0; i < count; i++) {
       if (broken.has(i)) continue;
       const a = (i / count) * Math.PI * 2;
@@ -439,7 +676,9 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
   }
 
   const snowMat = new THREE.MeshStandardMaterial({ color: 0xf2f8ff, roughness: 0.8 });
-  const roofSet = roofTexture(3);
+  const roofKey = `${BIOME}|${SKIN}`;
+  const roofSet = ROOF_SET_CACHE.get(roofKey) ?? roofTexture(3);
+  ROOF_SET_CACHE.set(roofKey, roofSet);
   function roofMat(repX: number, repY: number) {
     const map = roofSet.map.clone();
     map.repeat.set(repX, repY);
@@ -447,7 +686,18 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const bump = roofSet.bump.clone();
     bump.repeat.set(repX, repY);
     bump.needsUpdate = true;
-    const m = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: 1.6, roughness: D.roofMetal ? 0.35 : 0.75, metalness: D.roofMetal ?? 0.05 });
+    const m = new THREE.MeshStandardMaterial({ map, roughness: D.roofMetal ? 0.35 : 0.82, metalness: D.roofMetal ?? 0.0 });
+    if (roofSet.normal) {
+      const nm = roofSet.normal.clone();
+      nm.repeat.set(repX, repY);
+      nm.needsUpdate = true;
+      m.normalMap = nm;
+      m.normalScale = new THREE.Vector2(1.3, 1.3);
+    } else {
+      m.bumpMap = bump;
+      m.bumpScale = 1.6;
+    }
+    weather(m, "roof");
     if (D.frostRoof) {
       m.transparent = true;
       m.opacity = 0.92;
@@ -493,7 +743,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const r = kind === "spire" ? radius * 0.85 : radius;
     return { mesh: new THREE.Mesh(new THREE.ConeGeometry(r, h, segments, 1), roofMat(repX, repY)), height: h };
   }
-  const windowMat = new THREE.MeshStandardMaterial({ color: 0x1a0e06, emissive: new THREE.Color(D.window), emissiveIntensity: 1.4 });
+  const windowMat = new THREE.MeshStandardMaterial({ color: 0x120a04, emissive: new THREE.Color(D.window), emissiveIntensity: 0.75, roughness: 0.6 });
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0906, roughness: 1 });
   const ironMat = new THREE.MeshStandardMaterial({ color: 0x2e2c2a, roughness: 0.5, metalness: 0.7 });
   const poleMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a, roughness: 0.8 });
@@ -596,8 +846,16 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     // Windows on the keep face.
     for (const wy of [22, 38, 54]) {
       for (const wx of wy === 54 ? [0] : [-6, 6]) {
-        const arch = new THREE.Mesh(new THREE.BoxGeometry(3, 5, 0.6), windowMat);
-        arch.position.set(wx, wy, keepZ + (ARCH.keep === "box" ? keepD / 2 + 0.25 : 13.6 - (wy / keepH) * 2));
+        // a stone surround with a deep reveal, then the lit glass set back inside it
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(4.6, 6.8, 0.9), stoneMat("sill", 0.3, 0.4, { rows: 3, cols: 2 }));
+        frame.position.set(wx, wy, keepZ + (ARCH.keep === "box" ? keepD / 2 + 0.1 : 13.4 - (wy / keepH) * 2));
+        frame.castShadow = true;
+        root.add(frame);
+        const reveal = new THREE.Mesh(new THREE.BoxGeometry(3.2, 5.2, 0.5), darkMat);
+        reveal.position.set(wx, wy, keepZ + (ARCH.keep === "box" ? keepD / 2 + 0.4 : 13.7 - (wy / keepH) * 2));
+        root.add(reveal);
+        const arch = new THREE.Mesh(new THREE.BoxGeometry(2.2, 4.0, 0.4), windowMat);
+        arch.position.set(wx, wy - 0.3, keepZ + (ARCH.keep === "box" ? keepD / 2 + 0.6 : 13.9 - (wy / keepH) * 2));
         root.add(arch);
         const sill = new THREE.Mesh(new THREE.BoxGeometry(4, 0.8, 1.6), stoneMat("sill", 0.3, 0.1, { rows: 2, cols: 2 }));
         sill.position.set(wx, wy - 2.8, keepZ + (ARCH.keep === "box" ? keepD / 2 + 0.6 : 14 - (wy / keepH) * 2));
@@ -747,7 +1005,21 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       {
         const by = Math.round((broken ? th - 9 : th) * 0.66);
         const br = tr + 3.2;
-        const deck = new THREE.Mesh(new THREE.CylinderGeometry(br, br - 1.2, 1.4, 20), new THREE.MeshStandardMaterial({ color: 0x5a3e24, roughness: 0.9 }));
+        const plank = woodSet ?? (woodSet = woodTexture());
+        const deckMap = plank.map.clone();
+        deckMap.wrapS = deckMap.wrapT = THREE.RepeatWrapping;
+        deckMap.repeat.set(4, 0.3);
+        deckMap.needsUpdate = true;
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(br, br - 1.2, 1.4, 20), new THREE.MeshStandardMaterial({ map: deckMap, color: 0x9a8070, roughness: 0.9 }));
+        // timber brackets under the deck, braced into the tower wall
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const brace = new THREE.Mesh(new THREE.BoxGeometry(0.7, 4.2, 0.7), new THREE.MeshStandardMaterial({ color: 0x3a2814, roughness: 0.95 }));
+          brace.position.set(tx + Math.cos(a) * (tr + 1.4), by - 2.2, tz + Math.sin(a) * (tr + 1.4));
+          brace.rotation.set(Math.sin(a) * 0.6, 0, -Math.cos(a) * 0.6);
+          brace.castShadow = true;
+          root.add(brace);
+        }
         deck.position.set(tx, by, tz);
         deck.castShadow = deck.receiveShadow = true;
         root.add(deck);
