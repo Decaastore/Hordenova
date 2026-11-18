@@ -1860,14 +1860,14 @@ const LOBBY_CSS = `
 .du-hold { color: var(--ash-2); font-size: 12px; }
 @media (max-width: 640px) { .du-hrow { grid-template-columns: 1fr auto; } .du-hdate, .du-hmeta { grid-column: 1 / -1; } }
 .du-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-top: 14px; }
-.du-cardbtn { display: grid; justify-items: center; gap: 6px; padding: 14px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--bone); cursor: pointer; }
+.du-cardbtn { display: grid; justify-items: center; align-content: start; gap: 6px; padding: 14px 10px; border-radius: 12px; border: 1px solid var(--line); background: rgba(24,18,12,0.55); color: var(--bone); cursor: pointer; }
 .du-cardbtn.is-on { border-color: rgba(232,176,75,0.7); background: linear-gradient(180deg, rgba(232,176,75,0.14), rgba(24,18,12,0.6)); }
 .du-cardbtn:focus-visible { outline: 2px solid var(--gold-hi); outline-offset: 2px; }
 .du-desc { font-size: 12px; color: var(--ash); text-align: center; line-height: 1.35; }
 `;
 
 const MATCH_CSS = `
-.has-frame .dc-face { border-color: var(--fr1) !important; box-shadow: 0 0 0 1px var(--fr2), 0 0 14px color-mix(in srgb, var(--fr1) 45%, transparent), inset 0 1px 0 rgba(255,230,180,0.15) !important; }
+.has-frame .dc-face { box-shadow: 0 0 0 1px var(--fr2), 0 0 14px color-mix(in srgb, var(--fr1) 45%, transparent), inset 0 1px 0 rgba(255,230,180,0.15) !important; }
 .dm-tr { font-size: 20px !important; font-weight: 700; }
 .dm-rankchange { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-radius: 12px; background: rgba(0,0,0,0.45); font-family: Georgia, serif; font-size: 22px; font-weight: 700; animation: dmIn 0.6s ease-out; }
 .dm-rankchange.is-up { color: #ffd56a; box-shadow: 0 0 30px rgba(255,213,106,0.35); }
@@ -2079,6 +2079,59 @@ const MATCH_CSS = `
 .du-cardbtn:not(.is-locked):active { transform: translateY(-2px) scale(0.97); transition-duration: 70ms; }
 .du-draft-opt { animation: dcDeal 620ms cubic-bezier(.2,.9,.25,1.15) backwards; }
 .du-draft-opt:nth-child(2) { animation-delay: 110ms; } .du-draft-opt:nth-child(3) { animation-delay: 220ms; }
+
+/* ---------------- CARD FRAMES ----------------
+ * Each card is set in a forged frame: a bevelled metal border (steel-blue
+ * for towers, gold for spells, copper for creatures), an inner gilt line,
+ * filigree in the four corners, a framed art window and a name plate.
+ * A cosmetic frame from the shop (has-frame) recolours the metal. */
+.dc-face { --m1: #f6dc9c; --m2: #b8863a; --m3: #4a2e0e; --plate: #2a1c0e;
+  border: 2px solid transparent;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255,230,170,0.10), transparent 60%) padding-box,
+    linear-gradient(180deg, #3a2a1a, #1a120a) padding-box,
+    linear-gradient(155deg, var(--m1) 0%, var(--m2) 28%, var(--m3) 52%, var(--m2) 76%, var(--m1) 100%) border-box;
+  box-shadow: inset 0 1px 0 rgba(255,236,190,0.18), inset 0 0 0 1px rgba(0,0,0,0.55), 0 6px 14px rgba(0,0,0,0.5); }
+.dc-face.is-TOWER { --m1: #eef4ff; --m2: #7d9cd0; --m3: #1e2c48; --plate: #16223a;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(190,215,255,0.12), transparent 60%) padding-box,
+    linear-gradient(180deg, #24324a, #10161f) padding-box,
+    linear-gradient(155deg, var(--m1) 0%, var(--m2) 28%, var(--m3) 52%, var(--m2) 76%, var(--m1) 100%) border-box; }
+.dc-face.is-SPELL { --m1: #fff2c0; --m2: #d8a440; --m3: #5a3a0c; --plate: #33220a;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255,220,140,0.16), transparent 60%) padding-box,
+    linear-gradient(180deg, #3e2c16, #1a1208) padding-box,
+    linear-gradient(155deg, var(--m1) 0%, var(--m2) 28%, var(--m3) 52%, var(--m2) 76%, var(--m1) 100%) border-box; }
+.dc-face.is-SEND { --m1: #ffd8bc; --m2: #c06a3e; --m3: #4a160a; --plate: #3a160c;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255,180,140,0.12), transparent 60%) padding-box,
+    linear-gradient(180deg, #4a2418, #1e0e08) padding-box,
+    linear-gradient(155deg, var(--m1) 0%, var(--m2) 28%, var(--m3) 52%, var(--m2) 76%, var(--m1) 100%) border-box; }
+.has-frame .dc-face { --m1: color-mix(in srgb, var(--fr1) 45%, #fff); --m2: var(--fr1); --m3: color-mix(in srgb, var(--fr2) 60%, #000); border-color: transparent !important; }
+/* inner gilt line and corner filigree */
+.dc-face::before { content: ""; position: absolute; inset: 3px; border-radius: 9px; pointer-events: none;
+  border: 1px solid color-mix(in srgb, var(--m1) 55%, transparent); box-shadow: inset 0 0 8px rgba(0,0,0,0.45); }
+.dc-face::after { content: ""; position: absolute; inset: 1px; pointer-events: none; opacity: 0.85;
+  background-color: var(--m1);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%280 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") top left / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%2890 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") top right / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%28270 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") bottom left / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%28180 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") bottom right / 15px 15px no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%280 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") top left / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%2890 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") top right / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%28270 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") bottom left / 15px 15px no-repeat, url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cg transform='rotate%28180 10 10%29' fill='none' stroke='white' stroke-width='1.4' stroke-linecap='round'%3E%3Cpath d='M2 14V6a4 4 0 0 1 4-4h8'/%3E%3Cpath d='M5 11c0-3 3-6 6-6' opacity='.75'/%3E%3Ccircle cx='5.2' cy='5.2' r='1.6' fill='white' stroke='none'/%3E%3C/g%3E%3C/svg%3E") bottom right / 15px 15px no-repeat; }
+.dc-face:not(.is-small) { border-width: 3px; grid-template-rows: auto auto 1fr; }
+/* a card never stretches to its neighbours' height (deck grid, hand) */
+.du-cardbtn > .dc-face, .dm-card-body > .dc-face { align-self: start; }
+.dc-face:not(.is-small) .dc-name { display: flex; align-items: center; justify-content: center; }
+.dc-face.is-small::before { inset: 2px; border-radius: 6px; }
+.dc-face.is-small::after { -webkit-mask-size: 9px 9px; mask-size: 9px 9px; }
+/* framed art window */
+.dc-face:not(.is-small) .dc-art { position: relative; z-index: 1; margin-top: 2px; padding: 2px; border-radius: 8px;
+  background: radial-gradient(circle at 50% 60%, rgba(255,255,255,0.12), rgba(0,0,0,0.35)) padding-box, linear-gradient(160deg, var(--m1), var(--m3)) border-box;
+  border: 1px solid transparent; box-shadow: inset 0 0 10px rgba(0,0,0,0.6), 0 1px 0 rgba(255,236,190,0.12); }
+/* type label between two small gems, name on a plate */
+.dc-kind { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px; text-transform: uppercase; letter-spacing: 0.1em; font-size: 8.5px; color: color-mix(in srgb, var(--m1) 80%, #fff); }
+.dc-kind::before, .dc-kind::after { content: ""; width: 4px; height: 4px; transform: rotate(45deg); background: var(--m2); box-shadow: 0 0 4px var(--m2); }
+.dc-name { position: relative; z-index: 1; width: calc(100% + 8px); max-width: none; margin-left: -4px; margin-right: -4px; padding: 3px 2px 4px; overflow-wrap: normal; word-break: normal; hyphens: none; letter-spacing: -0.01em; margin-top: 1px; border-radius: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--plate) 70%, #000), var(--plate)) padding-box, linear-gradient(90deg, transparent, var(--m2), transparent) border-box;
+  border-top: 1px solid transparent; border-bottom: 1px solid transparent; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.dc-cost { z-index: 2; border-color: var(--m1); box-shadow: 0 2px 6px rgba(0,0,0,0.6), 0 0 0 1px var(--m3); }
 @media (prefers-reduced-motion: reduce) {
   .dm-card, .dm-card-body, .dm-card .dc-face, .dm-card-body::after, .dm-card .dc-cost, .dm-card .dc-art, .dm-card-charge::after, .dm-card.is-picked .dm-card-body::before,
   .dm-next-card, .dm-mana > .dm-mana-orb, .dm-mana-orb::before, .dm-mana-orb::after, .dm-mana-bar i.on, .du-cardbtn, .du-draft-opt { animation: none !important; transition: none !important; }
