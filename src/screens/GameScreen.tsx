@@ -7,6 +7,7 @@ import { EternalPanel } from "@/ui/EternalPanel";
 import { romanDepth } from "@/config/eternal";
 import { beginHunt, endHunt, ETERNAL_STORAGE_KEY, HUNT_STORAGE_KEY, loadHuntMeta, loadSave } from "@/engine/SaveSystem";
 import { HuntBanner } from "@/ui/HuntBanner";
+import { GarrisonPanel } from "@/ui/GarrisonPanel";
 import { BestiaryPanel } from "@/ui/BestiaryPanel";
 import { TalentPanel } from "@/ui/TalentPanel";
 import { RiftPanel } from "@/ui/RiftPanel";
@@ -143,6 +144,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
   const [riftOpen, setRiftOpen] = useState(false);
   const [talentsOpen, setTalentsOpen] = useState(false);
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
+  const [garrisonOpen, setGarrisonOpen] = useState(false);
   const [eternalOpen, setEternalOpen] = useState(openMerchant);
   const [expeditionsOpen, setExpeditionsOpen] = useState<null | "trips" | "forge">(null);
   const mapAreaRef = useRef<HTMLDivElement>(null);
@@ -507,7 +509,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
           }}
         />
       )}
-      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => (open === "trips" ? null : "trips"))} onToggleForge={() => setExpeditionsOpen((open) => (open === "forge" ? null : "forge"))} />
+      <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleGarrison={() => setGarrisonOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => (open === "trips" ? null : "trips"))} onToggleForge={() => setExpeditionsOpen((open) => (open === "forge" ? null : "forge"))} />
 
       {/*
         MUNDO 3D — `zIndex: 0` here (instead of leaving it "auto") is load-
@@ -837,6 +839,16 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             onBuy={(id) => engine.buyFromMerchant(id)}
             onClose={() => setEternalOpen(false)}
             initialTab={openMerchant ? "merchant" : "contracts"}
+          />
+        )}
+        {garrisonOpen && hud.garrison && (
+          <GarrisonPanel
+            level={hud.garrison.level}
+            nextCost={hud.garrison.nextCost}
+            gold={hud.gold}
+            mode={mode}
+            onUpgrade={() => engine.upgradeGarrison()}
+            onClose={() => setGarrisonOpen(false)}
           />
         )}
         {bestiaryOpen && (

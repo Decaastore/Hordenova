@@ -1,3 +1,4 @@
+import { sanitizeGarrisonLevel } from "@/config/garrison";
 import { planHunt, sanitizeHuntMeta, type HuntMeta } from "@/config/hunt";
 import { sanitizeInventoryExpansions } from "@/config/inventoryExpansion";
 import { sanitizeBossKills, type BossKills } from "@/config/bossBestiary";
@@ -161,6 +162,8 @@ export interface SaveData {
   // -----------------------------------------------------------------------
   /** Cumulative permanent bonus to max Castle HP, from every CASTLE_HP_* roulette win ever landed — never decreases. */
   castleHpBonus: number;
+  /** GUARNIÇÃO — this castle's garrison level (config/garrison.ts). Season castle: resets with the Season; Eternal: kept for good. */
+  garrisonLevel: number;
   /** config/castleSkins.ts CastleSkinDefinition ids this save has unlocked via the Roulette's CASTLE_SKIN outcome — permanent, non-consumable, never removed (spec section 48: "deve ser permanente... nunca desaparecer"). */
   unlockedCastleSkinIds: string[];
 
@@ -392,6 +395,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   ownedCosmetics: [],
   seasonRewardRecords: [],
   castleHpBonus: 0,
+  garrisonLevel: 0,
   unlockedCastleSkinIds: [],
   prestigeLevel: 0,
   pendingRouletteSpinWaves: [],
@@ -932,6 +936,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       seasonRewardRecords: parseSeasonRewardRecords(parsed.seasonRewardRecords),
       // Master Implementation (save v8 -> v9) — same pattern once more.
       castleHpBonus: typeof parsed.castleHpBonus === "number" && parsed.castleHpBonus >= 0 ? parsed.castleHpBonus : 0,
+      garrisonLevel: sanitizeGarrisonLevel(parsed.garrisonLevel),
       unlockedCastleSkinIds: parseUnlockedCastleSkinIds(parsed.unlockedCastleSkinIds),
       // Master Implementation Pass (save v10 -> v11) — same pattern once more.
       prestigeLevel: typeof parsed.prestigeLevel === "number" && parsed.prestigeLevel >= 0 ? parsed.prestigeLevel : 0,
@@ -1146,6 +1151,7 @@ export const CASTLE_FIELDS = [
   "towerMasteryLevels",
   "towerManaLevels",
   "castleHpBonus",
+  "garrisonLevel",
   "hordeAdaptation",
   "city",
   "rift",

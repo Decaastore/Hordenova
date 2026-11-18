@@ -15,6 +15,7 @@ import { buildFoundation, type FoundationStyle } from "./foundations";
 import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
+import { Garrison } from "./garrison3d";
 import { Effects } from "@/battlefield3d/fx";
 import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
@@ -626,6 +627,7 @@ function Castle({
     </mesh>
     <group ref={group} position={anchor} rotation-y={YAW} scale={scale}>
       <primitive object={model.root} />
+      <Garrison engine={engine} model={model} group={group} fx={fx} />
       {flags.map((f) => (
         <primitive key={f.uuid} object={f} />
       ))}

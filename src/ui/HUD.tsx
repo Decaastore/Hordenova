@@ -34,6 +34,8 @@ interface HUDProps {
   onToggleTalents?: () => void;
   /** BESTIÁRIO E CONQUISTAS — opens the bestiary panel. */
   onToggleBestiary?: () => void;
+  /** GUARNIÇÃO — opens the castle garrison panel. */
+  onToggleGarrison?: () => void;
   /** MODO ETERNO — opens the Eternal panel (only shown in the Eternal castle). */
   onToggleEternal?: () => void;
   /** EXPEDIÇÕES E FORJA — opens the Expeditions and Forge panel. */
@@ -42,7 +44,7 @@ interface HUDProps {
   onToggleForge?: () => void;
 }
 
-export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleEternal, onToggleExpeditions, onToggleForge }: HUDProps) {
+export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStore, onToggleMissions, onToggleCity, onToggleRift, onToggleTalents, onToggleBestiary, onToggleGarrison, onToggleEternal, onToggleExpeditions, onToggleForge }: HUDProps) {
   const { t } = useLanguage();
   const hpRatio = Math.max(0, Math.min(1, hud.baseHp / Math.max(1, hud.maxBaseHp)));
   const hpColor = hpRatio > 0.5 ? PALETTE.success : hpRatio > 0.2 ? PALETTE.gold : PALETTE.danger;
@@ -217,6 +219,18 @@ export function HUD({ hud, onSetSpeed, onOpenInventory, onExitToHome, onOpenStor
               <HudEmblem tone="city" />
               <span className="hh-btn-txt">{t("city.button")}</span>
               {Object.keys(hud.city.burning).length > 0 && <span className="hh-badge is-fire">{Object.keys(hud.city.burning).length}</span>}
+            </button>
+          )}
+          {onToggleGarrison && (
+            <button
+              onClick={onToggleGarrison}
+              className={`hh-btn${hud.garrison && hud.garrison.nextCost !== null && hud.gold >= hud.garrison.nextCost && hud.garrison.level === 0 ? " is-live" : ""}`}
+              data-testid="garrison-button"
+              title={t("garrison.tooltip")}
+            >
+              <HudEmblem tone="garrison" />
+              <span className="hh-btn-txt">{t("garrison.button")}</span>
+              {hud.garrison && hud.garrison.level > 0 && <span className="hh-badge">{hud.garrison.level}</span>}
             </button>
           )}
           {onToggleBestiary && (

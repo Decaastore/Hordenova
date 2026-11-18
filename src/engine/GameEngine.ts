@@ -6,6 +6,7 @@ import { ETERNAL_STORAGE_KEY, HUNT_STORAGE_KEY, loadHuntMeta, writeHuntMeta } fr
 import { HUNT_BREACH_MULT, HUNT_HP_MULT, HUNT_SPEED_MULT, huntStatWave, type HuntRun } from "@/config/hunt";
 import { getInventoryExpansionPrice, INVENTORY_EXPANSION_SLOTS, MAX_INVENTORY_EXPANSIONS } from "@/config/inventoryExpansion";
 import { PHASES } from "@/config/phaseConfig";
+import { GARRISON_MAX_LEVEL, GARRISON_ROAD_RANGE, GARRISON_STUN_MS, GARRISON_VOLLEY_MS, garrisonSoldiers, garrisonUpgradeCost, garrisonVolleyDamage } from "@/config/garrison";
 import type { BossKills } from "@/config/bossBestiary";
 import { bestiaryStats, reachedAchievements, type AchievementId, type AchievementStats, type BestiaryKills } from "@/config/achievements";
 import { RARITY_DEFINITIONS } from "@/config/rarity";
@@ -107,6 +108,7 @@ import { seasonClock } from "./SeasonClock";
 import { freshMissionsState, MISSION_REWARD_KILLS_WORTH_OF_GOLD, MISSION_REWARD_SHARDS, missionsForDay, type DailyMissionsState, type MissionKind } from "@/config/dailyMissions";
 import {
   advanceEnemy,
+  applyDamageToEnemy,
   createEliteEnemyInstance,
   createEnemyInstance,
   isEnemyDead,
@@ -293,6 +295,8 @@ export interface HudSnapshot {
     lastEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null;
     contractsReady: number;
   };
+  /** GUARNIÇÃO — the castle's garrison level and the gold for the next level (null at the top). */
+  garrison?: { level: number; max: number; nextCost: number | null; soldiers: number };
   /** CAÇADA — the hunt this castle is playing (config/hunt.ts), or null outside a hunt. */
   hunt?: { phaseIndex: number; startWave: number; endWave: number; powerWave: number; won: boolean } | null;
   /** EXPEDIÇÕES E FORJA — trips and forge ready to collect, and trips under way. */
@@ -389,6 +393,8 @@ export interface RenderSnapshot {
   lootDrops: readonly LootDrop[];
   /** MODO ETERNO — the depth being fought (0 outside the Eternal castle); deeper maps are drawn corrupted. */
   depth: number;
+  /** GUARNIÇÃO — the castle's soldiers: level, whether a boss blow has them down, and the latest volleys (seq bumps per volley). */
+  garrison?: { level: number; soldiers: number; stunned: boolean; volley: { seq: number; targetId: string } | null };
 }
 
 function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
@@ -462,6 +468,7 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.eternal.lastEvent?.seq === b.eternal.lastEvent?.seq &&
     a.eternal.contractsReady === b.eternal.contractsReady &&
     a.hunt?.won === b.hunt?.won &&
+    a.garrison?.level === b.garrison?.level &&
     a.hunt?.phaseIndex === b.hunt?.phaseIndex &&
     JSON.stringify(a.rift.armed) === JSON.stringify(b.rift.armed) &&
     a.rift.active?.wave === b.rift.active?.wave &&
@@ -637,6 +644,11 @@ export class GameEngine {
   private bossKills: BossKills = {};
   /** CAÇADA — the hunt this castle plays (HUNT_STORAGE_KEY only). */
   private hunt: HuntRun | null = null;
+  /** GUARNIÇÃO — this castle's garrison (config/garrison.ts). */
+  private garrisonLevel = 0;
+  private garrisonCooldownMs = 0;
+  private garrisonStunMs = 0;
+  private garrisonVolley: { seq: number; targetId: string } | null = null;
   /** INVENTORY EXPANSION — Gem expansions bought (config/inventoryExpansion.ts). */
   private inventoryExpansions = 0;
   private achievements: AchievementId[] = [];
@@ -773,6 +785,7 @@ export class GameEngine {
     this.bestiaryKills = { ...save.bestiaryKills };
     this.bossKills = { ...save.bossKills };
     this.inventoryExpansions = save.inventoryExpansions;
+    this.garrisonLevel = save.garrisonLevel;
     this.hunt = this.isHunt ? loadHuntMeta().active : null;
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
@@ -2350,6 +2363,46 @@ export class GameEngine {
     return true;
   }
 
+  /**
+   * GUARNIÇÃO — every GARRISON_VOLLEY_MS the soldiers loose a volley at the
+   * Boss or Mini-Boss nearest the gate within GARRISON_ROAD_RANGE of road.
+   * The ordinary horde is never targeted.
+   */
+  private tickGarrison(dtMs: number): void {
+    if (this.garrisonStunMs > 0) this.garrisonStunMs = Math.max(0, this.garrisonStunMs - dtMs);
+    if (this.garrisonLevel <= 0) return;
+    this.garrisonCooldownMs -= dtMs;
+    if (this.garrisonCooldownMs > 0 || this.garrisonStunMs > 0) return;
+    const roadEnd = this.layout.length;
+    let target: EnemyInstance | null = null;
+    for (const e of this.enemies) {
+      if (!e.boss || isEnemyDead(e)) continue;
+      const toGate = roadEnd - e.distanceTraveled;
+      if (toGate > GARRISON_ROAD_RANGE) continue;
+      if (!target || toGate < roadEnd - target.distanceTraveled) target = e;
+    }
+    if (!target) {
+      this.garrisonCooldownMs = 0;
+      return;
+    }
+    this.garrisonCooldownMs = GARRISON_VOLLEY_MS;
+    applyDamageToEnemy(target, garrisonVolleyDamage(this.garrisonLevel, target.maxHp, !!this.hunt));
+    this.garrisonVolley = { seq: (this.garrisonVolley?.seq ?? 0) + 1, targetId: target.id };
+  }
+
+  /** GUARNIÇÃO — pays the next level in Gold. */
+  upgradeGarrison(): boolean {
+    if (this.isHunt) return false;
+    const cost = garrisonUpgradeCost(this.garrisonLevel);
+    if (cost === null || this.gold < cost) return false;
+    this.gold -= cost;
+    this.garrisonLevel += 1;
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
   /** BESTIÁRIO DOS CHEFES — defeats per boss id. */
   getBossKills(): Readonly<BossKills> {
     return this.bossKills;
@@ -2950,6 +3003,7 @@ export class GameEngine {
     }
 
     tickEnemyDisableAbilities(this.enemies, this.towers, nowMs);
+    this.tickGarrison(scaledDt);
 
     // Tick every boss-tagged enemy's abilities — the main boss during
     // BOSS_BATTLE, AND any mini-boss currently walking through a regular
@@ -3062,6 +3116,8 @@ export class GameEngine {
         const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp) * (fragile ? RIFT_FRAGILE_BREACH : 1) * (this.hunt ? HUNT_BREACH_MULT : 1) * (1 - talentBonus(this.talents).castleDamageReductionPct / 100);
         this.baseHp = Math.max(0, this.baseHp - castleDamage);
         recordBaseHit(this.battleStats, enemy, castleDamage);
+        // a boss blow on the castle knocks the garrison off the walls for a moment
+        if (enemy.boss) this.garrisonStunMs = GARRISON_STUN_MS;
         continue; // removed, no gold — it breached the base
       }
       if (isEnemyDead(enemy)) {
@@ -3752,6 +3808,7 @@ export class GameEngine {
         bestiaryKills: this.bestiaryKills,
         bossKills: this.bossKills,
         inventoryExpansions: this.inventoryExpansions,
+        garrisonLevel: this.garrisonLevel,
         achievements: this.achievements,
         equippedTitle: this.equippedTitle,
         riftsCleared: this.riftsCleared,
@@ -3831,6 +3888,7 @@ export class GameEngine {
         contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
       },
       hunt: this.hunt ? { ...this.hunt } : null,
+      garrison: { level: this.garrisonLevel, max: GARRISON_MAX_LEVEL, nextCost: garrisonUpgradeCost(this.garrisonLevel), soldiers: garrisonSoldiers(this.garrisonLevel) },
       expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters, forgeReady: !!this.expeditions.forging && Date.now() >= this.expeditions.forging.endsAt },
       momentOffer: this.momentOffers.active && this.momentOffers.active.expiresAt > Date.now() ? this.momentOffers.active : null,
     };
@@ -3853,6 +3911,7 @@ export class GameEngine {
       mapLayoutId: this.layout.id,
       lootDrops: this.lootDrops,
       depth: this.isEternal ? depthOfWave(this.wave.currentWave) : 0,
+      garrison: { level: this.garrisonLevel, soldiers: garrisonSoldiers(this.garrisonLevel), stunned: this.garrisonStunMs > 0, volley: this.garrisonVolley },
     };
   }
 }

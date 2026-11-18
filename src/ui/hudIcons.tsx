@@ -9,7 +9,7 @@ import { Medallion, type GameIconName } from "./gameIcons";
  * also gets a turning ring of light around its emblem (HUD.tsx).
  */
 
-export type EmblemTone = "missions" | "expeditions" | "forge" | "talents" | "rift" | "eternal" | "city" | "bestiary" | "inventory";
+export type EmblemTone = "missions" | "expeditions" | "forge" | "talents" | "rift" | "eternal" | "city" | "garrison" | "bestiary" | "inventory";
 
 export const EMBLEM_COLOR: Record<EmblemTone, string> = {
   missions: "#e89a2a",
@@ -19,6 +19,7 @@ export const EMBLEM_COLOR: Record<EmblemTone, string> = {
   rift: "#8a4ae0",
   eternal: "#2ab0a8",
   city: "#3a7ae0",
+  garrison: "#7a8a9a",
   bestiary: "#d0242a",
   inventory: "#a8683a",
 };
@@ -31,6 +32,7 @@ const EMBLEM_ICON: Record<EmblemTone, GameIconName> = {
   rift: "vortex",
   eternal: "hourglass",
   city: "castle",
+  garrison: "swords",
   bestiary: "skull",
   inventory: "pouch",
 };

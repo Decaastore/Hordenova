@@ -628,10 +628,16 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     }
     flagPole(0, keepH + keepRoofH, keepZ, 10, "bannerKeep");
 
-    // ---- Side curtain walls (from towers back to the keep) ----
+    // ---- Side curtain walls (front towers back to the rear towers) and the rear wall behind the keep ----
     for (const sx of [-1, 1]) {
-      const wall = addBox(4, 26, 22, sx * 30, 0, -4, stoneMat("sidewall", 1.6, 2, { rows: 7, cols: 4, mossy: 0.5 }));
-      wall.position.y = 13;
+      const wall = addBox(4, 24, 42, sx * 31.5, 0, -16, stoneMat("sidewall", 1.6, 2, { rows: 7, cols: 8, mossy: 0.5 }));
+      wall.position.y = 12;
+      anchors[sx < 0 ? "postWallL" : "postWallR"] = new THREE.Vector3(sx * 31.5, 24, -16);
+    }
+    {
+      const rearWall = addBox(58, 22, 4, 0, 0, -39, stoneMat("rearwall", 4, 2, { rows: 7, cols: 10, mossy: 0.5 }));
+      rearWall.position.y = 11;
+      battlementLine(-27, 27, 22, -37.5, 2);
     }
 
     // ---- Front curtain wall with gatehouse ----
@@ -710,11 +716,15 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       anchors[sx < 0 ? "torchL" : "torchR"] = new THREE.Vector3(sx * 8.5, 17.5, frontZ + 2.2 + gd / 2 + 0.4);
     }
     anchors.gate = new THREE.Vector3(0, 8, frontZ + 2.2 + gd / 2);
+    anchors.postGate = new THREE.Vector3(0, gh, frontZ + 2.2);
+    anchors.postFrontL = new THREE.Vector3(-16.5, wallH, frontZ);
+    anchors.postFrontR = new THREE.Vector3(16.5, wallH, frontZ);
 
-    // ---- Two round flanking towers ----
-    for (const sx of [-1, 1]) {
-      const tx = sx * 34, tz = 6, tr = ARCH.towerR, th = ARCH.towerH;
-      const broken = TIER >= 3 && sx < 0;
+    // ---- Four corner towers: two flanking the gate, two at the back (where the garrison stands) ----
+    for (const [sx, rear] of [[-1, false], [1, false], [-1, true], [1, true]] as const) {
+      const tx = sx * (rear ? 31.5 : 34), tz = rear ? -39 : 6, tr = ARCH.towerR * (rear ? 0.9 : 1), th = ARCH.towerH * (rear ? 0.92 : 1);
+      const broken = !rear && TIER >= 3 && sx < 0;
+      const side = (rear ? "B" : "") + (sx < 0 ? "L" : "R");
       const height = broken ? th - 9 : th;
       const tseg = { round: 32, hex: 6, octagon: 8, jagged: 5, needle: 12, tree: 10, square: 4 }[ARCH.tower];
       const tMat = ARCH.tower === "tree" ? new THREE.MeshStandardMaterial({ color: 0x5a3e24, roughness: 1 }) : stoneMat("tower", 3.4, 4.2, { rows: 7, cols: 5, mossy: 1 });
@@ -732,7 +742,27 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       // Arrow slits facing the camera-ish.
       for (const sy of [14, 28]) arrowSlit(tx + Math.sin(-0.25 * sx) * (tr + 0.1), sy, tz + Math.cos(-0.25 * sx) * (tr + 0.1), -0.25 * sx);
       if (!broken) arrowSlit(tx, 40, tz + tr + 0.1, 0, 1.6, 3.2);
-      anchors[sx < 0 ? "towerWindowL" : "towerWindowR"] = new THREE.Vector3(tx, 28, tz + tr);
+      if (!rear) anchors[sx < 0 ? "towerWindowL" : "towerWindowR"] = new THREE.Vector3(tx, 28, tz + tr);
+      // GUARNIÇÃO — an archers' balcony round the tower, below the roof, where its soldiers stand
+      {
+        const by = Math.round((broken ? th - 9 : th) * 0.66);
+        const br = tr + 3.2;
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(br, br - 1.2, 1.4, 20), new THREE.MeshStandardMaterial({ color: 0x5a3e24, roughness: 0.9 }));
+        deck.position.set(tx, by, tz);
+        deck.castShadow = deck.receiveShadow = true;
+        root.add(deck);
+        const rail = new THREE.Mesh(new THREE.TorusGeometry(br - 0.2, 0.28, 4, 24), new THREE.MeshStandardMaterial({ color: 0x3a2814, roughness: 0.9 }));
+        rail.rotation.x = Math.PI / 2;
+        rail.position.set(tx, by + 2.6, tz);
+        root.add(rail);
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 2.6, 0.5), rail.material);
+          post.position.set(tx + Math.cos(a) * (br - 0.2), by + 1.3, tz + Math.sin(a) * (br - 0.2));
+          root.add(post);
+        }
+        anchors[`postTower${side}`] = new THREE.Vector3(tx, by + 0.7, tz + (rear ? -1 : 1) * (tr + 1.4));
+      }
       if (broken) {
         // Jagged broken top: irregular stone chunks, no roof.
         const rr = rng(5);
@@ -770,7 +800,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
           cap.position.set(tx, height + roofH * 0.75 + 2.5, tz);
           root.add(cap);
         }
-        flagPole(tx, height + roofH + 2, tz, 8, sx < 0 ? "bannerTowerL" : "bannerTowerR");
+        flagPole(tx, height + roofH + 2, tz, 8, `bannerTower${side}`);
       }
     }
 
