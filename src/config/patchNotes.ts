@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v156",
+    dateIso: "2026-11-18",
+    category: "INTERFACE",
+    title: {
+      en: "New Ranking Page and Medallion Icons",
+      ptBR: "Página de Ranking Nova e Ícones em Medalhão",
+    },
+    description: {
+      en: "The Ranking page was rebuilt with every ranking in the game in one place, and the icons at the top of the game and on the Ranking became bronze-and-enamel medallions.",
+      ptBR: "A página de Ranking foi refeita com todos os rankings do jogo num só lugar, e os ícones do topo do jogo e do Ranking viraram medalhões de bronze e esmalte.",
+    },
+    highlights: [
+      {
+        en: "Nine rankings, each in its own tab: Season, Eternal, Duel, Global Boss, Record, Prestige, Bosses, Bestiary and Achievements — with what each one measures and how to climb it.",
+        ptBR: "Nove rankings, cada um na sua aba: Season, Eterno, Duelo, Chefe Global, Recorde, Prestígio, Chefes, Bestiário e Conquistas — com o que cada um mede e como subir nele.",
+      },
+      {
+        en: "Your own numbers on every board, a \"your record\" card, and your best marks up front. The podium and other players arrive with the online ranking; until then each board honestly lists only you.",
+        ptBR: "Seus números em cada placar, um card com o seu recorde, e suas melhores marcas logo no topo. O pódio e os outros jogadores chegam com o ranking online; até lá cada placar mostra só você, sem jogadores inventados.",
+      },
+      {
+        en: "New medallion icons: a bronze rim with studs, coloured enamel and a raised symbol. A band of light sweeps across them on hover, and a medallion glows softly when something is waiting for you.",
+        ptBR: "Ícones novos em medalhão: aro de bronze com rebites, esmalte colorido e símbolo em relevo. Uma faixa de luz passa por eles ao passar o mouse, e o medalhão brilha quando tem algo esperando por você.",
+      },
+    ],
+  },
+  {
     id: "v155",
     dateIso: "2026-11-18",
     category: "INTERFACE",
