@@ -5,6 +5,8 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition, type ItemCategory } from "@/config/itemDefinitions";
 import { RARITIES, getRarityDefinition, type Rarity } from "@/config/rarity";
+import { DualGemPriceButtons } from "./DualGemPriceButtons";
+import type { DualGemPrice } from "@/config/gemsEconomy";
 import { FUSION_ITEM_COUNT, getFusionSuccessChance, getNextRarity } from "@/config/itemFusion";
 import { itemRollQuality } from "@/config/itemRolls";
 import type { TowerType } from "@/config/towerStats";
@@ -117,8 +119,30 @@ const CSS = `
 .inv-chip[aria-pressed=true]{border-color:${PALETTE.uiAccent};color:${PALETTE.uiAccentBright};background:rgba(255,210,87,.14)}
 .inv-sort{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:11px;color:${PALETTE.uiTextDim}}
 .inv-sort select{background:rgba(0,0,0,.35);color:${PALETTE.uiText};border:1px solid ${PALETTE.uiPanelBorder};border-radius:6px;padding:4px 6px;font-size:11.5px}
-.inv-fuse-toggle{padding:6px 12px;border-radius:7px;border:1px solid ${PALETTE.uiAccent};background:rgba(255,210,87,.1);color:${PALETTE.uiAccentBright};font-weight:700;font-size:11.5px;cursor:pointer}
+.inv-fuse-toggle{position:relative;display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;border:1px solid ${PALETTE.uiAccent};background:linear-gradient(180deg,rgba(255,210,87,.22),rgba(255,160,40,.1));color:${PALETTE.uiAccentBright};font-weight:800;font-size:12px;cursor:pointer;box-shadow:0 0 0 1px rgba(255,210,87,.12),0 2px 8px rgba(0,0,0,.35)}
+.inv-fuse-toggle:hover{filter:brightness(1.15)}
 .inv-fuse-toggle[aria-pressed=true]{background:${PALETTE.uiAccent};color:#2a1a08}
+.inv-fuse-toggle.is-ready{animation:inv-fuse-glow 1.8s ease-in-out infinite}
+.inv-fuse-ico{font-size:14px;line-height:1}
+.inv-fuse-badge{min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#ff5a2a;color:#fff;font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center}
+@keyframes inv-fuse-glow{0%,100%{box-shadow:0 0 0 1px rgba(255,210,87,.2),0 0 6px rgba(255,170,60,.25)}50%{box-shadow:0 0 0 1px rgba(255,210,87,.55),0 0 16px rgba(255,170,60,.6)}}
+.inv-fuse-banner{display:flex;align-items:center;gap:12px;width:100%;margin:0 0 12px;padding:10px 14px;border-radius:10px;border:1px solid ${PALETTE.uiAccent}88;background:linear-gradient(100deg,rgba(255,140,40,.16),rgba(255,210,87,.06) 60%,rgba(0,0,0,.15));color:${PALETTE.uiText};cursor:pointer;text-align:left;font:inherit}
+.inv-fuse-banner:hover{border-color:${PALETTE.uiAccentBright}}
+.inv-fuse-banner.is-ready{border-color:${PALETTE.uiAccentBright};box-shadow:0 0 14px rgba(255,170,60,.25)}
+.inv-fuse-banner-ico{flex:none;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:19px;background:radial-gradient(circle at 35% 30%,#ffd27a,#c2621a 70%,#5a2a08);color:#2a1206;box-shadow:inset 0 0 0 2px rgba(255,230,170,.5),0 2px 6px rgba(0,0,0,.5)}
+.inv-fuse-banner-txt{display:flex;flex-direction:column;gap:2px;min-width:0;flex:1;font-size:11.5px;color:${PALETTE.uiTextDim}}
+.inv-fuse-banner-txt b{font-size:13px;color:${PALETTE.uiAccentBright}}
+.inv-fuse-banner-go{flex:none;padding:6px 12px;border-radius:7px;background:${PALETTE.uiAccent};color:#2a1a08;font-weight:800;font-size:11.5px}
+.inv-expand{position:relative}
+.inv-expand-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 11px;border-radius:7px;border:1px solid ${PALETTE.gem};background:rgba(200,138,255,.12);color:#f1e4ff;font-weight:700;font-size:11.5px;cursor:pointer;white-space:nowrap}
+.inv-expand-btn:hover{background:rgba(200,138,255,.22)}
+.inv-expand-btn.is-full{animation:inv-fuse-glow 1.8s ease-in-out infinite}
+.inv-expand-max{font-size:11px;color:${PALETTE.uiTextDim}}
+.inv-expand-pop{position:absolute;top:calc(100% + 6px);left:0;z-index:5;width:250px;padding:12px;border-radius:10px;border:1px solid ${PALETTE.gem}88;background:linear-gradient(160deg,rgba(48,30,62,.99),rgba(22,14,28,.99));box-shadow:0 12px 30px rgba(0,0,0,.6);display:flex;flex-direction:column;gap:7px}
+.inv-expand-title{font-weight:800;font-size:13px;color:#f1e4ff}
+.inv-expand-txt{font-size:11.5px;color:${PALETTE.uiText};line-height:1.4}
+.inv-expand-txt.dim{color:${PALETTE.uiTextDim}}
+@media (prefers-reduced-motion: reduce){.inv-fuse-toggle.is-ready,.inv-expand-btn.is-full{animation:none}}
 .inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:9px}
 .hordenova-item-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:7px;aspect-ratio:1/1.12;padding:12px 6px 10px;border-radius:10px;border:1px solid;background:rgba(0,0,0,.28);color:inherit;cursor:pointer;text-align:center;transition:transform 140ms ease,box-shadow 140ms ease,opacity 140ms ease;font:inherit}
 .hordenova-item-tile:hover:not(:disabled){transform:translateY(-2px)}
@@ -199,6 +223,9 @@ interface InventoryPanelProps {
   onRerollItem?: (instanceId: string) => number[] | null;
   /** instanceId -> the tower type wearing it (GameEngine.getEquippedItemTowers). Omitted = equipped state unknown. */
   equippedTowers?: Readonly<Record<string, TowerType>>;
+  /** INVENTORY EXPANSION — the next +slots purchase (GameEngine.getInventoryExpansionInfo). Omitted = not offered here. */
+  expansion?: { bought: number; max: number; slots: number; price: DualGemPrice | null };
+  onBuyExpansion?: (currency: GemCurrency) => void;
 }
 
 export function InventoryPanel({
@@ -219,6 +246,8 @@ export function InventoryPanel({
   onAttemptFusion,
   onRerollItem,
   equippedTowers,
+  expansion,
+  onBuyExpansion,
 }: InventoryPanelProps) {
   const { t } = useLanguage();
   const narrow = useNarrow();
@@ -233,6 +262,7 @@ export function InventoryPanel({
   const [fusionSelectedIds, setFusionSelectedIds] = useState<string[]>([]);
   const [fusionConfirming, setFusionConfirming] = useState(false);
   const [fusionOutcome, setFusionOutcome] = useState<FusionOutcome | null>(null);
+  const [expandOpen, setExpandOpen] = useState(false);
 
   useEffect(() => {
     setFusionSelectedIds((prev) => prev.filter((id) => inventory.some((item) => item.instanceId === id)));
@@ -304,6 +334,19 @@ export function InventoryPanel({
     }
   };
 
+  // How many sets of 3 same-rarity items could be fused right now — shown on the fusion buttons so the feature is found.
+  const readyTrios = (() => {
+    const byRarity = new Map<string, number>();
+    for (const item of inventory) {
+      if (!fusable(item) || equippedTowers?.[item.instanceId]) continue;
+      const r = rarityOf(item)!;
+      byRarity.set(r, (byRarity.get(r) ?? 0) + 1);
+    }
+    let n = 0;
+    for (const c of byRarity.values()) n += Math.floor(c / FUSION_ITEM_COUNT);
+    return n;
+  })();
+
   const used = inventory.length;
   const fillPct = Math.min(100, inventoryCapacity > 0 ? (used / inventoryCapacity) * 100 : 0);
   const meterColor = used >= inventoryCapacity ? PALETTE.danger : fillPct >= 80 ? "#ffb347" : PALETTE.uiAccent;
@@ -327,6 +370,33 @@ export function InventoryPanel({
               <div className="inv-meter-fill" style={{ width: `${fillPct}%`, background: meterColor }} />
             </div>
           </div>
+          {expansion && onBuyExpansion && (
+            <div className="inv-expand">
+              {expansion.price ? (
+                <button className={`inv-expand-btn${used >= inventoryCapacity ? " is-full" : ""}`} aria-expanded={expandOpen} onClick={() => setExpandOpen(!expandOpen)} data-testid="inventory-expand">
+                  <span aria-hidden="true">＋</span> {t("inventory.expand.button", { slots: expansion.slots })}
+                </button>
+              ) : (
+                <span className="inv-expand-max">{t("inventory.expand.maxed")}</span>
+              )}
+              {expandOpen && expansion.price && (
+                <div className="inv-expand-pop hn-pop" role="dialog" aria-label={t("inventory.expand.title")}>
+                  <div className="inv-expand-title">{t("inventory.expand.title")}</div>
+                  <div className="inv-expand-txt">{t("inventory.expand.body", { slots: expansion.slots, from: inventoryCapacity, to: inventoryCapacity + expansion.slots })}</div>
+                  <div className="inv-expand-txt dim">{t("inventory.expand.left", { n: expansion.max - expansion.bought })}</div>
+                  <DualGemPriceButtons
+                    price={expansion.price}
+                    freeBalance={freeGems}
+                    purchasedBalance={purchasedGems}
+                    onPay={(currency) => {
+                      onBuyExpansion(currency);
+                      setExpandOpen(false);
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+          )}
           {gemShards > 0 && (
             // GameEngine.canConvertGemShards is the one rule both this button and convertGemShards() read.
             <div className="inv-shards" title={t("inventory.convertNeed", { rate })}>
@@ -379,11 +449,24 @@ export function InventoryPanel({
                   </label>
                 )}
                 {inventory.length > 0 && (
-                  <button className="inv-fuse-toggle" aria-pressed={fusionMode} onClick={() => setFusion(!fusionMode)} data-testid="inventory-fusion-toggle">
+                  <button className={`inv-fuse-toggle${readyTrios > 0 && !fusionMode ? " is-ready" : ""}`} aria-pressed={fusionMode} onClick={() => setFusion(!fusionMode)} data-testid="inventory-fusion-toggle">
+                    <span className="inv-fuse-ico" aria-hidden="true">⚒</span>
                     {fusionMode ? t("inventory.fusion.exitMode") : t("inventory.fusion.mode")}
+                    {readyTrios > 0 && !fusionMode && <span className="inv-fuse-badge">{readyTrios}</span>}
                   </button>
                 )}
               </div>
+
+              {!fusionMode && inventory.length > 0 && (
+                <button className={`inv-fuse-banner${readyTrios > 0 ? " is-ready" : ""}`} onClick={() => setFusion(true)} data-testid="inventory-fusion-banner">
+                  <span className="inv-fuse-banner-ico" aria-hidden="true">⚒</span>
+                  <span className="inv-fuse-banner-txt">
+                    <b>{t("inventory.fusion.bannerTitle")}</b>
+                    <span>{readyTrios > 0 ? t("inventory.fusion.bannerReady", { n: readyTrios }) : t("inventory.fusion.bannerHow")}</span>
+                  </span>
+                  <span className="inv-fuse-banner-go">{t("inventory.fusion.mode")}</span>
+                </button>
+              )}
 
               {inventory.length === 0 ? (
                 <div className="inv-empty">{t("inventory.empty")}</div>

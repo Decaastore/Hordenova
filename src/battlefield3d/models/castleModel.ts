@@ -53,6 +53,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     VOID_SPIRE: { stoneA: "#5a4a7a", stoneB: "#22183a", mortar: "#0e0818", roof: "#4a1a7a", roofDark: "#14062a", ground: "#1e1830", core: "#c890ff", window: "#d0a0ff", roofKind: "spire" },
     RECRUIT_KEEP: { stoneA: "#b8a07a", stoneB: "#7a6040", mortar: "#4a3a24", roof: "#8a5a2a", roofDark: "#4a2a10", ground: "#7a6a40", moss: "#5a6a2a", core: "#ffcf8a", window: "#ffcf8a", roofKind: "cone" },
     OBSIDIAN_BASTION: { stoneA: "#55555f", stoneB: "#17171d", mortar: "#1c3a38", roof: "#16161c", roofDark: "#060608", ground: "#1a1c20", core: "#2fe0c8", window: "#5af0d8", roofKind: "flat" },
+    HUNTER_THRONE: { stoneA: "#5a3a34", stoneB: "#24120f", mortar: "#120806", roof: "#7a121a", roofDark: "#2a0408", ground: "#2a1a14", core: "#ff6a3a", window: "#ff9a5a", roofKind: "spire" },
     PRESTIGE_ETERNAL_BASTION: { stoneA: "#f4f0e6", stoneB: "#c8bca0", mortar: "#7a6a4a", roof: "#e0b440", roofDark: "#8a6010", ground: "#d8ccaa", core: "#ffe08a", window: "#fff0b0", roofKind: "spire", roofMetal: 0.9 },
   };
   const SD: SkinDress | null = SKIN_DRESS[SKIN] ?? null;
@@ -77,6 +78,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       VOID_SPIRE: { keep: "octagon", tower: "needle", keepH: 82, towerH: 70, towerR: 7, wall: "glass" },
       RECRUIT_KEEP: { keep: "box", tower: "square", keepH: 52, towerH: 38, towerR: 9, wall: "wood" },
       OBSIDIAN_BASTION: { keep: "box", tower: "square", keepH: 52, towerH: 36, towerR: 15, wall: "glass" },
+      HUNTER_THRONE: { keep: "jagged", tower: "hex", keepH: 78, towerH: 54, towerR: 11, wall: "stone" },
       PRESTIGE_ETERNAL_BASTION: { keep: "octagon", tower: "octagon", keepH: 72, towerH: 50, towerR: 10, wall: "marble" },
     } as Record<string, Arch>)[SKIN] ?? { keep: "box", tower: "round", keepH: 70, towerH: 48, towerR: 11, wall: "stone" };
   const D: SkinDress = SD ?? DRESS[BIOME] ?? DRESS.ANCIENT_FOREST!;
@@ -1027,6 +1029,59 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
         }
         // golden trims along the front wall
         addBox(46, 0.8, 0.8, 0, 26.4, 11.4, gold);
+        break;
+      }
+      case "HUNTER_THRONE": {
+        // The hunter's hall: bone trophies of every boss brought down — great
+        // horns over the keep, a palisade of bone spikes, crimson war banners
+        // and ember braziers burning at the gate.
+        const bone = new THREE.MeshStandardMaterial({ color: 0xe8dcc0, roughness: 0.75 });
+        const cloth = new THREE.MeshStandardMaterial({ color: 0x8a101a, roughness: 0.85, side: THREE.DoubleSide });
+        const ember = glowMat("#ff6a2a", 2.2);
+        const iron = new THREE.MeshStandardMaterial({ color: 0x241c1a, roughness: 0.45, metalness: 0.7 });
+        // horns curling up from the keep's crown
+        for (const sx of [-1, 1]) {
+          for (let i = 0; i < 6; i++) {
+            const k = i / 5;
+            const h = new THREE.Mesh(new THREE.ConeGeometry(3.2 * (1 - k * 0.75), 7, 7), bone);
+            h.position.set(sx * (9 + k * 10), 80 + Math.sin(k * Math.PI * 0.9) * 14, -2 - k * 4);
+            h.rotation.z = -sx * (0.5 + k * 1.1);
+            h.castShadow = true;
+            root.add(h);
+          }
+        }
+        // bone spike palisade around the mound
+        ring(22, 47, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 14) return;
+          const sp = new THREE.Mesh(new THREE.ConeGeometry(1.5, 9 + rr() * 7, 6), bone);
+          sp.position.set(x, 4, z);
+          sp.rotation.set(Math.cos(a) * 0.35, 0, -Math.sin(a) * 0.35);
+          sp.castShadow = true;
+          root.add(sp);
+        });
+        // crimson war banners hanging from the towers
+        for (const [bx, by, bz] of [[-34, 44, 8], [34, 44, 8], [0, 58, 12]] as const) {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 16, 6), iron);
+          pole.rotation.z = Math.PI / 2;
+          pole.position.set(bx, by + 6, bz + 1);
+          root.add(pole);
+          const banner = new THREE.Mesh(new THREE.PlaneGeometry(9, 16, 1, 4), cloth);
+          banner.position.set(bx, by - 2, bz + 1.2);
+          root.add(banner);
+          const sigil = new THREE.Mesh(new THREE.CircleGeometry(2.2, 3), ember);
+          sigil.position.set(bx, by, bz + 1.4);
+          sigil.rotation.z = Math.PI;
+          root.add(sigil);
+        }
+        // braziers at the gate
+        for (const sx of [-1, 1]) {
+          const bowl = new THREE.Mesh(new THREE.CylinderGeometry(2.6, 1.4, 2.4, 10), iron);
+          bowl.position.set(sx * 13, 5, 20);
+          root.add(bowl);
+          const fire = new THREE.Mesh(new THREE.ConeGeometry(1.8, 4.5, 8), ember);
+          fire.position.set(sx * 13, 8, 20);
+          root.add(fire);
+        }
         break;
       }
       case "VERDANT_HOLD": {

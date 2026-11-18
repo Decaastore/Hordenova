@@ -5,7 +5,8 @@ import { ExpeditionPanel } from "@/ui/ExpeditionPanel";
 import { MomentOfferCard } from "@/ui/MomentOfferCard";
 import { EternalPanel } from "@/ui/EternalPanel";
 import { romanDepth } from "@/config/eternal";
-import { ETERNAL_STORAGE_KEY } from "@/engine/SaveSystem";
+import { beginHunt, endHunt, ETERNAL_STORAGE_KEY, HUNT_STORAGE_KEY, loadHuntMeta, loadSave } from "@/engine/SaveSystem";
+import { HuntBanner } from "@/ui/HuntBanner";
 import { BestiaryPanel } from "@/ui/BestiaryPanel";
 import { TalentPanel } from "@/ui/TalentPanel";
 import { RiftPanel } from "@/ui/RiftPanel";
@@ -100,7 +101,7 @@ const WorldSceneOverlay = lazy(() =>
 );
 
 /** MODO ETERNO — the Season castle (competitive, resets each Season) or the Eternal one. */
-export type GameMode = "SEASON" | "ETERNAL";
+export type GameMode = "SEASON" | "ETERNAL" | "HUNT";
 
 interface GameScreenProps {
   mode?: GameMode;
@@ -109,10 +110,14 @@ interface GameScreenProps {
   onOpenStore?: () => void;
   /** Eternal: open the Eternal panel on the Merchant tab right away. */
   openMerchant?: boolean;
+  /** CAÇADA — a hunt was set up (SaveSystem.beginHunt): play it. */
+  onStartHunt?: () => void;
+  /** CAÇADA — the hunt ended (won or abandoned): back to the Season castle. */
+  onEndHunt?: () => void;
 }
 
-export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMerchant = false }: GameScreenProps) {
-  const { engine, hud } = useGameEngine(mode === "ETERNAL" ? ETERNAL_STORAGE_KEY : undefined);
+export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMerchant = false, onStartHunt, onEndHunt }: GameScreenProps) {
+  const { engine, hud } = useGameEngine(mode === "ETERNAL" ? ETERNAL_STORAGE_KEY : mode === "HUNT" ? HUNT_STORAGE_KEY : undefined);
   const tabPresence = useTabPresence(hud);
   useGameAudio(engine);
   // Stable callback identities for the dismissible banners below: `engine`
@@ -492,6 +497,16 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
 
   return (
     <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column" }}>
+      {hud.hunt && (
+        <HuntBanner
+          hunt={hud.hunt}
+          wave={hud.wave}
+          onLeave={() => {
+            endHunt();
+            onEndHunt?.();
+          }}
+        />
+      )}
       <HUD hud={hud} onSetSpeed={engine.setSpeed.bind(engine)} onOpenInventory={() => setInventoryOpen((open) => !open)} onExitToHome={onExitToMenu} onOpenStore={onOpenStore} onToggleMissions={() => setMissionsOpen((open) => !open)} onToggleCity={() => setCityOpen((open) => !open)} onToggleRift={() => setRiftOpen((open) => !open)} onToggleTalents={() => setTalentsOpen((open) => !open)} onToggleBestiary={() => setBestiaryOpen((open) => !open)} onToggleEternal={() => setEternalOpen((open) => !open)} onToggleExpeditions={() => setExpeditionsOpen((open) => (open === "trips" ? null : "trips"))} onToggleForge={() => setExpeditionsOpen((open) => (open === "forge" ? null : "forge"))} />
 
       {/*
@@ -827,6 +842,24 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
         {bestiaryOpen && (
           <BestiaryPanel
             kills={engine.getBestiaryKills()}
+            bossKills={engine.getBossKills()}
+            hunt={(() => {
+              const season = loadSave();
+              const meta = loadHuntMeta();
+              return { seasonBestWave: season.seasonBestWave, seasonWave: season.currentWave, wins: meta.wins, activePhase: meta.active?.phaseIndex ?? null };
+            })()}
+            onStartHunt={(phaseIndex) => {
+              const active = loadHuntMeta().active;
+              const resume = active?.phaseIndex === phaseIndex && !active.won;
+              if (resume && mode === "HUNT") {
+                setBestiaryOpen(false);
+                return;
+              }
+              if (resume || beginHunt(phaseIndex)) {
+                setBestiaryOpen(false);
+                onStartHunt?.();
+              }
+            }}
             stats={engine.getAchievementStats()}
             unlocked={engine.getUnlockedAchievements()}
             title={hud.achievement.title}
@@ -881,6 +914,8 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
             onAttemptFusion={(ids) => engine.attemptFusion(ids)}
             onRerollItem={(id) => engine.rerollItem(id)}
             equippedTowers={engine.getEquippedItemTowers()}
+            expansion={engine.getInventoryExpansionInfo()}
+            onBuyExpansion={(currency) => engine.buyInventoryExpansion(currency)}
           />
         )}
       </div>

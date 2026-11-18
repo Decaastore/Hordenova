@@ -25,7 +25,8 @@ import { getEquippedSkinGameplayEffect, getTowerStats } from "@/entities/Tower";
 import { PALETTE, TOWER_THEME, ARCHETYPE_VISUAL_SCALE, ENEMY_DISPLAY_SCALE } from "./theme";
 import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
-import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools } from "./groundBakes";
+import { getActiveMapLayout } from "@/data/mapLayouts";
+import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools, withoutRoadPastGate } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
 import { pruneTowerAims, steerTowerAim } from "./towerSprites";
@@ -133,6 +134,10 @@ interface CanvasRendererProps {
   /** HÍBRIDO (prévia) — a live 3D castle is drawn over the map, so skip the whole 2D fortress. */
   hideCastle?: boolean;
 }
+
+
+/** How far before the gate a creature starts walking in (shrinking and fading). */
+const GATE_ENTRY_DISTANCE = 46;
 
 export interface MapPointerBridge {
   click(world: Vector2): void;
@@ -474,7 +479,9 @@ export function CanvasRenderer({
       // Baked ground (terrain + road + static scenery pre-rendered with real
       // light/shadow) replaces the live ground/road/scenery drawing for the
       // biomes that have one; the 3D terrain layer stands down for them too.
-      const rawBake = getGroundBake(biome.id);
+      // every road ends at the castle gate now: the painted stretch past the castle comes out of the ground image
+      const loadedBake = getGroundBake(biome.id);
+      const rawBake = loadedBake ? withoutRoadPastGate(loadedBake, biome) : null;
       // with the 3D lava pools showing, the painted ones come out of the ground image
       const groundBake = rawBake && PROPS_3D.active && biome.liquidGlows ? withoutLavaPools(rawBake, biome) : rawBake;
       // the hybrid 3D layer builds the light towers and lava pools itself: leave the flat ones out
@@ -620,7 +627,23 @@ export function CanvasRenderer({
             drawEnemy(ctx, shown, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
             ctx.restore();
           } else {
-            drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+            // THE GATE — the road ends at the castle: over its last stretch a
+            // creature walks in through the gate, shrinking into the doorway
+            // and fading out of sight, then it is gone.
+            const toGate = getActiveMapLayout().length - enemy.distanceTraveled;
+            if (toGate < GATE_ENTRY_DISTANCE) {
+              const k = Math.max(0, toGate / GATE_ENTRY_DISTANCE);
+              const e = k * k * (3 - 2 * k);
+              ctx.save();
+              ctx.globalAlpha = e;
+              ctx.translate(enemy.position.x, enemy.position.y);
+              ctx.scale(0.55 + 0.45 * e, 0.55 + 0.45 * e);
+              ctx.translate(-enemy.position.x, -enemy.position.y);
+              drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+              ctx.restore();
+            } else {
+              drawEnemy(ctx, enemy, timestamp, hitFlashMs, scale, bossColor, smoothedAngle, turnRate);
+            }
           }
         }
         // SHIELD DURANTE O MODO ENFURECIDO — drawn on top of the body itself

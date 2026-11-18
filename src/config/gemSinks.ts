@@ -11,10 +11,9 @@
  * attack speed, drop-rate, or any other combat/progression advantage. A
  * free player must always be able to out-progress a paying one through
  * time/skill/strategy alone; Gems only ever make that same path faster or
- * prettier, never gate it. `inventory_expansion` stays what SaveSystem.ts's
- * own inventoryCapacity field already documented — architecturally
- * reserved, honestly marked `implemented: false` below, not silently
- * pretended into existence.
+ * prettier, never gate it. `inventory_expansion` is now a real purchase
+ * (config/inventoryExpansion.ts, GameEngine.buyInventoryExpansion): +10
+ * slots each, capped, never a combat or drop advantage.
  *
  * FASE 6 (currency division: "Gold compra/evolui poder. Gems compram
  * acesso/decisões específicas e Prestige permanente.") — `tower_mastery`
@@ -41,7 +40,7 @@ export interface GemSinkDefinition {
 
 export const GEM_SINKS: readonly GemSinkDefinition[] = [
   { id: "specialization_unlock", category: "CONVENIENCE", i18nKey: "SPECIALIZATION_UNLOCK", uncapped: false, implemented: true },
-  { id: "inventory_expansion", category: "CONVENIENCE", i18nKey: "INVENTORY_EXPANSION", uncapped: false, implemented: false },
+  { id: "inventory_expansion", category: "CONVENIENCE", i18nKey: "INVENTORY_EXPANSION", uncapped: false, implemented: true },
   { id: "profile_prestige", category: "COSMETIC_PRESTIGE", i18nKey: "PROFILE_PRESTIGE", uncapped: true, implemented: true },
   { id: "tower_skin", category: "COSMETIC_PRESTIGE", i18nKey: "TOWER_SKIN", uncapped: false, implemented: true },
 ];

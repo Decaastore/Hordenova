@@ -14,9 +14,11 @@ describe("gemSinks (Master Implementation Pass spec section 7/8/46)", () => {
     expect(hasUncappedGemSink()).toBe(true);
   });
 
-  it("inventory expansion is honestly marked not-yet-implemented, never silently claimed as a working purchase flow", () => {
+  it("inventory expansion is a real, capped CONVENIENCE purchase", () => {
     const expansion = GEM_SINKS.find((s) => s.id === "inventory_expansion");
-    expect(expansion!.implemented).toBe(false);
+    expect(expansion!.implemented).toBe(true);
+    expect(expansion!.uncapped).toBe(false);
+    expect(expansion!.category).toBe("CONVENIENCE");
   });
 
   it("every sink has a unique id", () => {

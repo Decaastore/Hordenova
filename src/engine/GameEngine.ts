@@ -2,7 +2,11 @@ import { BLESSING_EVERY, BLESSING_MULT, BLESSING_WAVES, ELEMENT_OF_TOWER, elemen
 import { FUSION_MAX_DISTANCE, FUSION_MIN_LEVEL, getFusionCost, getFusionGemPrice, type FusionPayment } from "@/config/towerFusion";
 import { interestForWave } from "@/config/goldInterest";
 import { claimableMilestones, contractsForWeek, depthOfWave, depthReward, MERCHANT_OFFERS, milestoneReward, rollWeek, SHARD_POUCH_AMOUNT, type EternalState, type MerchantOfferId, createEternalState } from "@/config/eternal";
-import { ETERNAL_STORAGE_KEY } from "./SaveSystem";
+import { ETERNAL_STORAGE_KEY, HUNT_STORAGE_KEY, loadHuntMeta, writeHuntMeta } from "./SaveSystem";
+import { HUNT_BREACH_MULT, HUNT_HP_MULT, HUNT_SPEED_MULT, huntStatWave, type HuntRun } from "@/config/hunt";
+import { getInventoryExpansionPrice, INVENTORY_EXPANSION_SLOTS, MAX_INVENTORY_EXPANSIONS } from "@/config/inventoryExpansion";
+import { PHASES } from "@/config/phaseConfig";
+import type { BossKills } from "@/config/bossBestiary";
 import { bestiaryStats, reachedAchievements, type AchievementId, type AchievementStats, type BestiaryKills } from "@/config/achievements";
 import { RARITY_DEFINITIONS } from "@/config/rarity";
 import { canRaiseTalent, LAST_STAND_HP_FRACTION, sanitizeTalentRanks, talentBonus, talentPointsFree, type TalentId, type TalentRanks } from "@/config/talents";
@@ -289,6 +293,8 @@ export interface HudSnapshot {
     lastEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null;
     contractsReady: number;
   };
+  /** CAÇADA — the hunt this castle is playing (config/hunt.ts), or null outside a hunt. */
+  hunt?: { phaseIndex: number; startWave: number; endWave: number; powerWave: number; won: boolean } | null;
   /** EXPEDIÇÕES E FORJA — trips and forge ready to collect, and trips under way. */
   expeditions: { ready: number; away: number; forging: boolean; splinters: number; forgeReady: boolean };
   /** OFERTAS DE MOMENTO — the offer on screen, if any. */
@@ -455,6 +461,8 @@ function hudSnapshotsEqual(a: HudSnapshot, b: HudSnapshot): boolean {
     a.eternal.depth === b.eternal.depth &&
     a.eternal.lastEvent?.seq === b.eternal.lastEvent?.seq &&
     a.eternal.contractsReady === b.eternal.contractsReady &&
+    a.hunt?.won === b.hunt?.won &&
+    a.hunt?.phaseIndex === b.hunt?.phaseIndex &&
     JSON.stringify(a.rift.armed) === JSON.stringify(b.rift.armed) &&
     a.rift.active?.wave === b.rift.active?.wave &&
     a.rift.lastResult?.seq === b.rift.lastResult?.seq &&
@@ -625,6 +633,12 @@ export class GameEngine {
   private seasonRule: SeasonRule | null = null;
   private lastEternalEvent: { seq: number; kind: "DEPTH" | "MILESTONE"; value: number; marks: number; shards: number } | null = null;
   private bestiaryKills: BestiaryKills = {};
+  /** BESTIÁRIO DOS CHEFES — defeats per boss id (config/bossBestiary.ts). */
+  private bossKills: BossKills = {};
+  /** CAÇADA — the hunt this castle plays (HUNT_STORAGE_KEY only). */
+  private hunt: HuntRun | null = null;
+  /** INVENTORY EXPANSION — Gem expansions bought (config/inventoryExpansion.ts). */
+  private inventoryExpansions = 0;
   private achievements: AchievementId[] = [];
   private equippedTitle: AchievementId | null = null;
   private riftsCleared = 0;
@@ -757,6 +771,9 @@ export class GameEngine {
     setActiveCastleSkin(save.equippedCastleSkinId && save.unlockedCastleSkinIds.includes(save.equippedCastleSkinId) ? save.equippedCastleSkinId : null);
     this.discoveredItemIds = new Set(save.discoveredItemIds);
     this.bestiaryKills = { ...save.bestiaryKills };
+    this.bossKills = { ...save.bossKills };
+    this.inventoryExpansions = save.inventoryExpansions;
+    this.hunt = this.isHunt ? loadHuntMeta().active : null;
     this.achievements = [...save.achievements];
     this.equippedTitle = save.equippedTitle;
     this.riftsCleared = save.riftsCleared;
@@ -821,7 +838,7 @@ export class GameEngine {
     this.wave.currentWave = save.currentWave;
 
     const elapsed = save.lastPlayedAt !== null ? Date.now() - save.lastPlayedAt : 0;
-    if (save.currentWave > 0 && save.towerLoadout.length > 0 && elapsed >= OFFLINE_RETURN_MIN_ELAPSED_MS) {
+    if (!this.isHunt && save.currentWave > 0 && save.towerLoadout.length > 0 && elapsed >= OFFLINE_RETURN_MIN_ELAPSED_MS) {
       const capacityMs = computeOfflineCapacityMs(save.lastPlayedAt as number, Date.now());
       const result = simulateOfflineDefense({
         startingWave: save.currentWave,
@@ -920,7 +937,7 @@ export class GameEngine {
    * ignored, like the offline return's own minimum.
    */
   catchUpHiddenTime(ms: number): boolean {
-    if (ms < OFFLINE_RETURN_MIN_ELAPSED_MS || this.towers.length === 0) return false;
+    if (this.isHunt || ms < OFFLINE_RETURN_MIN_ELAPSED_MS || this.towers.length === 0) return false;
     if (this.phase === "PRE_RUN" || this.phase === "OFFLINE_RETURN" || this.phase === "PROGRESSION_STOPPED" || this.phase === "DEPLOY") return false;
     const capacityMs = Math.min(ms, MAX_OFFLINE_CAPACITY_MS);
     const result = simulateOfflineDefense({
@@ -2302,6 +2319,55 @@ export class GameEngine {
     return this.inventoryCapacity;
   }
 
+  /** INVENTORY EXPANSION — what the next +slots purchase costs (null at the cap). */
+  getInventoryExpansionInfo(): { bought: number; max: number; slots: number; price: DualGemPrice | null } {
+    return { bought: this.inventoryExpansions, max: MAX_INVENTORY_EXPANSIONS, slots: INVENTORY_EXPANSION_SLOTS, price: getInventoryExpansionPrice(this.inventoryExpansions) };
+  }
+
+  /**
+   * INVENTORY EXPANSION — pays the next expansion's price in the chosen Gem
+   * currency and adds INVENTORY_EXPANSION_SLOTS slots for good. Items waiting
+   * in the overflow area move into the new room straight away.
+   */
+  buyInventoryExpansion(currency: GemCurrency): boolean {
+    const price = getInventoryExpansionPrice(this.inventoryExpansions);
+    if (!price) return false;
+    const cost = gemPriceForCurrency(price, currency);
+    if (!this.canAffordGemsInCurrency(cost, currency)) return false;
+    if (!this.spendGems(cost, `inventory_expansion:${this.inventoryExpansions + 1}`, currency)) return false;
+    appendLedgerEvent({ eventType: "INVENTORY_EXPANSION_PURCHASED", fromOwner: this.playerId, toOwner: null, source: "inventory_expansion", amount: cost, currency });
+    this.inventoryExpansions += 1;
+    this.inventoryCapacity += INVENTORY_EXPANSION_SLOTS;
+    while (this.overflowInventory.length > 0 && this.inventory.length < this.inventoryCapacity) {
+      const result = claimFromOverflow(this.inventory, this.overflowInventory, this.overflowInventory[0]!.instanceId, this.inventoryCapacity);
+      if (result.inventory.length === this.inventory.length) break;
+      this.inventory = result.inventory;
+      this.overflowInventory = result.overflow;
+    }
+    this.emitAudio({ type: "level_unlock" });
+    this.persist();
+    this.notify();
+    return true;
+  }
+
+  /** BESTIÁRIO DOS CHEFES — defeats per boss id. */
+  getBossKills(): Readonly<BossKills> {
+    return this.bossKills;
+  }
+
+  /** CAÇADA — marks the active hunt as won (once) and records it per phase. */
+  private winHunt(): void {
+    if (!this.hunt) return;
+    this.hunt = { ...this.hunt, won: true };
+    const meta = loadHuntMeta();
+    const phaseId = PHASES[this.hunt.phaseIndex]?.id;
+    const wins = { ...meta.wins };
+    if (phaseId) wins[phaseId] = (wins[phaseId] ?? 0) + 1;
+    writeHuntMeta({ active: this.hunt, wins });
+    this.emitAudio({ type: "victory" });
+    this.persist();
+  }
+
   getOverflowInventory(): readonly ItemInstance[] {
     return this.overflowInventory;
   }
@@ -2485,6 +2551,24 @@ export class GameEngine {
     this.riftsCleared += 1;
     this.bumpContract("RIFTS", 1, (c) => active.mods.length >= (c.minCurses ?? 0));
     this.checkAchievements();
+  }
+
+  /** CAÇADA — this engine plays a hunt castle (see SaveSystem's HUNT_STORAGE_KEY). */
+  get isHunt(): boolean {
+    return this.storageKey === HUNT_STORAGE_KEY;
+  }
+
+  /** The wave whose stats a creature uses: inside a hunt, the strength the hunt was planned with. */
+  private statWave(wave: number): number {
+    return this.hunt ? huntStatWave(this.hunt, wave) : wave;
+  }
+
+  /** CAÇADA — every creature in a hunt comes tougher and faster (config/hunt.ts). */
+  private applyHuntToSpawn(enemy: EnemyInstance): void {
+    if (!this.hunt) return;
+    enemy.maxHp = Math.round(enemy.maxHp * HUNT_HP_MULT);
+    enemy.hp = Math.round(enemy.hp * HUNT_HP_MULT);
+    enemy.baseSpeed *= HUNT_SPEED_MULT;
   }
 
   /** MODO ETERNO — this engine plays the Eternal castle (see SaveSystem's ETERNAL_STORAGE_KEY). */
@@ -2796,7 +2880,8 @@ export class GameEngine {
     if (this.phase === "BOSS_INTRO") {
       this.bossIntroRemainingMs -= scaledDt;
       if (this.bossIntroRemainingMs <= 0) {
-        const boss = createBossInstance(getMainBossForWave(this.wave.currentWave), this.wave.currentWave, nowMs);
+        const boss = createBossInstance(getMainBossForWave(this.wave.currentWave), this.statWave(this.wave.currentWave), nowMs);
+        this.applyHuntToSpawn(boss);
         // the wounds of earlier assaults stay
         if (this.bossSiege && this.bossSiege.wave === this.wave.currentWave) {
           boss.hp = Math.max(1, Math.round(boss.maxHp * this.bossSiege.hpFraction));
@@ -2812,6 +2897,12 @@ export class GameEngine {
     }
 
     if (this.phase === "VICTORY") {
+      // CAÇADA — the phase's main boss fell: the hunt is won and stops here.
+      if (this.hunt && this.wave.currentWave >= this.hunt.endWave) {
+        if (!this.hunt.won) this.winHunt();
+        this.notify();
+        return;
+      }
       this.victoryRemainingMs -= scaledDt;
       if (this.victoryRemainingMs <= 0) {
         this.activeBossId = null;
@@ -2846,7 +2937,8 @@ export class GameEngine {
       const { enemyTypeToSpawn } = tickWaveManager(this.wave, scaledDt, this.enemies.length);
       if (this.wave.currentWave !== waveBefore) this.onWaveStarted(this.wave.currentWave);
       if (enemyTypeToSpawn) {
-        const spawned = createEnemyInstance(enemyTypeToSpawn, this.wave.currentWave, waveHpFactor(this.wave.currentWave));
+        const spawned = createEnemyInstance(enemyTypeToSpawn, this.statWave(this.wave.currentWave), waveHpFactor(this.statWave(this.wave.currentWave)));
+        this.applyHuntToSpawn(spawned);
         spawned.goldReward = Math.round(spawned.goldReward * waveGoldFactor(this.wave.currentWave));
         this.applyRiftToSpawn(spawned);
         this.applySeasonRuleToSpawn(spawned);
@@ -2967,7 +3059,7 @@ export class GameEngine {
         // enemy, never applied more than this one time per enemy).
         const category: CastleDamageCategory = enemy.boss?.isMainBoss ? "BOSS" : enemy.boss ? "MINI_BOSS" : "NORMAL";
         const fragile = this.rift.active?.wave === this.wave.currentWave && this.rift.active.mods.includes("FRAGILE");
-        const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp) * (fragile ? RIFT_FRAGILE_BREACH : 1) * (1 - talentBonus(this.talents).castleDamageReductionPct / 100);
+        const castleDamage = computeCastleDamage(category, this.wave.currentWave, this.maxBaseHp) * (fragile ? RIFT_FRAGILE_BREACH : 1) * (this.hunt ? HUNT_BREACH_MULT : 1) * (1 - talentBonus(this.talents).castleDamageReductionPct / 100);
         this.baseHp = Math.max(0, this.baseHp - castleDamage);
         recordBaseHit(this.battleStats, enemy, castleDamage);
         continue; // removed, no gold — it breached the base
@@ -3314,7 +3406,9 @@ export class GameEngine {
     if (this.miniBossSpawnedForWave === this.wave.currentWave) return;
     if (this.wave.phase !== "SPAWNING") return;
     this.miniBossSpawnedForWave = this.wave.currentWave;
-    this.enemies.push(createBossInstance(getMiniBossForWave(this.wave.currentWave), this.wave.currentWave, nowMs));
+    const mini = createBossInstance(getMiniBossForWave(this.wave.currentWave), this.statWave(this.wave.currentWave), nowMs);
+    this.applyHuntToSpawn(mini);
+    this.enemies.push(mini);
   }
 
   /** Elite Wave (spec section 4/5): one stat-and-ability-boosted enemy on top of the wave's normal composition, not a wave-wide change. */
@@ -3324,7 +3418,8 @@ export class GameEngine {
     if (this.eliteSpawnedForWave === this.wave.currentWave) return;
     if (this.wave.phase !== "SPAWNING") return;
     this.eliteSpawnedForWave = this.wave.currentWave;
-    const elite = createEliteEnemyInstance(ELITE_BASE_TYPE, this.wave.currentWave, ELITE_MODIFIER, waveHpFactor(this.wave.currentWave));
+    const elite = createEliteEnemyInstance(ELITE_BASE_TYPE, this.statWave(this.wave.currentWave), ELITE_MODIFIER, waveHpFactor(this.statWave(this.wave.currentWave)));
+    this.applyHuntToSpawn(elite);
     elite.goldReward = Math.round(elite.goldReward * waveGoldFactor(this.wave.currentWave));
     this.applySeasonRuleToSpawn(elite);
     this.enemies.push(elite);
@@ -3352,6 +3447,7 @@ export class GameEngine {
    * section 25's "não criar dezenas de itens agora".
    */
   private grantBossDrop(boss: BossState, at?: { x: number; y: number }): void {
+    this.bossKills[boss.bossId] = (this.bossKills[boss.bossId] ?? 0) + 1;
     if (boss.isMainBoss) this.bossesDefeatedTotal += 1;
     else this.miniBossesDefeatedTotal += 1;
     this.addForgeMaterials(boss.isMainBoss ? BOSS_SPLINTERS : MINI_BOSS_SPLINTERS, NO_ESSENCES);
@@ -3654,6 +3750,8 @@ export class GameEngine {
         expeditions: this.expeditions,
         momentOffers: this.momentOffers,
         bestiaryKills: this.bestiaryKills,
+        bossKills: this.bossKills,
+        inventoryExpansions: this.inventoryExpansions,
         achievements: this.achievements,
         equippedTitle: this.equippedTitle,
         riftsCleared: this.riftsCleared,
@@ -3732,6 +3830,7 @@ export class GameEngine {
         lastEvent: this.lastEternalEvent,
         contractsReady: this.isEternal ? this.getEternalContracts().filter((c) => c.done && !c.claimed).length : 0,
       },
+      hunt: this.hunt ? { ...this.hunt } : null,
       expeditions: { ready: this.expeditionsReady(Date.now()), away: this.expeditions.active.length, forging: !!this.expeditions.forging, splinters: this.expeditions.splinters, forgeReady: !!this.expeditions.forging && Date.now() >= this.expeditions.forging.endsAt },
       momentOffer: this.momentOffers.active && this.momentOffers.active.expiresAt > Date.now() ? this.momentOffers.active : null,
     };

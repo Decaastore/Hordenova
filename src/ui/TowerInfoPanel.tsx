@@ -1075,71 +1075,79 @@ function SkinSection({
   const previewSkin: TowerSkinDefinition | null = previewSkinId ? (skins.find((s) => s.id === previewSkinId) ?? null) : null;
   const previewEffectLines = previewSkin ? formatGameplayEffectLines(previewSkin.gameplayEffect, t) : [];
 
+  // The preview opens right under the skin you clicked (an accordion), so the
+  // picture, its effects and its price all sit next to the name you picked.
+  const detail = (
+    <div className="ti-skin-detail" data-testid="skin-preview-detail">
+      {/* Stacked, not side by side: the panel is only ~200px wide, so a text column next to the 150px preview was squeezed to one word per line. */}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <SkinPreviewCanvas tower={tower} skinId={previewSkinId} previewLevel={previewLevel} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, width: "100%", overflowWrap: "anywhere" }}>
+            <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>
+              {previewSkin ? t(`towerSkins.${previewSkin.id}.name` as TranslationKey) : t("towerInfo.skinDefault")}
+            </div>
+            <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, lineHeight: 1.35 }}>
+              {previewSkin ? t(`towerSkins.${previewSkin.id}.description` as TranslationKey) : t("towerInfo.skinDefaultDescription")}
+            </div>
+            {previewSkin && (
+              <div style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
+                {t("towerInfo.skinCosmeticAttributeLabel")}: {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeName` as TranslationKey)}
+                <span style={{ display: "block", color: PALETTE.uiTextDim, fontWeight: 400, fontStyle: "italic" }}>
+                  {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeDescription` as TranslationKey)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* L1/L20/L40/L60 evolution scrubber — same footprint at every level (Absolute Rule #1), only the preview's own level number changes, never the real tower's. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+          <span style={{ fontSize: 9, color: PALETTE.uiTextDim }}>{t("towerInfo.skinPreviewLevel")}</span>
+          <div style={{ display: "flex", gap: 3 }}>
+            {SKIN_PREVIEW_LEVELS.map((lvl) => (
+              <button
+                key={lvl}
+                onClick={() => setPreviewLevel(lvl)}
+                style={{
+                  ...previewLevelChipStyle,
+                  borderColor: previewLevel === lvl ? theme.accent : PALETTE.uiPanelBorder,
+                  color: previewLevel === lvl ? theme.accent : PALETTE.uiTextDim,
+                }}
+              >
+                L{lvl}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Real, transparent gameplay numbers for whatever is currently PREVIEWED — never applied until actually equipped (see the component doc comment above). */}
+        <div style={{ fontSize: 9, color: PALETTE.uiTextDim, fontWeight: 700, letterSpacing: 0.4, marginBottom: 2 }}>
+          {t("towerInfo.skinGameplayEffectsLabel")}
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          {previewEffectLines.length === 0 ? (
+            <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, fontStyle: "italic" }}>{t("towerInfo.skinGameplayEffectsNone")}</div>
+          ) : (
+            previewEffectLines.map((line) => (
+              <div key={line} style={{ fontSize: 10, color: PALETTE.uiText }}>
+                {line}
+              </div>
+            ))
+          )}
+          {previewSkin && isPaidTowerSkin(previewSkin.id) && (
+            <div style={{ fontSize: 10, color: PALETTE.gold, marginTop: 2 }}>{t("towerInfo.skinRewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100), mana: Math.round(SKIN_MANA_GAIN_BONUS * 100) })}</div>
+          )}
+        </div>
+
+    </div>
+  );
+
   return (
     <>
       <div style={dividerStyle} />
       <div style={sectionLabelStyle}>{t("towerInfo.skinSection")}</div>
-
-      {/* Stacked, not side by side: the panel is only ~200px wide, so a text column next to the 150px preview was squeezed to one word per line. */}
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        <SkinPreviewCanvas tower={tower} skinId={previewSkinId} previewLevel={previewLevel} />
-        <div style={{ display: "flex", flexDirection: "column", gap: 3, minWidth: 0, width: "100%", overflowWrap: "anywhere" }}>
-          <div style={{ fontSize: 11.5, fontWeight: 700, color: PALETTE.uiText }}>
-            {previewSkin ? t(`towerSkins.${previewSkin.id}.name` as TranslationKey) : t("towerInfo.skinDefault")}
-          </div>
-          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, lineHeight: 1.35 }}>
-            {previewSkin ? t(`towerSkins.${previewSkin.id}.description` as TranslationKey) : t("towerInfo.skinDefaultDescription")}
-          </div>
-          {previewSkin && (
-            <div style={{ fontSize: 9, color: theme.accent, fontWeight: 600 }}>
-              {t("towerInfo.skinCosmeticAttributeLabel")}: {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeName` as TranslationKey)}
-              <span style={{ display: "block", color: PALETTE.uiTextDim, fontWeight: 400, fontStyle: "italic" }}>
-                {t(`towerSkins.${previewSkin.cosmeticAttribute.i18nKey}.attributeDescription` as TranslationKey)}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* L1/L20/L40/L60 evolution scrubber — same footprint at every level (Absolute Rule #1), only the preview's own level number changes, never the real tower's. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
-        <span style={{ fontSize: 9, color: PALETTE.uiTextDim }}>{t("towerInfo.skinPreviewLevel")}</span>
-        <div style={{ display: "flex", gap: 3 }}>
-          {SKIN_PREVIEW_LEVELS.map((lvl) => (
-            <button
-              key={lvl}
-              onClick={() => setPreviewLevel(lvl)}
-              style={{
-                ...previewLevelChipStyle,
-                borderColor: previewLevel === lvl ? theme.accent : PALETTE.uiPanelBorder,
-                color: previewLevel === lvl ? theme.accent : PALETTE.uiTextDim,
-              }}
-            >
-              L{lvl}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Real, transparent gameplay numbers for whatever is currently PREVIEWED — never applied until actually equipped (see the component doc comment above). */}
-      <div style={{ fontSize: 9, color: PALETTE.uiTextDim, fontWeight: 700, letterSpacing: 0.4, marginBottom: 2 }}>
-        {t("towerInfo.skinGameplayEffectsLabel")}
-      </div>
-      <div style={{ marginBottom: 8 }}>
-        {previewEffectLines.length === 0 ? (
-          <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, fontStyle: "italic" }}>{t("towerInfo.skinGameplayEffectsNone")}</div>
-        ) : (
-          previewEffectLines.map((line) => (
-            <div key={line} style={{ fontSize: 10, color: PALETTE.uiText }}>
-              {line}
-            </div>
-          ))
-        )}
-        {previewSkin && isPaidTowerSkin(previewSkin.id) && (
-          <div style={{ fontSize: 10, color: PALETTE.gold, marginTop: 2 }}>{t("towerInfo.skinRewardBonus", { pct: Math.round(SKIN_REWARD_BONUS_PER_TYPE * 100), mana: Math.round(SKIN_MANA_GAIN_BONUS * 100) })}</div>
-        )}
-      </div>
-
+      <div style={{ fontSize: 9, color: PALETTE.uiTextDim, marginBottom: 5 }}>{t("towerInfo.skinTapHint")}</div>
+      <style>{SKIN_ROW_CSS}</style>
       <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
         <SkinRow
           name={t("towerInfo.skinDefault")}
@@ -1147,6 +1155,7 @@ function SkinSection({
           badge={tower.equippedSkinId === null ? { text: t("towerInfo.skinEquipped"), tone: "equipped" } : null}
           theme={theme}
           onPreview={() => setPreviewSkinId(null)}
+          detail={previewSkinId === null ? detail : null}
           action={
             tower.equippedSkinId !== null ? (
               <button onClick={() => onEquip(null)} style={{ ...skinActionButtonStyle, borderColor: theme.primary }}>
@@ -1202,6 +1211,7 @@ function SkinSection({
               theme={theme}
               onPreview={() => setPreviewSkinId(skin.id)}
               action={action}
+              detail={selected ? detail : null}
             />
           );
         })}
@@ -1231,6 +1241,7 @@ function SkinRow({
   theme,
   onPreview,
   action,
+  detail,
 }: {
   name: string;
   selected: boolean;
@@ -1238,18 +1249,26 @@ function SkinRow({
   theme: (typeof TOWER_THEME)[TowerType];
   onPreview: () => void;
   action: ReactNode;
+  /** The preview, shown inside this row (under its name) while it is the one picked. */
+  detail?: ReactNode;
 }) {
   const badgeColor =
     badge?.tone === "equipped" ? theme.accent : badge?.tone === "owned" ? PALETTE.uiTextDim : PALETTE.uiTextDim;
   return (
-    <div style={{ ...skinRowStyle, borderColor: selected ? theme.accent : PALETTE.uiPanelBorder }}>
-      <button onClick={onPreview} style={skinRowNameButtonStyle} title={name}>
-        <span style={{ fontSize: 10.5, fontWeight: 600, color: PALETTE.uiText }}>{name}</span>
-        {badge && (
-          <span style={{ fontSize: 8.5, fontWeight: 700, color: badgeColor, letterSpacing: 0.3 }}>{badge.text}</span>
-        )}
-      </button>
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>{action}</div>
+    <div className={`ti-skin-row${selected ? " is-open" : ""}`} style={{ borderColor: selected ? theme.accent : PALETTE.uiPanelBorder, ["--skin-accent" as string]: theme.accent } as CSSProperties}>
+      <div style={skinRowStyle}>
+        <button onClick={onPreview} style={skinRowNameButtonStyle} title={name} aria-expanded={selected}>
+          <span style={{ fontSize: 10.5, fontWeight: 600, color: PALETTE.uiText, display: "flex", alignItems: "center", gap: 5 }}>
+            <span className="ti-skin-caret" aria-hidden="true">▸</span>
+            {name}
+          </span>
+          {badge && (
+            <span style={{ fontSize: 8.5, fontWeight: 700, color: badgeColor, letterSpacing: 0.3, paddingLeft: 13 }}>{badge.text}</span>
+          )}
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>{action}</div>
+      </div>
+      {selected && detail}
     </div>
   );
 }
@@ -1474,11 +1493,19 @@ const skinRowStyle: CSSProperties = {
   alignItems: "center",
   justifyContent: "space-between",
   gap: 6,
-  borderRadius: 8,
-  border: "1px solid",
-  background: "rgba(255,255,255,0.03)",
   paddingRight: 8,
 };
+
+const SKIN_ROW_CSS = `
+.ti-skin-row { border-radius: 8px; border: 1px solid; background: rgba(255,255,255,0.03); transition: border-color 160ms ease, background 160ms ease; }
+.ti-skin-row:hover { background: rgba(255,255,255,0.06); }
+.ti-skin-row.is-open { background: rgba(255,255,255,0.05); box-shadow: 0 0 0 1px color-mix(in srgb, var(--skin-accent) 30%, transparent), 0 4px 14px rgba(0,0,0,0.35); }
+.ti-skin-caret { display: inline-block; font-size: 9px; color: var(--skin-accent); transition: transform 180ms ease; }
+.ti-skin-row.is-open .ti-skin-caret { transform: rotate(90deg); }
+.ti-skin-detail { padding: 2px 8px 8px; border-top: 1px dashed rgba(255,255,255,0.08); animation: ti-skin-open 220ms ease-out backwards; }
+@keyframes ti-skin-open { from { opacity: 0; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .ti-skin-detail { animation: none; } .ti-skin-caret { transition: none; } }
+`;
 
 const skinActionButtonStyle: CSSProperties = {
   padding: "4px 8px",

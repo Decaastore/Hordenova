@@ -167,6 +167,98 @@ export function withoutLavaPools(bake: LoadedGroundBake, biome: BiomeDefinition)
   return out;
 }
 
+const roadless = new Map<string, LoadedGroundBake>();
+
+/**
+ * The baked ground with the stretch of road that used to run on past the
+ * castle to the map's edge painted over (every road now ends at the castle
+ * gate — data/mapLayouts.ts cutRoadAtGate). Plain ground from beside the
+ * road is stamped along that stretch in soft round patches. Made once per map.
+ */
+export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefinition): LoadedGroundBake {
+  const hit = roadless.get(biome.id);
+  if (hit) return hit;
+  const layout = getMapLayout(biome.id);
+  const past = layout.roadPastGate;
+  if (past.length < 2 || typeof document === "undefined") return bake;
+  const { def } = bake;
+  const W = def.x1 - def.x0, H = def.y1 - def.y0;
+  const gw = imgW(bake.ground), gh = imgH(bake.ground);
+  const kx = gw / W, ky = gh / H;
+  const ground = document.createElement("canvas");
+  ground.width = gw;
+  ground.height = gh;
+  const g = ground.getContext("2d")!;
+  g.drawImage(bake.ground, 0, 0);
+
+  // the stretch to cover, carried on past the map's edge to the bake's own edge
+  const a = past[past.length - 2]!, b = past[past.length - 1]!;
+  const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const dir = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
+  const pts = [...past, { x: b.x + dir.x * 260, y: b.y + dir.y * 260 }];
+  const road = layout.path;
+  const clearOfRoad = (x: number, y: number, r: number) => {
+    for (let i = 1; i < road.length; i++) {
+      const p = road[i - 1]!, q = road[i]!;
+      const dx = q.x - p.x, dy = q.y - p.y;
+      const t = Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(p.x + dx * t - x, p.y + dy * t - y) < r + 36) return false;
+    }
+    for (let i = 1; i < pts.length; i++) {
+      const p = pts[i - 1]!, q = pts[i]!;
+      const dx = q.x - p.x, dy = q.y - p.y;
+      const t = Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(p.x + dx * t - x, p.y + dy * t - y) < r + 30) return false;
+    }
+    return true;
+  };
+
+  const R = 50;
+  const tmp = document.createElement("canvas");
+  const pw = Math.ceil(R * 2 * kx), ph = Math.ceil(R * 2 * ky);
+  tmp.width = pw;
+  tmp.height = ph;
+  const t = tmp.getContext("2d")!;
+  // walk the stretch in short steps, starting a little inside the castle so no seam shows at the gate
+  const stamps: { x: number; y: number; nx: number; ny: number }[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const p = pts[i - 1]!, q = pts[i]!;
+    const segLen = Math.hypot(q.x - p.x, q.y - p.y);
+    const n = Math.max(1, Math.ceil(segLen / 22));
+    for (let k = 0; k <= n; k++) {
+      const x = p.x + ((q.x - p.x) * k) / n, y = p.y + ((q.y - p.y) * k) / n;
+      stamps.push({ x, y, nx: -(q.y - p.y) / (segLen || 1), ny: (q.x - p.x) / (segLen || 1) });
+    }
+  }
+  for (const st of stamps) {
+    let donor: { x: number; y: number } | null = null;
+    for (const dist of [2.4, 3, 3.8]) {
+      for (const sgn of [1, -1]) {
+        const x = st.x + st.nx * R * dist * sgn, y = st.y + st.ny * R * dist * sgn;
+        if (x - R < def.x0 || y - R < def.y0 || x + R > def.x1 || y + R > def.y1) continue;
+        if (!clearOfRoad(x, y, R)) continue;
+        donor = { x, y };
+        break;
+      }
+      if (donor) break;
+    }
+    if (!donor) continue;
+    t.globalCompositeOperation = "source-over";
+    t.clearRect(0, 0, pw, ph);
+    t.drawImage(bake.ground, (donor.x - R - def.x0) * kx, (donor.y - R - def.y0) * ky, pw, ph, 0, 0, pw, ph);
+    t.globalCompositeOperation = "destination-in";
+    const gr = t.createRadialGradient(pw / 2, ph / 2, Math.min(pw, ph) * 0.25, pw / 2, ph / 2, Math.min(pw, ph) / 2);
+    gr.addColorStop(0, "rgba(0,0,0,1)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    t.fillStyle = gr;
+    t.fillRect(0, 0, pw, ph);
+    g.drawImage(tmp, (st.x - def.x0) * kx - pw / 2, (st.y - def.y0) * ky - ph / 2);
+  }
+  const out: LoadedGroundBake = { def, ground, emissive: bake.emissive, skipKinds: bake.skipKinds };
+  roadless.set(biome.id, out);
+  return out;
+}
+
 const cache = new Map<string, { ground: HTMLImageElement; emissive: HTMLImageElement | null; ready: boolean; skip: ReadonlySet<DecorationKind> }>();
 
 function loadImage(src: string, onLoad: () => void): HTMLImageElement {

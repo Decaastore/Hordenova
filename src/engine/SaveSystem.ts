@@ -1,3 +1,6 @@
+import { planHunt, sanitizeHuntMeta, type HuntMeta } from "@/config/hunt";
+import { sanitizeInventoryExpansions } from "@/config/inventoryExpansion";
+import { sanitizeBossKills, type BossKills } from "@/config/bossBestiary";
 import { createDuelProfile, sanitizeDuelProfile, type DuelProfile } from "@/config/duel";
 import { createColossusProfile, sanitizeColossusProfile, type ColossusProfile } from "@/config/colossus";
 import { createDailyLogin, sanitizeDailyLogin, type DailyLoginState } from "@/config/dailyLogin";
@@ -124,6 +127,8 @@ export interface SaveData {
   inventoryCapacity: number;
   /** Progression 2.0 spec section 39 — items that arrived while the inventory was full. Never deleted; the player reclaims them by freeing a slot. */
   overflowInventory: ItemInstance[];
+  /** INVENTORY EXPANSION — how many +slots expansions were bought with Gems (config/inventoryExpansion.ts); sets the next price. */
+  inventoryExpansions: number;
 
   // -----------------------------------------------------------------------
   // Master Implementation spec sections 1-24 — ASCENSION. Every field below
@@ -300,6 +305,8 @@ export interface SaveData {
   ageVerification: AgeVerification;
   /** BESTIÁRIO — defeats per creature, forever (config/achievements.ts). Permanent. */
   bestiaryKills: BestiaryKills;
+  /** BESTIÁRIO DOS CHEFES — defeats per boss id (main and mini), account-wide (config/bossBestiary.ts). */
+  bossKills: BossKills;
   /** CONQUISTAS — achievements unlocked, the title worn, and the counters they need. Permanent. */
   achievements: AchievementId[];
   equippedTitle: AchievementId | null;
@@ -376,6 +383,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   gemShards: 0,
   inventoryCapacity: DEFAULT_INVENTORY_CAPACITY,
   overflowInventory: [],
+  inventoryExpansions: 0,
   ascensionLastSyncedSeason: seasonClock.getCurrentSeasonWindow().seasonNumber,
   ascensionHistory: [],
   ascensionSeasonsWon: 0,
@@ -420,6 +428,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   discoveredItemIds: [],
   equippedCastleSkinId: null,
   bestiaryKills: {},
+  bossKills: {},
   achievements: [],
   equippedTitle: null,
   riftsCleared: 0,
@@ -901,6 +910,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
           ? parsed.inventoryCapacity
           : DEFAULT_INVENTORY_CAPACITY,
       overflowInventory: parseInventory(parsed.overflowInventory),
+      inventoryExpansions: sanitizeInventoryExpansions(parsed.inventoryExpansions),
       // Master Implementation (save v6 -> v7) — same "brand new field, so a
       // pre-existing save just gets the sensible fresh-account default"
       // pattern as the v5->v6 Gem Economy fields above. ascensionLastSyncedSeason
@@ -978,6 +988,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       city: sanitizeCityState(parsed.city),
       rift: sanitizeRiftState(parsed.rift),
       bestiaryKills: sanitizeBestiaryKills(parsed.bestiaryKills),
+      bossKills: sanitizeBossKills(parsed.bossKills),
       achievements: Array.isArray(parsed.achievements) ? [...new Set(parsed.achievements.filter(isAchievementId))] : [],
       equippedTitle: isAchievementId(parsed.equippedTitle) && Array.isArray(parsed.achievements) && parsed.achievements.includes(parsed.equippedTitle) ? parsed.equippedTitle : null,
       riftsCleared: typeof parsed.riftsCleared === "number" && Number.isFinite(parsed.riftsCleared) ? Math.max(0, Math.floor(parsed.riftsCleared)) : 0,
@@ -1019,6 +1030,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
 /** `storageKey` defaults to the Infinite (permanent) save — pass ASCENSION_STORAGE_KEY to read/write the separate, temporary Ascension namespace instead (see the const's own doc comment above). Both use the exact same SaveData shape and this exact same function — Ascension gameplay is architecturally just "GameEngine pointed at a different key", not a second parser. */
 export function loadSave(storageKey: string = SAVE_STORAGE_KEY): SaveData {
   if (storageKey === ETERNAL_STORAGE_KEY) return loadEternalView();
+  if (storageKey === HUNT_STORAGE_KEY) return loadHuntView();
   if (!isStorageAvailable()) return { ...emptySaveData(), playerId: generateId("player") };
 
   try {
@@ -1061,6 +1073,10 @@ export function writeSave(data: SaveData, storageKey: string = SAVE_STORAGE_KEY)
   if (!isStorageAvailable()) return;
   if (storageKey === ETERNAL_STORAGE_KEY) {
     writeEternalView(data);
+    return;
+  }
+  if (storageKey === HUNT_STORAGE_KEY) {
+    writeHuntView(data);
     return;
   }
   try {
@@ -1192,4 +1208,90 @@ export function writeEternalCastle(castle: CastleFields): void {
 export function loadEternalCastle(): CastleFields | null {
   if (!hasEternalCastle()) return null;
   return pickCastle(loadEternalView());
+}
+
+
+// ---------------------------------------------------------------------------
+// CAÇADA (config/hunt.ts) — a temporary third castle on the same account,
+// laid over it exactly like the Eternal one: the account part of every write
+// goes back to the main save (so the Bestiary, items, gems… are shared) and
+// the castle part stays here. It is rebuilt from the Season castle every time
+// a hunt starts, so nothing done inside a hunt reaches the Season castle.
+// ---------------------------------------------------------------------------
+export const HUNT_STORAGE_KEY = "hordenova.hunt.save.v1";
+export const HUNT_META_KEY = "hordenova.hunt.meta.v1";
+
+function readJson(key: string): unknown {
+  if (!isStorageAvailable()) return null;
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as unknown) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeJson(key: string, value: unknown): void {
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+    notifySaveWritten(key);
+  } catch {
+    /* storage full — the hunt simply won't persist this session */
+  }
+}
+
+export function loadHuntMeta(): HuntMeta {
+  return sanitizeHuntMeta(readJson(HUNT_META_KEY));
+}
+
+export function writeHuntMeta(meta: HuntMeta): void {
+  writeJson(HUNT_META_KEY, meta);
+}
+
+function loadHuntView(): SaveData {
+  const main = loadSave(SAVE_STORAGE_KEY);
+  const raw = readJson(HUNT_STORAGE_KEY) as Record<string, unknown> | null;
+  const castle: Record<string, unknown> = raw ? Object.fromEntries(CASTLE_FIELDS.filter((k) => k in raw).map((k) => [k, raw[k]])) : { ...freshCastle() };
+  return parseSaveObject({ ...(JSON.parse(JSON.stringify(main)) as Partial<SaveData>), ...(castle as Partial<SaveData>) });
+}
+
+function writeHuntView(data: SaveData): void {
+  const main = loadSave(SAVE_STORAGE_KEY);
+  const account: SaveData = { ...data };
+  for (const k of CASTLE_FIELDS) (account as unknown as Record<string, unknown>)[k] = main[k];
+  writeSave(account, SAVE_STORAGE_KEY);
+  writeJson(HUNT_STORAGE_KEY, pickCastle(data));
+}
+
+/**
+ * Starts a hunt of PHASES[phaseIndex]: copies the Season castle (towers,
+ * talents, mastery, city, gold…) into a fresh hunt castle placed at the
+ * phase's first wave. Returns false when the phase can't be hunted yet.
+ */
+export function beginHunt(phaseIndex: number): boolean {
+  const season = loadSave(SAVE_STORAGE_KEY);
+  const run = planHunt(phaseIndex, season.seasonBestWave, season.currentWave);
+  if (!run) return false;
+  const castle: CastleFields = {
+    ...pickCastle(season),
+    currentWave: run.startWave,
+    rift: freshCastle().rift,
+    bossSiege: null,
+    hordeAdaptation: freshCastle().hordeAdaptation,
+  };
+  writeJson(HUNT_STORAGE_KEY, castle);
+  writeHuntMeta({ ...loadHuntMeta(), active: run });
+  return true;
+}
+
+/** Ends the active hunt (won or abandoned); the hunt castle is thrown away. */
+export function endHunt(): void {
+  writeHuntMeta({ ...loadHuntMeta(), active: null });
+  if (!isStorageAvailable()) return;
+  try {
+    window.localStorage.removeItem(HUNT_STORAGE_KEY);
+  } catch {
+    /* nothing to clean */
+  }
 }

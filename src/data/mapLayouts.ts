@@ -50,8 +50,15 @@ export interface MapLayout {
   /** Developer-facing one-liner describing the route. */
   summary: string;
   controlPoints: readonly Vector2[];
-  /** Dense walked/drawn road, rift (start) to castle gate (end). */
+  /** Dense walked/drawn road, rift (start) to castle gate (end). The road ENDS at the gate: creatures walk in and are gone. */
   path: readonly Vector2[];
+  /**
+   * The stretch of the original road that used to run on past the castle to
+   * the map's edge (empty when the road already ended at the gate). Nothing
+   * walks it any more; the painted ground images still show it, so the
+   * renderer paints it over (rendering/groundBakes.ts withoutRoadPastGate).
+   */
+  roadPastGate: readonly Vector2[];
   length: number;
   /** Enemy movement multiplier that keeps crossing time equal to the reference map. */
   speedScale: number;
@@ -402,20 +409,49 @@ const SOURCES: Record<string, LayoutSource> = {
   },
 };
 
+/**
+ * Crossing time is kept as it always was: speedScale divides by the ORIGINAL
+ * forest road's full length, so a map's crossing still takes the same time
+ * now that every road stops at the castle gate.
+ */
 export const REFERENCE_PATH_LENGTH = getPathLength(ENEMY_PATH);
+
+/** Cuts a road that ran off the map's edge at the castle gate (fortressAnchorFor), returning the walked part and the part past the gate. */
+export function cutRoadAtGate(full: readonly Vector2[]): { path: Vector2[]; past: Vector2[] } {
+  const gate = fortressAnchorFor(full).position;
+  const end = full[full.length - 1]!;
+  if (Math.hypot(end.x - gate.x, end.y - gate.y) < 1) return { path: [...full], past: [] };
+  // the road point nearest the gate, searched from the end so a loop passing nearby earlier can't win
+  let best = full.length - 1;
+  let bestD = Infinity;
+  for (let i = full.length - 1; i >= Math.max(0, full.length - 60); i--) {
+    const d = Math.hypot(full[i]!.x - gate.x, full[i]!.y - gate.y);
+    if (d < bestD) {
+      bestD = d;
+      best = i;
+    }
+  }
+  const before = full[best]!;
+  const keepUpTo = Math.hypot(before.x - gate.x, before.y - gate.y) < 2 ? best - 1 : best;
+  const path = [...full.slice(0, Math.max(1, keepUpTo + 1)), { ...gate }];
+  const past = [{ ...gate }, ...full.slice(best + 1)];
+  return { path, past };
+}
 
 function categoryFor(distance: number): SlotDistanceCategory {
   return distance < 52 ? "CLOSE" : distance < 70 ? "MEDIUM" : "FAR";
 }
 
 function buildLayout(src: LayoutSource): MapLayout {
-  const path = src.id === "ANCIENT_FOREST" ? ENEMY_PATH : buildCatmullRomSpline(src.controlPoints, 14);
+  const full = src.id === "ANCIENT_FOREST" ? ENEMY_PATH : buildCatmullRomSpline(src.controlPoints, 14);
+  const { path, past } = cutRoadAtGate(full);
   const length = getPathLength(path);
   return {
     id: src.id,
     summary: src.summary,
     controlPoints: src.controlPoints,
     path,
+    roadPastGate: past,
     length,
     speedScale: length / REFERENCE_PATH_LENGTH,
     sites: src.sites.map((s) => {

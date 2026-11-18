@@ -32,6 +32,7 @@ export default function App() {
     setView("GAME");
   };
   const [openMerchant, setOpenMerchant] = useState(false);
+  const [huntSeq, setHuntSeq] = useState(0);
   const playEternal = (merchant = false) => {
     // a Season that ended joins the Eternal castle before that castle is opened
     syncSeasonIfNeeded();
@@ -89,7 +90,22 @@ export default function App() {
   return (
     <LanguageProvider>
       {view === "GAME" ? (
-        <GameScreen key={mode} mode={mode} openMerchant={mode === "ETERNAL" && openMerchant} onExitToMenu={() => setView("HOME")} onOpenStore={() => setView("STORE")} />
+        <GameScreen
+          key={`${mode}-${huntSeq}`}
+          mode={mode}
+          openMerchant={mode === "ETERNAL" && openMerchant}
+          onExitToMenu={() => setView("HOME")}
+          onOpenStore={() => setView("STORE")}
+          onStartHunt={() => {
+            // CAÇADA — the hunt castle was set up; (re)mount the game on it
+            setHuntSeq((n) => n + 1);
+            setMode("HUNT");
+          }}
+          onEndHunt={() => {
+            setHuntSeq((n) => n + 1);
+            setMode("SEASON");
+          }}
+        />
       ) : view === "DUEL" ? (
         <DuelScreen onExit={() => setView("SEASON")} />
       ) : view === "COLOSSUS" ? (

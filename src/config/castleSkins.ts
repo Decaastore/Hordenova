@@ -87,6 +87,7 @@ export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
   { id: "VERDANT_HOLD", i18nKey: "VERDANT_HOLD", paletteOverride: { rock: "#4d6a3a", rockDark: "#1f2e16" }, source: "STORE", tint: "#5f9a3a", tintStrength: 0.6, glow: "#d8ff9a", aura: "VERDANT", priceGems: 450 },
   // earned, never sold
   { id: "VOID_SPIRE", i18nKey: "VOID_SPIRE", paletteOverride: { rock: "#3a2a5a", rockDark: "#140c24" }, source: "COLLECTION", tint: "#7a4ad8", tintStrength: 0.72, glow: "#c79bff", aura: "VOID" },
+  { id: "HUNTER_THRONE", i18nKey: "HUNTER_THRONE", paletteOverride: { rock: "#4a1a1c", rockDark: "#1a0608" }, source: "COLLECTION", tint: "#a01822", tintStrength: 0.7, glow: "#ff8a5a", aura: "EMBER" },
   { id: "RECRUIT_KEEP", i18nKey: "RECRUIT_KEEP", paletteOverride: { rock: "#8a6a44", rockDark: "#3a2a16" }, source: "BEGINNER", tint: "#c08a4a", tintStrength: 0.45, glow: "#ffcf8a", aura: "BANNERS" },
 ];
 

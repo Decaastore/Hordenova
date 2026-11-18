@@ -3,14 +3,25 @@ import { ENEMY_TYPES, type EnemyType } from "./enemyStats";
 /**
  * BESTIÁRIO E CONQUISTAS — long-term goals that never reset with the Season.
  *
- * Bestiary: every creature you defeat counts towards its page. At 10, 100
- * and 1,000 defeats it earns a bronze, silver and gold star.
+ * Bestiary: every creature you defeat counts towards its page. At 25, 250
+ * and 1,000 defeats it earns a bronze, silver and gold star. The Bestiary
+ * album's castle skin (config/collections.ts) asks for a silver star on
+ * EVERY creature — creatures of a phase you already left are hunted again
+ * in Hunt mode (config/hunt.ts).
  *
  * Achievements: real milestones of your account. Each one unlocks a title
  * you can wear; the title shows next to your name on the Ranking. Purely
  * prestige — no achievement grants power.
  */
-export const BESTIARY_STARS = [10, 100, 1000] as const;
+export const BESTIARY_STARS = [25, 250, 1000] as const;
+
+/** Stars a creature needs to count towards the Bestiary album (and its castle skin). */
+export const BESTIARY_ALBUM_STARS = 2;
+
+/** Has this creature reached the album's star? */
+export function bestiaryMastered(kills: number): boolean {
+  return bestiaryStars(kills) >= BESTIARY_ALBUM_STARS;
+}
 
 export type BestiaryKills = Partial<Record<EnemyType, number>>;
 
@@ -86,17 +97,19 @@ export function reachedAchievements(stats: AchievementStats): AchievementId[] {
   }).map((a) => a.id);
 }
 
-export function bestiaryStats(kills: BestiaryKills): { total: number; met: number; goldStars: number } {
+export function bestiaryStats(kills: BestiaryKills): { total: number; met: number; goldStars: number; mastered: number } {
   let total = 0;
   let met = 0;
   let goldStars = 0;
+  let mastered = 0;
   for (const type of ENEMY_TYPES) {
     const n = kills[type] ?? 0;
     total += n;
     if (n > 0) met += 1;
     if (bestiaryStars(n) === 3) goldStars += 1;
+    if (bestiaryMastered(n)) mastered += 1;
   }
-  return { total, met, goldStars };
+  return { total, met, goldStars, mastered };
 }
 
 export function sanitizeBestiaryKills(raw: unknown): BestiaryKills {

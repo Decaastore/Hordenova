@@ -5,7 +5,7 @@ const base: AchievementStats = { totalKills: 0, bossesDefeated: 0, miniBossesDef
 
 describe("bestiary and achievements", () => {
   it("stars at 10, 100 and 1000 defeats", () => {
-    expect([0, 9, 10, 99, 100, 999, 1000].map(bestiaryStars)).toEqual([0, 0, 1, 1, 2, 2, 3]);
+    expect([0, 24, 25, 249, 250, 999, 1000].map(bestiaryStars)).toEqual([0, 0, 1, 1, 2, 2, 3]);
   });
 
   it("nothing is unlocked from zero; milestones unlock exactly at their target", () => {
@@ -18,7 +18,7 @@ describe("bestiary and achievements", () => {
   it("counts the bestiary and cleans broken saves", () => {
     const kills = sanitizeBestiaryKills({ CRAWLER: 1200, RUNNER: 5.7, NOPE: 3, BRUTE: -2 });
     expect(kills).toEqual({ CRAWLER: 1200, RUNNER: 5 });
-    expect(bestiaryStats(kills)).toEqual({ total: 1205, met: 2, goldStars: 1 });
+    expect(bestiaryStats(kills)).toEqual({ total: 1205, met: 2, goldStars: 1, mastered: 1 });
   });
 
   it("every achievement has a reachable target", () => {

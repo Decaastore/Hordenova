@@ -4,14 +4,18 @@ import { ITEM_DEFINITIONS } from "./itemDefinitions";
 import { TOWER_SKINS } from "./towerSkins";
 import { CASTLE_SKINS } from "./castleSkins";
 import { ENEMY_TYPES } from "./enemyStats";
+import { bestiaryMastered } from "./achievements";
+import { ALL_BOSSES, bossMastered } from "./bossBestiary";
 import type { TowerType } from "./towerStats";
 
 /**
  * COLEÇÕES — albums of things to collect. Each album lists its entries
  * (owned or not) and pays a reward at each milestone. Completing the
- * Bestiary album gives the Void Spire castle skin.
+ * Bestiary album (every creature at its silver star) gives the Void Spire
+ * castle skin; the Boss album (every boss at its silver star) gives the
+ * Hunter's Throne.
  */
-export type CollectionId = "ARSENAL" | "SKINS_IRONWOOD" | "SKINS_INFERNO" | "SKINS_FROSTBORN" | "SKINS_STORMCALLER" | "CASTLES" | "BESTIARY";
+export type CollectionId = "ARSENAL" | "SKINS_IRONWOOD" | "SKINS_INFERNO" | "SKINS_FROSTBORN" | "SKINS_STORMCALLER" | "CASTLES" | "BESTIARY" | "BOSSES";
 
 export interface CollectionEntry {
   id: string;
@@ -75,11 +79,22 @@ export const COLLECTIONS: readonly CollectionDef[] = [
   },
   {
     id: "BESTIARY",
-    entries: (s) => ENEMY_TYPES.map((e) => ({ id: e, labelKey: `enemies.${e}.name`, owned: s.discoveredEnemyTypes.includes(e) })),
+    // A creature counts once it has its silver star (BESTIARY_ALBUM_STARS) — not just seen once.
+    entries: (s) => ENEMY_TYPES.map((e) => ({ id: e, labelKey: `enemies.${e}.name`, owned: bestiaryMastered(s.bestiaryKills[e] ?? 0) })),
     milestones: [
       { count: 10, reward: { shards: 10 } },
       { count: 25, reward: { splinters: 60 } },
       { count: ENEMY_TYPES.length, reward: { castleSkinId: "VOID_SPIRE", freeGems: 2 } },
+    ],
+  },
+  {
+    id: "BOSSES",
+    // A boss counts once it has its silver star (defeated BOSS_STARS[1] times).
+    entries: (s) => ALL_BOSSES.map((b) => ({ id: b.id, labelKey: `bosses.${b.i18nKey}.name`, owned: bossMastered(s.bossKills[b.id] ?? 0) })),
+    milestones: [
+      { count: 8, reward: { shards: 20 } },
+      { count: 16, reward: { splinters: 100 } },
+      { count: ALL_BOSSES.length, reward: { castleSkinId: "HUNTER_THRONE", freeGems: 3 } },
     ],
   },
 ];
