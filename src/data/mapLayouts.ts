@@ -475,7 +475,35 @@ function bezier(p0: Vector2, c0: Vector2, c1: Vector2, p1: Vector2, step = 10): 
  * other stretch of road running through its grounds. None fits → the road
  * keeps its old end.
  */
-function addGateApproach(path: Vector2[], sites: readonly { x: number; y: number }[]): { path: Vector2[]; added: Vector2[] } {
+type SiteSrc = { id: string; x: number; y: number; trait: SiteTrait };
+
+/** A new spot for a build site the castle now stands on: the nearest one that keeps every placement rule. */
+function relocateSite(site: SiteSrc, others: readonly SiteSrc[], road: readonly Vector2[], gate: Vector2): SiteSrc | null {
+  for (const r of [30, 45, 60, 80, 100, 125, 150, 180]) {
+    let best: SiteSrc | null = null;
+    let bestScore = Infinity;
+    for (let i = 0; i < 24; i++) {
+      const a = (i / 24) * Math.PI * 2;
+      const x = Math.round(site.x + Math.cos(a) * r), y = Math.round(site.y + Math.sin(a) * r);
+      if (x < 30 || x > WORLD_SIZE.width - 30 || y < 30 || y > WORLD_SIZE.height - 30) continue;
+      const pos = { x, y };
+      if (isInsideCastleFootprint(pos, gate) || Math.hypot(x - gate.x, y - gate.y) < 126) continue;
+      const dRoad = distanceToPolyline(pos, road);
+      if (dRoad < 44 || dRoad > 92) continue;
+      if (others.some((o) => o.id !== site.id && Math.hypot(o.x - x, o.y - y) < 92)) continue;
+      // keep roughly the same distance from the road it had, so its role doesn't change
+      const score = Math.abs(dRoad - distanceToPolyline(site, road));
+      if (score < bestScore) {
+        bestScore = score;
+        best = { ...site, x, y };
+      }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+function addGateApproach(path: Vector2[], sites: readonly SiteSrc[], moveSites = false, requireReach = false): { path: Vector2[]; added: Vector2[]; sites: readonly SiteSrc[] } {
   const P = path[path.length - 1]!;
   let k = path.length - 2;
   while (k > 0 && Math.hypot(path[k]!.x - P.x, path[k]!.y - P.y) < 30) k--;
@@ -483,7 +511,7 @@ function addGateApproach(path: Vector2[], sites: readonly { x: number; y: number
   const dl = Math.hypot(P.x - Q.x, P.y - Q.y) || 1;
   const d = { x: (P.x - Q.x) / dl, y: (P.y - Q.y) / dl };
   // already climbing into the gate from below
-  if (d.y < -0.85) return { path, added: [] };
+  if (d.y < -0.85) return { path, added: [], sites };
   const sides = Math.abs(d.x) >= 0.3 ? [Math.sign(d.x), -Math.sign(d.x)] : P.x < WORLD_SIZE.width / 2 ? [1, -1] : [-1, 1];
   // a road coming down the screen can't climb into the gate without a U-turn below it
   const comingDown = d.y > 0.5;
@@ -491,6 +519,12 @@ function addGateApproach(path: Vector2[], sites: readonly { x: number; y: number
   const shapes: [number, number][] = [];
   for (const up of [-40, -55, -30, -70, -85, -20, -100]) for (const w of [40, 55, 30, 70, 20, 85, 0, 100]) shapes.push([w, up]);
   for (const down of [30, 50, 70]) for (const w of [70, 90, 110]) shapes.push([w, down]);
+  // wider hooks, only tried when nothing smaller fits
+  for (const up of [-115, -130]) for (const w of [60, 100, 140, 170]) shapes.push([w, up]);
+  for (const up of [-40, -70, -100]) for (const w of [120, 140, 170, 200]) shapes.push([w, up]);
+  for (const down of [20, 40, 60, 90, 110]) for (const w of [50, 130, 150, 180]) shapes.push([w, down]);
+  for (const down of [130, 150, 170]) for (const w of [0, 40, 80, 120, 160, 200]) shapes.push([w, down]);
+  for (const up of [-150, -180]) for (const w of [0, 60, 120, 180]) shapes.push([w, up]);
   for (const side of sides) {
     for (const [w, hgt] of shapes) {
       if (comingDown && hgt < 0) continue;
@@ -508,23 +542,75 @@ function addGateApproach(path: Vector2[], sites: readonly { x: number; y: number
         const a = next[i]!, b = next[i + 1]!;
         walked += Math.hypot(b.x - a.x, b.y - a.y);
         if (total - walked < 170) break;
-        if (Math.hypot(b.x - G.x, b.y - G.y) <= 108) ok = false;
+        if (Math.hypot(b.x - G.x, b.y - G.y) <= 106) ok = false;
+      }
+      // nothing may walk through the castle itself: no road above the gate within the walls,
+      // and the new stretch only ever comes at the gate from below
+      walked = 0;
+      for (let i = 0; i < next.length - 1 && ok; i++) {
+        const a = next[i]!, b = next[i + 1]!;
+        walked += Math.hypot(b.x - a.x, b.y - a.y);
+        if (total - walked < 12) break;
+        if (b.y < G.y - 6 && b.y > G.y - 150 && Math.abs(b.x - G.x) < 80) ok = false;
       }
       if (!ok) continue;
       // no build site under the walls, too near the gate, or on the new road
-      if (sites.some((st) => isInsideCastleFootprint(st, G) || Math.hypot(st.x - G.x, st.y - G.y) < 122 || distanceToPolyline(st, added) < 40)) continue;
-      return { path: next, added };
+      const blocked = (st: SiteSrc) => isInsideCastleFootprint(st, G) || Math.hypot(st.x - G.x, st.y - G.y) < 122 || distanceToPolyline(st, added) < 40 || (requireReach && distanceToPolyline(st, next) > 96);
+      if (!sites.some(blocked)) return { path: next, added, sites };
+      if (!moveSites) continue;
+      // the castle needs the ground a site stands on: move those sites to the nearest good spot
+      let moved: SiteSrc[] = [...sites];
+      let fine = true;
+      for (const st of sites) {
+        if (!blocked(st)) continue;
+        const spot = relocateSite(st, moved, next, G);
+        if (!spot) {
+          fine = false;
+          break;
+        }
+        moved = moved.map((o) => (o.id === st.id ? spot : o));
+      }
+      if (fine) return { path: next, added, sites: moved };
     }
   }
-  return { path, added: [] };
+  return { path, added: [], sites };
+}
+
+/** Cuts `dist` world units off the end of a road: the part kept and the part removed (which starts where the kept part ends). */
+function trimRoadEnd(path: readonly Vector2[], dist: number): { kept: Vector2[]; removed: Vector2[] } {
+  if (dist <= 0) return { kept: [...path], removed: [] };
+  let left = dist;
+  for (let i = path.length - 1; i > 0; i--) {
+    const a = path[i - 1]!, b = path[i]!;
+    const seg = Math.hypot(b.x - a.x, b.y - a.y);
+    if (seg >= left) {
+      const t = 1 - left / seg;
+      const cutAt = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      return { kept: [...path.slice(0, i), cutAt], removed: [cutAt, ...path.slice(i)] };
+    }
+    left -= seg;
+  }
+  return { kept: [...path], removed: [] };
 }
 
 function buildLayout(src: LayoutSource): MapLayout {
   const full = src.id === "ANCIENT_FOREST" ? ENEMY_PATH : buildCatmullRomSpline(src.controlPoints, 14);
   const cut = cutRoadAtGate(full);
-  const approach = addGateApproach(cut.path, src.sites);
+  let approach = addGateApproach(cut.path, src.sites);
+  let past = cut.past;
+  if (approach.added.length === 0 && src.id !== "ANCIENT_FOREST") {
+    // still no room: let the hook start a little further back along the road (that stretch is painted over)
+    for (const back of [0, 60, 120, 180, 240, 320, 400, 480]) {
+      const { kept, removed } = trimRoadEnd(cut.path, back);
+      const tryIt = addGateApproach(kept, src.sites, true, back > 0);
+      if (tryIt.added.length > 0) {
+        approach = tryIt;
+        past = removed.length > 1 ? [...removed, ...cut.past.slice(1)] : cut.past;
+        break;
+      }
+    }
+  }
   const path = approach.path;
-  const past = cut.past;
   const length = getPathLength(path);
   return {
     id: src.id,
@@ -535,7 +621,7 @@ function buildLayout(src: LayoutSource): MapLayout {
     roadToGate: approach.added,
     length,
     speedScale: length / REFERENCE_PATH_LENGTH,
-    sites: src.sites.map((s) => {
+    sites: approach.sites.map((s) => {
       const position = { x: s.x, y: s.y };
       return { id: s.id, position, trait: s.trait, distanceCategory: categoryFor(distanceToPolyline(position, path)) };
     }),
