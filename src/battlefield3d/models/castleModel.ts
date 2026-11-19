@@ -189,8 +189,16 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     const rg = rc.getContext("2d")!;
     const r = rng(seed);
     // real stone is greyer and browner than a game palette: pull the colours towards a weathered grey
-    const A = desat(hexRgb(D.stoneA), 0.35);
-    const B = desat(hexRgb(D.stoneB), 0.25);
+    let A = desat(hexRgb(D.stoneA), 0.35);
+    let B = desat(hexRgb(D.stoneB), 0.25);
+    // very dark dressings (basalt, obsidian) read as a black hole once weathered: lift them into a
+    // dark-but-legible stone so the blocks and their relief still show
+    const lumA = A[0] * 0.3 + A[1] * 0.59 + A[2] * 0.11;
+    if (lumA < 105) {
+      const k = (105 - lumA) / 105;
+      A = [A[0] + (140 - A[0]) * k * 0.7, A[1] + (132 - A[1]) * k * 0.7, A[2] + (124 - A[2]) * k * 0.7];
+      B = [B[0] + (92 - B[0]) * k * 0.6, B[1] + (86 - B[1]) * k * 0.6, B[2] + (80 - B[2]) * k * 0.6];
+    }
     const M = hexRgb(D.mortar);
     g.fillStyle = `rgb(${M[0]},${M[1]},${M[2]})`;
     g.fillRect(0, 0, S, S);

@@ -59,6 +59,14 @@ export interface MapLayout {
    * renderer paints it over (rendering/groundBakes.ts withoutRoadPastGate).
    */
   roadPastGate: readonly Vector2[];
+  /**
+   * THE GATE APPROACH — the new last stretch of road (part of `path`) that
+   * turns and climbs straight up into the castle's gate from the front, so
+   * the gate faces the camera and every creature is seen walking in. The
+   * painted ground images don't have it; the renderer paints it on
+   * (rendering/groundBakes.ts). Empty when the map had no room for it.
+   */
+  roadToGate: readonly Vector2[];
   length: number;
   /** Enemy movement multiplier that keeps crossing time equal to the reference map. */
   speedScale: number;
@@ -442,9 +450,81 @@ function categoryFor(distance: number): SlotDistanceCategory {
   return distance < 52 ? "CLOSE" : distance < 70 ? "MEDIUM" : "FAR";
 }
 
+/** Points along a cubic Bezier, end point included, start point excluded. */
+function bezier(p0: Vector2, c0: Vector2, c1: Vector2, p1: Vector2, step = 10): Vector2[] {
+  const approx = Math.hypot(c0.x - p0.x, c0.y - p0.y) + Math.hypot(c1.x - c0.x, c1.y - c0.y) + Math.hypot(p1.x - c1.x, p1.y - c1.y);
+  const n = Math.max(4, Math.ceil(approx / step));
+  const out: Vector2[] = [];
+  for (let i = 1; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    out.push({
+      x: u * u * u * p0.x + 3 * u * u * t * c0.x + 3 * u * t * t * c1.x + t * t * t * p1.x,
+      y: u * u * u * p0.y + 3 * u * u * t * c0.y + 3 * u * t * t * c1.y + t * t * t * p1.y,
+    });
+  }
+  return out;
+}
+
+/**
+ * THE GATE APPROACH — after the road is cut at the old castle spot, a last
+ * curve turns it so it climbs straight up (towards the top of the screen)
+ * into the castle's gate. The castle then stands with its gate facing the
+ * camera, and its gate machinery and every creature walking in are in plain
+ * view. Tries a few shapes and keeps the first that fits the map: castle
+ * inside the world, no build site under its walls or on the new road, and no
+ * other stretch of road running through its grounds. None fits → the road
+ * keeps its old end.
+ */
+function addGateApproach(path: Vector2[], sites: readonly { x: number; y: number }[]): { path: Vector2[]; added: Vector2[] } {
+  const P = path[path.length - 1]!;
+  let k = path.length - 2;
+  while (k > 0 && Math.hypot(path[k]!.x - P.x, path[k]!.y - P.y) < 30) k--;
+  const Q = path[k]!;
+  const dl = Math.hypot(P.x - Q.x, P.y - Q.y) || 1;
+  const d = { x: (P.x - Q.x) / dl, y: (P.y - Q.y) / dl };
+  // already climbing into the gate from below
+  if (d.y < -0.85) return { path, added: [] };
+  const sides = Math.abs(d.x) >= 0.3 ? [Math.sign(d.x), -Math.sign(d.x)] : P.x < WORLD_SIZE.width / 2 ? [1, -1] : [-1, 1];
+  // a road coming down the screen can't climb into the gate without a U-turn below it
+  const comingDown = d.y > 0.5;
+  // [sideways, up(-)/down(+)] offsets of the gate from the old road end — smallest hooks first
+  const shapes: [number, number][] = [];
+  for (const up of [-40, -55, -30, -70, -85, -20, -100]) for (const w of [40, 55, 30, 70, 20, 85, 0, 100]) shapes.push([w, up]);
+  for (const down of [30, 50, 70]) for (const w of [70, 90, 110]) shapes.push([w, down]);
+  for (const side of sides) {
+    for (const [w, hgt] of shapes) {
+      if (comingDown && hgt < 0) continue;
+      if (side === -Math.sign(d.x) && Math.abs(d.x) >= 0.3 && hgt < 0 && w < 60) continue;
+      const G = { x: P.x + side * w, y: P.y + hgt };
+      if (G.x < 110 || G.x > WORLD_SIZE.width - 95 || G.y < 180 || G.y > WORLD_SIZE.height - 30) continue;
+      const lead = Math.max(40, Math.abs(w) * 0.6);
+      const added = bezier(P, { x: P.x + d.x * lead, y: P.y + d.y * lead }, { x: G.x, y: G.y + Math.max(50, Math.abs(hgt) * 0.8) }, G);
+      const next = [...path, ...added];
+      // castle grounds clear of every other stretch of road
+      let walked = 0;
+      const total = getPathLength(next);
+      let ok = true;
+      for (let i = 0; i < next.length - 1 && ok; i++) {
+        const a = next[i]!, b = next[i + 1]!;
+        walked += Math.hypot(b.x - a.x, b.y - a.y);
+        if (total - walked < 170) break;
+        if (Math.hypot(b.x - G.x, b.y - G.y) <= 108) ok = false;
+      }
+      if (!ok) continue;
+      // no build site under the walls, too near the gate, or on the new road
+      if (sites.some((st) => isInsideCastleFootprint(st, G) || Math.hypot(st.x - G.x, st.y - G.y) < 122 || distanceToPolyline(st, added) < 40)) continue;
+      return { path: next, added };
+    }
+  }
+  return { path, added: [] };
+}
+
 function buildLayout(src: LayoutSource): MapLayout {
   const full = src.id === "ANCIENT_FOREST" ? ENEMY_PATH : buildCatmullRomSpline(src.controlPoints, 14);
-  const { path, past } = cutRoadAtGate(full);
+  const cut = cutRoadAtGate(full);
+  const approach = addGateApproach(cut.path, src.sites);
+  const path = approach.path;
+  const past = cut.past;
   const length = getPathLength(path);
   return {
     id: src.id,
@@ -452,6 +532,7 @@ function buildLayout(src: LayoutSource): MapLayout {
     controlPoints: src.controlPoints,
     path,
     roadPastGate: past,
+    roadToGate: approach.added,
     length,
     speedScale: length / REFERENCE_PATH_LENGTH,
     sites: src.sites.map((s) => {

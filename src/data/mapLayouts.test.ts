@@ -30,8 +30,10 @@ describe("map layouts — one battlefield per phase", () => {
 
   it("Ancient Forest keeps its original road and its original 12 sites exactly", () => {
     // the road is the original one, cut at the castle gate (every road ends at the gate now)
-    expect(forest.path).toEqual(cutRoadAtGate(ENEMY_PATH).path);
-    expect(forest.path.slice(0, -1)).toEqual(ENEMY_PATH.slice(0, forest.path.length - 1));
+    // ...and then turned up into the gate (the gate approach)
+    const cut = cutRoadAtGate(ENEMY_PATH).path;
+    expect(forest.path.slice(0, cut.length)).toEqual(cut);
+    expect(forest.path.slice(0, cut.length - 1)).toEqual(ENEMY_PATH.slice(0, cut.length - 1));
     for (const slot of TOWER_SLOTS) expect(forest.sites.find((s) => s.id === slot.id)?.position).toEqual(slot.position);
     expect(forest.length / forest.speedScale).toBeCloseTo(REFERENCE_PATH_LENGTH, 6);
   });

@@ -3,6 +3,7 @@ import type { DecorationKind } from "./mapDecorations";
 import { getMapDecorations } from "./mapDecorations";
 import type { VisibleBounds } from "./MapRenderer";
 import { getMapLayout } from "@/data/mapLayouts";
+import type { Vector2 } from "@/utils/geometry";
 
 /** Bumped whenever the baked images change, so browsers never mix new code with an old cached image. */
 const BAKE_VERSION = 6;
@@ -180,7 +181,7 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
   if (hit) return hit;
   const layout = getMapLayout(biome.id);
   const past = layout.roadPastGate;
-  if (past.length < 2 || typeof document === "undefined") return bake;
+  if ((past.length < 2 && layout.roadToGate.length < 2) || typeof document === "undefined") return bake;
   const { def } = bake;
   const W = def.x1 - def.x0, H = def.y1 - def.y0;
   const gw = imgW(bake.ground), gh = imgH(bake.ground);
@@ -191,12 +192,13 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
   const g = ground.getContext("2d")!;
   g.drawImage(bake.ground, 0, 0);
 
+  const road = layout.path;
+  if (past.length >= 2) {
   // the stretch to cover, carried on past the map's edge to the bake's own edge
   const a = past[past.length - 2]!, b = past[past.length - 1]!;
   const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
   const dir = { x: (b.x - a.x) / len, y: (b.y - a.y) / len };
   const pts = [...past, { x: b.x + dir.x * 260, y: b.y + dir.y * 260 }];
-  const road = layout.path;
   const clearOfRoad = (x: number, y: number, r: number) => {
     for (let i = 1; i < road.length; i++) {
       const p = road[i - 1]!, q = road[i]!;
@@ -253,6 +255,43 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
     t.fillStyle = gr;
     t.fillRect(0, 0, pw, ph);
     g.drawImage(tmp, (st.x - def.x0) * kx - pw / 2, (st.y - def.y0) * ky - ph / 2);
+  }
+  }
+  // THE GATE APPROACH — paint the new last stretch of road (up into the gate) with the
+  // map's own road surface, lifted from the middle of a straight run of the old road
+  const added = layout.roadToGate;
+  if (added.length > 1) {
+    const Rr = 30;
+    let donor: Vector2 | null = null;
+    for (let i = Math.floor(road.length * 0.3); i < road.length * 0.7 && !donor; i++) {
+      const p0 = road[i - 3]!, p1 = road[i]!, p2 = road[i + 3]!;
+      const a1 = Math.atan2(p1.y - p0.y, p1.x - p0.x), a2 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      const bend = Math.abs(Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1)));
+      if (bend < 0.05 && p1.x - Rr > def.x0 && p1.y - Rr > def.y0 && p1.x + Rr < def.x1 && p1.y + Rr < def.y1) donor = p1;
+    }
+    if (donor) {
+      const qw = Math.ceil(Rr * 2 * kx), qh = Math.ceil(Rr * 2 * ky);
+      const dc = document.createElement("canvas");
+      dc.width = qw;
+      dc.height = qh;
+      const d2 = dc.getContext("2d")!;
+      d2.drawImage(bake.ground, (donor.x - Rr - def.x0) * kx, (donor.y - Rr - def.y0) * ky, qw, qh, 0, 0, qw, qh);
+      d2.globalCompositeOperation = "destination-in";
+      const gr = d2.createRadialGradient(qw / 2, qh / 2, Math.min(qw, qh) * 0.28, qw / 2, qh / 2, Math.min(qw, qh) / 2);
+      gr.addColorStop(0, "rgba(0,0,0,1)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      d2.fillStyle = gr;
+      d2.fillRect(0, 0, qw, qh);
+      const pts = [road[road.length - added.length - 1] ?? added[0]!, ...added];
+      for (let i = 1; i < pts.length; i++) {
+        const p = pts[i - 1]!, q = pts[i]!;
+        const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 6));
+        for (let k = 0; k < n; k++) {
+          const x = p.x + ((q.x - p.x) * k) / n, y = p.y + ((q.y - p.y) * k) / n;
+          g.drawImage(dc, (x - def.x0) * kx - qw / 2, (y - def.y0) * ky - qh / 2);
+        }
+      }
+    }
   }
   const out: LoadedGroundBake = { def, ground, emissive: bake.emissive, skipKinds: bake.skipKinds };
   roadless.set(biome.id, out);

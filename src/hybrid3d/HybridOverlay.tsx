@@ -224,17 +224,13 @@ function Castle({
   const oilAt = useRef<{ at: THREE.Vector3; h: number } | null>(null);
   const debrisGroup = useRef<THREE.Group>(null);
   const debris = useRef<{ m: THREE.Mesh; v: THREE.Vector3; w: THREE.Vector3; life: number; rest: boolean }[]>([]);
-  const anchor = loc(fortress);
-  // the gate (the model's +Z) faces back along the road the horde comes in on, turned towards
-  // the viewer so the castle still shows its face rather than a flank or its back
+  // the gate (the model's +Z) faces straight back down the road the horde comes in on — squared
+  // to the map (one of the four sides), never at a slant — so the road runs right into the gate
   const YAW = useMemo(() => {
-    let gx = -facing.x;
-    let gy = -facing.y + 0.9;
-    if (Math.hypot(gx, gy) < 0.3) {
-      gx = Math.sign(gx) || -1;
-      gy = 0.3;
-    }
-    return worldDirectionToThreeYaw({ x: gx, y: gy });
+    const gx = -facing.x;
+    const gy = -facing.y;
+    const square = Math.abs(gx) >= Math.abs(gy) ? { x: Math.sign(gx) || -1, y: 0 } : { x: 0, y: Math.sign(gy) || 1 };
+    return worldDirectionToThreeYaw(square);
   }, [facing.x, facing.y]);
   // the castle stands straight on the map's ground: its round stone platform is taken away
   // (the ground patch below takes its place), and it is sized to the 2D castle's footprint
@@ -252,6 +248,15 @@ function Castle({
     const box = new THREE.Box3().setFromObject(model.root);
     return 118 / Math.max(1, box.max.x - box.min.x);
   }, [model]);
+  // the road ends at the castle's GATE, not at its middle: the building stands back from the
+  // road's end by the gate's own depth, so whatever walks the road goes in through the arch
+  const anchor = useMemo(() => {
+    const at0 = loc(fortress);
+    const g = model.anchors.gate;
+    if (!g) return at0;
+    const v = new THREE.Vector3(g.x, 0, g.z + 1.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), YAW).multiplyScalar(scale);
+    return at0.sub(v);
+  }, [fortress.x, fortress.y, model, YAW, scale]);
   const parts = useMemo(() => {
     const portcullis = model.root.getObjectByName("portcullis") ?? null;
     const door = model.root.getObjectByName("gateDoor") as THREE.Mesh | undefined;
