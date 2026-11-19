@@ -16,6 +16,7 @@ import type { Battlefield3DUiState } from "@/battlefield3d/Battlefield3D";
 import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldToLocalGround } from "@/rendering3d/enemyProjection";
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Garrison } from "./garrison3d";
+import { City3D } from "./city3d";
 import { Effects } from "@/battlefield3d/fx";
 import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
@@ -1886,6 +1887,7 @@ function Scene({ engine, hiddenIds, hiddenTowerIds, ui }: { engine: GameEngine; 
       {TOWERS_3D_PREVIEW && <EnvLight intensity={0.55} />}
       <MapProps engine={engine} fx={fx} />
       <Castle key={lid} engine={engine} fortress={fortress} facing={anchorInfo.facingDir} fx={fx} state={castle} />
+      <City3D key={`city-${lid}`} engine={engine} fx={fx} />
       <LayerBoundary onError={() => hiddenIds.current?.clear()}>
         <Suspense fallback={null}>
           <Creatures engine={engine} hiddenIds={hiddenIds} fx={fx} castle={castle} portal={portal} fortress={fortress} roadLength={layout.length} castleAt={Math.hypot(layout.path[layout.path.length - 1]!.x - fortress.x, layout.path[layout.path.length - 1]!.y - fortress.y)} />

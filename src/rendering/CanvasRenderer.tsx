@@ -512,9 +512,10 @@ export function CanvasRenderer({
       for (const id of cityKnown) if (!cityBuilt.has(id)) { cityKnown.delete(id); cityRaisedAt.delete(id); }
       const cityState = { built: cityBuilt, burning: hud.city.burning, raisedAt: cityRaisedAt };
       const castleBaseY = getFortressAnchor(roadPath).position.y;
-      drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, false);
+      // the 3D view builds the city (and its townsfolk) itself: hybrid3d/city3d.tsx
+      if (!hideCastleRef.current) drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, false);
       drawPathEndpoints(ctx, roadPath, biome, timestamp, castleHpPercent, hideCastleRef.current ? "all" : false, { emergingIds, rimBaked: groundBake !== null });
-      drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, true);
+      if (!hideCastleRef.current) drawCity(ctx, biome.id, cityPlots, castleBaseY, cityState, timestamp, true);
 
       const occupiedSlotIds = new Set(snapshot.towers.map((t) => t.slotId));
       pruneTowerAims(new Set(snapshot.towers.map((t) => t.id)));
