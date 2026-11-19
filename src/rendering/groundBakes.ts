@@ -257,70 +257,91 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
     g.drawImage(tmp, (st.x - def.x0) * kx - pw / 2, (st.y - def.y0) * ky - ph / 2);
   }
   }
-  // THE GATE APPROACH — paint the new last stretch of road (up into the gate) as a real
-  // road: the colour is the map's own road surface (sampled from the painted road), with a
-  // dark worn edge, soft shoulders, grit and two wheel ruts, joined smoothly onto the old road
+  // THE GATE APPROACH — the new last stretch of road (up into the gate) is made of the map's
+  // own painted road: a straight run of the original road is lifted out as a strip and laid
+  // down slice by slice along the new curve, turning with it, so its dirt, stones, ruts and
+  // edges are exactly the original ones. The strip's sides fade so it melts into the ground.
   const added = layout.roadToGate;
   if (added.length > 1) {
-    // the road's own colour: the median of many samples taken on the old road's centre line
-    const samples: [number, number, number][] = [];
-    for (let i = 4; i < road.length - added.length - 4; i += Math.max(1, Math.floor(road.length / 40))) {
-      const q = road[i]!;
-      const sx = Math.round((q.x - def.x0) * kx), sy = Math.round((q.y - def.y0) * ky);
-      if (sx < 2 || sy < 2 || sx > gw - 3 || sy > gh - 3) continue;
-      const d = g.getImageData(sx - 2, sy - 2, 5, 5).data;
-      let r = 0, gg = 0, b = 0;
-      for (let k = 0; k < d.length; k += 4) {
-        r += d[k]!;
-        gg += d[k + 1]!;
-        b += d[k + 2]!;
+    const STRIP_W = 96; // road plus its shoulders, world units
+    const STEP = 3;
+    // 1) the longest nearly straight run of the old road, away from both ends
+    const old = road.slice(0, road.length - added.length);
+    let best: { a: number; b: number; len: number } | null = null;
+    for (let a = Math.floor(old.length * 0.15); a < old.length * 0.85; a++) {
+      let len = 0;
+      let b = a;
+      const h0 = Math.atan2(old[a + 1]!.y - old[a]!.y, old[a + 1]!.x - old[a]!.x);
+      while (b + 1 < old.length * 0.9) {
+        const h = Math.atan2(old[b + 1]!.y - old[b]!.y, old[b + 1]!.x - old[b]!.x);
+        if (Math.abs(Math.atan2(Math.sin(h - h0), Math.cos(h - h0))) > 0.12) break;
+        len += Math.hypot(old[b + 1]!.x - old[b]!.x, old[b + 1]!.y - old[b]!.y);
+        b++;
+        if (len > 220) break;
       }
-      samples.push([r / 25, gg / 25, b / 25]);
+      const A = old[a]!, B = old[b]!;
+      const inside = (v: Vector2) => v.x - STRIP_W > def.x0 && v.y - STRIP_W > def.y0 && v.x + STRIP_W < def.x1 && v.y + STRIP_W < def.y1;
+      if (inside(A) && inside(B) && (!best || len > best.len)) best = { a, b, len };
     }
-    const lumOf = (c: [number, number, number]) => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
-    samples.sort((a, b) => lumOf(a) - lumOf(b));
-    const mid = samples[Math.floor(samples.length / 2)] ?? [120, 100, 80];
-    const rgb = (c: number[], k = 1, a = 1) => `rgba(${Math.round(c[0]! * k)},${Math.round(c[1]! * k)},${Math.round(c[2]! * k)},${a})`;
-    // the centre line, started a little way back on the old road so the join is seamless
-    const lead = road.slice(Math.max(0, road.length - added.length - 5), road.length - added.length);
-    const line = [...lead, ...added];
-    const P = (v: Vector2) => [(v.x - def.x0) * kx, (v.y - def.y0) * ky] as const;
-    const stroke = (width: number, style: string, blur = 0, dash: number[] = [], offset = 0) => {
-      g.save();
-      g.lineCap = g.lineJoin = "round";
-      g.strokeStyle = style;
-      g.lineWidth = width * kx;
-      if (blur) g.filter = `blur(${blur * kx}px)`;
-      g.setLineDash(dash.map((x) => x * kx));
-      g.beginPath();
-      line.forEach((v, n) => {
-        // offset sideways (for the ruts)
-        const a = line[Math.max(0, n - 1)]!, b = line[Math.min(line.length - 1, n + 1)]!;
-        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
-        const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
-        const [x, y] = P({ x: v.x + nx * offset, y: v.y + ny * offset });
-        if (n === 0) g.moveTo(x, y);
-        else g.lineTo(x, y);
-      });
-      g.stroke();
-      g.restore();
-    };
-    stroke(64, "rgba(10,8,6,0.28)", 6); // soft shoulder shadow
-    stroke(54, rgb(mid, 0.72), 2); // worn edge
-    stroke(46, rgb(mid, 1.0), 1.5); // the road
-    stroke(30, rgb(mid, 1.08, 0.6), 4); // lighter, trodden middle
-    stroke(3, rgb(mid, 0.62, 0.55), 0.8, [], -8); // wheel ruts
-    stroke(3, rgb(mid, 0.62, 0.55), 0.8, [], 8);
-    // grit: little stones and dark pits along the road
-    let seed = 1234;
-    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-    for (const v of added) {
-      for (let k = 0; k < 6; k++) {
-        const [x, y] = P({ x: v.x + (rnd() - 0.5) * 40, y: v.y + (rnd() - 0.5) * 40 });
-        g.fillStyle = rnd() < 0.5 ? rgb(mid, 0.55, 0.5) : rgb(mid, 1.25, 0.45);
-        g.beginPath();
-        g.arc(x, y, (0.6 + rnd() * 1.6) * kx, 0, Math.PI * 2);
-        g.fill();
+    if (best && best.len > 40) {
+      const A = old[best.a]!, B = old[best.b]!;
+      const ang = Math.atan2(B.y - A.y, B.x - A.x);
+      const L = best.len;
+      // 2) the strip: the original road between A and B, turned so it runs left to right
+      const sw = Math.ceil(L * kx), sh = Math.ceil(STRIP_W * ky);
+      const strip = document.createElement("canvas");
+      strip.width = sw;
+      strip.height = sh;
+      const sg = strip.getContext("2d")!;
+      sg.translate(0, sh / 2);
+      sg.rotate(-ang);
+      sg.translate(-(A.x - def.x0) * kx, -(A.y - def.y0) * ky);
+      sg.drawImage(bake.ground, 0, 0);
+      sg.setTransform(1, 0, 0, 1, 0, 0);
+      // fade the shoulders into whatever ground it is laid on
+      sg.globalCompositeOperation = "destination-in";
+      const fade = sg.createLinearGradient(0, 0, 0, sh);
+      fade.addColorStop(0, "rgba(0,0,0,0)");
+      fade.addColorStop(0.2, "rgba(0,0,0,1)");
+      fade.addColorStop(0.8, "rgba(0,0,0,1)");
+      fade.addColorStop(1, "rgba(0,0,0,0)");
+      sg.fillStyle = fade;
+      sg.fillRect(0, 0, sw, sh);
+      // 3) lay it along the new road, starting a little way back on the old one so the join is seamless
+      const lead = road.slice(Math.max(0, road.length - added.length - 4), road.length - added.length);
+      const line = [...lead, ...added];
+      // resample the line at even steps
+      const pts: Vector2[] = [line[0]!];
+      let carry = 0;
+      for (let k = 1; k < line.length; k++) {
+        const p = line[k - 1]!, q = line[k]!;
+        const seg = Math.hypot(q.x - p.x, q.y - p.y);
+        let t = STEP - carry;
+        while (t <= seg) {
+          pts.push({ x: p.x + ((q.x - p.x) * t) / seg, y: p.y + ((q.y - p.y) * t) / seg });
+          t += STEP;
+        }
+        carry = seg - (t - STEP);
+      }
+      const slice = Math.ceil((STEP + 2) * kx);
+      let u = 0; // where along the strip we are (it ping-pongs so no hard seam appears)
+      let dir = 1;
+      for (let k = 0; k < pts.length - 1; k++) {
+        const p = pts[k]!, q = pts[k + 1]!;
+        const h = Math.atan2(q.y - p.y, q.x - p.x);
+        const sx = Math.max(0, Math.min(sw - slice, Math.round(u * kx)));
+        g.save();
+        g.translate((p.x - def.x0) * kx, (p.y - def.y0) * ky);
+        g.rotate(h);
+        if (dir < 0) g.scale(-1, 1);
+        g.drawImage(strip, sx, 0, slice, sh, dir < 0 ? -slice : 0, -sh / 2, slice, sh);
+        g.restore();
+        u += STEP * dir;
+        if (u > L - STEP - 2) dir = -1;
+        else if (u < 0) {
+          u = 0;
+          dir = 1;
+        }
       }
     }
   }
