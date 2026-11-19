@@ -1,3 +1,4 @@
+import { getMapLayout } from "@/data/mapLayouts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "./AscensionManager";
 import { loadSave, updateSave } from "./SaveSystem";
@@ -7,8 +8,7 @@ import { getSeasonRewardBundle } from "@/config/ascension";
 import { RUN_START } from "@/config/gameBalance";
 import { createItemInstance } from "@/entities/Item";
 import type { EnemyInstance } from "@/entities/Enemy";
-import { TOWER_SLOTS, ENEMY_PATH } from "@/data/mapWhisperingWoods";
-import { getPathLength } from "@/utils/geometry";
+import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 
 /**
  * PRÓXIMA GRANDE FASE — "DECISÃO DEFINITIVA SOBRE PROGRESSÃO" +
@@ -663,7 +663,7 @@ describe("AscensionManager.resetSeasonProgressionForTesting — manual global re
     return engine as unknown as EngineInternals;
   }
 
-  const PATH_LENGTH = getPathLength(ENEMY_PATH);
+  const PATH_LENGTH = getMapLayout("ANCIENT_FOREST").length; // the walked road (it ends at the castle gate)
 
   /** Ticks a real GameEngine until at least one enemy exists, then forces it to the very edge of the path — same technique as CastleDamage.test.ts. */
   function spawnEnemyAtPathEnd(engine: GameEngine): EnemyInstance {

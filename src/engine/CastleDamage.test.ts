@@ -1,8 +1,7 @@
+import { getMapLayout } from "@/data/mapLayouts";
 import { beforeEach, describe, expect, it } from "vitest";
 import { GameEngine } from "./GameEngine";
 import type { EnemyInstance } from "@/entities/Enemy";
-import { ENEMY_PATH } from "@/data/mapWhisperingWoods";
-import { getPathLength } from "@/utils/geometry";
 import { computeCastleDamage } from "@/config/castleDamage";
 
 /**
@@ -23,7 +22,7 @@ function internals(engine: GameEngine): EngineInternals {
   return engine as unknown as EngineInternals;
 }
 
-const PATH_LENGTH = getPathLength(ENEMY_PATH);
+const PATH_LENGTH = getMapLayout("ANCIENT_FOREST").length; // the walked road (it ends at the castle gate)
 
 /** Spawns a real GameEngine with an empty build, ticks until at least one enemy exists, then forces it to the very edge of the path. */
 function spawnEnemyAtPathEnd(engine: GameEngine): EnemyInstance {

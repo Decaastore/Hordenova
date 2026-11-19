@@ -450,20 +450,6 @@ function categoryFor(distance: number): SlotDistanceCategory {
   return distance < 52 ? "CLOSE" : distance < 70 ? "MEDIUM" : "FAR";
 }
 
-/** Points along a cubic Bezier, end point included, start point excluded. */
-function bezier(p0: Vector2, c0: Vector2, c1: Vector2, p1: Vector2, step = 10): Vector2[] {
-  const approx = Math.hypot(c0.x - p0.x, c0.y - p0.y) + Math.hypot(c1.x - c0.x, c1.y - c0.y) + Math.hypot(p1.x - c1.x, p1.y - c1.y);
-  const n = Math.max(4, Math.ceil(approx / step));
-  const out: Vector2[] = [];
-  for (let i = 1; i <= n; i++) {
-    const t = i / n, u = 1 - t;
-    out.push({
-      x: u * u * u * p0.x + 3 * u * u * t * c0.x + 3 * u * t * t * c1.x + t * t * t * p1.x,
-      y: u * u * u * p0.y + 3 * u * u * t * c0.y + 3 * u * t * t * c1.y + t * t * t * p1.y,
-    });
-  }
-  return out;
-}
 
 /**
  * THE GATE APPROACH — after the road is cut at the old castle spot, a last
@@ -503,6 +489,10 @@ function relocateSite(site: SiteSrc, others: readonly SiteSrc[], road: readonly 
   return null;
 }
 
+/** The standard gate approach: every map's road ends with the same bend and the same straight run. */
+const GATE_TURN_RADIUS = 62;
+const GATE_STRAIGHT = 46;
+
 function addGateApproach(path: Vector2[], sites: readonly SiteSrc[], moveSites = false, requireReach = false): { path: Vector2[]; added: Vector2[]; sites: readonly SiteSrc[] } {
   const P = path[path.length - 1]!;
   let k = path.length - 2;
@@ -510,29 +500,36 @@ function addGateApproach(path: Vector2[], sites: readonly SiteSrc[], moveSites =
   const Q = path[k]!;
   const dl = Math.hypot(P.x - Q.x, P.y - Q.y) || 1;
   const d = { x: (P.x - Q.x) / dl, y: (P.y - Q.y) / dl };
-  // already climbing into the gate from below
-  if (d.y < -0.85) return { path, added: [], sites };
-  const sides = Math.abs(d.x) >= 0.3 ? [Math.sign(d.x), -Math.sign(d.x)] : P.x < WORLD_SIZE.width / 2 ? [1, -1] : [-1, 1];
-  // a road coming down the screen can't climb into the gate without a U-turn below it
-  const comingDown = d.y > 0.5;
-  // [sideways, up(-)/down(+)] offsets of the gate from the old road end — smallest hooks first
-  const shapes: [number, number][] = [];
-  for (const up of [-40, -55, -30, -70, -85, -20, -100]) for (const w of [40, 55, 30, 70, 20, 85, 0, 100]) shapes.push([w, up]);
-  for (const down of [30, 50, 70]) for (const w of [70, 90, 110]) shapes.push([w, down]);
-  // wider hooks, only tried when nothing smaller fits
-  for (const up of [-115, -130]) for (const w of [60, 100, 140, 170]) shapes.push([w, up]);
-  for (const up of [-40, -70, -100]) for (const w of [120, 140, 170, 200]) shapes.push([w, up]);
-  for (const down of [20, 40, 60, 90, 110]) for (const w of [50, 130, 150, 180]) shapes.push([w, down]);
-  for (const down of [130, 150, 170]) for (const w of [0, 40, 80, 120, 160, 200]) shapes.push([w, down]);
-  for (const up of [-150, -180]) for (const w of [0, 60, 120, 180]) shapes.push([w, up]);
-  for (const side of sides) {
-    for (const [w, hgt] of shapes) {
-      if (comingDown && hgt < 0) continue;
-      if (side === -Math.sign(d.x) && Math.abs(d.x) >= 0.3 && hgt < 0 && w < 60) continue;
-      const G = { x: P.x + side * w, y: P.y + hgt };
-      if (G.x < 110 || G.x > WORLD_SIZE.width - 95 || G.y < 180 || G.y > WORLD_SIZE.height - 30) continue;
-      const lead = Math.max(40, Math.abs(w) * 0.6);
-      const added = bezier(P, { x: P.x + d.x * lead, y: P.y + d.y * lead }, { x: G.x, y: G.y + Math.max(50, Math.abs(hgt) * 0.8) }, G);
+  // THE STANDARD APPROACH — the same on every map: one circular bend of radius
+  // GATE_TURN_RADIUS that swings the road round until it points straight up the
+  // screen, then a straight run of GATE_STRAIGHT into the gate. Only the side it
+  // turns to differs (the shorter way round, or either way for a road coming down).
+  const heading = Math.atan2(d.y, d.x);
+  const target = -Math.PI / 2;
+  const delta = Math.atan2(Math.sin(target - heading), Math.cos(target - heading));
+  const turns = Math.abs(delta) < 0.04 ? [0] : Math.abs(Math.abs(delta) - Math.PI) < 0.35 ? [1, -1] : [Math.sign(delta)];
+  for (const sgn of turns) {
+    {
+      const added: Vector2[] = [];
+      let end = P;
+      if (sgn !== 0) {
+        const sweep = sgn === Math.sign(delta) ? Math.abs(delta) : Math.PI * 2 - Math.abs(delta);
+        const C = { x: P.x + GATE_TURN_RADIUS * Math.cos(heading + (sgn * Math.PI) / 2), y: P.y + GATE_TURN_RADIUS * Math.sin(heading + (sgn * Math.PI) / 2) };
+        const n = Math.max(3, Math.ceil((sweep * GATE_TURN_RADIUS) / 8));
+        for (let i = 1; i <= n; i++) {
+          const phi = heading - (sgn * Math.PI) / 2 + sgn * sweep * (i / n);
+          added.push({ x: C.x + GATE_TURN_RADIUS * Math.cos(phi), y: C.y + GATE_TURN_RADIUS * Math.sin(phi) });
+        }
+        end = added[added.length - 1]!;
+      }
+      const steps = Math.ceil(GATE_STRAIGHT / 8);
+      for (let i = 1; i <= steps; i++) added.push({ x: end.x, y: end.y - (GATE_STRAIGHT * i) / steps });
+      const G = added[added.length - 1]!;
+      if (G.x < 70 || G.x > WORLD_SIZE.width - 66 || G.y < 110 || G.y > WORLD_SIZE.height - 30) continue;
+      if (added.some((v) => v.x < 25 || v.x > WORLD_SIZE.width - 25 || v.y < 25 || v.y > WORLD_SIZE.height - 25)) continue;
+      // the bend must not run over another stretch of the old road
+      const earlier = path.slice(0, Math.max(2, path.length - 10));
+      if (added.some((v) => distanceToPolyline(v, earlier) < 70)) continue;
       const next = [...path, ...added];
       // castle grounds clear of every other stretch of road
       let walked = 0;
@@ -551,7 +548,7 @@ function addGateApproach(path: Vector2[], sites: readonly SiteSrc[], moveSites =
         const a = next[i]!, b = next[i + 1]!;
         walked += Math.hypot(b.x - a.x, b.y - a.y);
         if (total - walked < 12) break;
-        if (b.y < G.y - 6 && b.y > G.y - 150 && Math.abs(b.x - G.x) < 80) ok = false;
+        if (b.y < G.y - 6 && b.y > G.y - 100 && Math.abs(b.x - G.x) < 64) ok = false;
       }
       if (!ok) continue;
       // no build site under the walls, too near the gate, or on the new road
@@ -593,21 +590,50 @@ function trimRoadEnd(path: readonly Vector2[], dist: number): { kept: Vector2[];
   return { kept: [...path], removed: [] };
 }
 
+/** How much road the best 12 sites reach (the same measure the map tests use), for keeping a map's difficulty while its end moves. */
+function bestTwelveReach(road: readonly Vector2[], sites: readonly SiteSrc[], range: number): number {
+  const samples: Vector2[] = [];
+  for (let i = 1; i < road.length; i++) {
+    const a = road[i - 1]!, b = road[i]!;
+    const n = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / 8));
+    for (let k = 0; k < n; k++) samples.push({ x: a.x + ((b.x - a.x) * k) / n, y: a.y + ((b.y - a.y) * k) / n });
+  }
+  return sites
+    .map((st) => {
+      const r = range * (st.trait === "HIGH_GROUND" ? HIGH_GROUND_RANGE_MULT : 1);
+      let inside = 0;
+      for (const v of samples) if ((v.x - st.x) ** 2 + (v.y - st.y) ** 2 <= r * r) inside++;
+      return inside / Math.max(1, samples.length);
+    })
+    .sort((x, y) => y - x)
+    .slice(0, MAX_TOWERS_ON_MAP)
+    .reduce((x, y) => x + y, 0);
+}
+
 function buildLayout(src: LayoutSource): MapLayout {
   const full = src.id === "ANCIENT_FOREST" ? ENEMY_PATH : buildCatmullRomSpline(src.controlPoints, 14);
   const cut = cutRoadAtGate(full);
   let approach = addGateApproach(cut.path, src.sites);
   let past = cut.past;
-  if (approach.added.length === 0 && src.id !== "ANCIENT_FOREST") {
-    // still no room: let the hook start a little further back along the road (that stretch is painted over)
-    for (const back of [0, 60, 120, 180, 240, 320, 400, 480]) {
+  const baseline = [150, 190, 240].map((r) => bestTwelveReach(cut.path, src.sites, r));
+  const deviation = (a: { path: Vector2[]; sites: readonly SiteSrc[] }) =>
+    Math.max(...[150, 190, 240].map((r, i) => Math.abs(bestTwelveReach(a.path, a.sites, r) / Math.max(1e-6, baseline[i]!) - 1)));
+  if (approach.added.length === 0 || (src.id !== "ANCIENT_FOREST" && deviation(approach) > 0.05)) {
+    // no room, or the map would get easier/harder: start the same bend a little further back along
+    // the road (that stretch is painted over), and keep the version closest to the original difficulty
+    let bestScore = approach.added.length > 0 ? deviation(approach) : Infinity;
+    for (let back = 0; back <= 480; back += 20) {
       const { kept, removed } = trimRoadEnd(cut.path, back);
       const tryIt = addGateApproach(kept, src.sites, true, back > 0);
-      if (tryIt.added.length > 0) {
+      if (tryIt.added.length === 0) continue;
+      const dev = deviation(tryIt);
+      const score = dev + back / 4000;
+      if (score < bestScore) {
+        bestScore = score;
         approach = tryIt;
         past = removed.length > 1 ? [...removed, ...cut.past.slice(1)] : cut.past;
-        break;
       }
+      if (dev < 0.04) break;
     }
   }
   const path = approach.path;
