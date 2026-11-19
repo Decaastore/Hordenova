@@ -257,39 +257,70 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
     g.drawImage(tmp, (st.x - def.x0) * kx - pw / 2, (st.y - def.y0) * ky - ph / 2);
   }
   }
-  // THE GATE APPROACH — paint the new last stretch of road (up into the gate) with the
-  // map's own road surface, lifted from the middle of a straight run of the old road
+  // THE GATE APPROACH — paint the new last stretch of road (up into the gate) as a real
+  // road: the colour is the map's own road surface (sampled from the painted road), with a
+  // dark worn edge, soft shoulders, grit and two wheel ruts, joined smoothly onto the old road
   const added = layout.roadToGate;
   if (added.length > 1) {
-    const Rr = 30;
-    let donor: Vector2 | null = null;
-    for (let i = Math.floor(road.length * 0.3); i < road.length * 0.7 && !donor; i++) {
-      const p0 = road[i - 3]!, p1 = road[i]!, p2 = road[i + 3]!;
-      const a1 = Math.atan2(p1.y - p0.y, p1.x - p0.x), a2 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-      const bend = Math.abs(Math.atan2(Math.sin(a2 - a1), Math.cos(a2 - a1)));
-      if (bend < 0.05 && p1.x - Rr > def.x0 && p1.y - Rr > def.y0 && p1.x + Rr < def.x1 && p1.y + Rr < def.y1) donor = p1;
+    // the road's own colour: the median of many samples taken on the old road's centre line
+    const samples: [number, number, number][] = [];
+    for (let i = 4; i < road.length - added.length - 4; i += Math.max(1, Math.floor(road.length / 40))) {
+      const q = road[i]!;
+      const sx = Math.round((q.x - def.x0) * kx), sy = Math.round((q.y - def.y0) * ky);
+      if (sx < 2 || sy < 2 || sx > gw - 3 || sy > gh - 3) continue;
+      const d = g.getImageData(sx - 2, sy - 2, 5, 5).data;
+      let r = 0, gg = 0, b = 0;
+      for (let k = 0; k < d.length; k += 4) {
+        r += d[k]!;
+        gg += d[k + 1]!;
+        b += d[k + 2]!;
+      }
+      samples.push([r / 25, gg / 25, b / 25]);
     }
-    if (donor) {
-      const qw = Math.ceil(Rr * 2 * kx), qh = Math.ceil(Rr * 2 * ky);
-      const dc = document.createElement("canvas");
-      dc.width = qw;
-      dc.height = qh;
-      const d2 = dc.getContext("2d")!;
-      d2.drawImage(bake.ground, (donor.x - Rr - def.x0) * kx, (donor.y - Rr - def.y0) * ky, qw, qh, 0, 0, qw, qh);
-      d2.globalCompositeOperation = "destination-in";
-      const gr = d2.createRadialGradient(qw / 2, qh / 2, Math.min(qw, qh) * 0.28, qw / 2, qh / 2, Math.min(qw, qh) / 2);
-      gr.addColorStop(0, "rgba(0,0,0,1)");
-      gr.addColorStop(1, "rgba(0,0,0,0)");
-      d2.fillStyle = gr;
-      d2.fillRect(0, 0, qw, qh);
-      const pts = [road[road.length - added.length - 1] ?? added[0]!, ...added];
-      for (let i = 1; i < pts.length; i++) {
-        const p = pts[i - 1]!, q = pts[i]!;
-        const n = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.y - p.y) / 6));
-        for (let k = 0; k < n; k++) {
-          const x = p.x + ((q.x - p.x) * k) / n, y = p.y + ((q.y - p.y) * k) / n;
-          g.drawImage(dc, (x - def.x0) * kx - qw / 2, (y - def.y0) * ky - qh / 2);
-        }
+    const lumOf = (c: [number, number, number]) => c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11;
+    samples.sort((a, b) => lumOf(a) - lumOf(b));
+    const mid = samples[Math.floor(samples.length / 2)] ?? [120, 100, 80];
+    const rgb = (c: number[], k = 1, a = 1) => `rgba(${Math.round(c[0]! * k)},${Math.round(c[1]! * k)},${Math.round(c[2]! * k)},${a})`;
+    // the centre line, started a little way back on the old road so the join is seamless
+    const lead = road.slice(Math.max(0, road.length - added.length - 5), road.length - added.length);
+    const line = [...lead, ...added];
+    const P = (v: Vector2) => [(v.x - def.x0) * kx, (v.y - def.y0) * ky] as const;
+    const stroke = (width: number, style: string, blur = 0, dash: number[] = [], offset = 0) => {
+      g.save();
+      g.lineCap = g.lineJoin = "round";
+      g.strokeStyle = style;
+      g.lineWidth = width * kx;
+      if (blur) g.filter = `blur(${blur * kx}px)`;
+      g.setLineDash(dash.map((x) => x * kx));
+      g.beginPath();
+      line.forEach((v, n) => {
+        // offset sideways (for the ruts)
+        const a = line[Math.max(0, n - 1)]!, b = line[Math.min(line.length - 1, n + 1)]!;
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        const nx = -(b.y - a.y) / len, ny = (b.x - a.x) / len;
+        const [x, y] = P({ x: v.x + nx * offset, y: v.y + ny * offset });
+        if (n === 0) g.moveTo(x, y);
+        else g.lineTo(x, y);
+      });
+      g.stroke();
+      g.restore();
+    };
+    stroke(64, "rgba(10,8,6,0.28)", 6); // soft shoulder shadow
+    stroke(54, rgb(mid, 0.72), 2); // worn edge
+    stroke(46, rgb(mid, 1.0), 1.5); // the road
+    stroke(30, rgb(mid, 1.08, 0.6), 4); // lighter, trodden middle
+    stroke(3, rgb(mid, 0.62, 0.55), 0.8, [], -8); // wheel ruts
+    stroke(3, rgb(mid, 0.62, 0.55), 0.8, [], 8);
+    // grit: little stones and dark pits along the road
+    let seed = 1234;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (const v of added) {
+      for (let k = 0; k < 6; k++) {
+        const [x, y] = P({ x: v.x + (rnd() - 0.5) * 40, y: v.y + (rnd() - 0.5) * 40 });
+        g.fillStyle = rnd() < 0.5 ? rgb(mid, 0.55, 0.5) : rgb(mid, 1.25, 0.45);
+        g.beginPath();
+        g.arc(x, y, (0.6 + rnd() * 1.6) * kx, 0, Math.PI * 2);
+        g.fill();
       }
     }
   }
