@@ -548,7 +548,7 @@ function addGateApproach(path: Vector2[], sites: readonly SiteSrc[], moveSites =
         const a = next[i]!, b = next[i + 1]!;
         walked += Math.hypot(b.x - a.x, b.y - a.y);
         if (total - walked < 12) break;
-        if (b.y < G.y - 6 && b.y > G.y - 100 && Math.abs(b.x - G.x) < 64) ok = false;
+        if (b.y < G.y - 6 && b.y > G.y - 105 && Math.abs(b.x - G.x) < 70) ok = false;
       }
       if (!ok) continue;
       // no build site under the walls, too near the gate, or on the new road

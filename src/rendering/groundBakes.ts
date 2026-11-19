@@ -234,7 +234,7 @@ export function withoutRoadPastGate(bake: LoadedGroundBake, biome: BiomeDefiniti
   }
   for (const st of stamps) {
     let donor: { x: number; y: number } | null = null;
-    for (const dist of [2.4, 3, 3.8]) {
+    for (const dist of [2.4, 3, 3.8, 4.6, 5.6, 7]) {
       for (const sgn of [1, -1]) {
         const x = st.x + st.nx * R * dist * sgn, y = st.y + st.ny * R * dist * sgn;
         if (x - R < def.x0 || y - R < def.y0 || x + R > def.x1 || y + R > def.y1) continue;
