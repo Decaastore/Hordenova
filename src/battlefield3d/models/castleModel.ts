@@ -1357,6 +1357,209 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
         addBox(46, 0.8, 0.8, 0, 26.4, 11.4, gold);
         break;
       }
+      // ---- PACOTES: each bundle castle carries its own crest ----
+      case "EMBER_KEEP": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xd8a040, metalness: 0.9, roughness: 0.28 });
+        const obs = new THREE.MeshStandardMaterial({ color: 0x0c0a0e, roughness: 0.12, metalness: 0.4 });
+        const lava = glowMat("#ff6a1a", 2.4);
+        // a molten heart in a gold cage over the keep
+        const hy = ARCH.keepH + 32;
+        const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(8, 0), glowMat("#ff5a10", 2.6));
+        heart.position.set(0, hy, -18);
+        heart.scale.y = 1.25;
+        root.add(heart);
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const pts: THREE.Vector3[] = [];
+          for (let k = 0; k <= 14; k++) {
+            const t = k / 14, r2 = 4 + Math.sin(t * Math.PI) * 10;
+            pts.push(new THREE.Vector3(Math.cos(a) * r2, hy - 15 + t * 30, -18 + Math.sin(a) * r2));
+          }
+          const rib = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.7, 6, false), gold);
+          root.add(rib);
+        }
+        // a lava moat of glowing cracks and obsidian obelisks round the mound
+        ring(10, 46, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const ob = new THREE.Mesh(new THREE.CylinderGeometry(1, 2.4, 14 + rr() * 6, 4), obs);
+          ob.position.set(x, 7, z);
+          ob.rotation.y = a;
+          ob.castShadow = true;
+          root.add(ob);
+          const crack = new THREE.Mesh(new THREE.BoxGeometry(6, 0.3, 0.8), lava);
+          crack.position.set(x * 0.9, 0.6, z * 0.9);
+          crack.rotation.y = -a + Math.PI / 2;
+          root.add(crack);
+        });
+        break;
+      }
+      case "WINTER_CROWN_CITADEL": {
+        const ice = new THREE.MeshPhysicalMaterial({ color: 0xdce8ff, emissive: 0x3a6aff, emissiveIntensity: 0.5, roughness: 0.06, transparent: true, opacity: 0.9, clearcoat: 1 });
+        const silver = new THREE.MeshStandardMaterial({ color: 0xc8ccd8, metalness: 0.9, roughness: 0.25 });
+        // an ice crown round the keep's top
+        const cy = ARCH.keepH + 2;
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          const h = i % 2 ? 10 : 16;
+          const c = new THREE.Mesh(new THREE.OctahedronGeometry(1.8, 0), ice);
+          c.position.set(Math.cos(a) * 11, cy + h / 2, -18 + Math.sin(a) * 11);
+          c.scale.set(1, h / 3.4, 1);
+          c.rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
+          root.add(c);
+          const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), glowMat("#4a7aff", 2.6));
+          gem.position.set(Math.cos(a) * 11.4, cy, -18 + Math.sin(a) * 11.4);
+          root.add(gem);
+        }
+        const band = new THREE.Mesh(new THREE.TorusGeometry(11, 1, 10, 48), silver);
+        band.rotation.x = Math.PI / 2;
+        band.position.set(0, cy, -18);
+        root.add(band);
+        // frozen spires on the mound
+        ring(16, 46, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const sp = new THREE.Mesh(new THREE.OctahedronGeometry(1.6, 0), ice);
+          const h = 8 + rr() * 10;
+          sp.position.set(x, h / 2, z);
+          sp.scale.set(1, h / 3, 1);
+          sp.rotation.set(Math.cos(a) * 0.25, 0, -Math.sin(a) * 0.25);
+          root.add(sp);
+        });
+        break;
+      }
+      case "EMERALD_BASTION": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xe8c050, metalness: 0.9, roughness: 0.28 });
+        const cloth = new THREE.MeshStandardMaterial({ color: 0x1e5a32, roughness: 0.85, side: THREE.DoubleSide });
+        // a great emerald over the gate in a golden frame
+        const em = new THREE.Mesh(new THREE.OctahedronGeometry(4, 0), glowMat("#2affa0", 2.2));
+        em.position.set(0, 40, 13);
+        em.scale.set(1, 1.4, 0.6);
+        root.add(em);
+        const fr = new THREE.Mesh(new THREE.TorusGeometry(5, 0.6, 8, 32), gold);
+        fr.position.set(0, 40, 12.6);
+        root.add(fr);
+        // guard banners on gilded poles round the mound
+        ring(8, 46, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 24, 8), gold);
+          pole.position.set(x, 12, z);
+          root.add(pole);
+          const flag = new THREE.Mesh(new THREE.PlaneGeometry(6, 10), cloth);
+          flag.position.set(x + Math.cos(a + Math.PI / 2) * 3.2, 17, z + Math.sin(a + Math.PI / 2) * 3.2);
+          flag.rotation.y = -a;
+          root.add(flag);
+          const gem = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), glowMat("#8affb8", 2.4));
+          gem.position.set(x, 24.6, z);
+          root.add(gem);
+        });
+        break;
+      }
+      case "CRIMSON_STORM_KEEP": {
+        const red = glowMat("#e8101e", 1.6);
+        const steel = new THREE.MeshStandardMaterial({ color: 0xb8bcc8, metalness: 0.9, roughness: 0.25 });
+        // a crimson vortex turning over the keep, with bolts striking the towers
+        const vy = ARCH.keepH + 20;
+        for (let k = 0; k < 3; k++) {
+          const t = new THREE.Mesh(new THREE.TorusGeometry(16 - k * 4, 0.6, 8, 64), red);
+          t.position.set(0, vy + k * 4, -18);
+          t.rotation.set(Math.PI / 2 + (k - 1) * 0.2, 0, k * 0.5);
+          root.add(t);
+        }
+        for (const [x, z] of [[-34, 6], [34, 6], [-34, -39], [34, -39]] as const) {
+          const pts: THREE.Vector3[] = [];
+          const rb = rng(Math.abs(x) + z * 3);
+          for (let i = 0; i <= 8; i++) {
+            const t = i / 8;
+            pts.push(new THREE.Vector3(x * t + (i > 0 && i < 8 ? (rb() - 0.5) * 4 : 0), vy - t * (vy - ARCH.towerH - 14), -18 + (z + 18) * t));
+          }
+          root.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 40, 0.35, 5, false), red));
+        }
+        // steel lightning needles on the mound
+        ring(8, 46, (x, z) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const n = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 1.6, 22, 8), steel);
+          n.position.set(x, 11, z);
+          root.add(n);
+          const tip = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), red);
+          tip.position.set(x, 22.6, z);
+          root.add(tip);
+        });
+        break;
+      }
+      case "ECLIPSE_SPIRE": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xd8a838, metalness: 0.9, roughness: 0.25 });
+        const obs = new THREE.MeshStandardMaterial({ color: 0x0c0a0e, roughness: 0.12, metalness: 0.4 });
+        // an eclipsed sun over the keep, ringed by a golden corona
+        const ey = ARCH.keepH + 30;
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(7, 28, 20), new THREE.MeshStandardMaterial({ color: 0x030205, roughness: 0.2, metalness: 0.3 }));
+        sun.position.set(0, ey, -18);
+        root.add(sun);
+        const cor = new THREE.Mesh(new THREE.TorusGeometry(9, 1.1, 12, 64), glowMat("#ffc848", 3));
+        cor.position.set(0, ey, -18);
+        cor.rotation.x = Math.PI / 2.15;
+        root.add(cor);
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * Math.PI * 2;
+          const ray = new THREE.Mesh(new THREE.ConeGeometry(0.6, i % 2 ? 4 : 7, 5), glowMat("#ffc848", 2.4));
+          ray.position.set(Math.cos(a) * 12.5, ey + Math.sin(a) * 12.5, -18);
+          ray.rotation.z = a - Math.PI / 2;
+          root.add(ray);
+        }
+        // black crystals veined with gold round the mound
+        ring(14, 46, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const h = 8 + rr() * 9;
+          const c = new THREE.Mesh(new THREE.OctahedronGeometry(2, 0), obs);
+          c.position.set(x, h / 2, z);
+          c.scale.set(1, h / 4, 1);
+          c.rotation.set(Math.cos(a) * 0.3, 0, -Math.sin(a) * 0.3);
+          root.add(c);
+          const vein = new THREE.Mesh(new THREE.BoxGeometry(0.2, h * 0.9, 0.2), glowMat("#ffc848", 2.4));
+          vein.position.set(x, h / 2, z);
+          vein.rotation.copy(c.rotation);
+          root.add(vein);
+        });
+        void gold;
+        break;
+      }
+      case "SOVEREIGN_PALACE": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xffd878, metalness: 0.9, roughness: 0.25 });
+        const marble = new THREE.MeshStandardMaterial({ color: 0xf6f0e2, roughness: 0.35 });
+        const cloth = new THREE.MeshStandardMaterial({ color: 0xb01a2a, roughness: 0.8, side: THREE.DoubleSide });
+        // golden wings spread behind the keep, under a sun disk and a crown
+        const wy = ARCH.keepH + 10;
+        for (const sx of [-1, 1]) {
+          for (let k = 0; k < 9; k++) {
+            const f = new THREE.Mesh(new THREE.BoxGeometry(1.2, 22 - k * 1.6, 3), k % 2 ? gold : marble);
+            f.position.set(sx * (8 + k * 3.4), wy + k * 1.4, -30);
+            f.rotation.z = sx * (0.28 + k * 0.15);
+            root.add(f);
+          }
+        }
+        const disk = new THREE.Mesh(new THREE.CircleGeometry(10, 40), glowMat("#ffe2a0", 1.6));
+        disk.position.set(0, wy + 16, -31);
+        root.add(disk);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(10.6, 0.8, 8, 48), gold);
+        rim.position.set(0, wy + 16, -30.8);
+        root.add(rim);
+        // a marble colonnade round the mound, with crimson banners
+        ring(12, 46, (x, z, a, i) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const col = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.7, 18, 14), marble);
+          col.position.set(x, 9, z);
+          col.castShadow = true;
+          root.add(col);
+          const cap = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.2, 4.2), gold);
+          cap.position.set(x, 18.6, z);
+          root.add(cap);
+          if (i % 2 === 0) {
+            const ban = new THREE.Mesh(new THREE.PlaneGeometry(3.6, 10), cloth);
+            ban.position.set(x * 0.97, 12, z * 0.97);
+            ban.rotation.y = -a + Math.PI / 2;
+            root.add(ban);
+          }
+        });
+        break;
+      }
       case "HUNTER_THRONE": {
         // The hunter's hall: bone trophies of every boss brought down — great
         // horns over the keep, a palisade of bone spikes, crimson war banners

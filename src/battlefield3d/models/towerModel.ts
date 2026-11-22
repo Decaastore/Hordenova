@@ -1944,7 +1944,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         }
         mesh(new THREE.BoxGeometry(1.4, 3, 0.4), glow(L.vein, 2.4), 0, 12, 6.3);
         mesh(new THREE.CircleGeometry(6, 24), glow(L.vein, 1.2), 0, 0.1, 0).rotation.x = -Math.PI / 2;
-        const tent = plainMat("#4a1a6a", { rough: 0.5, emissive: L.vein, ei: 0.15 });
+        const tent = LOOK === "IRONWOOD_PACK_ECLIPSE" ? plainMat("#16141a", { rough: 0.3, metal: 0.4, emissive: L.vein, ei: 0.08 }) : plainMat("#4a1a6a", { rough: 0.5, emissive: L.vein, ei: 0.15 });
         const n = s >= 3 ? 5 : 3;
         for (let k = 0; k < n; k++) {
           const a0 = (k / n) * Math.PI * 2;
@@ -3673,62 +3673,209 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
       mesh(new THREE.OctahedronGeometry(0.85, 0), glowM(P.gem, 2.6), Math.cos(a) * 15.8, 1.5, Math.sin(a) * 15.8);
     }
     const y = top + 4;
-    if (P.crest === "crown") {
-      const band = mesh(new THREE.CylinderGeometry(4.6, 4.2, 1.6, 24, 1, true), gold, 0, y, 0);
+    const R = Math.max(8, Math.min(14, Math.max(box.max.x - box.min.x, box.max.z - box.min.z) / 2));
+    const steel = plainMat("#b8bcc8", { metal: 0.9, rough: 0.25 });
+    const marble = plainMat("#f4efe4", { rough: 0.35, metal: 0.05 });
+    const obsidian = plainMat("#0c0a0e", { rough: 0.12, metal: 0.4 });
+    const crown = (cy: number, rad: number, m: THREE.Material, n = 6) => {
+      const band = mesh(new THREE.CylinderGeometry(rad, rad * 0.92, rad * 0.36, 28, 1, true), m, 0, cy, 0);
       (band.material as THREE.Material).side = THREE.DoubleSide;
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2;
-        mesh(new THREE.ConeGeometry(0.75, 3.2, 6), gold, Math.cos(a) * 4.4, y + 2.2, Math.sin(a) * 4.4);
-        mesh(new THREE.SphereGeometry(0.55, 10, 8), glowM(P.gem, 2.8), Math.cos(a) * 4.4, y + 4, Math.sin(a) * 4.4);
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        mesh(new THREE.ConeGeometry(rad * 0.17, rad * 0.7, 6), m, Math.cos(a) * rad, cy + rad * 0.5, Math.sin(a) * rad);
+        mesh(new THREE.SphereGeometry(rad * 0.12, 10, 8), glowM(P.gem, 2.8), Math.cos(a) * rad, cy + rad * 0.92, Math.sin(a) * rad);
       }
-    } else if (P.crest === "banners") {
-      for (let i = 0; i < 4; i++) {
-        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
-        const x = Math.cos(a) * 14.5, z = Math.sin(a) * 14.5;
-        mesh(new THREE.CylinderGeometry(0.28, 0.32, 15, 8), gold, x, 7.5, z);
-        mesh(new THREE.SphereGeometry(0.6, 10, 8), glowM(P.gem, 2.6), x, 15.3, z);
-        const flag = mesh(new THREE.PlaneGeometry(4.2, 6.2), plainMat(P.cloth, { rough: 0.85 }), x + Math.cos(a + Math.PI / 2) * 2.2, 11.6, z + Math.sin(a + Math.PI / 2) * 2.2);
-        flag.rotation.y = -a;
-        (flag.material as THREE.Material).side = THREE.DoubleSide;
-        const trim = mesh(new THREE.PlaneGeometry(4.2, 0.6), gold, x + Math.cos(a + Math.PI / 2) * 2.2, 8.4, z + Math.sin(a + Math.PI / 2) * 2.2);
-        trim.rotation.y = -a;
-        (trim.material as THREE.Material).side = THREE.DoubleSide;
+    };
+    const arc = (r0: number, h: number, ang: number, m: THREE.Material, rad = 0.4) => {
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 24; i++) {
+        const t = i / 24, th = Math.PI * t;
+        pts.push(new THREE.Vector3(Math.cos(ang) * Math.cos(th) * r0, 1 + Math.sin(th) * h, Math.sin(ang) * Math.cos(th) * r0));
       }
-    } else if (P.crest === "orbit") {
-      const t1 = mesh(new THREE.TorusGeometry(7, 0.22, 8, 60), glowM(P.gem, 1.8), 0, y - 1, 0);
-      t1.rotation.set(Math.PI / 2.4, 0, 0.3);
-      const t2 = mesh(new THREE.TorusGeometry(7, 0.22, 8, 60), glowM(P.gem, 1.8), 0, y - 1, 0);
-      t2.rotation.set(Math.PI / 1.7, 0.6, -0.3);
-      for (let i = 0; i < 3; i++) {
-        const a = (i / 3) * Math.PI * 2;
-        mesh(new THREE.SphereGeometry(1, 14, 10), glowM(P.gem, 3), Math.cos(a) * 7, y - 1 + Math.sin(a * 2) * 2.2, Math.sin(a) * 7);
+      tube(pts, rad, m, 60);
+    };
+    const bolt = (from: THREE.Vector3, to: THREE.Vector3, m: THREE.Material, seed: number) => {
+      const rb = rng(seed);
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 7; i++) {
+        const t = i / 7;
+        const p = from.clone().lerp(to, t);
+        if (i > 0 && i < 7) p.add(new THREE.Vector3((rb() - 0.5) * 2.4, (rb() - 0.5) * 1.2, (rb() - 0.5) * 2.4));
+        pts.push(p);
       }
-    } else if (P.crest === "eclipse") {
-      const disc = mesh(new THREE.SphereGeometry(3.2, 24, 18), plainMat("#050407", { rough: 0.2, metal: 0.3 }), 0, y + 1.5, 0);
-      void disc;
-      const corona = mesh(new THREE.TorusGeometry(4.1, 0.5, 10, 60), glowM(P.gem, 3), 0, y + 1.5, 0);
-      corona.rotation.x = Math.PI / 2.2;
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2;
-        const ray = mesh(new THREE.ConeGeometry(0.3, 2.6, 5), glowM(P.gem, 2.4), Math.cos(a) * 5.4, y + 1.5, Math.sin(a) * 5.4 * 0.4);
-        ray.rotation.z = a - Math.PI / 2;
-      }
-    } else {
-      // wings: two fans of gilded feathers behind the crest, and a small crown between them
-      for (const side of [-1, 1]) {
-        for (let k = 0; k < 6; k++) {
-          const f = mesh(new THREE.BoxGeometry(0.5, 7 - k * 0.6, 1.4), k % 2 ? gold : plainMat(P.cloth, { rough: 0.5, metal: 0.2, emissive: P.gem, ei: 0.15 }), side * (2.4 + k * 1.3), y - 2 + k * 0.5, -3.5);
-          f.rotation.z = side * (0.35 + k * 0.17);
+      tube(pts, 0.22, m, 40);
+    };
+
+    switch (LOOK) {
+      // ---- a molten heart floating in a gold cage over the crater, ringed by obsidian obelisks ----
+      case "INFERNO_PACK_EMBERHEART": {
+        const hy = top + 7;
+        const heart = mesh(new THREE.IcosahedronGeometry(4.4, 0), plainMat("#ff6a1a", { emissive: "#ff5a10", ei: 2.4, rough: 0.2 }), 0, hy, 0);
+        heart.scale.set(1, 1.25, 1);
+        mesh(new THREE.IcosahedronGeometry(5.6, 1), new THREE.MeshBasicMaterial({ color: "#ffb23a", transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }), 0, hy, 0);
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2;
+          const pts: THREE.Vector3[] = [];
+          for (let k = 0; k <= 16; k++) {
+            const t = k / 16, rr2 = 3 + Math.sin(t * Math.PI) * 5.5;
+            pts.push(new THREE.Vector3(Math.cos(a) * rr2, top - 1 + t * 16, Math.sin(a) * rr2));
+          }
+          tube(pts, 0.38, gold, 50);
         }
+        mesh(new THREE.TorusGeometry(8.4, 0.5, 8, 40), gold, 0, hy, 0).rotation.x = Math.PI / 2;
+        crown(top + 16.5, 2.6, gold);
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const x = Math.cos(a) * (R + 4), z = Math.sin(a) * (R + 4);
+          mesh(new THREE.CylinderGeometry(0.9, 1.9, 13, 4), obsidian, x, 6.5, z).rotation.y = a;
+          mesh(new THREE.BoxGeometry(0.25, 10, 0.9), glowM("#ff7a1a", 2.6), x + Math.cos(a) * 1.2, 6.5, z + Math.sin(a) * 1.2).rotation.y = -a;
+          mesh(new THREE.ConeGeometry(1.2, 2.4, 4), gold, x, 14.2, z);
+        }
+        pointLights.push({ pos: new THREE.Vector3(0, hy, 0), color: "#ff7a2a", intensity: 320, dist: 36 });
+        break;
       }
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2;
-        mesh(new THREE.ConeGeometry(0.5, 2.2, 6), gold, Math.cos(a) * 2.4, y + 2, Math.sin(a) * 2.4);
+      // ---- a great crown of ice crystals round the top, silver buttresses and a snowflake halo ----
+      case "FROSTBORN_PACK_WINTER_CROWN": {
+        const ice = new THREE.MeshPhysicalMaterial({ color: "#dce8ff", emissive: "#3a6aff", emissiveIntensity: 0.55, roughness: 0.06, transparent: true, opacity: 0.9, clearcoat: 1 });
+        const cy = top - 6;
+        mesh(new THREE.TorusGeometry(6.4, 0.8, 10, 48), steel, 0, cy, 0).rotation.x = Math.PI / 2;
+        for (let i = 0; i < 10; i++) {
+          const a = (i / 10) * Math.PI * 2;
+          const h = i % 2 ? 7 : 11;
+          const c = mesh(new THREE.OctahedronGeometry(1.4, 0), ice, Math.cos(a) * 6.6, cy + h / 2 + 0.5, Math.sin(a) * 6.6);
+          c.scale.set(1, h / 2.6, 1);
+          c.rotation.set(Math.sin(a) * 0.28, 0, -Math.cos(a) * 0.28);
+          mesh(new THREE.OctahedronGeometry(0.75, 0), glowM("#4a7aff", 2.6), Math.cos(a) * 6.9, cy + 0.2, Math.sin(a) * 6.9);
+        }
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const bx = Math.cos(a) * (R + 2.5), bz = Math.sin(a) * (R + 2.5);
+          const ph = top * 0.55;
+          mesh(new THREE.CylinderGeometry(1.6, 2, 1.4, 8), steel, bx, 0.7, bz);
+          const pillar = mesh(new THREE.OctahedronGeometry(1.5, 0), ice, bx, ph / 2 + 1, bz);
+          pillar.scale.set(1, ph / 3, 1);
+          mesh(new THREE.OctahedronGeometry(0.9, 0), ice, bx + Math.cos(a) * 1.4, ph * 0.3, bz + Math.sin(a) * 1.4).scale.set(1, 2.6, 1);
+          mesh(new THREE.SphereGeometry(0.9, 14, 10), glowM("#5a8aff", 2.4), bx, ph + 1.6, bz);
+        }
+        const fy = top + 9;
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI;
+          const arm = mesh(new THREE.BoxGeometry(14, 0.35, 0.35), glowM("#d8e8ff", 1.6), 0, fy, 0);
+          arm.rotation.y = a;
+          for (const d of [-1, 1]) {
+            const tip = mesh(new THREE.OctahedronGeometry(0.6, 0), glowM("#ffffff", 2), Math.cos(a) * 7 * d, fy, -Math.sin(a) * 7 * d);
+            void tip;
+          }
+        }
+        crown(fy + 2.2, 2.2, steel);
+        pointLights.push({ pos: new THREE.Vector3(0, fy, 2), color: "#8ab0ff", intensity: 260, dist: 34 });
+        break;
       }
-      mesh(new THREE.TorusGeometry(2.4, 0.35, 8, 30), gold, 0, y + 0.9, 0).rotation.x = Math.PI / 2;
-      mesh(new THREE.OctahedronGeometry(0.9, 0), glowM(P.gem, 3), 0, y + 2.4, 0);
+      // ---- an emerald heart set in the trunk, gilded bands, golden antlers and hanging lanterns ----
+      case "IRONWOOD_PACK_EMERALD_SENTINEL": {
+        const em = mesh(new THREE.OctahedronGeometry(2.6, 0), plainMat("#2affa0", { emissive: "#10c070", ei: 2.2, rough: 0.1, metal: 0.2 }), 0, 11, 6.2);
+        em.scale.set(1, 1.4, 0.7);
+        mesh(new THREE.TorusGeometry(3.2, 0.42, 8, 30), gold, 0, 11, 5.9);
+        for (const [yy, rad] of [[5, 6.6], [13, 5.8], [18.5, 5.2]] as const) mesh(new THREE.TorusGeometry(rad, 0.45, 8, 40), gold, 0, yy, 0).rotation.x = Math.PI / 2;
+        for (const side of [-1, 1]) {
+          const base = new THREE.Vector3(side * 3, top - 1, -1);
+          for (let k = 0; k < 3; k++) {
+            tube([base, new THREE.Vector3(side * (5 + k), top + 3 + k * 1.5, -1 + k), new THREE.Vector3(side * (8 + k * 1.6), top + 7 + k * 2.4, -2 + k * 1.6)], 0.42 - k * 0.08, gold, 20);
+          }
+        }
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + 0.3;
+          const lx = Math.cos(a) * 9.5, lz = Math.sin(a) * 9.5, ly = top - 6;
+          tube([new THREE.Vector3(lx, ly + 4, lz), new THREE.Vector3(lx, ly + 1, lz)], 0.08, gold, 4);
+          mesh(new THREE.OctahedronGeometry(0.85, 0), glowM("#8affb8", 2.4), lx, ly, lz).scale.y = 1.5;
+        }
+        pointLights.push({ pos: new THREE.Vector3(0, 11, 9), color: "#4affa0", intensity: 240, dist: 30 });
+        break;
+      }
+      // ---- a crimson vortex round the storm, red bolts striking the rods, and tall steel needles ----
+      case "STORMCALLER_PACK_CRIMSON_STORM": {
+        const red = glowM("#e8101e", 1.5);
+        const vy = top - 7;
+        for (let k = 0; k < 3; k++) {
+          const t = mesh(new THREE.TorusGeometry(9.5 - k * 2.2, 0.32, 8, 64), red, 0, vy + k * 3.2, 0);
+          t.rotation.set(Math.PI / 2 + (k - 1) * 0.22, 0, k * 0.6);
+        }
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + 0.4;
+          bolt(new THREE.Vector3(Math.cos(a) * 4, vy, Math.sin(a) * 4), new THREE.Vector3(Math.cos(a) * 12.5, 5.5, Math.sin(a) * 12.5), red, 70 + i);
+        }
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const x = Math.cos(a) * (R + 3.5), z = Math.sin(a) * (R + 3.5);
+          mesh(new THREE.CylinderGeometry(0.35, 1.3, 18, 8), steel, x, 9, z);
+          mesh(new THREE.TorusGeometry(1.4, 0.25, 6, 20), steel, x, 6, z).rotation.x = Math.PI / 2;
+          mesh(new THREE.SphereGeometry(0.75, 12, 10), red, x, 18.6, z);
+        }
+        pointLights.push({ pos: new THREE.Vector3(0, vy, 4), color: "#ff3a4a", intensity: 300, dist: 38 });
+        break;
+      }
+      // ---- the Eclipse pair: golden filigree arches over the tower, black crystals veined with gold ----
+      case "IRONWOOD_PACK_ECLIPSE":
+      case "FROSTBORN_PACK_ECLIPSE": {
+        for (const ang of [0.35, Math.PI / 2 + 0.35]) arc(R + 2, top + 2, ang, gold, 0.42);
+        for (let i = 0; i < 9; i++) {
+          const a = (i / 9) * Math.PI * 2;
+          const d = R + 1 + (i % 3) * 1.2;
+          const h = 4 + (i % 4) * 1.8;
+          const c = mesh(new THREE.OctahedronGeometry(1.2, 0), obsidian, Math.cos(a) * d, h / 2, Math.sin(a) * d);
+          c.scale.set(1, h / 2.4, 1);
+          c.rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
+          mesh(new THREE.BoxGeometry(0.12, h * 0.9, 0.12), glowM(P.gem, 2.6), Math.cos(a) * d, h / 2, Math.sin(a) * d).rotation.set(Math.sin(a) * 0.3, 0, -Math.cos(a) * 0.3);
+        }
+        const ey = top + 8;
+        mesh(new THREE.SphereGeometry(3.4, 28, 20), plainMat("#030205", { rough: 0.2, metal: 0.3 }), 0, ey, 0);
+        const cor = mesh(new THREE.TorusGeometry(4.3, 0.55, 12, 64), glowM(P.gem, 3.2), 0, ey, 0);
+        cor.rotation.x = Math.PI / 2.15;
+        mesh(new THREE.SphereGeometry(5.4, 24, 16), new THREE.MeshBasicMaterial({ color: P.gem, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }), 0, ey, 0);
+        for (let i = 0; i < 16; i++) {
+          const a = (i / 16) * Math.PI * 2;
+          const ray = mesh(new THREE.ConeGeometry(0.28, i % 2 ? 2 : 3.4, 5), glowM(P.gem, 2.4), Math.cos(a) * 6.2, ey + Math.sin(a) * 6.2 * 0.42, Math.sin(a) * 1.2);
+          ray.rotation.z = a - Math.PI / 2;
+        }
+        pointLights.push({ pos: new THREE.Vector3(0, ey, 3), color: P.gem, intensity: 260, dist: 34 });
+        break;
+      }
+      // ---- the Sovereign pair: a marble colonnade with a gold lintel, crimson banners, great wings and a sun disk ----
+      default: {
+        const n = 8;
+        const cr = R + 3.5;
+        for (let i = 0; i < n; i++) {
+          const a = (i / n) * Math.PI * 2 + Math.PI / 8;
+          const x = Math.cos(a) * cr, z = Math.sin(a) * cr;
+          mesh(new THREE.CylinderGeometry(0.85, 1, 11, 14), marble, x, 5.5, z);
+          mesh(new THREE.BoxGeometry(2.4, 0.7, 2.4), gold, x, 11.2, z).rotation.y = -a;
+          mesh(new THREE.BoxGeometry(2.4, 0.6, 2.4), gold, x, 0.3, z).rotation.y = -a;
+          if (i % 2 === 0) {
+            const ban = mesh(new THREE.PlaneGeometry(2.6, 6), plainMat("#b01a2a", { rough: 0.8 }), Math.cos(a + 0.39) * (cr + 0.1), 7.6, Math.sin(a + 0.39) * (cr + 0.1));
+            ban.rotation.y = -(a + 0.39) + Math.PI / 2;
+            (ban.material as THREE.Material).side = THREE.DoubleSide;
+          }
+        }
+        mesh(new THREE.TorusGeometry(cr, 0.55, 8, 72), gold, 0, 11.8, 0).rotation.x = Math.PI / 2;
+        const sy = y;
+        const disk = mesh(new THREE.CircleGeometry(5.8, 40), glowM("#ffe2a0", 1.6), 0, sy, -5.4);
+        void disk;
+        mesh(new THREE.TorusGeometry(6.2, 0.4, 8, 48), gold, 0, sy, -5.3);
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          const ray = mesh(new THREE.ConeGeometry(0.5, 2.6, 5), gold, Math.cos(a) * 7.6, sy + Math.sin(a) * 7.6, -5.3);
+          ray.rotation.z = a - Math.PI / 2;
+        }
+        for (const side of [-1, 1]) {
+          for (let k = 0; k < 8; k++) {
+            const f = mesh(new THREE.BoxGeometry(0.6, 9 - k * 0.7, 1.8), k % 2 ? gold : marble, side * (3 + k * 1.5), sy - 3 + k * 0.6, -3.2);
+            f.rotation.z = side * (0.3 + k * 0.16);
+          }
+        }
+        crown(sy + 1.2, 2.2, gold, 5);
+        pointLights.push({ pos: new THREE.Vector3(0, sy, 2), color: "#ffe2a0", intensity: 260, dist: 36 });
+      }
     }
-    pointLights.push({ pos: new THREE.Vector3(0, y, 3), color: P.gem, intensity: 160, dist: 30 });
   }
 
   // ---------------------------------------------------------------------------
