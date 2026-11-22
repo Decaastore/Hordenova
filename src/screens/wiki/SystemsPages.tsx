@@ -1,3 +1,4 @@
+import { bundleForCastleSkin } from "@/config/store";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { MAX_TOWERS_ON_MAP, MAX_TOWERS_PER_TYPE } from "@/data/mapLayouts";
@@ -356,7 +357,7 @@ export function StorePage() {
                   <td>
                     {c.source === "STORE" && c.priceGems
                       ? t("wiki.store.castleBuy", { purchased: dualGemPrice(c.priceGems).purchased, free: dualGemPrice(c.priceGems).free })
-                      : t(`wiki.store.castleSource.${c.source}` as TranslationKey)}
+                      : t(`wiki.store.castleSource.${c.source}` as TranslationKey, { bundle: t(`store.bundles.${bundleForCastleSkin(c.id)?.id ?? ""}.name` as TranslationKey) })}
                   </td>
                 </tr>
               ))}

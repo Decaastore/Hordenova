@@ -74,8 +74,10 @@ export const DAILY_GIFT_FREE_GEMS = 1;
  * built around tower skins that exist ONLY in that bundle
  * (config/towerSkins.ts PACK_TOWER_SKINS): never sold for Gems, never in the
  * daily shop or the Season Pass. Everything inside is shown before buying —
- * no random contents. Items stay at Rare at most (like the starter pack), so
- * money buys looks, Gems and room, not top-tier power. Gems match the plain
+ * no random contents. Each bundle also carries a castle skin of its own
+ * (config/castleSkins.ts, source PACK). Items stay at Rare (like the starter
+ * pack), except one Epic in the biggest bundle (owner's call) — never
+ * Legendary or Mythic, so money buys looks, Gems and room, not top-tier power. Gems match the plain
  * gem packs' rate for the price (~22-30 per R$), so the exclusive skins and
  * items are always on top of it, never a hidden discount.
  * Like every real-money purchase: 18+ only, "coming soon" until payments open.
@@ -93,6 +95,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     priceBrl: 19.9,
     contents: [
       { kind: "SKIN", skinId: "INFERNO_PACK_EMBERHEART" },
+      { kind: "CASTLE_SKIN", skinId: "EMBER_KEEP" },
       { kind: "PURCHASED_GEMS", amount: 450 },
     ],
   },
@@ -101,6 +104,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     priceBrl: 39.9,
     contents: [
       { kind: "SKIN", skinId: "FROSTBORN_PACK_WINTER_CROWN" },
+      { kind: "CASTLE_SKIN", skinId: "WINTER_CROWN_CITADEL" },
       { kind: "PURCHASED_GEMS", amount: 900 },
       { kind: "ITEM", rarity: "RARE" },
     ],
@@ -110,6 +114,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     priceBrl: 69.9,
     contents: [
       { kind: "SKIN", skinId: "IRONWOOD_PACK_EMERALD_SENTINEL" },
+      { kind: "CASTLE_SKIN", skinId: "EMERALD_BASTION" },
       { kind: "PURCHASED_GEMS", amount: 1700 },
       { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 10 },
@@ -121,6 +126,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     priceBrl: 129.9,
     contents: [
       { kind: "SKIN", skinId: "STORMCALLER_PACK_CRIMSON_STORM" },
+      { kind: "CASTLE_SKIN", skinId: "CRIMSON_STORM_KEEP" },
       { kind: "PURCHASED_GEMS", amount: 3600 },
       { kind: "ITEM", rarity: "RARE" },
       { kind: "ITEM", rarity: "RARE" },
@@ -133,6 +139,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     contents: [
       { kind: "SKIN", skinId: "IRONWOOD_PACK_ECLIPSE" },
       { kind: "SKIN", skinId: "FROSTBORN_PACK_ECLIPSE" },
+      { kind: "CASTLE_SKIN", skinId: "ECLIPSE_SPIRE" },
       { kind: "PURCHASED_GEMS", amount: 5800 },
       { kind: "ITEM", rarity: "RARE" },
       { kind: "ITEM", rarity: "RARE" },
@@ -145,8 +152,9 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
     contents: [
       { kind: "SKIN", skinId: "INFERNO_PACK_SOVEREIGN" },
       { kind: "SKIN", skinId: "STORMCALLER_PACK_SOVEREIGN" },
+      { kind: "CASTLE_SKIN", skinId: "SOVEREIGN_PALACE" },
       { kind: "PURCHASED_GEMS", amount: 9000 },
-      { kind: "ITEM", rarity: "RARE" },
+      { kind: "ITEM", rarity: "EPIC" },
       { kind: "ITEM", rarity: "RARE" },
       { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 20 },
@@ -158,6 +166,17 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
 /** The bundle a pack-exclusive skin comes in, if any. */
 export function bundleForSkin(skinId: string): SkinBundle | null {
   return SKIN_BUNDLES.find((b) => b.contents.some((p) => p.kind === "SKIN" && p.skinId === skinId)) ?? null;
+}
+
+/** The bundle a pack-exclusive castle skin comes in, if any. */
+export function bundleForCastleSkin(castleSkinId: string): SkinBundle | null {
+  return SKIN_BUNDLES.find((b) => b.contents.some((p) => p.kind === "CASTLE_SKIN" && p.skinId === castleSkinId)) ?? null;
+}
+
+/** The castle skin inside a bundle, if any. */
+export function bundleCastleSkinId(bundle: SkinBundle): string | null {
+  for (const p of bundle.contents) if (p.kind === "CASTLE_SKIN") return p.skinId;
+  return null;
 }
 
 /** Skins inside a bundle. */

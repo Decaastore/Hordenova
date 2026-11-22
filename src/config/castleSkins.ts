@@ -34,7 +34,7 @@ export interface CastleSkinPaletteOverride {
   rockDark?: string;
 }
 
-export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER";
+export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER" | "PACK";
 export type CastleSkinAura = "EMBER" | "FROST" | "SOLAR" | "VERDANT" | "VOID" | "BANNERS" | "SHARDS";
 
 export interface CastleSkinDefinition {
@@ -88,6 +88,13 @@ export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
   // earned, never sold
   { id: "VOID_SPIRE", i18nKey: "VOID_SPIRE", paletteOverride: { rock: "#3a2a5a", rockDark: "#140c24" }, source: "COLLECTION", tint: "#7a4ad8", tintStrength: 0.72, glow: "#c79bff", aura: "VOID" },
   { id: "HUNTER_THRONE", i18nKey: "HUNTER_THRONE", paletteOverride: { rock: "#4a1a1c", rockDark: "#1a0608" }, source: "COLLECTION", tint: "#a01822", tintStrength: 0.7, glow: "#ff8a5a", aura: "EMBER" },
+  // PACOTES — castle skins that only come inside a real-money Store bundle (config/store.ts SKIN_BUNDLES), matching its tower skins.
+  { id: "EMBER_KEEP", i18nKey: "EMBER_KEEP", paletteOverride: { rock: "#4a1612", rockDark: "#1a0604" }, source: "PACK", tint: "#d0401a", tintStrength: 0.7, glow: "#ffb23a", aura: "EMBER" },
+  { id: "WINTER_CROWN_CITADEL", i18nKey: "WINTER_CROWN_CITADEL", paletteOverride: { rock: "#c8d4e4", rockDark: "#3a4a6a" }, source: "PACK", tint: "#4a7aff", tintStrength: 0.6, glow: "#bcd4ff", aura: "FROST" },
+  { id: "EMERALD_BASTION", i18nKey: "EMERALD_BASTION", paletteOverride: { rock: "#3a5a3e", rockDark: "#122014" }, source: "PACK", tint: "#2aa860", tintStrength: 0.62, glow: "#8affb8", aura: "VERDANT" },
+  { id: "CRIMSON_STORM_KEEP", i18nKey: "CRIMSON_STORM_KEEP", paletteOverride: { rock: "#4a1a1e", rockDark: "#1a0608" }, source: "PACK", tint: "#e0203a", tintStrength: 0.68, glow: "#ff5a6a", aura: "SHARDS" },
+  { id: "ECLIPSE_SPIRE", i18nKey: "ECLIPSE_SPIRE", paletteOverride: { rock: "#1c1a22", rockDark: "#060508" }, source: "PACK", tint: "#141218", tintStrength: 0.75, glow: "#ffc848", aura: "VOID" },
+  { id: "SOVEREIGN_PALACE", i18nKey: "SOVEREIGN_PALACE", paletteOverride: { rock: "#f2ead8", rockDark: "#9a7a3a" }, source: "PACK", tint: "#ffe2a0", tintStrength: 0.5, glow: "#ff4a5a", aura: "SOLAR" },
   { id: "RECRUIT_KEEP", i18nKey: "RECRUIT_KEEP", paletteOverride: { rock: "#8a6a44", rockDark: "#3a2a16" }, source: "BEGINNER", tint: "#c08a4a", tintStrength: 0.45, glow: "#ffcf8a", aura: "BANNERS" },
 ];
 

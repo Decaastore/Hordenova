@@ -7,7 +7,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { loadSave, type SaveData } from "@/engine/SaveSystem";
-import { bundleSkinIds, DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, SKIN_BUNDLES, STARTER_PACK } from "@/config/store";
+import { bundleCastleSkinId, bundleForCastleSkin, bundleSkinIds, DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, SKIN_BUNDLES, STARTER_PACK } from "@/config/store";
 import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
@@ -18,7 +18,7 @@ import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
 import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import { MaterialIcon } from "@/ui/MaterialIcon";
-import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
+import { Castle3DPortrait, Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { ChestArt, CrownArt, GemPile, PerkIcon, StoreGem } from "@/ui/StoreArt";
 import { STARTER_PACK_SKIN_ID } from "@/config/seasonPass";
@@ -369,7 +369,8 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
             <div className="st-bundles">
               {SKIN_BUNDLES.map((b) => {
                 const skinIds = bundleSkinIds(b);
-                const owned = skinIds.every((id) => save.ownedTowerSkinIds.includes(id));
+                const castleId = bundleCastleSkinId(b);
+                const owned = skinIds.every((id) => save.ownedTowerSkinIds.includes(id)) && (!castleId || save.unlockedCastleSkinIds.includes(castleId));
                 const pair = skinIds.length > 1;
                 return (
                   <article key={b.id} className={`st-bundle${b.tag ? ` is-${b.tag}` : ""}${owned ? " is-owned" : ""}`} data-testid={`bundle-${b.id}`}>
@@ -384,8 +385,17 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                     <p className="st-feat-body">{t(`store.bundles.${b.id}.body` as TranslationKey)}</p>
                     <p className="st-contents-label">{t("store.bundleSkins")}</p>
                     <p className="st-bundle-skins">{skinIds.map((id) => t(`towerSkins.${id}.name` as TranslationKey)).join(" · ")}</p>
+                    {bundleCastleSkinId(b) && (
+                      <div className="st-bundle-castle">
+                        <Castle3DPortrait dressing="ANCIENT_FOREST" skin={bundleCastleSkinId(b)!} width={104} height={78} spin={false} />
+                        <div>
+                          <p className="st-contents-label">{t("store.bundleCastle")}</p>
+                          <p className="st-bundle-skins">{t(`castleSkins.${bundleCastleSkinId(b)}.name` as TranslationKey)}</p>
+                        </div>
+                      </div>
+                    )}
                     <ul className="st-contents">
-                      {groupParts(b.contents.filter((part) => part.kind !== "SKIN")).map(({ part, count }, i) => (
+                      {groupParts(b.contents.filter((part) => part.kind !== "SKIN" && part.kind !== "CASTLE_SKIN")).map(({ part, count }, i) => (
                         <li key={i}>
                           <span className="st-contents-ico">
                             <PerkIcon kind={partIcon(part.kind)} />
@@ -462,7 +472,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                       <CastleSkinPreview skinId={c.id} size={170} />
                     </div>
                     <h3>{t(`castleSkins.${c.i18nKey}.name` as TranslationKey)}</h3>
-                    <p className="st-castle-how">{owned ? t("store.owned") : t(`store.castleHow.${c.source}` as TranslationKey)}</p>
+                    <p className="st-castle-how">{owned ? t("store.owned") : t(`store.castleHow.${c.source}` as TranslationKey, { bundle: t(`store.bundles.${bundleForCastleSkin(c.id)?.id ?? ""}.name` as TranslationKey) })}</p>
                     {owned ? (
                       <button className={on ? "st-wear is-on" : "st-wear"} disabled={on} onClick={() => onEquipCastle(c.id)}>
                         {on ? t("store.castleOn") : t("store.castleWear")}
@@ -742,6 +752,9 @@ const STORE_CSS = `
 .st-bundle-skins { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #ffd9a0; }
 .st-bundle .st-contents { grid-template-columns: 1fr; }
 .st-bundle.is-owned { opacity: 0.85; }
+.st-bundle-castle { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 6px 10px 6px 6px; border-radius: 10px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,236,190,0.08); }
+.st-bundle-castle .st-contents-label { margin: 0 0 2px; }
+.st-bundle-castle .st-bundle-skins { margin: 0; }
 
 .st-vip-gems { width: 100%; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 13px; color: #e8dcff !important; background: rgba(120,80,200,0.16); border: 1px solid rgba(190,160,255,0.45); }
 .st-vip-gems:hover:not(:disabled) { background: rgba(140,100,230,0.28); }

@@ -59,6 +59,13 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     OBSIDIAN_BASTION: { stoneA: "#55555f", stoneB: "#17171d", mortar: "#1c3a38", roof: "#16161c", roofDark: "#060608", ground: "#1a1c20", core: "#2fe0c8", window: "#5af0d8", roofKind: "flat" },
     HUNTER_THRONE: { stoneA: "#5a3a34", stoneB: "#24120f", mortar: "#120806", roof: "#7a121a", roofDark: "#2a0408", ground: "#2a1a14", core: "#ff6a3a", window: "#ff9a5a", roofKind: "spire" },
     PRESTIGE_ETERNAL_BASTION: { stoneA: "#f4f0e6", stoneB: "#c8bca0", mortar: "#7a6a4a", roof: "#e0b440", roofDark: "#8a6010", ground: "#d8ccaa", core: "#ffe08a", window: "#fff0b0", roofKind: "spire", roofMetal: 0.9 },
+    // PACOTES (config/castleSkins.ts source PACK)
+    EMBER_KEEP: { stoneA: "#5a2a22", stoneB: "#22100c", mortar: "#0e0604", roof: "#d8a040", roofDark: "#6a3a10", ground: "#2a1610", lava: true, core: "#ffb23a", window: "#ffb23a", roofKind: "spire", roofMetal: 0.8 },
+    WINTER_CROWN_CITADEL: { stoneA: "#dce4f0", stoneB: "#8a96aa", mortar: "#4a5468", roof: "#2a4a9a", roofDark: "#0e1e4a", ground: "#c8d4e4", snow: true, core: "#6a9aff", window: "#bcd4ff", roofKind: "spire", roofMetal: 0.5, frostRoof: true },
+    EMERALD_BASTION: { stoneA: "#7a8a72", stoneB: "#3a4a36", mortar: "#1e2a1c", roof: "#1e6a3a", roofDark: "#0a2a16", ground: "#3a5a2a", moss: "#2a8a4a", core: "#6affa0", window: "#e8c050", roofKind: "cone" },
+    CRIMSON_STORM_KEEP: { stoneA: "#5a2228", stoneB: "#22080c", mortar: "#0e0406", roof: "#8a8a96", roofDark: "#2a2a32", ground: "#2a1418", core: "#ff3a4a", window: "#ff5a6a", roofKind: "spire", roofMetal: 0.85 },
+    ECLIPSE_SPIRE: { stoneA: "#2a2830", stoneB: "#0c0b10", mortar: "#3a2a10", roof: "#d8a838", roofDark: "#5a3a08", ground: "#14121a", core: "#ffc848", window: "#ffc848", roofKind: "spire", roofMetal: 0.9 },
+    SOVEREIGN_PALACE: { stoneA: "#f6f0e2", stoneB: "#c8b898", mortar: "#8a7a58", roof: "#ffd878", roofDark: "#a0781a", ground: "#e8dcc0", core: "#ff4a5a", window: "#ffe2a0", roofKind: "dome", roofMetal: 0.9 },
   };
   const SD: SkinDress | null = SKIN_DRESS[SKIN] ?? null;
 
@@ -84,6 +91,12 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       OBSIDIAN_BASTION: { keep: "box", tower: "square", keepH: 52, towerH: 36, towerR: 15, wall: "glass" },
       HUNTER_THRONE: { keep: "jagged", tower: "hex", keepH: 78, towerH: 54, towerR: 11, wall: "stone" },
       PRESTIGE_ETERNAL_BASTION: { keep: "octagon", tower: "octagon", keepH: 72, towerH: 50, towerR: 10, wall: "marble" },
+      EMBER_KEEP: { keep: "jagged", tower: "round", keepH: 70, towerH: 46, towerR: 12, wall: "stone" },
+      WINTER_CROWN_CITADEL: { keep: "hex", tower: "needle", keepH: 86, towerH: 62, towerR: 8, wall: "ice" },
+      EMERALD_BASTION: { keep: "octagon", tower: "round", keepH: 68, towerH: 50, towerR: 11, wall: "stone" },
+      CRIMSON_STORM_KEEP: { keep: "box", tower: "needle", keepH: 80, towerH: 66, towerR: 8, wall: "stone" },
+      ECLIPSE_SPIRE: { keep: "octagon", tower: "needle", keepH: 88, towerH: 70, towerR: 7, wall: "glass" },
+      SOVEREIGN_PALACE: { keep: "round", tower: "octagon", keepH: 70, towerH: 52, towerR: 12, wall: "marble" },
     } as Record<string, Arch>)[SKIN] ?? { keep: "box", tower: "round", keepH: 70, towerH: 48, towerR: 11, wall: "stone" };
   const D: SkinDress = SD ?? DRESS[BIOME] ?? DRESS.ANCIENT_FOREST!;
 

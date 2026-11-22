@@ -99,6 +99,8 @@ export function RewardIcon({ part, size = 40 }: { part: RewardPart; size?: numbe
       return <ItemRune size={size} color={getRarityDefinition(part.rarity).color} />;
     case "INVENTORY_SLOTS":
       return <Slots size={size} />;
+    case "CASTLE_SKIN":
+      return <Slots size={size} />;
     case "SKIN": {
       const skin = getTowerSkinDefinition(part.skinId);
       return skin ? (

@@ -25,6 +25,7 @@ export function applyRewardParts(save: SaveData, parts: readonly RewardPart[], s
   let inventory: ItemInstance[] = [...save.inventory];
   let overflow: ItemInstance[] = [...save.overflowInventory];
   let ownedSkins = [...save.ownedTowerSkinIds];
+  let castleSkins = [...save.unlockedCastleSkinIds];
   const ledgerSource = `${source.type.toLowerCase()}:${source.refId}`;
 
   for (const part of parts) {
@@ -50,6 +51,9 @@ export function applyRewardParts(save: SaveData, parts: readonly RewardPart[], s
       case "SKIN":
         if (!ownedSkins.includes(part.skinId)) ownedSkins = [...ownedSkins, part.skinId];
         break;
+      case "CASTLE_SKIN":
+        if (!castleSkins.includes(part.skinId)) castleSkins = [...castleSkins, part.skinId];
+        break;
       case "ITEM": {
         const defId = rewardItemDefinitionId(part.rarity);
         if (!defId) break;
@@ -65,5 +69,5 @@ export function applyRewardParts(save: SaveData, parts: readonly RewardPart[], s
       }
     }
   }
-  return { gold, gemShards, freeGems, purchasedGems, inventoryCapacity, inventory, overflowInventory: overflow, ownedTowerSkinIds: ownedSkins };
+  return { gold, gemShards, freeGems, purchasedGems, inventoryCapacity, inventory, overflowInventory: overflow, ownedTowerSkinIds: ownedSkins, unlockedCastleSkinIds: castleSkins };
 }

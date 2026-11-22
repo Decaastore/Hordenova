@@ -45,6 +45,12 @@ export function RewardPartsLabel({ parts, currentWave }: { parts: readonly Rewar
                 {t("reward.skin", { name: t(`towerSkins.${part.skinId}.name` as TranslationKey) })}
               </span>
             );
+          case "CASTLE_SKIN":
+            return (
+              <span key={i} className="rw-skin">
+                {t("reward.castleSkin", { name: t(`castleSkins.${part.skinId}.name` as TranslationKey) })}
+              </span>
+            );
         }
       })}
     </>

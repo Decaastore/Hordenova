@@ -76,7 +76,9 @@ describe("Store", () => {
     for (const b of SKIN_BUNDLES) {
       expect(b.priceBrl).toBeGreaterThan(0);
       expect(b.priceBrl).toBeLessThanOrEqual(300);
-      expect(b.contents.every((p) => p.kind !== "ITEM" || p.rarity === "RARE")).toBe(true);
+      // Rare items only, except one Epic in the biggest bundle (owner's call); never Legendary or Mythic
+      expect(b.contents.every((p) => p.kind !== "ITEM" || p.rarity === "RARE" || (p.rarity === "EPIC" && b.id === "BUNDLE_SOVEREIGN"))).toBe(true);
+      expect(b.contents.filter((p) => p.kind === "CASTLE_SKIN")).toHaveLength(1);
       expect(requestGemPackPurchase(b.id)).toEqual({ ok: false, reason: "PAYMENTS_NOT_ENABLED" });
     }
   });

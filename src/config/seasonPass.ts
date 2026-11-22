@@ -48,7 +48,9 @@ export type RewardPart =
   | { kind: "GOLD"; kills: number }
   | { kind: "ITEM"; rarity: Rarity }
   | { kind: "INVENTORY_SLOTS"; amount: number }
-  | { kind: "SKIN"; skinId: string };
+  | { kind: "SKIN"; skinId: string }
+  /** A castle skin — only ever part of a real-money Store bundle. */
+  | { kind: "CASTLE_SKIN"; skinId: string };
 
 export type PassReward = readonly RewardPart[];
 
