@@ -331,15 +331,9 @@ export interface SaveData {
   auctionListings: AuctionListing[];
 
   /**
-   * PLAYER ECONOMY UNLOCK — the ONE gate before the ENTIRE player-to-player
-   * economy becomes usable: Marketplace (listing AND bidding) AND Direct
-   * Inventory Trade, together, from a single purchase — never two separate
-   * unlocks. Spends either 1,500 Free OR 500 Purchased Gems (config/
-   * gemsEconomy.ts's TRADE_UNLOCK_PRICE — a deliberate 3x asymmetry, not the
-   * usual 1.5x multiplier), once, permanently — never re-locked, never
-   * re-charged, and never charged again for the other half of the economy.
-   * false on every save that predates this field, exactly like every other
-   * one-time permanent unlock in this file.
+   * LEGACY — the old one-time Gem unlock for Trading. No longer used as a
+   * gate: the Marketplace and direct trades now need an active VIP
+   * (config/marketplace.ts hasMarketAccess). Kept so old saves still parse.
    */
   tradeUnlocked: boolean;
 

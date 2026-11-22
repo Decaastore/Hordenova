@@ -1,5 +1,5 @@
-import { dualGemPrice, type DualGemPrice } from "./gemsEconomy";
 import type { Rarity } from "./rarity";
+import { isVipActive, type VipState } from "./shopOffers";
 
 /**
  * MARKETPLACE / LEILÃO — economy grounding. Every number below was derived
@@ -33,13 +33,8 @@ export const AUCTION_MIN_BID_BY_RARITY: Record<Rarity, number> = {
  * roughly the same ~5-8% ratio as the user's own worked example (100 Gems
  * fee on a 2000 Gems minimum bid), scaled per rarity tier.
  *
- * This is the PURCHASED-Gems anchor only. LISTING (selling) is dual-priced
- * like every other system in the game — see `getAuctionListingFeeDualPrice`
- * below — because selling an item you own carries no Purchased-Gems
- * requirement: a pure F2P seller must be able to list using only Free Gems,
- * per the economy spec's explicit worked example (F2P unlocks Trade with
- * Free Gems, lists a Mythic item, sells it, receives Purchased Gems from
- * the buyer). Only BUYING another player's item is Purchased-Gems-only.
+ * Paid in Purchased Gems only, like every Marketplace charge (see
+ * hasMarketAccess below: the whole Marketplace is for VIP players).
  */
 export const AUCTION_LISTING_FEE_BY_RARITY: Record<Rarity, number> = {
   COMMON: 3,
@@ -94,9 +89,35 @@ export function getAuctionListingFee(rarity: Rarity): number {
   return AUCTION_LISTING_FEE_BY_RARITY[rarity];
 }
 
-/** Dual-priced listing fee — the seller picks either currency; see `AUCTION_LISTING_FEE_BY_RARITY`'s own comment for why selling has no Purchased-Gems requirement. */
-export function getAuctionListingFeeDualPrice(rarity: Rarity): DualGemPrice {
-  return dualGemPrice(getAuctionListingFee(rarity));
+/**
+ * WHO CAN USE THE MARKETPLACE — only players with an active VIP (a real-money
+ * subscription, config/shopOffers.ts). Listing, bidding and direct trades
+ * all need it; when VIP lapses, auctions already running still finish, but
+ * nothing new can be listed or bid on. Every Marketplace fee is paid in
+ * Purchased Gems only. Together this keeps the item trade between paying
+ * players, so a free account can't be used just to farm items and sell
+ * them without ever putting anything into the game.
+ */
+export function hasMarketAccess(vip: VipState, nowMs: number): boolean {
+  return isVipActive(vip, nowMs);
+}
+
+/** Of every sale, this share is kept by the house (a Gem sink); the seller receives the rest, in Purchased Gems. */
+export const AUCTION_SALE_TAX_PERCENT = 10;
+
+/** What the seller receives for a sale of `amount` Gems, after the sale tax (rounded in the house's favour). */
+export function auctionSellerProceeds(amount: number): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  return Math.max(0, Math.floor(amount) - Math.ceil((Math.floor(amount) * AUCTION_SALE_TAX_PERCENT) / 100));
+}
+
+/** New listings one account may open per rolling 7 days — caps item farming even for VIP accounts. */
+export const AUCTION_WEEKLY_LISTING_LIMIT = 10;
+export const AUCTION_LISTING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Listings this seller opened in the last 7 days (cancelled ones count too — the slot was used). */
+export function listingsThisWeek(listings: readonly { sellerId: string; createdAt: number }[], sellerId: string, nowMs: number): number {
+  return listings.filter((l) => l.sellerId === sellerId && nowMs - l.createdAt < AUCTION_LISTING_WINDOW_MS).length;
 }
 
 /**

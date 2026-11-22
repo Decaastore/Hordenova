@@ -301,6 +301,7 @@ export function StorePage() {
         <ul className="wk-list">
           <li><div><p>{t("store.vipPerkGems", { gems: VIP_DAILY_GEMS })}</p></div></li>
           <li><div><p>{t("store.vipPerkGroup", { n: VIP_EXTRA_SCOUT_GROUPS })}</p></div></li>
+          <li><div><p>{t("store.vipPerkMarket")}</p></div></li>
           <li><div><p>{t("store.vipPerkFair")}</p></div></li>
         </ul>
       </section>

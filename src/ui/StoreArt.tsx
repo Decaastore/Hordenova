@@ -143,7 +143,7 @@ export function CrownArt() {
 }
 
 /** Small perk icons for the VIP and starter cards. */
-export function PerkIcon({ kind }: { kind: "GEMS" | "SCOUT" | "FAIR" | "SKIN" | "ITEM" | "SLOTS" | "CLOCK" }) {
+export function PerkIcon({ kind }: { kind: "GEMS" | "SCOUT" | "FAIR" | "SKIN" | "ITEM" | "SLOTS" | "CLOCK" | "MARKET" }) {
   const s = { width: 18, height: 18, viewBox: "0 0 24 24", "aria-hidden": true } as const;
   switch (kind) {
     case "GEMS":
@@ -183,6 +183,13 @@ export function PerkIcon({ kind }: { kind: "GEMS" | "SCOUT" | "FAIR" | "SKIN" | 
           <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
           <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
           <path d="M17 14v6M14 17h6" strokeLinecap="round" />
+        </svg>
+      );
+    case "MARKET":
+      return (
+        <svg {...s} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3v17M7 20h10M4 7h16" />
+          <path d="M4 7 1.5 13a3 3 0 0 0 5 0Z M20 7l-2.5 6a3 3 0 0 0 5 0Z" fill="currentColor" fillOpacity="0.2" />
         </svg>
       );
     case "CLOCK":

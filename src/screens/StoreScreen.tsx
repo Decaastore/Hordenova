@@ -323,6 +323,10 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                     {t("store.vipPerkGroup", { n: VIP_EXTRA_SCOUT_GROUPS })}
                   </li>
                   <li>
+                    <span className="st-contents-ico"><PerkIcon kind="MARKET" /></span>
+                    {t("store.vipPerkMarket")}
+                  </li>
+                  <li>
                     <span className="st-contents-ico"><PerkIcon kind="FAIR" /></span>
                     {t("store.vipPerkFair")}
                   </li>

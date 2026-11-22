@@ -151,6 +151,10 @@ nav.tn .tn-play {
 }
 nav.tn .tn-play:hover { filter: brightness(1.15); transform: translateY(-1px); box-shadow: inset 0 1px 0 rgba(255,255,255,0.3), inset 0 0 0 1px rgba(0,0,0,0.35), 0 0 28px rgba(226,49,63,0.7), 0 2px 0 #3d0508; }
 nav.tn .tn-play:active { transform: translateY(1px); }
+@media (max-width: 1440px) and (min-width: 901px) {
+  nav.tn .tn-link { padding: 0 5px; letter-spacing: 0.9px; font-size: 12px; }
+  nav.tn .tn-play { padding: 10px 18px; }
+}
 @media (max-width: 900px) {
   .tn { flex-wrap: wrap; padding-top: 8px; }
   .tn-tools { margin-left: auto; }

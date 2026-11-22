@@ -1,10 +1,9 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
+import { hasMarketAccess, MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave } from "@/engine/SaveSystem";
-import { getTradeUnlockPrice, unlockTrade } from "@/engine/MarketplaceService";
 import {
   addItemToMyTradeOffer,
   cancelActiveTrade,
@@ -16,7 +15,6 @@ import {
 } from "@/engine/TradeService";
 import type { TradeSession } from "@/engine/TradeManager";
 import { getItemDefinition } from "@/config/itemDefinitions";
-import { DualGemPriceButtons } from "./DualGemPriceButtons";
 import { RarityBadge } from "./RarityBadge";
 import { ItemGlyph } from "./ItemGlyph";
 
@@ -45,40 +43,12 @@ export function TradeScreen() {
 
   const bump = () => setRefreshTick((n) => n + 1);
 
-  if (!save.tradeUnlocked) {
-    const price = getTradeUnlockPrice();
+  if (!hasMarketAccess(save.vip, Date.now())) {
     return (
       <div style={lockedBoxStyle}>
         <div style={lockedTitleStyle}>{t("trade.lockedTitle")}</div>
-        <p style={lockedTextStyle}>{t("trade.lockedExplainer")}</p>
-        <ul style={checklistStyle}>
-          {(
-            [
-              "marketplace",
-              "auctions",
-              "directTrade",
-              "itemForItem",
-              "itemForGems",
-              "selling",
-              "buying",
-            ] as const
-          ).map((key) => (
-            <li key={key}>✓ {t(`trade.unlockChecklist.${key}` as TranslationKey)}</li>
-          ))}
-        </ul>
-        {MARKETPLACE_SERVER_ONLINE ? (
-          <DualGemPriceButtons
-            price={price}
-            freeBalance={save.freeGems}
-            purchasedBalance={save.purchasedGems}
-            onPay={(currency) => {
-              unlockTrade(currency);
-              bump();
-            }}
-          />
-        ) : (
-          <p style={{ color: "#ffd56a", fontWeight: 700, fontSize: 13, margin: "10px 0 0" }}>{t("marketplace.trade.offline")}</p>
-        )}
+        <p style={lockedTextStyle}>{t("trade.vipRequired")}</p>
+        {!MARKETPLACE_SERVER_ONLINE && <p style={{ color: "#ffd56a", fontWeight: 700, fontSize: 13, margin: "10px 0 0" }}>{t("marketplace.trade.offline")}</p>}
       </div>
     );
   }
@@ -221,17 +191,6 @@ const lockedTextStyle: CSSProperties = {
   marginBottom: 10,
 };
 
-const checklistStyle: CSSProperties = {
-  listStyle: "none",
-  margin: "0 0 16px",
-  padding: 0,
-  textAlign: "left",
-  display: "inline-flex",
-  flexDirection: "column",
-  gap: 4,
-  fontSize: 11,
-  color: PALETTE.uiText,
-};
 
 const noticeStyle: CSSProperties = {
   padding: "14px 16px",

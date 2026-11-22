@@ -12,20 +12,22 @@ import {
   placeDemoBid,
   refreshMarketplace,
 } from "./MarketplaceService";
-import { DEMO_BIDDER_ID, getAuctionListingFee, getAuctionListingFeeDualPrice, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
+import { DEMO_BIDDER_ID, getAuctionListingFee, getAuctionMinBid, getMinimumNextBid } from "@/config/marketplace";
 import { checkFusionEligibility } from "./ItemFusion";
 import { getItemDefinition } from "@/config/itemDefinitions";
 
 const PLAYER = "player-1";
 const HOUR = 60 * 60 * 1000;
 const DAY0 = 1_700_000_000_000;
+/** The Marketplace is VIP-only: an active VIP well past every test's clock. */
+const VIP_ON = { until: DAY0 + 365 * 24 * HOUR, lastGiftDay: -1 };
 /** The real first-legal bid on a fresh UNCOMMON listing (its floor is getAuctionMinBid("UNCOMMON")) — spec's own worked example shows the first bid landing ABOVE the minimum, never exactly at it. */
 const FIRST_BID = getMinimumNextBid(getAuctionMinBid("UNCOMMON"));
 
 /** mosswood_charm: real UNCOMMON, tradable item (see config/itemDefinitions.ts). */
 function seedTradableItem() {
   const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-  updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, tradeUnlocked: true });
+  updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, vip: VIP_ON });
   return item;
 }
 
@@ -56,27 +58,14 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
     expect(save.auctionListings[0]!.listingFeePaid).toBe(fee);
   });
 
-  it("ECONOMY UPDATE section 8/9: a pure F2P seller (0 Purchased Gems) can list an item paying the fee entirely in Free Gems", () => {
+  it("the listing fee is Purchased Gems only: paying with Free Gems is refused and nothing is charged", () => {
     const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-    updateSave({ playerId: PLAYER, inventory: [item], freeGems: 1000, purchasedGems: 0, tradeUnlocked: true });
-    const fee = getAuctionListingFeeDualPrice("UNCOMMON");
-    const floor = getAuctionMinBid("UNCOMMON");
-
-    const result = createAuctionListingForItem(item.instanceId, floor, 24, "FREE");
-    expect(result.ok).toBe(true);
-
-    const save = loadSave();
-    expect(save.freeGems).toBe(1000 - fee.free);
-    expect(save.purchasedGems).toBe(0); // never touched — no cross-currency debit
-    expect(save.inventory[0]!.pendingAuction).toBe(true);
-  });
-
-  it("ECONOMY UPDATE: listing fee fails with INSUFFICIENT_FREE_GEMS when Free Gems alone can't cover it, even with Purchased Gems sitting unused", () => {
-    const item = createItemInstance("mosswood_charm", PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-    updateSave({ playerId: PLAYER, inventory: [item], freeGems: 0, purchasedGems: 1000, tradeUnlocked: true });
+    updateSave({ playerId: PLAYER, inventory: [item], freeGems: 1000, purchasedGems: 1000, vip: VIP_ON });
     const result = createAuctionListingForItem(item.instanceId, getAuctionMinBid("UNCOMMON"), 24, "FREE");
-    expect(result).toEqual({ ok: false, reason: "INSUFFICIENT_FREE_GEMS" });
-    expect(loadSave().purchasedGems).toBe(1000); // never auto-falls-back to the other currency
+    expect(result).toEqual({ ok: false, reason: "PURCHASED_GEMS_ONLY" });
+    expect(loadSave().freeGems).toBe(1000);
+    expect(loadSave().purchasedGems).toBe(1000);
+    expect(loadSave().inventory[0]!.pendingAuction).toBe(false);
   });
 
   it("rejects a minBid below the real rarity floor — never trusts an arbitrary UI value", () => {
@@ -251,7 +240,7 @@ describe("engine/MarketplaceService.ts — MARKETPLACE / LEILÃO integration (sp
       expect(def.tradable).toBe(true);
 
       const item = createItemInstance(amuletId, PLAYER, { type: "BOSS_DROP", refId: "hollow-warden" });
-      updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, tradeUnlocked: true });
+      updateSave({ playerId: PLAYER, inventory: [item], purchasedGems: 1000, vip: VIP_ON });
 
       const floor = getAuctionMinBid(def.rarity);
       const result = createAuctionListingForItem(item.instanceId, floor, 24, "PURCHASED");

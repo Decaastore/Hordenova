@@ -101,7 +101,8 @@ import {
   type SpecializationId,
 } from "@/config/specializations";
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
-import { gemPriceForCurrency, TRADE_UNLOCK_PRICE, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
+import { gemPriceForCurrency, type DualGemPrice, type GemCurrency } from "@/config/gemsEconomy";
+import { hasMarketAccess } from "@/config/marketplace";
 import { getCurrentDayIndex } from "./DailyClock";
 import { freshPassState, PASS_XP, type PassXpSource, type SeasonPassState } from "@/config/seasonPass";
 import { seasonClock } from "./SeasonClock";
@@ -601,7 +602,7 @@ export class GameEngine {
   private dailyMissions: DailyMissionsState = freshMissionsState(getCurrentDayIndex());
   private seasonPass: SeasonPassState = freshPassState(seasonClock.getCurrentSeasonWindow().seasonNumber);
   private skinShardCarry = 0;
-  /** GEMS ECONOMY v2 — the permanent, one-time Trade Unlock gate (see canUnlockTrade/unlockTrade below). */
+  /** LEGACY — the old one-time Trade Unlock flag, kept only so old saves round-trip; the real gate is VIP (isTradeUnlocked). */
   private tradeUnlocked = false;
   private inventoryCapacity = DEFAULT_INVENTORY_CAPACITY;
   private overflowInventory: ItemInstance[] = [];
@@ -2236,27 +2237,9 @@ export class GameEngine {
   // Wallet) can show Trade status without a Marketplace screen mounted.
   // -------------------------------------------------------------------
 
-  isTradeUnlocked(): boolean {
-    return this.tradeUnlocked;
-  }
-
-  getTradeUnlockPrice(): DualGemPrice {
-    return TRADE_UNLOCK_PRICE;
-  }
-
-  canUnlockTrade(currency: GemCurrency): boolean {
-    if (this.tradeUnlocked) return false;
-    return this.canAffordGemsInCurrency(gemPriceForCurrency(TRADE_UNLOCK_PRICE, currency), currency);
-  }
-
-  /** Spends the chosen currency's Trade Unlock price in full — never converts currency, only flips the permanent `tradeUnlocked` gate. */
-  unlockTrade(currency: GemCurrency): boolean {
-    if (!this.canUnlockTrade(currency)) return false;
-    if (!this.spendGems(gemPriceForCurrency(TRADE_UNLOCK_PRICE, currency), "trade_unlock", currency)) return false;
-    this.tradeUnlocked = true;
-    this.persist();
-    this.notify();
-    return true;
+  /** The Marketplace and direct trades are for VIP players only (config/marketplace.ts hasMarketAccess). */
+  isTradeUnlocked(nowMs = Date.now()): boolean {
+    return hasMarketAccess(this.vip, nowMs);
   }
 
   // -------------------------------------------------------------------

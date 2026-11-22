@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
-import { MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
+import { hasMarketAccess, MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -11,12 +11,9 @@ import {
   getActiveAuctionListings,
   getMyAuctionListings,
   getPriceHistoryForItemDefinition,
-  getTradeUnlockPrice,
   placeDemoBid,
   refreshMarketplace,
-  unlockTrade,
 } from "@/engine/MarketplaceService";
-import { DualGemPriceButtons } from "@/ui/DualGemPriceButtons";
 import { canListItemForAuction } from "@/engine/AuctionManager";
 import { isItemEquippedAnywhere } from "@/engine/InventoryManager";
 import { getCurrentBidAmount, type AuctionListing } from "@/entities/Auction";
@@ -27,6 +24,7 @@ import { AuctionDetailModal } from "@/ui/AuctionDetailModal";
 import { CreateAuctionModal } from "@/ui/CreateAuctionModal";
 import { MyMarketPanel } from "@/ui/MyMarketPanel";
 import { RarityBadge } from "@/ui/RarityBadge";
+import { MarketplacePreview } from "@/ui/MarketplacePreview";
 
 interface MarketplaceScreenProps {
   onNavigate: (view: NavView) => void;
@@ -140,6 +138,12 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
     ? [...activeListings, ...myListings].find((l) => l.id === selectedAuctionId) ?? null
     : null;
 
+  // The auction house itself opens only online, and only for VIP players (config/marketplace.ts hasMarketAccess).
+  const vipActive = hasMarketAccess(save.vip, nowMs);
+  if (!MARKETPLACE_SERVER_ONLINE || !vipActive) {
+    return <MarketplacePreview onNavigate={onNavigate} onPlay={onPlay} vipActive={vipActive} eligibleCount={eligibleItems.length} />;
+  }
+
   return (
     <div style={rootStyle}>
       <style>{RESPONSIVE_CSS}</style>
@@ -157,39 +161,12 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
             <div style={gemsBadgeStyle}>
               {t("hud.purchasedGems")}: <strong>{save.purchasedGems.toLocaleString()}</strong>
             </div>
-            {save.tradeUnlocked && (
-              <button onClick={() => setCreating(true)} style={createCtaStyle}>
-                {t("marketplace.create.title")}
-              </button>
-            )}
+            <button onClick={() => setCreating(true)} style={createCtaStyle}>
+              {t("marketplace.create.title")}
+            </button>
           </div>
         </div>
 
-        {!save.tradeUnlocked ? (
-          <div style={tradeLockedBoxStyle}>
-            <div style={tradeLockedTitleStyle}>{t("marketplace.trade.lockedTitle")}</div>
-            <p style={tradeLockedExplainerStyle}>{t("marketplace.trade.lockedExplainer")}</p>
-            <p style={tradeLockedExplainerStyle}>
-              {t("marketplace.trade.unlockPrompt", { free: getTradeUnlockPrice().free, purchased: getTradeUnlockPrice().purchased })}
-            </p>
-            <p style={tradeLockedExplainerStyle}>{t("marketplace.trade.priceHint")}</p>
-            {!MARKETPLACE_SERVER_ONLINE ? (
-              <p style={{ ...tradeLockedExplainerStyle, color: "#ffd56a", fontWeight: 700 }} data-testid="market-offline">
-                {t("marketplace.trade.offline")}
-              </p>
-            ) : (
-            <DualGemPriceButtons
-              price={getTradeUnlockPrice()}
-              freeBalance={save.freeGems}
-              purchasedBalance={save.purchasedGems}
-              onPay={(currency) => {
-                unlockTrade(currency);
-                setRefreshTick((n) => n + 1);
-              }}
-            />
-            )}
-          </div>
-        ) : (
           <>
         <div style={tabRowStyle}>
           <TabButton active={tab === "BROWSE"} label={t("marketplace.tabs.browse")} onClick={() => setTab("BROWSE")} />
@@ -271,7 +248,6 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
           />
         )}
           </>
-        )}
       </div>
 
       {selectedListing && (
@@ -292,11 +268,10 @@ export function MarketplaceScreen({ onNavigate, onPlay }: MarketplaceScreenProps
       {creating && (
         <CreateAuctionModal
           eligibleItems={eligibleItems}
-          freeGemsBalance={save.freeGems}
           purchasedGemsBalance={save.purchasedGems}
           onClose={() => setCreating(false)}
-          onCreate={(instanceId, minBid, durationHours, currency) => {
-            const result = createAuctionListingForItem(instanceId, minBid, durationHours, currency);
+          onCreate={(instanceId, minBid, durationHours) => {
+            const result = createAuctionListingForItem(instanceId, minBid, durationHours);
             setRefreshTick((n) => n + 1);
             return result;
           }}
@@ -413,30 +388,8 @@ const createCtaStyle: CSSProperties = {
   cursor: "pointer",
 };
 
-const tradeLockedBoxStyle: CSSProperties = {
-  maxWidth: 480,
-  margin: "0 auto 24px",
-  padding: "20px 24px",
-  borderRadius: 14,
-  border: `1px solid ${PALETTE.gem}`,
-  background: "rgba(200,138,255,0.06)",
-  textAlign: "center",
-};
 
-const tradeLockedTitleStyle: CSSProperties = {
-  fontFamily: "Georgia, 'Times New Roman', serif",
-  fontSize: 18,
-  fontWeight: 800,
-  color: PALETTE.uiAccentBright,
-  marginBottom: 8,
-};
 
-const tradeLockedExplainerStyle: CSSProperties = {
-  fontSize: 11.5,
-  color: PALETTE.uiTextDim,
-  lineHeight: 1.6,
-  marginBottom: 10,
-};
 
 const tabRowStyle: CSSProperties = {
   display: "flex",
