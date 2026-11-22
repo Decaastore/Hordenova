@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { beginHunt, loadHuntMeta } from "@/engine/SaveSystem";
+import { canHuntPhase } from "@/config/hunt";
+import { PHASES } from "@/config/phaseConfig";
+import { castleDressingFor } from "@/rendering/castleSprites";
+import { PRESTIGE_CASTLE_SKIN_ID } from "@/config/castleSkins";
 import { GameModes, type GameModeCard } from "@/ui/GameModes";
 import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
 import { ColossusAlert } from "@/ui/ColossusPromo";
@@ -33,6 +38,8 @@ interface SeasonScreenProps {
   onPlayDuel?: () => void;
   /** CHEFE GLOBAL — opens the Serpent of the Eclipse. */
   onPlayColossus?: () => void;
+  /** CAÇADA — a hunt castle was set up (SaveSystem.beginHunt): play it. */
+  onPlayHunt?: () => void;
 }
 
 const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
@@ -46,8 +53,8 @@ const THEME_ART: Record<string, string> = {
   STORMFALL: "floating_isles",
 };
 
-/** Castle art per theme ground (themes without their own castle use the forest one). */
-const CASTLE_ART: Record<string, string> = { ancient_forest: "ancient_forest", volcanic_wastes: "volcanic_wastes", frozen_tundra: "frozen_tundra", abyss: "abyss" };
+/** The 3D castle's dressing for each theme ground (themes without their own dressing use the forest one). */
+const CASTLE_DRESSING: Record<string, string> = { ancient_forest: "ANCIENT_FOREST", volcanic_wastes: "VOLCANIC_WASTES", frozen_tundra: "FROZEN_TUNDRA", abyss: "ABYSS" };
 
 const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
 
@@ -61,7 +68,7 @@ const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
 /** The tester-only Season reset shows in development, or on the live site with ?testes in the address. */
 const SHOW_TESTING_TOOLS = import.meta.env.DEV || (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("testes"));
 
-export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalMerchant, onPlayDuel, onPlayColossus }: SeasonScreenProps) {
+export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalMerchant, onPlayDuel, onPlayColossus, onPlayHunt }: SeasonScreenProps) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
@@ -93,13 +100,26 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
   const inRun = save.currentWave > 0 && save.towerLoadout.length > 0;
   const bossRecords = save.bossRecords && save.bossRecords.seasonNumber === status.seasonNumber ? Object.entries(save.bossRecords.assaultsByWave).sort((a, b) => Number(a[0]) - Number(b[0])) : [];
 
+  // CAÇADAS — phases the Season castle has already cleared can be replayed, much harder
+  const huntMeta = useMemo(() => loadHuntMeta(), [refreshTick]);
+  const huntable = PHASES.map((phase, index) => ({ phase, index })).filter(({ phase }) => canHuntPhase(phase, save.seasonBestWave));
+  const activeHunt = huntMeta.active && !huntMeta.active.won ? huntMeta.active.phaseIndex : null;
+  const [huntPick, setHuntPick] = useState<number | null>(null);
+  const huntIndex = huntPick ?? activeHunt ?? huntable[huntable.length - 1]?.index ?? 0;
+  const huntPhase = PHASES[huntIndex] ?? PHASES[0]!;
+  const huntWins = Object.values(huntMeta.wins).reduce((a, b) => a + b, 0);
+  const playHunt = () => {
+    if (!onPlayHunt) return;
+    if (activeHunt === huntIndex || beginHunt(huntIndex)) onPlayHunt();
+  };
+
   const duelRank = rankFor(save.duel.trophies);
   const colossusLife = (worldState(save.colossus, Date.now()).fraction * 100).toFixed(1);
   const modeCards: GameModeCard[] = [
     {
       id: "SEASON",
       kicker: t("modes.seasonKicker", { n: status.seasonNumber }),
-      title: theme,
+      title: t("modes.seasonTitle"),
       pitch: t("modes.seasonPitch"),
       figures: [
         { label: t("modes.record"), value: status.hasParticipated ? score : "—" },
@@ -109,7 +129,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
       onPlay,
       testId: "play-season",
       ground: art,
-      castle: CASTLE_ART[art] ?? "ancient_forest",
+      castle: { dressing: CASTLE_DRESSING[art] ?? castleDressingFor(art.toUpperCase()).toUpperCase() },
     },
     ...(onPlayEternal
       ? [
@@ -126,6 +146,8 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
             cta: eternalCastle && eternalCastle.currentWave > 0 ? t("eternal.continue", { wave: eternalCastle.currentWave }) : t("eternal.start"),
             onPlay: onPlayEternal,
             testId: "play-eternal",
+            ground: "abyss",
+            castle: { dressing: "ABYSS", skin: PRESTIGE_CASTLE_SKIN_ID },
             ...(onOpenEternalMerchant ? { extra: { label: t("modes.merchant"), onClick: onOpenEternalMerchant, testId: "open-eternal-merchant" } } : {}),
           },
         ]
@@ -144,6 +166,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
             cta: t("duel.open"),
             onPlay: onPlayDuel,
             testId: "play-duel",
+            ground: "volcanic_wastes",
           },
         ]
       : []),
@@ -162,6 +185,36 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
             onPlay: onPlayColossus,
             testId: "play-colossus",
             badge: `● ${t("modes.live")}`,
+          },
+        ]
+      : []),
+    ...(onPlayHunt
+      ? [
+          {
+            id: "HUNT" as const,
+            kicker: t("modes.huntKicker"),
+            title: t("modes.huntTitle"),
+            pitch: t("modes.huntPitch"),
+            figures: [
+              { label: t("modes.huntOpen"), value: `${huntable.length}/${PHASES.length}` },
+              { label: t("modes.huntWon"), value: huntWins.toLocaleString(locale) },
+            ],
+            cta: activeHunt === huntIndex ? t("bestiary.huntNow") : t("bestiary.huntStart"),
+            onPlay: playHunt,
+            testId: "play-hunt",
+            ground: huntPhase.biomeId.toLowerCase(),
+            boss: huntPhase.mainBossId,
+            ...(huntable.length === 0
+              ? { locked: t("bestiary.huntLocked", { wave: PHASES[0]!.endWave }) }
+              : {
+                  picker: {
+                    label: t("modes.huntPhase"),
+                    value: String(huntIndex),
+                    options: huntable.map(({ phase, index }) => ({ value: String(index), label: `${index + 1}. ${t(`phases.${phase.i18nKey}.name` as TranslationKey)}${activeHunt === index ? ` · ${t("modes.huntInProgress")}` : ""}` })),
+                    onChange: (v: string) => setHuntPick(Number(v)),
+                    testId: "hunt-phase",
+                  },
+                }),
           },
         ]
       : []),
@@ -193,9 +246,6 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
                 </div>
               </div>
               <div className="pg-actions">
-                <button className="pg-btn" onClick={onPlay}>
-                  {inRun ? t("season.continueRun", { wave: save.currentWave }) : t("season.startRun")}
-                </button>
                 <button className="pg-btn-ghost" onClick={() => setPanelOpen(true)}>
                   {t("season.collectionCta")}
                 </button>
@@ -210,7 +260,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
         </header>
 
         <div className="pg-wrap">
-          <GameModes cards={modeCards} />
+          <GameModes cards={modeCards} sub={t("modes.sub")} />
           <BeginnerSection />
           <dl className="pg-figures">
             <div>

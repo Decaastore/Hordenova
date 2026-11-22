@@ -116,7 +116,7 @@ export default function App() {
         // at the current Season (name/theme/timer/best/ranking) before this
         // fires, satisfying the required HOME -> JOGAR -> SEASON ATUAL ->
         // INICIAR/CONTINUAR RUN -> GAMEPLAY flow.
-        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={() => playEternal()} onOpenEternalMerchant={() => playEternal(true)} onPlayDuel={() => setView("DUEL")} onPlayColossus={() => setView("COLOSSUS")} />
+        <SeasonScreen onNavigate={navigate} onPlay={playSeason} onPlayEternal={() => playEternal()} onOpenEternalMerchant={() => playEternal(true)} onPlayDuel={() => setView("DUEL")} onPlayColossus={() => setView("COLOSSUS")} onPlayHunt={() => { setHuntSeq((n) => n + 1); setMode("HUNT"); setView("GAME"); }} />
       ) : view === "RANKING" ? (
         <RankingScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "WIKI" ? (

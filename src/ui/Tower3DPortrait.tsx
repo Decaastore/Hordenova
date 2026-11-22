@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, type TowerType } from "@/config/towerStats";
+import { buildCastleModel } from "@/battlefield3d/models/castleModel";
 
 /**
  * TOWER PORTRAIT IN 3D — the tower exactly as the battlefield draws it (the
@@ -17,9 +18,7 @@ import { getTowerVisualStage, type TowerType } from "@/config/towerStats";
 interface Portrait {
   canvas: HTMLCanvasElement;
   key: string;
-  type: TowerType;
-  stage: number;
-  skin: string;
+  build: () => THREE.Object3D;
   width: number;
   height: number;
   visible: boolean;
@@ -30,7 +29,7 @@ interface Portrait {
 let renderer: THREE.WebGLRenderer | null = null;
 let scene: THREE.Scene | null = null;
 let camera: THREE.PerspectiveCamera | null = null;
-const models = new Map<string, { model: TowerModel; size: THREE.Vector3; center: THREE.Vector3 }>();
+const models = new Map<string, { model: { root: THREE.Object3D }; size: THREE.Vector3; center: THREE.Vector3 }>();
 const portraits = new Set<Portrait>();
 let raf = 0;
 let last = 0;
@@ -65,7 +64,7 @@ function setup(): boolean {
 function modelFor(p: Portrait) {
   let m = models.get(p.key);
   if (!m) {
-    const model = buildTowerModel(p.type, p.stage, p.skin);
+    const model = { root: p.build() };
     const box = new THREE.Box3().setFromObject(model.root);
     m = { model, size: box.getSize(new THREE.Vector3()), center: box.getCenter(new THREE.Vector3()) };
     models.set(p.key, m);
@@ -84,7 +83,7 @@ function frame(now: number) {
     const ctx = p.canvas.getContext("2d");
     if (!ctx) continue;
     const { model, size, center } = modelFor(p);
-    if (p.spin) p.angle += dt * 0.5;
+    if (p.spin) p.angle += dt * (p.key.startsWith("castle") ? 0.18 : 0.5);
     model.root.rotation.y = p.angle;
     const w = Math.round(p.width * dpr), h = Math.round(p.height * dpr);
     renderer.setSize(w, h, false);
@@ -128,15 +127,34 @@ export function Tower3DPortrait({ type, level, skinId = null, width, height, spi
     if (!canvas || !setup()) return;
     const stage = getTowerVisualStage(level);
     const skin = skinId ?? "base";
-    const p: Portrait = { canvas, key: `${type}|${stage}|${skin}`, type, stage, skin, width, height, visible: true, spin, angle: -0.5 };
-    portraits.add(p);
-    const observer = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(([e]) => (p.visible = e?.isIntersecting ?? true)) : null;
-    observer?.observe(canvas);
-    if (!raf) raf = requestAnimationFrame(frame);
-    return () => {
-      portraits.delete(p);
-      observer?.disconnect();
-    };
+    return mountPortrait(canvas, `tower|${type}|${stage}|${skin}`, () => (buildTowerModel(type, stage, skin) as TowerModel).root, width, height, spin, -0.5);
   }, [type, level, skinId, width, height, spin]);
+  return <canvas ref={ref} style={{ width, height, display: "block" }} aria-hidden="true" />;
+}
+
+function mountPortrait(canvas: HTMLCanvasElement, key: string, build: () => THREE.Object3D, width: number, height: number, spin: boolean, angle: number): () => void {
+  const p: Portrait = { canvas, key, build, width, height, visible: true, spin, angle };
+  portraits.add(p);
+  const observer = typeof IntersectionObserver !== "undefined" ? new IntersectionObserver(([e]) => (p.visible = e?.isIntersecting ?? true)) : null;
+  observer?.observe(canvas);
+  if (!raf) raf = requestAnimationFrame(frame);
+  return () => {
+    portraits.delete(p);
+    observer?.disconnect();
+  };
+}
+
+/**
+ * The castle in 3D — the same procedural model the battlefield builds
+ * (battlefield3d/models/castleModel.ts), intact, for the mode cards.
+ * `dressing` is a biome dressing id (e.g. "FROZEN_TUNDRA"); `skin` a castle skin id.
+ */
+export function Castle3DPortrait({ dressing, skin = "", width, height, spin = true }: { dressing: string; skin?: string; width: number; height: number; spin?: boolean }) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas || !setup()) return;
+    return mountPortrait(canvas, `castle|${dressing}|${skin}`, () => buildCastleModel(dressing, 1, skin).root, width, height, spin, -0.35);
+  }, [dressing, skin, width, height, spin]);
   return <canvas ref={ref} style={{ width, height, display: "block" }} aria-hidden="true" />;
 }
