@@ -1,5 +1,5 @@
 import { useMemo, useState, type CSSProperties } from "react";
-import { hasMarketAccess, MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
+import { FREE_TRADER_MIN_PHASE, MARKETPLACE_SERVER_ONLINE, tradeTierFor } from "@/config/marketplace";
 import { PALETTE } from "@/rendering/theme";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
@@ -43,11 +43,11 @@ export function TradeScreen() {
 
   const bump = () => setRefreshTick((n) => n + 1);
 
-  if (!hasMarketAccess(save.vip, Date.now())) {
+  if (!tradeTierFor(save, Date.now()).open) {
     return (
       <div style={lockedBoxStyle}>
         <div style={lockedTitleStyle}>{t("trade.lockedTitle")}</div>
-        <p style={lockedTextStyle}>{t("trade.vipRequired")}</p>
+        <p style={lockedTextStyle}>{t("trade.lockedRule", { phase: FREE_TRADER_MIN_PHASE })}</p>
         {!MARKETPLACE_SERVER_ONLINE && <p style={{ color: "#ffd56a", fontWeight: 700, fontSize: 13, margin: "10px 0 0" }}>{t("marketplace.trade.offline")}</p>}
       </div>
     );

@@ -68,3 +68,99 @@ export function gemPackTotal(pack: GemPack): number {
  * can never be used to buy another player's item on the Marketplace.
  */
 export const DAILY_GIFT_FREE_GEMS = 1;
+
+/**
+ * PACOTES COM SKINS EXCLUSIVAS — real-money bundles, once per account, each
+ * built around tower skins that exist ONLY in that bundle
+ * (config/towerSkins.ts PACK_TOWER_SKINS): never sold for Gems, never in the
+ * daily shop or the Season Pass. Everything inside is shown before buying —
+ * no random contents. Items stay at Rare at most (like the starter pack), so
+ * money buys looks, Gems and room, not top-tier power. Gems match the plain
+ * gem packs' rate for the price (~22-30 per R$), so the exclusive skins and
+ * items are always on top of it, never a hidden discount.
+ * Like every real-money purchase: 18+ only, "coming soon" until payments open.
+ */
+export interface SkinBundle {
+  id: string;
+  priceBrl: number;
+  contents: readonly RewardPart[];
+  tag?: "POPULAR" | "BEST_VALUE";
+}
+
+export const SKIN_BUNDLES: readonly SkinBundle[] = [
+  {
+    id: "BUNDLE_EMBER",
+    priceBrl: 19.9,
+    contents: [
+      { kind: "SKIN", skinId: "INFERNO_PACK_EMBERHEART" },
+      { kind: "PURCHASED_GEMS", amount: 450 },
+    ],
+  },
+  {
+    id: "BUNDLE_WINTER",
+    priceBrl: 39.9,
+    contents: [
+      { kind: "SKIN", skinId: "FROSTBORN_PACK_WINTER_CROWN" },
+      { kind: "PURCHASED_GEMS", amount: 900 },
+      { kind: "ITEM", rarity: "RARE" },
+    ],
+  },
+  {
+    id: "BUNDLE_SENTINEL",
+    priceBrl: 69.9,
+    contents: [
+      { kind: "SKIN", skinId: "IRONWOOD_PACK_EMERALD_SENTINEL" },
+      { kind: "PURCHASED_GEMS", amount: 1700 },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "INVENTORY_SLOTS", amount: 10 },
+    ],
+    tag: "POPULAR",
+  },
+  {
+    id: "BUNDLE_CRIMSON",
+    priceBrl: 129.9,
+    contents: [
+      { kind: "SKIN", skinId: "STORMCALLER_PACK_CRIMSON_STORM" },
+      { kind: "PURCHASED_GEMS", amount: 3600 },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "INVENTORY_SLOTS", amount: 10 },
+    ],
+  },
+  {
+    id: "BUNDLE_ECLIPSE",
+    priceBrl: 199.9,
+    contents: [
+      { kind: "SKIN", skinId: "IRONWOOD_PACK_ECLIPSE" },
+      { kind: "SKIN", skinId: "FROSTBORN_PACK_ECLIPSE" },
+      { kind: "PURCHASED_GEMS", amount: 5800 },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "INVENTORY_SLOTS", amount: 10 },
+    ],
+  },
+  {
+    id: "BUNDLE_SOVEREIGN",
+    priceBrl: 299.9,
+    contents: [
+      { kind: "SKIN", skinId: "INFERNO_PACK_SOVEREIGN" },
+      { kind: "SKIN", skinId: "STORMCALLER_PACK_SOVEREIGN" },
+      { kind: "PURCHASED_GEMS", amount: 9000 },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "ITEM", rarity: "RARE" },
+      { kind: "INVENTORY_SLOTS", amount: 20 },
+    ],
+    tag: "BEST_VALUE",
+  },
+];
+
+/** The bundle a pack-exclusive skin comes in, if any. */
+export function bundleForSkin(skinId: string): SkinBundle | null {
+  return SKIN_BUNDLES.find((b) => b.contents.some((p) => p.kind === "SKIN" && p.skinId === skinId)) ?? null;
+}
+
+/** Skins inside a bundle. */
+export function bundleSkinIds(bundle: SkinBundle): string[] {
+  return bundle.contents.flatMap((p) => (p.kind === "SKIN" ? [p.skinId] : []));
+}

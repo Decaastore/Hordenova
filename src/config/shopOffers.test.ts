@@ -68,7 +68,7 @@ describe("moment offers and VIP", () => {
   it("only a paid VIP collects the daily VIP Gems, once a day", () => {
     const now = 50 * DAY;
     expect(claimVipGift(now)).toBeNull();
-    updateSave({ vip: { until: now + 30 * DAY, lastGiftDay: -1 } });
+    updateSave({ vip: { until: now + 30 * DAY, lastGiftDay: -1, paidGifts: 30 } }); // a real-money VIP
     expect(isVipActive(loadSave().vip, now)).toBe(true);
     expect(claimVipGift(now)!.purchasedGems).toBe(20);
     expect(vipGiftAvailable(loadSave().vip, now)).toBe(false);

@@ -2,7 +2,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
-import { AUCTION_DURATION_HOURS, AUCTION_SALE_TAX_PERCENT, AUCTION_WEEKLY_LISTING_LIMIT, getAuctionListingFee, getAuctionMinBid, MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
+import { FREE_TRADER_MIN_PHASE, FREE_TRADER_TAX_PERCENT, FREE_TRADER_WEEKLY_SALES, TRADE_MAX_OVER_FLOOR, AUCTION_DURATION_HOURS, AUCTION_SALE_TAX_PERCENT, AUCTION_WEEKLY_LISTING_LIMIT, getAuctionListingFee, getAuctionMinBid, MARKETPLACE_SERVER_ONLINE } from "@/config/marketplace";
 import { RARITIES, RARITY_DEFINITIONS } from "@/config/rarity";
 
 /**
@@ -126,6 +126,19 @@ export function MarketplacePreview({ onNavigate, onPlay, vipActive, eligibleCoun
               <div className="pg-block">
                 <h3>{t("marketplace.preview.taxTitle")}</h3>
                 <p>{t("marketplace.preview.taxBody", { tax: AUCTION_SALE_TAX_PERCENT, limit: AUCTION_WEEKLY_LISTING_LIMIT })}</p>
+              </div>
+              <div className="pg-block" data-testid="trade-rules">
+                <h3>{t("marketplace.preview.tradeTitle")}</h3>
+                <p>
+                  {t("marketplace.preview.tradeBody", {
+                    phase: FREE_TRADER_MIN_PHASE,
+                    max: TRADE_MAX_OVER_FLOOR,
+                    freeTax: FREE_TRADER_TAX_PERCENT,
+                    vipTax: AUCTION_SALE_TAX_PERCENT,
+                    freeLimit: FREE_TRADER_WEEKLY_SALES,
+                    vipLimit: AUCTION_WEEKLY_LISTING_LIMIT,
+                  })}
+                </p>
               </div>
               <div className="pg-block">
                 <h3>{t("marketplace.preview.yoursTitle")}</h3>

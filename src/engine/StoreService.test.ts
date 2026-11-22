@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { loadSave, updateSave } from "./SaveSystem";
-import { buyTowerSkin, claimDailyGift, equipTowerSkin, getSkinStatus, isDailyGiftAvailable, requestGemPackPurchase } from "./StoreService";
-import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal } from "@/config/store";
-import { getTowerSkinDualPrice, TOWER_SKINS } from "@/config/towerSkins";
+import { buyTowerSkin, buyVipWithGems, claimVipGift, claimDailyGift, equipTowerSkin, getSkinStatus, isDailyGiftAvailable, requestGemPackPurchase } from "./StoreService";
+import { bundleForSkin, bundleSkinIds, DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, SKIN_BUNDLES } from "@/config/store";
+import { DUEL_TOWER_SKINS, getTowerSkinDefinition, getTowerSkinDualPrice, PACK_TOWER_SKINS, PRESTIGE_TOWER_SKINS, TOWER_SKINS } from "@/config/towerSkins";
 import { DAY_DURATION_MS } from "./DailyClock";
 
 const skin = TOWER_SKINS.find((s) => s.towerType === "IRONWOOD")!;
@@ -56,5 +56,49 @@ describe("Store", () => {
     expect(claimDailyGift(now + 1000)).toBeNull();
     expect(isDailyGiftAvailable(loadSave(), now + 1000)).toBe(false);
     expect(claimDailyGift(now + DAY_DURATION_MS)!.freeGems).toBe(DAILY_GIFT_FREE_GEMS * 2);
+  });
+
+  it("Prestige, Duel and bundle-exclusive skins can never be bought with Gems (they cost 0 in the skin table)", () => {
+    updateSave({ freeGems: 99_999, purchasedGems: 99_999 });
+    for (const skin of [...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS, ...PACK_TOWER_SKINS]) {
+      expect(buyTowerSkin(skin.id, "PURCHASED").ok).toBe(false);
+      expect(buyTowerSkin(skin.id, "FREE").ok).toBe(false);
+    }
+    expect(loadSave().ownedTowerSkinIds).toEqual([]);
+    expect(loadSave().purchasedGems).toBe(99_999);
+  });
+
+  it("skin bundles: every bundle-exclusive skin is in exactly one bundle, prices go up to R$ 300, and payments stay closed", () => {
+    for (const skin of PACK_TOWER_SKINS) expect(bundleForSkin(skin.id)).not.toBeNull();
+    const all = SKIN_BUNDLES.flatMap(bundleSkinIds);
+    expect(new Set(all).size).toBe(all.length);
+    for (const id of all) expect(getTowerSkinDefinition(id)?.tier).toBe("PACK");
+    for (const b of SKIN_BUNDLES) {
+      expect(b.priceBrl).toBeGreaterThan(0);
+      expect(b.priceBrl).toBeLessThanOrEqual(300);
+      expect(b.contents.every((p) => p.kind !== "ITEM" || p.rarity === "RARE")).toBe(true);
+      expect(requestGemPackPurchase(b.id)).toEqual({ ok: false, reason: "PAYMENTS_NOT_ENABLED" });
+    }
+  });
+
+  it("VIP with Purchased Gems: 400 Gems buy 30 days; its daily gift pays FREE Gems, so it can never pay itself back in Purchased Gems", () => {
+    const now = Date.UTC(2026, 10, 22, 12);
+    updateSave({ purchasedGems: 399, freeGems: 0 });
+    expect(buyVipWithGems(now)).toEqual({ ok: false, reason: "INSUFFICIENT_GEMS" });
+    updateSave({ purchasedGems: 400 });
+    expect(buyVipWithGems(now).ok).toBe(true);
+    expect(loadSave().purchasedGems).toBe(0);
+    expect(loadSave().vip.until).toBe(now + 30 * 86_400_000);
+    expect(claimVipGift(now)).not.toBeNull();
+    expect(loadSave().purchasedGems).toBe(0);
+    expect(loadSave().freeGems).toBe(20);
+  });
+
+  it("days paid with real money pay the VIP gift in Purchased Gems", () => {
+    const now = Date.UTC(2026, 10, 22, 12);
+    updateSave({ purchasedGems: 0, vip: { until: now + 86_400_000, lastGiftDay: -1, paidGifts: 1 } });
+    claimVipGift(now);
+    expect(loadSave().purchasedGems).toBe(20);
+    expect(loadSave().vip.paidGifts).toBe(0);
   });
 });

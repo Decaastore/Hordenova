@@ -7,13 +7,13 @@ import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { loadSave, type SaveData } from "@/engine/SaveSystem";
-import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
+import { bundleSkinIds, DAILY_GIFT_FREE_GEMS, GEM_PACKS, gemPackTotal, REAL_MONEY_PAYMENTS_ENABLED, SKIN_BUNDLES, STARTER_PACK } from "@/config/store";
 import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDualPrice, SKIN_REWARD_BONUS_PER_TYPE, type TowerSkinDefinition } from "@/config/towerSkins";
 import type { GemCurrency } from "@/config/gemsEconomy";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
-import { buyCastleSkin, castleSkinPrice, equipCastleSkin, buyDailyOffer, buySkinEvolution, buyTowerSkin, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
-import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_PRICE_BRL, vipGiftAvailable, type DailyOffer, type MomentOffer } from "@/config/shopOffers";
+import { buyCastleSkin, castleSkinPrice, equipCastleSkin, buyDailyOffer, buySkinEvolution, buyTowerSkin, buyVipWithGems, claimDailyGift, claimVipGift, equipTowerSkin, getDailyOffers, getSkinStatus, getStoreTowerSkins, isDailyGiftAvailable, requestGemPackPurchase } from "@/engine/StoreService";
+import { activeMomentOffer, isVipActive, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_GEM_PRICE, VIP_PRICE_BRL, vipGiftAvailable, type DailyOffer, type MomentOffer } from "@/config/shopOffers";
 import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
 import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
@@ -103,6 +103,14 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
       setSave(result.save);
       setNotice(t("store.dailyBought"));
     } else if (result.reason === "INSUFFICIENT_GEMS") setNotice(t(currency === "FREE" ? "store.notEnoughFree" : "store.notEnoughPurchased"));
+  };
+
+  const onBuyVipWithGems = () => {
+    const result = buyVipWithGems();
+    if (result.ok) {
+      setSave(result.save);
+      setNotice(t("store.vipGemsBought"));
+    } else setNotice(t("store.notEnoughPurchased"));
   };
 
   const onClaimVip = () => {
@@ -344,8 +352,64 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                       {REAL_MONEY_PAYMENTS_ENABLED ? t("store.vipSubscribe") : t("store.soon")}
                     </button>
                   )}
+                  <button className="st-vip-gems" disabled={save.purchasedGems < VIP_GEM_PRICE} onClick={onBuyVipWithGems} data-testid="vip-gems">
+                    {vipOn ? t("store.vipExtendGems", { gems: VIP_GEM_PRICE }) : t("store.vipBuyGems", { gems: VIP_GEM_PRICE })}
+                  </button>
+                  <small>{t("store.vipGemsNote")}</small>
                 </div>
               </article>
+            </div>
+          </section>
+
+          <section className="st-section" data-testid="skin-bundles">
+            <div className="pg-head st-head">
+              <h2 className="pg-h2">{t("store.bundlesTitle")}</h2>
+            </div>
+            <p className="pg-sub">{t("store.bundlesBody")}</p>
+            <div className="st-bundles">
+              {SKIN_BUNDLES.map((b) => {
+                const skinIds = bundleSkinIds(b);
+                const owned = skinIds.every((id) => save.ownedTowerSkinIds.includes(id));
+                const pair = skinIds.length > 1;
+                return (
+                  <article key={b.id} className={`st-bundle${b.tag ? ` is-${b.tag}` : ""}${owned ? " is-owned" : ""}`} data-testid={`bundle-${b.id}`}>
+                    {b.tag && <span className="st-tag">{t(b.tag === "POPULAR" ? "store.bundlePopular" : "store.bundleBest")}</span>}
+                    <div className={`st-bundle-stage${pair ? " is-pair" : ""}`}>
+                      {skinIds.map((id) => {
+                        const def = getTowerSkinDefinition(id);
+                        return def ? <Tower3DPortrait key={id} type={def.towerType} level={MAX_TOWER_LEVEL} skinId={id} width={pair ? 130 : 170} height={pair ? 150 : 170} /> : null;
+                      })}
+                    </div>
+                    <h3>{t(`store.bundles.${b.id}.name` as TranslationKey)}</h3>
+                    <p className="st-feat-body">{t(`store.bundles.${b.id}.body` as TranslationKey)}</p>
+                    <p className="st-contents-label">{t("store.bundleSkins")}</p>
+                    <p className="st-bundle-skins">{skinIds.map((id) => t(`towerSkins.${id}.name` as TranslationKey)).join(" · ")}</p>
+                    <ul className="st-contents">
+                      {groupParts(b.contents.filter((part) => part.kind !== "SKIN")).map(({ part, count }, i) => (
+                        <li key={i}>
+                          <span className="st-contents-ico">
+                            <PerkIcon kind={partIcon(part.kind)} />
+                          </span>
+                          <span>
+                            {count > 1 && `${count}× `}
+                            <RewardPartsLabel parts={[part]} currentWave={save.currentWave} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="st-buybox">
+                      <span className="st-price">{brl.format(b.priceBrl)}</span>
+                      {owned ? (
+                        <p className="st-owned">✓ {t("store.bundleOwned")}</p>
+                      ) : (
+                        <button className="st-buy" disabled={!REAL_MONEY_PAYMENTS_ENABLED} onClick={() => onBuyPack(b.id)}>
+                          {REAL_MONEY_PAYMENTS_ENABLED ? t("store.buy") : t("store.soon")}
+                        </button>
+                      )}
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           </section>
 
@@ -661,6 +725,28 @@ const STORE_CSS = `
 .st-pack-price { font-size: 16px; font-weight: 800; }
 .st-pack-soon { font-size: 10.5px; font-weight: 600; opacity: 0.85; }
 
+/* exclusive bundles: deep crimson-and-gold cases, each with its skins on a lit plinth */
+.st-bundles { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 18px; }
+.st-bundle { position: relative; display: flex; flex-direction: column; padding: 18px 20px 18px; border-radius: 16px; isolation: isolate;
+  background: radial-gradient(70% 45% at 50% 0%, rgba(255,120,90,0.14), transparent 70%), linear-gradient(170deg, #2a1414 0%, #170c0b 55%, #100908 100%);
+  border: 1px solid rgba(232,176,75,0.38); box-shadow: inset 0 1px 0 rgba(255,236,190,0.12), 0 10px 26px rgba(0,0,0,0.42);
+  transition: transform 220ms var(--hn-ease-out), border-color 200ms ease, box-shadow 220ms ease; }
+.st-bundle:hover { transform: translateY(-4px); border-color: rgba(240,190,82,0.75); box-shadow: inset 0 1px 0 rgba(255,236,190,0.16), 0 18px 34px rgba(0,0,0,0.5), 0 0 26px rgba(240,190,82,0.16); }
+.st-bundle.is-BEST_VALUE { border-color: rgba(240,190,82,0.8); box-shadow: inset 0 1px 0 rgba(255,236,190,0.18), 0 10px 26px rgba(0,0,0,0.42), 0 0 34px rgba(240,190,82,0.2); }
+.st-bundle .st-tag { left: 50%; transform: translateX(-50%); }
+.st-bundle-stage { display: flex; align-items: flex-end; justify-content: center; gap: 0; height: 170px; margin: -4px -8px 8px;
+  background: radial-gradient(48% 62% at 50% 46%, rgba(255,200,130,0.2), transparent 70%), radial-gradient(42% 10% at 50% 94%, rgba(0,0,0,0.6), transparent 70%); }
+.st-bundle-stage canvas { transition: transform 320ms var(--hn-ease-back); }
+.st-bundle:hover .st-bundle-stage canvas { transform: translateY(-4px) scale(1.04); }
+.st-bundle h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.08; color: var(--gold-hi); }
+.st-bundle-skins { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #ffd9a0; }
+.st-bundle .st-contents { grid-template-columns: 1fr; }
+.st-bundle.is-owned { opacity: 0.85; }
+
+.st-vip-gems { width: 100%; padding: 9px 12px; border-radius: 10px; cursor: pointer; font-weight: 700; font-size: 13px; color: #e8dcff !important; background: rgba(120,80,200,0.16); border: 1px solid rgba(190,160,255,0.45); }
+.st-vip-gems:hover:not(:disabled) { background: rgba(140,100,230,0.28); }
+.st-vip-gems:disabled { cursor: default; opacity: 0.55; }
+
 /* gold call to action */
 .st-buy { width: 100%; padding: 11px 14px; border-radius: 10px; cursor: pointer; font-weight: 800; font-size: 14px; border: 1px solid #f2c873; color: #2b1906 !important; position: relative; overflow: hidden;
   background: linear-gradient(180deg, #f6cf7a 0%, var(--gold) 55%, #c58a2c 100%); box-shadow: inset 0 1px 0 rgba(255,255,255,0.4), 0 4px 12px rgba(0,0,0,0.35);
@@ -742,3 +828,15 @@ const STORE_CSS = `
   .st-vip h3 { font-size: 32px; }
 }
 `;
+
+/** Identical reward parts (two Rare items, say) shown once with a count. */
+function groupParts<T>(parts: readonly T[]): { part: T; count: number }[] {
+  const out: { part: T; count: number; key: string }[] = [];
+  for (const part of parts) {
+    const key = JSON.stringify(part);
+    const hit = out.find((o) => o.key === key);
+    if (hit) hit.count++;
+    else out.push({ part, count: 1, key });
+  }
+  return out;
+}

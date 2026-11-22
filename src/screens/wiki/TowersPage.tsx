@@ -1,3 +1,4 @@
+import { bundleForSkin } from "@/config/store";
 import { SPECIAL_ATTACK_COOLDOWN_MS } from "@/config/towerSpecials";
 import { useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -209,6 +210,8 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
                 <p className="wk-skin-price">
                   {skin.tier === "PRESTIGE"
                     ? t("wiki.prestigeSkinUnlock", { level: PRESTIGE_SKIN_LEVEL })
+                    : skin.tier === "PACK"
+                    ? t("wiki.packSkinSource", { bundle: t(`store.bundles.${bundleForSkin(skin.id)?.id ?? ""}.name` as TranslationKey), price: (bundleForSkin(skin.id)?.priceBrl ?? 0).toLocaleString(locale, { style: "currency", currency: "BRL" }) })
                     : t("wiki.skinPrice", { purchased: price.purchased.toLocaleString(locale), free: price.free.toLocaleString(locale), level: skin.unlockLevel })}
                 </p>
                 <p className="wk-skin-desc">{t(`towerSkins.${skin.i18nKey}.description` as TranslationKey)}</p>

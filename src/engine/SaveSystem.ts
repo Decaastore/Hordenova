@@ -288,6 +288,8 @@ export interface SaveData {
   momentOffers: MomentOfferState;
   /** VIP — paid period and the last daily VIP gift. Account-level; only a real payment ever sets `until`. */
   vip: VipState;
+  /** When this account received Purchased Gems in a direct trade — counted against its weekly sales (config/marketplace.ts). */
+  gemTradeLog: number[];
   /** EVOLUÇÃO DE SKIN — Premium skins this account has evolved (animated). Account-level, permanent. */
   evolvedSkinIds: string[];
   /** DUELO — trophies, record, deck and today's rewarded wins (config/duel.ts). Account-level. */
@@ -417,6 +419,7 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   dailyShop: createDailyShopState(),
   momentOffers: createMomentOfferState(),
   vip: createVipState(),
+  gemTradeLog: [],
   evolvedSkinIds: [],
   duel: createDuelProfile(),
   colossus: createColossusProfile(),
@@ -998,6 +1001,7 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       dailyShop: sanitizeDailyShopState(parsed.dailyShop),
       momentOffers: sanitizeMomentOfferState(parsed.momentOffers),
       vip: sanitizeVipState(parsed.vip),
+      gemTradeLog: Array.isArray(parsed.gemTradeLog) ? parsed.gemTradeLog.filter((x: unknown): x is number => typeof x === "number" && Number.isFinite(x)).slice(-50) : [],
       duel: sanitizeDuelProfile(parsed.duel),
       colossus: sanitizeColossusProfile(parsed.colossus),
       dailyLogin: sanitizeDailyLogin(parsed.dailyLogin),

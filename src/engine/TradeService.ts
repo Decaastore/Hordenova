@@ -2,6 +2,9 @@ import { loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { isItemEquippedAnywhere } from "./InventoryManager";
 import type { ItemInstance } from "@/entities/Item";
+import { auctionSellerProceeds, checkTradeBalance, getAuctionListingFee, listingsThisWeek, salesThisWeek, tradeTierFor } from "@/config/marketplace";
+import { getItemDefinition } from "@/config/itemDefinitions";
+import type { Rarity } from "@/config/rarity";
 import {
   addItemToOffer,
   canOfferItemInTrade,
@@ -114,10 +117,35 @@ export function executeActiveTradeWithCounterpart(
   counterpartInventory: readonly ItemInstance[],
   counterpartPurchasedGems: number,
   counterpartEquippedInstanceIds: ReadonlySet<string> = new Set(),
+  /** Whether the other player may trade (config/marketplace.ts tradeTierFor) — supplied by the server from their own account, like their balance. */
+  counterpartTradeOpen = false,
 ): TradeExecutionOutcome {
   const save = loadSave();
   const session = save.activeTradeSession;
   if (!session) return { ok: false, reason: "NOT_PENDING" };
+  // Direct trades are open to VIPs, and to everyone else once they've cleared the minimum phase — on BOTH sides.
+  const now = Date.now();
+  const tier = tradeTierFor(save, now);
+  if (!tier.open || !counterpartTradeOpen) return { ok: false, reason: "TRADE_LOCKED" };
+  const iAmA = session.playerAId === save.playerId;
+  const mine = iAmA ? session.offerA : session.offerB;
+  const theirs = iAmA ? session.offerB : session.offerA;
+  const gemsIn = theirs.purchasedGems;
+  // Balanced with the auction house (config/marketplace.ts checkTradeBalance): same floors, no hidden gifts.
+  const rarityOf = (pool: readonly ItemInstance[]) => (id: string): Rarity[] => {
+    const item = pool.find((i) => i.instanceId === id);
+    const def = item ? getItemDefinition(item.itemDefinitionId) : null;
+    return def ? [def.rarity] : [];
+  };
+  const myRarities = mine.itemInstanceIds.flatMap(rarityOf(save.inventory));
+  const theirRarities = theirs.itemInstanceIds.flatMap(rarityOf(counterpartInventory));
+  const balance = checkTradeBalance({ rarities: myRarities, gems: mine.purchasedGems }, { rarities: theirRarities, gems: theirs.purchasedGems });
+  if (!balance.ok) return { ok: false, reason: "UNBALANCED" };
+  // One weekly cap shared with the auction house.
+  const salesSoFar = salesThisWeek(save.gemTradeLog, now) + listingsThisWeek(save.auctionListings, save.playerId, now);
+  if (gemsIn > 0 && salesSoFar >= tier.weeklyLimit) return { ok: false, reason: "WEEKLY_LIMIT" };
+  // Selling items for Gems costs those items' auction listing fee, like listing them would.
+  const fee = gemsIn > 0 ? myRarities.reduce((sum, r) => sum + getAuctionListingFee(r), 0) : 0;
 
   const iAmPlayerA = session.playerAId === save.playerId;
   const myEquipped = new Set(save.towerLoadout.flatMap((t) => (t.equippedItemInstanceIds ?? []).filter((id): id is string => !!id)));
@@ -135,10 +163,15 @@ export function executeActiveTradeWithCounterpart(
   const myPurchasedGemsDelta = iAmPlayerA ? outcome.purchasedGemsDeltaA : outcome.purchasedGemsDeltaB;
 
   for (const event of outcome.ledgerEvents) appendLedgerEvent(event);
+  // The house keeps the trade tax from the Gems this player receives (a Gem sink).
+  const received = Math.max(0, myPurchasedGemsDelta);
+  const tax = Math.min(received, received - auctionSellerProceeds(received, tier.taxPercent) + fee);
+  if (tax > 0) appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: "trade_tax_and_fee", amount: tax, currency: "PURCHASED" });
   updateSave({
     inventory: myUpdatedInventory,
-    purchasedGems: save.purchasedGems + myPurchasedGemsDelta,
+    purchasedGems: save.purchasedGems + myPurchasedGemsDelta - tax,
     activeTradeSession: outcome.session,
+    gemTradeLog: gemsIn > 0 ? [...save.gemTradeLog, now].slice(-50) : save.gemTradeLog,
   });
   return outcome;
 }

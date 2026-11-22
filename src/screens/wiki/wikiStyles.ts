@@ -121,6 +121,7 @@ export const WIKI_CSS = `
 .wk-tier { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ash); }
 .wk-tier.is-intermediate { color: #8fc6ff; border-color: rgba(143,198,255,0.35); }
 .wk-tier.is-premium { color: #d6a5ff; border-color: rgba(214,165,255,0.4); }
+.wk-tier.is-pack { color: #ffb07a; border-color: rgba(255,150,100,0.45); }
 .wk-tier.is-prestige { color: var(--gold-hi); border-color: rgba(247,220,156,0.5); }
 
 /* bestiary / rows */

@@ -15,7 +15,7 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getTowerSkinDefinition } from "@/config/towerSkins";
+import { getTowerSkinDefinition, isGemPurchasableSkin } from "@/config/towerSkins";
 import { FUSION_DAMAGE_MULT } from "@/config/towerFusion";
 import { MANA_MAX, MANA_OVERCHARGE_MAX, manaGainMultiplier, overchargeMultiplier } from "@/config/towerMana";
 import { getMasteryBonuses, getMasteryUpgradeCost } from "@/config/towerMastery";
@@ -576,7 +576,7 @@ export function equipSkin(tower: TowerInstance, skinId: string | null, ownedSkin
  */
 export function canPurchaseSkin(tower: TowerInstance, skinId: string, ownedSkinIds: ReadonlySet<string>): boolean {
   const def = getTowerSkinDefinition(skinId);
-  return !!def && def.towerType === tower.type && tower.level >= def.unlockLevel && !ownedSkinIds.has(skinId);
+  return !!def && isGemPurchasableSkin(def) && def.towerType === tower.type && tower.level >= def.unlockLevel && !ownedSkinIds.has(skinId);
 }
 
 // ---------------------------------------------------------------------------

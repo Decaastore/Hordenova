@@ -1,14 +1,14 @@
 import { loadSave, updateSave, type SaveData } from "./SaveSystem";
 import { appendLedgerEvent } from "./EconomyLedger";
 import { getCurrentDayIndex } from "./DailyClock";
-import { canEvolveSkin, getTowerSkinDefinition, getTowerSkinDualPrice, SKIN_EVOLUTION_PRICE, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
+import { canEvolveSkin, getTowerSkinDefinition, isGemPurchasableSkin, getTowerSkinDualPrice, SKIN_EVOLUTION_PRICE, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { dualGemPrice, gemPriceForCurrency, type GemCurrency } from "@/config/gemsEconomy";
 import { getCastleSkinDefinition } from "@/config/castleSkins";
-import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, STARTER_PACK } from "@/config/store";
+import { DAILY_GIFT_FREE_GEMS, GEM_PACKS, REAL_MONEY_PAYMENTS_ENABLED, SKIN_BUNDLES, STARTER_PACK } from "@/config/store";
 import { canPayWithRealMoney } from "@/config/ageGate";
 import type { TowerType } from "@/config/towerStats";
 import { addEssences, NO_ESSENCES } from "@/config/expeditions";
-import { dailyOffers, dailyShopFor, MOMENT_OFFERS, shopDay, VIP_DAILY_GEMS, vipGiftAvailable, type DailyOffer } from "@/config/shopOffers";
+import { dailyOffers, dailyShopFor, MOMENT_OFFERS, shopDay, VIP_DAILY_GEMS, VIP_DAYS, VIP_GEM_PRICE, vipGiftAvailable, type DailyOffer } from "@/config/shopOffers";
 
 /**
  * STORE — the Loja page's actions, read and written straight on the save
@@ -55,7 +55,7 @@ export function buyTowerSkin(skinId: string, currency: GemCurrency): StoreResult
   const save = loadSave();
   const def = getTowerSkinDefinition(skinId);
   const status = getSkinStatus(skinId, save);
-  if (!def || !status) return { ok: false, reason: "UNKNOWN" };
+  if (!def || !status || !isGemPurchasableSkin(def)) return { ok: false, reason: "UNKNOWN" };
   if (status.kind === "OWNED") return { ok: false, reason: "OWNED" };
   if (status.kind === "LOCKED") return { ok: false, reason: "LOCKED" };
   const cost = gemPriceForCurrency(getTowerSkinDualPrice(def), currency);
@@ -103,7 +103,7 @@ export function requestGemPackPurchase(
   packId: string,
   save: SaveData = loadSave(),
 ): { ok: false; reason: "PAYMENTS_NOT_ENABLED" | "UNKNOWN_PACK" | "AGE_VERIFICATION_REQUIRED" | "UNDER_AGE" } {
-  if (packId !== STARTER_PACK.id && packId !== "VIP" && !GEM_PACKS.some((p) => p.id === packId) && !MOMENT_OFFERS.some((o) => o.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
+  if (packId !== STARTER_PACK.id && packId !== "VIP" && !GEM_PACKS.some((p) => p.id === packId) && !MOMENT_OFFERS.some((o) => o.id === packId) && !SKIN_BUNDLES.some((b) => b.id === packId)) return { ok: false, reason: "UNKNOWN_PACK" };
   if (!REAL_MONEY_PAYMENTS_ENABLED) return { ok: false, reason: "PAYMENTS_NOT_ENABLED" };
   // COMPRAS SÓ PARA MAIORES (config/ageGate.ts): a denied account never pays; an unverified one is
   // verified first, by the payment provider, as part of this same checkout.
@@ -154,12 +154,30 @@ export function buyDailyOffer(offerId: string, currency: GemCurrency, nowMs: num
 
 // ── VIP (config/shopOffers.ts) ─────────────────────────────────────────
 
-/** Collects today's VIP Gems. Only an active, paid VIP has any to collect. */
+/**
+ * Collects today's VIP Gems. Days paid with real money pay Purchased Gems
+ * (one of VipState.paidGifts each); days bought with Gems pay Free Gems — see
+ * VIP_GEM_PRICE's comment for why.
+ */
 export function claimVipGift(nowMs: number = Date.now()): SaveData | null {
   const save = loadSave();
   if (!vipGiftAvailable(save.vip, nowMs)) return null;
-  appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: save.playerId, source: "vip_daily", amount: VIP_DAILY_GEMS, currency: "PURCHASED" });
-  return updateSave({ purchasedGems: save.purchasedGems + VIP_DAILY_GEMS, vip: { ...save.vip, lastGiftDay: shopDay(nowMs) } });
+  const paid = (save.vip.paidGifts ?? 0) > 0;
+  appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: save.playerId, source: "vip_daily", amount: VIP_DAILY_GEMS, currency: paid ? "PURCHASED" : "FREE" });
+  const vip = { ...save.vip, lastGiftDay: shopDay(nowMs), paidGifts: Math.max(0, (save.vip.paidGifts ?? 0) - (paid ? 1 : 0)) };
+  return updateSave(paid ? { purchasedGems: save.purchasedGems + VIP_DAILY_GEMS, vip } : { freeGems: save.freeGems + VIP_DAILY_GEMS, vip });
+}
+
+/**
+ * Buys (or extends) VIP_DAYS of VIP with Purchased Gems — the Gems a player
+ * earns selling items in trades. Never with Free Gems. Adds no paid gifts.
+ */
+export function buyVipWithGems(nowMs: number = Date.now()): { ok: true; save: SaveData } | { ok: false; reason: "INSUFFICIENT_GEMS" } {
+  const save = loadSave();
+  if (save.purchasedGems < VIP_GEM_PRICE) return { ok: false, reason: "INSUFFICIENT_GEMS" };
+  appendLedgerEvent({ eventType: "GEMS_SPENT", fromOwner: save.playerId, toOwner: null, source: "vip_gems", amount: VIP_GEM_PRICE, currency: "PURCHASED" });
+  const until = Math.max(nowMs, save.vip.until) + VIP_DAYS * 86_400_000;
+  return { ok: true, save: updateSave({ purchasedGems: save.purchasedGems - VIP_GEM_PRICE, vip: { ...save.vip, until } }) };
 }
 
 // ── EVOLUÇÃO DE SKIN (config/towerSkins.ts) ────────────────────────────

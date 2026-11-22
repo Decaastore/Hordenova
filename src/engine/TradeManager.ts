@@ -114,6 +114,12 @@ export function cancelTrade(session: TradeSession, now = Date.now()): TradeSessi
 }
 
 export type TradeFailureReason =
+  /** One of the two players can't trade yet (config/marketplace.ts tradeTierFor). */
+  | "TRADE_LOCKED"
+  /** This player already made as many sales this week (auction + trades) as their limit allows. */
+  | "WEEKLY_LIMIT"
+  /** The two sides aren't balanced the auction house's way (config/marketplace.ts checkTradeBalance). */
+  | "UNBALANCED"
   | "NOT_PENDING"
   | "NOT_CONFIRMED"
   | "ITEM_NOT_FOUND"

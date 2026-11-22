@@ -169,6 +169,17 @@ export function activeMomentOffer(state: MomentOfferState, nowMs: number): { off
 // ── VIP (real money) ───────────────────────────────────────────────────
 export const VIP_PRICE_BRL = 14.9;
 export const VIP_DAYS = 30;
+/**
+ * The VIP can also be bought with Purchased Gems — the Gems a player earns by
+ * selling items to paying players (config/marketplace.ts). Priced above the
+ * real-money price (~R$ 20 of Gems against R$ 14,90) so paying directly is
+ * always the better deal. Never with Free Gems.
+ *
+ * A VIP bought with Gems pays its daily gift in FREE Gems: only days paid
+ * with real money pay Purchased Gems (VipState.paidGifts). Otherwise 400
+ * Gems would buy 30 x 20 = 600 Purchased Gems back — an endless Gem machine.
+ */
+export const VIP_GEM_PRICE = 400;
 /** Purchased Gems collected each day the player enters the game while VIP. */
 export const VIP_DAILY_GEMS = 20;
 export const VIP_EXTRA_SCOUT_GROUPS = 1;
@@ -178,10 +189,12 @@ export interface VipState {
   until: number;
   /** Last UTC day the daily VIP Gems were collected. */
   lastGiftDay: number;
+  /** Daily gifts still to be paid in Purchased Gems — VIP_DAYS added by each real-money VIP purchase, none by a Gem purchase. */
+  paidGifts?: number;
 }
 
 export function createVipState(): VipState {
-  return { until: 0, lastGiftDay: -1 };
+  return { until: 0, lastGiftDay: -1, paidGifts: 0 };
 }
 
 export function sanitizeVipState(raw: unknown): VipState {
@@ -190,6 +203,7 @@ export function sanitizeVipState(raw: unknown): VipState {
   return {
     until: typeof r.until === "number" && Number.isFinite(r.until) ? Math.max(0, r.until) : 0,
     lastGiftDay: typeof r.lastGiftDay === "number" && Number.isFinite(r.lastGiftDay) ? Math.floor(r.lastGiftDay) : -1,
+    paidGifts: typeof r.paidGifts === "number" && Number.isFinite(r.paidGifts) ? Math.max(0, Math.floor(r.paidGifts)) : 0,
   };
 }
 

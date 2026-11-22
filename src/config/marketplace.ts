@@ -1,5 +1,6 @@
 import type { Rarity } from "./rarity";
 import { isVipActive, type VipState } from "./shopOffers";
+import { PHASES } from "./phaseConfig";
 
 /**
  * MARKETPLACE / LEILÃO — economy grounding. Every number below was derived
@@ -34,7 +35,7 @@ export const AUCTION_MIN_BID_BY_RARITY: Record<Rarity, number> = {
  * fee on a 2000 Gems minimum bid), scaled per rarity tier.
  *
  * Paid in Purchased Gems only, like every Marketplace charge (see
- * hasMarketAccess below: the whole Marketplace is for VIP players).
+ * marketTierFor below).
  */
 export const AUCTION_LISTING_FEE_BY_RARITY: Record<Rarity, number> = {
   COMMON: 3,
@@ -90,30 +91,115 @@ export function getAuctionListingFee(rarity: Rarity): number {
 }
 
 /**
- * WHO CAN USE THE MARKETPLACE — only players with an active VIP (a real-money
- * subscription, config/shopOffers.ts). Listing, bidding and direct trades
- * all need it; when VIP lapses, auctions already running still finish, but
- * nothing new can be listed or bid on. Every Marketplace fee is paid in
- * Purchased Gems only. Together this keeps the item trade between paying
- * players, so a free account can't be used just to farm items and sell
- * them without ever putting anything into the game.
+ * THE AUCTION HOUSE (leilão) is for VIP players only — a real-money
+ * subscription (config/shopOffers.ts). Listing and bidding need it; when VIP
+ * lapses, running auctions still finish, but nothing new can be listed or
+ * bid on. Every fee is Purchased Gems only; each sale pays
+ * AUCTION_SALE_TAX_PERCENT; at most AUCTION_WEEKLY_LISTING_LIMIT listings per
+ * 7 days.
  */
 export function hasMarketAccess(vip: VipState, nowMs: number): boolean {
   return isVipActive(vip, nowMs);
 }
 
-/** Of every sale, this share is kept by the house (a Gem sink); the seller receives the rest, in Purchased Gems. */
 export const AUCTION_SALE_TAX_PERCENT = 10;
+export const AUCTION_WEEKLY_LISTING_LIMIT = 10;
 
-/** What the seller receives for a sale of `amount` Gems, after the sale tax (rounded in the house's favour). */
-export function auctionSellerProceeds(amount: number): number {
-  if (!Number.isFinite(amount) || amount <= 0) return 0;
-  return Math.max(0, Math.floor(amount) - Math.ceil((Math.floor(amount) * AUCTION_SALE_TAX_PERCENT) / 100));
+/**
+ * DIRECT TRADES (troca entre 2 pessoas) are open to everyone (owner's call,
+ * Nov 2026), so a free player can trade a good item to a paying player for
+ * Purchased Gems. Only Purchased Gems move in a trade — every one of them was
+ * bought with real money by somebody — and Free Gems never enter it.
+ *
+ * BALANCED WITH THE AUCTION HOUSE, so neither is a way around the other:
+ *  - the same price floor: Gems paid for items are at least those items'
+ *    auction minimum bid, and at most TRADE_MAX_OVER_FLOOR times it (no
+ *    hidden Gem gifts); an item-for-item swap must be within
+ *    TRADE_SWAP_MAX_RATIO of each other (no gifting a Mythic away);
+ *  - the same fee: whoever sells an item for Gems pays that item's auction
+ *    listing fee, out of the Gems received;
+ *  - the same tax for a VIP (10%) as in the auction; 20% for everyone else;
+ *  - one weekly cap shared by auction listings and Gem trades: 10 for a
+ *    VIP, 3 for everyone else;
+ *  - non-VIP players must have cleared phase FREE_TRADER_MIN_PHASE first
+ *    (keeps throwaway farm accounts out).
+ * The Gems received buy what Purchased Gems already buy (skins, offers,
+ * room) and the VIP itself (config/shopOffers.ts VIP_GEM_PRICE).
+ * Bundle-exclusive skins stay real-money only.
+ */
+export interface TradeTier {
+  /** Can trade at all. */
+  open: boolean;
+  vip: boolean;
+  /** Sales (auction listings + trades in which this player receives Gems) per rolling 7 days. */
+  weeklyLimit: number;
+  /** Share of the Gems received kept by the house. */
+  taxPercent: number;
 }
 
-/** New listings one account may open per rolling 7 days — caps item farming even for VIP accounts. */
-export const AUCTION_WEEKLY_LISTING_LIMIT = 10;
+export const FREE_TRADER_TAX_PERCENT = 20;
+export const FREE_TRADER_WEEKLY_SALES = 3;
+/** Non-VIP players must have cleared this phase (its last wave) in any Season. */
+export const FREE_TRADER_MIN_PHASE = 5;
+/** Gems paid for items may be at most this many times the items' auction floor. */
+export const TRADE_MAX_OVER_FLOOR = 10;
+/** In an item-for-item swap the richer side may be worth at most this many times the other (by auction floor). */
+export const TRADE_SWAP_MAX_RATIO = 2;
+
+export function freeTraderMinWave(): number {
+  return PHASES[FREE_TRADER_MIN_PHASE - 1]!.endWave;
+}
+
+export function tradeTierFor(player: { vip: VipState; bestWave: number }, nowMs: number): TradeTier {
+  if (isVipActive(player.vip, nowMs)) return { open: true, vip: true, weeklyLimit: AUCTION_WEEKLY_LISTING_LIMIT, taxPercent: AUCTION_SALE_TAX_PERCENT };
+  return { open: player.bestWave >= freeTraderMinWave(), vip: false, weeklyLimit: FREE_TRADER_WEEKLY_SALES, taxPercent: FREE_TRADER_TAX_PERCENT };
+}
+
+/** One side of a trade, valued the auction's way: the sum of its items' minimum bids, plus its Gems. */
+export interface TradeSideValue {
+  rarities: readonly Rarity[];
+  gems: number;
+}
+
+export type TradeBalance = { ok: true } | { ok: false; reason: "BELOW_FLOOR" | "ABOVE_CEILING" | "UNEVEN_SWAP" | "EMPTY" };
+
+function floorOf(rarities: readonly Rarity[]): number {
+  return rarities.reduce((sum, r) => sum + getAuctionMinBid(r), 0);
+}
+
+/** Whether a trade is balanced the same way the auction house is (see the block comment above). */
+export function checkTradeBalance(a: TradeSideValue, b: TradeSideValue): TradeBalance {
+  const aItems = floorOf(a.rarities), bItems = floorOf(b.rarities);
+  if (aItems === 0 && bItems === 0) return { ok: false, reason: "EMPTY" };
+  // items one way, Gems (and maybe items) the other: Gems must cover the price gap within floor..ceiling
+  for (const [seller, buyer] of [[a, b], [b, a]] as const) {
+    const sold = floorOf(seller.rarities) - floorOf(buyer.rarities);
+    if (buyer.gems > 0) {
+      if (sold <= 0) return { ok: false, reason: "ABOVE_CEILING" };
+      if (buyer.gems < sold) return { ok: false, reason: "BELOW_FLOOR" };
+      if (buyer.gems > sold * TRADE_MAX_OVER_FLOOR) return { ok: false, reason: "ABOVE_CEILING" };
+    }
+  }
+  if (a.gems === 0 && b.gems === 0) {
+    if (aItems === 0 || bItems === 0) return { ok: false, reason: "UNEVEN_SWAP" };
+    if (Math.max(aItems, bItems) > Math.min(aItems, bItems) * TRADE_SWAP_MAX_RATIO) return { ok: false, reason: "UNEVEN_SWAP" };
+  }
+  return { ok: true };
+}
+
+/** What a seller receives for `amount` Gems after `taxPercent` (rounded in the house's favour). */
+export function auctionSellerProceeds(amount: number, taxPercent: number = AUCTION_SALE_TAX_PERCENT): number {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  const whole = Math.floor(amount);
+  return Math.max(0, whole - Math.ceil((whole * taxPercent) / 100));
+}
+
 export const AUCTION_LISTING_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** How many of these timestamps fall in the last 7 days. */
+export function salesThisWeek(timestamps: readonly number[], nowMs: number): number {
+  return timestamps.filter((t) => nowMs - t < AUCTION_LISTING_WINDOW_MS).length;
+}
 
 /** Listings this seller opened in the last 7 days (cancelled ones count too — the slot was used). */
 export function listingsThisWeek(listings: readonly { sellerId: string; createdAt: number }[], sellerId: string, nowMs: number): number {

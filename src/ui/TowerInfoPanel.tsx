@@ -1,3 +1,4 @@
+import { bundleForSkin } from "@/config/store";
 import { Tower3DPortrait } from "./Tower3DPortrait";
 import { ELEMENT_COLOR, FUSION_COLORS, FUSION_CRIT_SHARE, FUSION_DAMAGE_MULT, FUSION_MIN_LEVEL, getFusionId, type FusionPayment } from "@/config/towerFusion";
 import { getManaUpgradeCost, MANA_MAX, MANA_OVERCHARGE_MAX, MANA_UPGRADE_GAIN_PER_LEVEL, MANA_UPGRADE_MAX_LEVEL, manaGainMultiplier, SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
@@ -29,7 +30,7 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, isPaidTowerSkin, SKIN_REWARD_BONUS_PER_TYPE, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
+import { getPackSkinsForTower, getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, isPaidTowerSkin, SKIN_REWARD_BONUS_PER_TYPE, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
@@ -1032,7 +1033,8 @@ function SkinSection({
   // PRESTIGE_TOWER_SKINS doc comment) only ever join the list once actually
   // owned (granted at Prestige level 50), so an unreached one never shows up
   // as a permanently-locked commercial card.
-  const skins = [...getSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
+  // PACOTES — bundle-exclusive skins always show (with their preview), but only a Store bundle grants them.
+  const skins = [...getSkinsForTower(tower.type), ...getPackSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
   const [previewSkinId, setPreviewSkinId] = useState<string | null>(tower.equippedSkinId);
   const [previewLevel, setPreviewLevel] = useState<number>(() => nearestPreviewLevel(tower.level));
   if (skins.length === 0) return null;
@@ -1149,6 +1151,15 @@ function SkinSection({
                 {t("towerInfo.skinEquipAction")}
               </button>
             );
+          } else if (skin.tier === "PACK") {
+            const bundle = bundleForSkin(skin.id);
+            badge = { text: t("towerInfo.skinPackOnly"), tone: "locked" };
+            action = bundle ? (
+              <span style={{ fontSize: 9, color: PALETTE.gold, fontWeight: 700, textAlign: "right", lineHeight: 1.25 }}>
+                {t(`store.bundles.${bundle.id}.name` as TranslationKey)}
+                <span style={{ display: "block", color: PALETTE.uiTextDim, fontWeight: 600 }}>{formatBrl(bundle.priceBrl)}</span>
+              </span>
+            ) : null;
           } else {
             badge = { text: t("towerInfo.skinLocked"), tone: "locked" };
             action = reachedLevel ? (
@@ -1183,6 +1194,11 @@ function SkinSection({
       </div>
     </>
   );
+}
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+function formatBrl(v: number): string {
+  return BRL.format(v);
 }
 
 /** Nearest scrubber checkpoint at or below `level`, so opening the panel previews a level the player has actually reached rather than always jumping to L1. */

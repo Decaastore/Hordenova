@@ -23,6 +23,7 @@ import {
   getAuctionMinBid,
   hasMarketAccess,
   listingsThisWeek,
+  salesThisWeek,
   getMinimumNextBid,
   isDemoBidder,
   type AuctionDurationHours,
@@ -214,7 +215,7 @@ export function createAuctionListingForItem(
   const now = Date.now();
   if (!marketOpenFor(save, now)) return { ok: false, reason: "VIP_REQUIRED" };
   if (currency !== "PURCHASED") return { ok: false, reason: "PURCHASED_GEMS_ONLY" };
-  if (listingsThisWeek(save.auctionListings, save.playerId, now) >= AUCTION_WEEKLY_LISTING_LIMIT) return { ok: false, reason: "WEEKLY_LIMIT" };
+  if (listingsThisWeek(save.auctionListings, save.playerId, now) + salesThisWeek(save.gemTradeLog, now) >= AUCTION_WEEKLY_LISTING_LIMIT) return { ok: false, reason: "WEEKLY_LIMIT" };
   const item = findItem(save.inventory, instanceId);
   if (!item || !canListItemForAuction(item, save.playerId, isItemEquippedAnywhere(save.towerLoadout, instanceId))) {
     return { ok: false, reason: "NOT_ELIGIBLE" };

@@ -16,6 +16,12 @@ export interface TowerModel {
 }
 
 export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED: string | null = null): TowerModel {
+  // PACOTES (config/towerSkins.ts PACK_TOWER_SKINS): a bundle-exclusive skin is
+  // built on one of its tower's premium structures (SKIN below), coloured by
+  // its own look (LOOK), with its own mark on top (packFlourish at the end).
+  const LOOK = SKIN;
+  const PACK = PACK_LOOKS[SKIN] ?? null;
+  if (PACK) SKIN = PACK.shape;
   // ---------------------------------------------------------------------------
   function rng(seed: number) {
     let a = seed;
@@ -288,6 +294,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     FROSTBORN_OBSIDIAN: { plinth: ["#1e1e24", "#0c0c10", "#040406"], obelisk: ["#24242c", "#101014", "#060608"], cap: ["#2c2c36", "#141418", "#08080a"], flag: ["#26262e", "#121216", "#060608"], rune: "#ff5a6a", trim: "#8a8a96", iron: "#141418", snow: "#c8ccd8", frost: 0.6, ice: ["#ff8a9a", "#ff2a4a"], ice2: ["#c04a5a", "#a01a2a"], orb: ["#ffa0aa", "#ff3a50"] },
     FROSTBORN_GLADIATOR: { plinth: ["#7a4a2e", "#3e2414", "#1e1008"], obelisk: ["#8a5232", "#462816", "#22120a"], cap: ["#d89a3a", "#7a5218", "#3a240a"], flag: ["#8a1a1a", "#4a0c0c", "#220606"], rune: "#ff6a3a", trim: "#d89a3a", iron: "#3a2a1e", snow: "#f0e0d0", frost: 0.35, ice: ["#ffb08a", "#ff5a2a"], ice2: ["#ff8a5a", "#c8301a"], orb: ["#ffc09a", "#ff4a1a"] },
     FROSTBORN_CHAMPION: { plinth: ["#e8e0cc", "#8a826e", "#3e3a30"], obelisk: ["#f0e8d4", "#968c76", "#46402e"], cap: ["#ffd060", "#9a7418", "#4a3608"], flag: ["#1a1a22", "#0c0c10", "#060608"], rune: "#ffe08a", trim: "#ffd060", iron: "#2a2620", snow: "#fffaf0", frost: 0.7, ice: ["#fff0b0", "#ffc83a"], ice2: ["#ffe08a", "#d8a020"], orb: ["#fff4c0", "#ffcc3a"] },
+    FROSTBORN_PACK_WINTER_CROWN: { plinth: ["#c8d0dc", "#7a8496", "#3a4250"], obelisk: ["#dce4f0", "#8a96aa", "#424c5c"], cap: ["#3a5aa8", "#1a2e64", "#0a1430"], flag: ["#2a4a9a", "#142a5a", "#08142e"], rune: "#6a9aff", trim: "#e8eef8", iron: "#5a6478", snow: "#ffffff", frost: 1.1, ice: ["#c8dcff", "#4a7aff"], ice2: ["#9ab8ff", "#2a5ae8"], orb: ["#d8e6ff", "#5a8aff"] },
+    FROSTBORN_PACK_ECLIPSE: { plinth: ["#1c1a22", "#0a090e", "#040306"], obelisk: ["#22202a", "#0e0c12", "#060508"], cap: ["#d8a838", "#7a5812", "#3a2806"], flag: ["#1a181e", "#0c0a10", "#040306"], rune: "#ffc848", trim: "#ffc848", iron: "#16141a", snow: "#3a3428", frost: 0, ice: ["#ffe08a", "#ffb020"], ice2: ["#2a2430", "#120e18"], orb: ["#fff0b0", "#ffb020"] },
     FROSTBORN_LEGEND: { plinth: ["#1e1a20", "#0c0a0e", "#040306"], obelisk: ["#241e26", "#100c12", "#060408"], cap: ["#ffc040", "#8a5a10", "#3a2406"], flag: ["#6a0e1e", "#3a0610", "#1a0208"], rune: "#ff4a6a", trim: "#ffc040", iron: "#141016", snow: "#ffd8e0", frost: 0.5, ice: ["#ff8aa8", "#ff2a5a"], ice2: ["#ffc040", "#c8801a"], orb: ["#ffb0c0", "#ff2a5a"] },
   };
 
@@ -438,6 +446,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     IRONWOOD_FROSTPINE: { bark: ["#4a5a66", "#1a2228"], vein: "#8ae8ff", mound: ["#c8d8e4", "#6a7a88"], iron: "#5a6a78", bronze: "#a8c0d0", wood: ["#5a6a74", "#2a343c"], moss: "#e8f4fc", cloak: ["#2a3a4a", "#3a4e60"], leaf: "#2a5a5a" },
     IRONWOOD_GLADIATOR: { bark: ["#6a3a1e", "#22100a"], vein: "#ff4a2a", mound: ["#5a3a24", "#1e120a"], iron: "#3a2e26", bronze: "#d89a3a", wood: ["#7a4424", "#3a1a0c"], moss: "#8a2a1a", cloak: ["#7a1414", "#9a1e1e"], leaf: "#b8301e" },
     IRONWOOD_CHAMPION: { bark: ["#e8e0cc", "#7a7060"], vein: "#ffd84a", mound: ["#2a2420", "#0e0c0a"], iron: "#1e1c1e", bronze: "#ffd060", wood: ["#f0e8d4", "#9a8e74"], moss: "#c8a040", cloak: ["#1a1a22", "#2a2a36"], leaf: "#e8c050" },
+    IRONWOOD_PACK_EMERALD_SENTINEL: { bark: ["#3a5a3e", "#122014"], vein: "#6affa0", mound: ["#2a3a2a", "#0e160e"], iron: "#2a3a2e", bronze: "#e8c050", wood: ["#2e4a32", "#142418"], moss: "#3a8a4a", cloak: ["#1a3a22", "#e8c050"], leaf: "#2aa860" },
+    IRONWOOD_PACK_ECLIPSE: { bark: ["#1a181e", "#060508"], vein: "#ffc848", mound: ["#16141a", "#060508"], iron: "#141218", bronze: "#ffc848", wood: ["#201c24", "#0a080c"], moss: "#3a2e14", cloak: ["#0e0c10", "#2a2010"], leaf: "#8a6a1a" },
     IRONWOOD_LEGEND: { bark: ["#1a1418", "#060406"], vein: "#ff3a5a", mound: ["#1e1a1e", "#08060a"], iron: "#141016", bronze: "#ffc040", wood: ["#241c22", "#0c080c"], moss: "#5a0a1a", cloak: ["#4a0a14", "#6a0e1e"], leaf: "#8a1028" },
   };
 
@@ -583,6 +593,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   interface InfLook { iron: string; dark: string; brass: string; brick: Tri; fire: string; lavaBrick?: boolean }
   const INF_LOOKS: Record<string, InfLook> = {
     base: { iron: "#3a3634", dark: "#24201e", brass: "#8a6a34", brick: ["#6a3a28", "#3a1c12", "#1a0c08"], fire: "#ff7a2a" },
+    INFERNO_PACK_EMBERHEART: { iron: "#3a1410", dark: "#160806", brass: "#ffb23a", brick: ["#5a1a14", "#2a0a08", "#120404"], fire: "#ffb23a", lavaBrick: true },
+    INFERNO_PACK_SOVEREIGN: { iron: "#c8a850", dark: "#6a5020", brass: "#ffe6a0", brick: ["#f2ead8", "#c0b090", "#7a6a48"], fire: "#ff4a5a" },
     INFERNO_ASHEN_TYRANT: { iron: "#2a1a1c", dark: "#120a0c", brass: "#5a1a1a", brick: ["#3a1a1a", "#1a0a0a", "#0a0404"], fire: "#ff2e2e", lavaBrick: true },
     INFERNO_VOLCANIC_COLOSSUS: { iron: "#3a2e28", dark: "#1c1410", brass: "#4a3428", brick: ["#4a3a30", "#1c1410", "#0e0806"], fire: "#ff8a3a", lavaBrick: true },
     INFERNO_INDUSTRIAL_FORGE: { iron: "#5a5e62", dark: "#2a2c2e", brass: "#b07a40", brick: ["#5a5450", "#2e2a28", "#141210"], fire: "#9ad8ff" },
@@ -709,6 +721,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   interface StormLook { dais: Tri; pillar: Tri; rod: string; band: string; glow: string; orb: [string, string] }
   const STORM_LOOKS: Record<string, StormLook> = {
     base: { dais: ["#6a6470", "#34303c", "#18161c"], pillar: ["#76707e", "#3e3a46", "#1c1a20"], rod: "#b06a3a", band: "#2c2a34", glow: "#a050ff", orb: ["#8a5ad0", "#5a20c0"] },
+    STORMCALLER_PACK_CRIMSON_STORM: { dais: ["#4a1a1e", "#1e080a", "#0c0304"], pillar: ["#5a1e24", "#240a0e", "#100406"], rod: "#c8c0c4", band: "#240a0e", glow: "#ff3a4a", orb: ["#ff8a94", "#ff1a2e"] },
+    STORMCALLER_PACK_SOVEREIGN: { dais: ["#f2ead8", "#c0b090", "#7a6a48"], pillar: ["#f6f0e2", "#c8b898", "#8a7a58"], rod: "#e8c870", band: "#b01a2a", glow: "#ffe2a0", orb: ["#fff4d0", "#ff4a5a"] },
     STORMCALLER_VOID: { dais: ["#2a2430", "#100c14", "#060408"], pillar: ["#2e2836", "#120e16", "#08060a"], rod: "#2a2234", band: "#120e18", glow: "#5a1fff", orb: ["#1a0a30", "#4a10ff"] },
     STORMCALLER_THUNDER: { dais: ["#4a5a6a", "#1c2834", "#0c141a"], pillar: ["#3a5068", "#182838", "#0a141c"], rod: "#8a96a2", band: "#1c2a3a", glow: "#4ac8ff", orb: ["#6ac0f0", "#1a8aff"] },
     STORMCALLER_CELESTIAL: { dais: ["#ece6d6", "#b4a888", "#7a6e54"], pillar: ["#f4eee0", "#c4b898", "#8a7e60"], rod: "#e8c870", band: "#c8a050", glow: "#ffe9a0", orb: ["#fff4c8", "#ffd060"] },
@@ -1274,7 +1288,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
 
   function buildFrostborn() {
     const s = STAGE;
-    const L = FROST_LOOKS[SKIN] ?? FROST_LOOKS.base!;
+    const L = FROST_LOOKS[LOOK] ?? FROST_LOOKS[SKIN] ?? FROST_LOOKS.base!;
     const plinthStone = stoneTex(11, L.plinth[0], L.plinth[1], L.plinth[2], 4, 6, { frost: 0.6 * L.frost });
     const obeliskStone = stoneTex(23, L.obelisk[0], L.obelisk[1], L.obelisk[2], 9, 3, { frost: 0.35 * L.frost, runes: L.rune, runeRows: s >= 3 ? [2, 6] : [] });
     const capStone = stoneTex(31, L.cap[0], L.cap[1], L.cap[2], 2, 4, { frost: L.frost });
@@ -2008,7 +2022,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
 
   function buildIronwood() {
     const s = STAGE;
-    const L = IRON_LOOKS[SKIN] ?? IRON_LOOKS.base!;
+    const L = IRON_LOOKS[LOOK] ?? IRON_LOOKS[SKIN] ?? IRON_LOOKS.base!;
     const own = ironSkinBody(L, s);
     if (own) {
       buildBallista(own, s);
@@ -2885,7 +2899,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
 
   function buildInferno() {
     const s = STAGE;
-    const L = INF_LOOKS[SKIN] ?? INF_LOOKS.base!;
+    const L = INF_LOOKS[LOOK] ?? INF_LOOKS[SKIN] ?? INF_LOOKS.base!;
     const iron = metalTex(71, L.iron, { rivets: true });
     const darkIron = metalTex(73, L.dark, { rivets: true });
     const brass = metalTex(75, L.brass, { rivets: true });
@@ -3461,7 +3475,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
 
   function buildStormcallerCoil() {
     const s = STAGE;
-    const L = STORM_LOOKS[SKIN] ?? STORM_LOOKS.base!;
+    const L = STORM_LOOKS[LOOK] ?? STORM_LOOKS[SKIN] ?? STORM_LOOKS.base!;
     const daisStone = stoneTex(81, L.dais[0], L.dais[1], L.dais[2], 3, 8);
     const flag = flagTex(85, L.dais[0], L.dais[1], L.dais[2]);
     const copper = metalTex(87, L.rod, { rivets: false });
@@ -3642,11 +3656,88 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   // ---------------------------------------------------------------------------
+  // PACOTES — the mark every bundle-exclusive skin carries: a gilded ring set
+  // with gems round its foot, and its own crest above (crown, banners, orbit,
+  // eclipse or wings) in the skin's colours.
+  // ---------------------------------------------------------------------------
+  function packFlourish(P: PackLook) {
+    PARENT = root;
+    const box = new THREE.Box3().setFromObject(root);
+    const top = Math.max(14, box.max.y);
+    const glowM = (c: string, ei = 2.2) => plainMat(c, { emissive: c, ei, rough: 0.3 });
+    const gold = plainMat(P.metal, { metal: 0.85, rough: 0.28 });
+    const ring = mesh(new THREE.TorusGeometry(15.8, 0.55, 10, 64), gold, 0, 0.8, 0);
+    ring.rotation.x = Math.PI / 2;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      mesh(new THREE.OctahedronGeometry(0.85, 0), glowM(P.gem, 2.6), Math.cos(a) * 15.8, 1.5, Math.sin(a) * 15.8);
+    }
+    const y = top + 4;
+    if (P.crest === "crown") {
+      const band = mesh(new THREE.CylinderGeometry(4.6, 4.2, 1.6, 24, 1, true), gold, 0, y, 0);
+      (band.material as THREE.Material).side = THREE.DoubleSide;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        mesh(new THREE.ConeGeometry(0.75, 3.2, 6), gold, Math.cos(a) * 4.4, y + 2.2, Math.sin(a) * 4.4);
+        mesh(new THREE.SphereGeometry(0.55, 10, 8), glowM(P.gem, 2.8), Math.cos(a) * 4.4, y + 4, Math.sin(a) * 4.4);
+      }
+    } else if (P.crest === "banners") {
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const x = Math.cos(a) * 14.5, z = Math.sin(a) * 14.5;
+        mesh(new THREE.CylinderGeometry(0.28, 0.32, 15, 8), gold, x, 7.5, z);
+        mesh(new THREE.SphereGeometry(0.6, 10, 8), glowM(P.gem, 2.6), x, 15.3, z);
+        const flag = mesh(new THREE.PlaneGeometry(4.2, 6.2), plainMat(P.cloth, { rough: 0.85 }), x + Math.cos(a + Math.PI / 2) * 2.2, 11.6, z + Math.sin(a + Math.PI / 2) * 2.2);
+        flag.rotation.y = -a;
+        (flag.material as THREE.Material).side = THREE.DoubleSide;
+        const trim = mesh(new THREE.PlaneGeometry(4.2, 0.6), gold, x + Math.cos(a + Math.PI / 2) * 2.2, 8.4, z + Math.sin(a + Math.PI / 2) * 2.2);
+        trim.rotation.y = -a;
+        (trim.material as THREE.Material).side = THREE.DoubleSide;
+      }
+    } else if (P.crest === "orbit") {
+      const t1 = mesh(new THREE.TorusGeometry(7, 0.22, 8, 60), glowM(P.gem, 1.8), 0, y - 1, 0);
+      t1.rotation.set(Math.PI / 2.4, 0, 0.3);
+      const t2 = mesh(new THREE.TorusGeometry(7, 0.22, 8, 60), glowM(P.gem, 1.8), 0, y - 1, 0);
+      t2.rotation.set(Math.PI / 1.7, 0.6, -0.3);
+      for (let i = 0; i < 3; i++) {
+        const a = (i / 3) * Math.PI * 2;
+        mesh(new THREE.SphereGeometry(1, 14, 10), glowM(P.gem, 3), Math.cos(a) * 7, y - 1 + Math.sin(a * 2) * 2.2, Math.sin(a) * 7);
+      }
+    } else if (P.crest === "eclipse") {
+      const disc = mesh(new THREE.SphereGeometry(3.2, 24, 18), plainMat("#050407", { rough: 0.2, metal: 0.3 }), 0, y + 1.5, 0);
+      void disc;
+      const corona = mesh(new THREE.TorusGeometry(4.1, 0.5, 10, 60), glowM(P.gem, 3), 0, y + 1.5, 0);
+      corona.rotation.x = Math.PI / 2.2;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const ray = mesh(new THREE.ConeGeometry(0.3, 2.6, 5), glowM(P.gem, 2.4), Math.cos(a) * 5.4, y + 1.5, Math.sin(a) * 5.4 * 0.4);
+        ray.rotation.z = a - Math.PI / 2;
+      }
+    } else {
+      // wings: two fans of gilded feathers behind the crest, and a small crown between them
+      for (const side of [-1, 1]) {
+        for (let k = 0; k < 6; k++) {
+          const f = mesh(new THREE.BoxGeometry(0.5, 7 - k * 0.6, 1.4), k % 2 ? gold : plainMat(P.cloth, { rough: 0.5, metal: 0.2, emissive: P.gem, ei: 0.15 }), side * (2.4 + k * 1.3), y - 2 + k * 0.5, -3.5);
+          f.rotation.z = side * (0.35 + k * 0.17);
+        }
+      }
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2;
+        mesh(new THREE.ConeGeometry(0.5, 2.2, 6), gold, Math.cos(a) * 2.4, y + 2, Math.sin(a) * 2.4);
+      }
+      mesh(new THREE.TorusGeometry(2.4, 0.35, 8, 30), gold, 0, y + 0.9, 0).rotation.x = Math.PI / 2;
+      mesh(new THREE.OctahedronGeometry(0.9, 0), glowM(P.gem, 3), 0, y + 2.4, 0);
+    }
+    pointLights.push({ pos: new THREE.Vector3(0, y, 3), color: P.gem, intensity: 160, dist: 30 });
+  }
+
+  // ---------------------------------------------------------------------------
   if (TYPE === "FROSTBORN") buildFrostborn();
   else if (TYPE === "IRONWOOD") buildIronwood();
   else if (TYPE === "INFERNO") buildInferno();
   else if (TYPE === "STORMCALLER") buildStormcaller();
   if (FUSED && FUSED !== TYPE) buildFusionCore(FUSED);
+  if (PACK) packFlourish(PACK);
   if (TURRET_PIVOT_Y) {
     for (const ch of turret.children) ch.position.y -= TURRET_PIVOT_Y;
     turret.position.y = TURRET_PIVOT_Y;
@@ -3654,3 +3745,24 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
   return { root, turret, anchors, turretAnchors, pointLights, turretMode: TURRET_MODE, turretPivotY: TURRET_PIVOT_Y, turretTilt: TURRET_TILT };
 }
+
+/** PACOTES — how each bundle-exclusive skin is built (see config/towerSkins.ts PACK_TOWER_SKINS). */
+interface PackLook {
+  /** The premium skin of the same tower whose structure it reuses. */
+  shape: string;
+  crest: "crown" | "banners" | "orbit" | "eclipse" | "wings";
+  metal: string;
+  gem: string;
+  cloth: string;
+}
+
+const PACK_LOOKS: Record<string, PackLook> = {
+  INFERNO_PACK_EMBERHEART: { shape: "INFERNO_VOLCANIC_COLOSSUS", crest: "crown", metal: "#d8a040", gem: "#ff7a2a", cloth: "#5a1a14" },
+  FROSTBORN_PACK_WINTER_CROWN: { shape: "FROSTBORN_GLACIAL_WARLORD", crest: "crown", metal: "#e8eef8", gem: "#5a8aff", cloth: "#2a4a9a" },
+  IRONWOOD_PACK_EMERALD_SENTINEL: { shape: "IRONWOOD_ANCIENT_HUNTER", crest: "banners", metal: "#e8c050", gem: "#4affa0", cloth: "#1e5a32" },
+  STORMCALLER_PACK_CRIMSON_STORM: { shape: "STORMCALLER_THUNDER", crest: "orbit", metal: "#c8c0c4", gem: "#ff3a4a", cloth: "#4a1a1e" },
+  IRONWOOD_PACK_ECLIPSE: { shape: "IRONWOOD_WARDEN_OF_THE_ABYSS", crest: "eclipse", metal: "#d8a838", gem: "#ffc848", cloth: "#141218" },
+  FROSTBORN_PACK_ECLIPSE: { shape: "FROSTBORN_ARCANE_CRYSTAL", crest: "eclipse", metal: "#d8a838", gem: "#ffc848", cloth: "#141218" },
+  INFERNO_PACK_SOVEREIGN: { shape: "INFERNO_SOLAR_ASCENDANT", crest: "wings", metal: "#ffd878", gem: "#ff3a4a", cloth: "#f2ead8" },
+  STORMCALLER_PACK_SOVEREIGN: { shape: "STORMCALLER_CELESTIAL", crest: "wings", metal: "#ffd878", gem: "#ff3a4a", cloth: "#f2ead8" },
+};

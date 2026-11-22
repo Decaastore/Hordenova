@@ -152,7 +152,7 @@ export const NO_GAMEPLAY_EFFECT: SkinGameplayEffect = {};
  * price points (see TOWER_SKIN_TIER_PRICES). Purely a pricing classification
  * — never read by combat code, never affects catalog/ownership/equip logic.
  */
-export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE" | "DUEL";
+export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE" | "DUEL" | "PACK";
 
 /**
  * The three approved commercial price points, in Gems, plus PRESTIGE (0 —
@@ -167,6 +167,8 @@ export const TOWER_SKIN_TIER_PRICES: Record<TowerSkinTier, number> = {
   PRESTIGE: 0,
   /** Bought with Duel Coins only (config/duel.ts DUEL_SHOP), never with Gems. */
   DUEL: 0,
+  /** Only inside a Store bundle bought with real money (config/store.ts SKIN_BUNDLES), never with Gems. */
+  PACK: 0,
 };
 
 /**
@@ -197,6 +199,11 @@ export const SKIN_REWARD_BONUS_PER_TYPE = 0.05;
  * colours (rendering/skinEvolution.ts). Purely visual, permanent.
  */
 export const SKIN_EVOLUTION_PRICE: DualGemPrice = dualGemPrice(400);
+
+/** Only the commercial tiers are sold for Gems; Prestige, Duel and bundle skins (price 0 here) never are. */
+export function isGemPurchasableSkin(def: Pick<TowerSkinDefinition, "tier">): boolean {
+  return def.tier === "ENTRY" || def.tier === "INTERMEDIATE" || def.tier === "PREMIUM";
+}
 
 export function canEvolveSkin(def: Pick<TowerSkinDefinition, "tier">): boolean {
   return def.tier === "PREMIUM";
@@ -1161,7 +1168,30 @@ export const DUEL_TOWER_SKINS: readonly TowerSkinDefinition[] = [
   },
 ];
 
-const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS].map((s) => [s.id, s]));
+/**
+ * PACOTES — tower skins that only come inside a Store bundle bought with
+ * real money (config/store.ts SKIN_BUNDLES). Never sold for Gems, never in
+ * the daily shop or the Season Pass. Each one is built on one of its tower's
+ * premium structures, in its own colours, with a mark of its own on top
+ * (`packFlourish`, drawn by battlefield3d/models/towerModel.ts). Like every
+ * paid skin, a small trade-off effect and the +5% Gold/shards bonus.
+ */
+function packSkin(id: string, towerType: TowerType, palette: TowerSkinPaletteOverride, material: SkinMaterialFinish, particle: SkinParticleStyle, projectileStyle: string, gameplayEffect: SkinGameplayEffect): TowerSkinDefinition {
+  return { id, towerType, i18nKey: id, paletteOverride: palette, unlockLevel: 1, tier: "PACK", gemCost: 0, material, coreShape: "", weaponDetail: "", particleStyle: particle, projectileStyle, cosmeticAttribute: { i18nKey: id }, gameplayEffect };
+}
+
+export const PACK_TOWER_SKINS: readonly TowerSkinDefinition[] = [
+  packSkin("INFERNO_PACK_EMBERHEART", "INFERNO", { primary: "#5a1a14", secondary: "#1a0606", accent: "#ffb23a", glow: "rgba(255,120,40,0.65)" }, "molten", { color: "#ffb23a", behavior: "embers" }, "magma-orb", { burnDamageMult: 1.05, attackSpeedMult: 0.97 }),
+  packSkin("FROSTBORN_PACK_WINTER_CROWN", "FROSTBORN", { primary: "#c8d4e4", secondary: "#2a3a5a", accent: "#4a7aff", glow: "rgba(90,140,255,0.6)" }, "glacial", { color: "#bcd4ff", behavior: "frost-shards" }, "glacial-bolt", { slowPercentAdd: 0.05, damageMult: 0.97 }),
+  packSkin("IRONWOOD_PACK_EMERALD_SENTINEL", "IRONWOOD", { primary: "#2a4a2e", secondary: "#0e1a10", accent: "#e8c050", glow: "rgba(80,230,140,0.55)" }, "natural", { color: "#6affa0", behavior: "drifting-leaves" }, "jade-bolt", { rangeMult: 1.05, attackSpeedMult: 0.97 }),
+  packSkin("STORMCALLER_PACK_CRIMSON_STORM", "STORMCALLER", { primary: "#3a1014", secondary: "#14060a", accent: "#ff3a4a", glow: "rgba(255,58,74,0.6)" }, "tempest", { color: "#ff5a6a", behavior: "sparks" }, "thunder-bolt", { damageMult: 1.06, rangeMult: 0.96 }),
+  packSkin("IRONWOOD_PACK_ECLIPSE", "IRONWOOD", { primary: "#141218", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "void-wisps" }, "void-bolt", { critChanceAdd: 0.05, damageMult: 0.97 }),
+  packSkin("FROSTBORN_PACK_ECLIPSE", "FROSTBORN", { primary: "#16141c", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "void-wisps" }, "black-frost-bolt", { freezeChanceAdd: 0.04, attackSpeedMult: 0.97 }),
+  packSkin("INFERNO_PACK_SOVEREIGN", "INFERNO", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "solar-flares" }, "solar-orb", { aoeRadiusMult: 1.05, burnDamageMult: 0.97 }),
+  packSkin("STORMCALLER_PACK_SOVEREIGN", "STORMCALLER", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "light-motes" }, "divine-bolt", { chainFalloffAdd: -0.04, damageMult: 0.97 }),
+];
+
+const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS, ...PACK_TOWER_SKINS].map((s) => [s.id, s]));
 
 export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
   return SKINS_BY_ID.get(id) ?? null;
@@ -1169,6 +1199,11 @@ export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
 
 export function getSkinsForTower(type: TowerType): readonly TowerSkinDefinition[] {
   return TOWER_SKINS.filter((s) => s.towerType === type);
+}
+
+/** Bundle-exclusive skins for this tower type (config/store.ts SKIN_BUNDLES). */
+export function getPackSkinsForTower(type: TowerType): readonly TowerSkinDefinition[] {
+  return PACK_TOWER_SKINS.filter((s) => s.towerType === type);
 }
 
 /** Prestige-exclusive skins for this tower type — never purchasable, only ever granted (see PRESTIGE_TOWER_SKINS's own doc comment). */
