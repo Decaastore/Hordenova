@@ -16,7 +16,7 @@ import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { SCENE_DURATION_MS, SHOWCASE_PHASE_IDS, showcasePhase } from "@/rendering/homeDiorama";
 import { buildProfileFromSave, countOwnedSkins, TOTAL_TOWER_SKINS } from "@/profile/playerProfile";
 import { HomeDiorama } from "./HomeDiorama";
@@ -289,7 +289,6 @@ function formatDate(iso: string, language: string): string {
 const STAGE_LEVELS = [1, 11, 21, 31, 41, 51, 60];
 const PREVIEW_W = 260;
 const PREVIEW_H = 290;
-const PREVIEW_ZOOM = 2.5;
 
 /** One tower column: the real tower art (climbing through its upgrade stages on hover), name, role, description. */
 function TowerShowcase({ type }: { type: TowerType }) {
@@ -321,7 +320,7 @@ function TowerShowcase({ type }: { type: TowerType }) {
       }}
     >
       <div className="hn-tower-stage">
-        <TowerPortrait type={type} level={level} width={PREVIEW_W} height={PREVIEW_H} zoom={PREVIEW_ZOOM} baseY={0.64} />
+        <Tower3DPortrait type={type} level={level} width={PREVIEW_W} height={PREVIEW_H} />
         <span className="hn-tower-level">{t("menu.towerLevel", { level })}</span>
       </div>
       <h3>{t(`towers.${type}.name` as TranslationKey)}</h3>

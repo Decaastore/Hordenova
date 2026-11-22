@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { TowerPortrait } from "./TowerPortrait";
+import { Tower3DPortrait } from "./Tower3DPortrait";
 import { ColossusShowcase } from "./ColossusPromo";
 
 /**
@@ -61,11 +61,11 @@ function Art({ card }: { card: GameModeCard }): ReactNode {
           <div className="gm-ground" style={{ backgroundImage: `url(${assetBase}sprites/duel/volcanic_wastes.webp)` }} />
           <div className="gm-duel">
             <div className="gm-tower is-left">
-              <TowerPortrait type="IRONWOOD" level={41} width={150} height={150} zoom={2.6} baseY={0.82} />
+              <Tower3DPortrait type="IRONWOOD" level={41} width={150} height={150} />
             </div>
             <span className="gm-vs">VS</span>
             <div className="gm-tower is-right">
-              <TowerPortrait type="INFERNO" level={41} width={150} height={150} zoom={2.6} baseY={0.82} />
+              <Tower3DPortrait type="INFERNO" level={41} width={150} height={150} />
             </div>
           </div>
         </>

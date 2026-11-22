@@ -115,6 +115,9 @@ export const WIKI_CSS = `
 .wk-skin h4 { margin-top: 6px; margin-bottom: 0; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.15; }
 .wk-skin-price { margin-top: 4px; margin-bottom: 0; font-size: 12.5px; color: var(--gold); }
 .wk-skin-desc { margin-top: 8px; margin-bottom: 0; font-size: 13px; line-height: 1.55; color: var(--ash); }
+.wk-skin-effects { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 5px; }
+.wk-skin-effects li { font-size: 11.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: rgba(120,200,120,0.12); color: #9ad07a; }
+.wk-skin-effects li.is-down { background: rgba(230,110,90,0.12); color: #e89a80; }
 .wk-tier { display: inline-block; font-size: 11.5px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--ash); }
 .wk-tier.is-intermediate { color: #8fc6ff; border-color: rgba(143,198,255,0.35); }
 .wk-tier.is-premium { color: #d6a5ff; border-color: rgba(214,165,255,0.4); }
@@ -178,6 +181,7 @@ export const WIKI_CSS = `
 .wk-table-wrap { overflow-x: auto; border-top: 1px solid var(--line); }
 .wk-table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
 .wk-table th, .wk-table td { padding: 10px 14px 10px 0; text-align: right; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+.wk-table td.wk-wrap { white-space: normal; text-align: left; min-width: 180px; }
 .wk-table thead th { font-size: 12px; font-weight: 500; color: var(--ash); }
 .wk-table th:first-child, .wk-table td:first-child { text-align: left; }
 .wk-table tbody th { font-weight: 500; color: var(--ash); }

@@ -3,7 +3,7 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { MAX_TOWER_LEVEL } from "@/config/towerStats";
 import type { PassReward, RewardPart } from "@/config/seasonPass";
 import { StoreGem } from "./StoreArt";
-import { TowerPortrait } from "./TowerPortrait";
+import { Tower3DPortrait } from "./Tower3DPortrait";
 
 /**
  * PASS ART — a picture for every kind of Season Pass reward, so the track
@@ -102,7 +102,7 @@ export function RewardIcon({ part, size = 40 }: { part: RewardPart; size?: numbe
     case "SKIN": {
       const skin = getTowerSkinDefinition(part.skinId);
       return skin ? (
-        <TowerPortrait type={skin.towerType} level={MAX_TOWER_LEVEL} skinId={skin.id} width={size * 1.5} height={size * 1.5} zoom={1.9} baseY={0.66} />
+        <Tower3DPortrait type={skin.towerType} level={MAX_TOWER_LEVEL} skinId={skin.id} width={size * 1.5} height={size * 1.5} />
       ) : null;
     }
   }

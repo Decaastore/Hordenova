@@ -43,6 +43,8 @@ export const GEM_SINKS: readonly GemSinkDefinition[] = [
   { id: "inventory_expansion", category: "CONVENIENCE", i18nKey: "INVENTORY_EXPANSION", uncapped: false, implemented: true },
   { id: "profile_prestige", category: "COSMETIC_PRESTIGE", i18nKey: "PROFILE_PRESTIGE", uncapped: true, implemented: true },
   { id: "tower_skin", category: "COSMETIC_PRESTIGE", i18nKey: "TOWER_SKIN", uncapped: false, implemented: true },
+  // Tower fusion can be paid in Gems instead of Gold (config/towerFusion.ts getFusionGemPrice) — a convenience, same result.
+  { id: "tower_fusion", category: "CONVENIENCE", i18nKey: "TOWER_FUSION", uncapped: false, implemented: true },
 ];
 
 /** Spec section 46's Gem Economy Invariant, made checkable: true as long as at least one UNCAPPED, IMPLEMENTED sink exists. */

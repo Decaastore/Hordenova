@@ -82,7 +82,7 @@ import { drawDuelFrame, DUEL_H, DUEL_W } from "@/rendering/duelRenderer";
 import { ensureEnemySpritesLoading, setSpriteBiome } from "@/rendering/enemySprites";
 import { createEnemyInstance } from "@/entities/Enemy";
 import type { EnemyType } from "@/config/enemyStats";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { MaterialIcon, type MaterialKind } from "@/ui/MaterialIcon";
 import { drawKillFx, setDuelLooks } from "@/rendering/duelLooks";
@@ -98,7 +98,7 @@ function CardFace({ id, small, dim }: { id: DuelCardId; small?: boolean; dim?: b
     <div className={`dc-face is-${card.kind}${small ? " is-small" : ""}${dim ? " is-dim" : ""}`}>
       <div className="dc-art">
         {card.kind === "TOWER" ? (
-          <TowerPortrait type={card.tower} level={21} width={size} height={size} zoom={1.7} baseY={0.74} />
+          <Tower3DPortrait type={card.tower} level={21} width={size} height={size} />
         ) : card.kind === "SPELL" ? (
           <SpellPortrait effect={card.effect} size={size} />
         ) : (
@@ -812,7 +812,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                       <div key={item.id} className={`du-item${c?.kind === "TOWER_SKIN" ? " is-skin" : ""}`}>
                         {c?.kind === "TOWER_SKIN" && c.skinId && c.tower ? (
                           <span className="du-skinart">
-                            <TowerPortrait type={c.tower} level={41} skinId={c.skinId} width={110} height={110} zoom={1.8} baseY={0.74} />
+                            <Tower3DPortrait type={c.tower} level={41} skinId={c.skinId} width={110} height={110} />
                           </span>
                         ) : c?.kind === "KILL_FX" && c.fx ? (
                           <KillFxPreview fx={c.fx} />

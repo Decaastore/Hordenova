@@ -1,8 +1,8 @@
+import { Tower3DPortrait } from "./Tower3DPortrait";
 import { ELEMENT_COLOR, FUSION_COLORS, FUSION_CRIT_SHARE, FUSION_DAMAGE_MULT, FUSION_MIN_LEVEL, getFusionId, type FusionPayment } from "@/config/towerFusion";
 import { getManaUpgradeCost, MANA_MAX, MANA_OVERCHARGE_MAX, MANA_UPGRADE_GAIN_PER_LEVEL, MANA_UPGRADE_MAX_LEVEL, manaGainMultiplier, SKIN_MANA_GAIN_BONUS } from "@/config/towerMana";
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import type { TowerInstance } from "@/entities/Tower";
-import { drawTower } from "@/rendering/EntityRenderer";
 import {
   canChooseSpecialization,
   canUpgradeMastery,
@@ -962,51 +962,16 @@ function SpecializationSection({
 const SKIN_PREVIEW_LEVELS: readonly number[] = [1, 20, 40, 60];
 
 const PREVIEW_PX = 150;
-const PREVIEW_ZOOM = 1.55;
 
 function SkinPreviewCanvas({ tower, skinId, previewLevel }: { tower: TowerInstance; skinId: string | null; previewLevel: number }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = PREVIEW_PX * dpr;
-    canvas.height = PREVIEW_PX * dpr;
-    // Shown bigger than in-game so the skin's details actually sell it.
-    ctx.scale(dpr * PREVIEW_ZOOM, dpr * PREVIEW_ZOOM);
-    // PREVIEW-ONLY OBJECT — never the real tower, never mutated back into
-    // engine state. `level` here overrides ONLY what gets drawn (via
-    // drawTower's own visualStage lookup); it never touches the account's
-    // actual Season-scoped tower.level, and reading gameplayEffect from
-    // THIS object is structurally impossible from here since drawTower is a
-    // pure renderer that never calls getTowerStats/getTowerSpecialAtLevel —
-    // see entities/Tower.ts's getTowerStats doc comment for the other half
-    // of this guarantee (why equipping for real is the only path in).
-    const view = PREVIEW_PX / PREVIEW_ZOOM;
-    const previewTower: TowerInstance = { ...tower, equippedSkinId: skinId, level: previewLevel, position: { x: view / 2, y: view * 0.72 } };
-    let raf = 0;
-    const loop = (t: number) => {
-      ctx.clearRect(0, 0, view, view);
-      // Soft pedestal light under the tower.
-      const spot = ctx.createRadialGradient(view / 2, view * 0.76, 0, view / 2, view * 0.76, view * 0.5);
-      spot.addColorStop(0, "rgba(255,236,200,0.16)");
-      spot.addColorStop(1, "rgba(255,236,200,0)");
-      ctx.fillStyle = spot;
-      ctx.fillRect(0, 0, view, view);
-      drawTower(ctx, previewTower, false, t);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [tower, skinId, previewLevel]);
-
+  // PREVIEW-ONLY — the 3D model the battlefield itself uses, built for the
+  // previewed skin and level. It never touches the real tower: the level
+  // only picks which visual stage is drawn, and equipping for real is the
+  // only path to a skin's gameplay effect (entities/Tower.ts getTowerStats).
   return (
-    <canvas
-      ref={canvasRef}
-      style={{ width: PREVIEW_PX, height: PREVIEW_PX, borderRadius: 8, background: "radial-gradient(circle at 50% 70%, rgba(60,48,36,0.55), rgba(0,0,0,0.35))", border: `1px solid ${PALETTE.uiPanelBorder}` }}
-    />
+    <div style={{ width: PREVIEW_PX, height: PREVIEW_PX, borderRadius: 8, background: "radial-gradient(circle at 50% 72%, rgba(90,72,52,0.6), rgba(0,0,0,0.38))", border: `1px solid ${PALETTE.uiPanelBorder}` }}>
+      <Tower3DPortrait type={tower.type} level={previewLevel} skinId={skinId} width={PREVIEW_PX} height={PREVIEW_PX} />
+    </div>
   );
 }
 

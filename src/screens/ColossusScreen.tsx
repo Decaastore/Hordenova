@@ -33,7 +33,7 @@ import { drawEclipseOver, drawEclipseUnder } from "@/rendering/eclipseAura";
 import { drawTower } from "@/rendering/EntityRenderer";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { MaterialIcon, type MaterialKind } from "@/ui/MaterialIcon";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 
 const W = COLOSSUS_VIEW_W;
 const H = COLOSSUS_VIEW_H;
@@ -282,7 +282,7 @@ export function ColossusScreen({ onExit }: ColossusScreenProps) {
 
           <section className="co-play">
             <div className="co-tower">
-              <TowerPortrait type={best.type} level={Math.max(1, best.level)} skinId={best.skin} width={92} height={92} zoom={1.6} baseY={0.74} />
+              <Tower3DPortrait type={best.type} level={Math.max(1, best.level)} skinId={best.skin} width={92} height={92} />
               <div>
                 <small>{t("colossus.yourTower")}</small>
                 <strong>

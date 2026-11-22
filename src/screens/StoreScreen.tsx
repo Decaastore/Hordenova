@@ -18,7 +18,7 @@ import { ESSENCE_RARITIES, type Essences } from "@/config/expeditions";
 import { canEvolveSkin, getTowerSkinDefinition, SKIN_EVOLUTION_PRICE } from "@/config/towerSkins";
 import { setEvolvedSkins } from "@/rendering/skinEvolution";
 import { MaterialIcon } from "@/ui/MaterialIcon";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { ChestArt, CrownArt, GemPile, PerkIcon, StoreGem } from "@/ui/StoreArt";
 import { STARTER_PACK_SKIN_ID } from "@/config/seasonPass";
@@ -240,7 +240,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                     {offer.discountPct ? <span className="st-ribbon">−{offer.discountPct}%</span> : null}
                     {skinDef ? (
                       <div className="st-stage">
-                        <TowerPortrait type={skinDef.towerType} level={MAX_TOWER_LEVEL} skinId={skinDef.id} width={120} height={120} zoom={1.9} baseY={0.72} />
+                        <Tower3DPortrait type={skinDef.towerType} level={MAX_TOWER_LEVEL} skinId={skinDef.id} width={120} height={120} />
                       </div>
                     ) : (
                       <div className={`st-stage is-mat is-${offer.kind}`} aria-hidden="true">
@@ -274,7 +274,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                 <span className="st-ribbon is-gold">{t("store.oneTime")}</span>
                 <div className="st-starter-stage">
                   {starterSkin && (
-                    <TowerPortrait type={starterSkin.towerType} level={MAX_TOWER_LEVEL} skinId={starterSkin.id} width={170} height={170} zoom={1.9} baseY={0.66} />
+                    <Tower3DPortrait type={starterSkin.towerType} level={MAX_TOWER_LEVEL} skinId={starterSkin.id} width={170} height={170} />
                   )}
                   <span className="st-starter-gems">
                     <GemPile tier={2} />
@@ -432,7 +432,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                   <article key={skin.id} className={`st-card st-skin is-${skin.tier}${status?.kind === "OWNED" && status.equipped ? " is-on" : ""}`} data-testid={`skin-${skin.id}`}>
                     <div className="st-stage st-portrait">
                       <span className={`st-tier is-${skin.tier}`}>{t(`store.tier.${skin.tier}` as TranslationKey)}</span>
-                      <TowerPortrait type={skin.towerType} level={MAX_TOWER_LEVEL} skinId={skin.id} width={150} height={150} zoom={1.9} baseY={0.64} />
+                      <Tower3DPortrait type={skin.towerType} level={MAX_TOWER_LEVEL} skinId={skin.id} width={150} height={150} />
                     </div>
                     <div className="st-skin-body">
                       <p className="st-type">{t(`towers.${skin.towerType}.name` as TranslationKey)}</p>

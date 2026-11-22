@@ -35,7 +35,7 @@
  * `hasUncappedGoldSink()` below now correctly returns true again.
  */
 
-export type GoldSinkCategory = "TOWER_LEVEL" | "SPECIALIZATION" | "MASTERY";
+export type GoldSinkCategory = "TOWER_LEVEL" | "SPECIALIZATION" | "MASTERY" | "GARRISON" | "FUSION";
 
 export interface GoldSinkDefinition {
   id: string;
@@ -54,6 +54,10 @@ export const GOLD_SINKS: readonly GoldSinkDefinition[] = [
   // it used to be a Gems purchase registered in gemSinks.ts, now removed
   // from there). Leveling stays uncapped, mirroring Specialization.
   { id: "mastery", category: "MASTERY", i18nKey: "MASTERY", uncapped: true },
+  // The castle's Garrison (config/garrison.ts): ten levels per castle, reset with the Season castle.
+  { id: "garrison", category: "GARRISON", i18nKey: "GARRISON", uncapped: false },
+  // Tower fusion (config/towerFusion.ts): Gold, or Gems as an alternative price.
+  { id: "tower_fusion", category: "FUSION", i18nKey: "TOWER_FUSION", uncapped: false },
 ];
 
 /** Spec section 45's Gold Economy Invariant, made checkable: true as long as at least one UNCAPPED sink exists — Gold can never structurally run out of somewhere to go, regardless of account age/level/wealth. */

@@ -16,6 +16,10 @@ import { seasonClock } from "@/engine/SeasonClock";
 import { RewardPartsLabel } from "@/ui/RewardPartsLabel";
 import { ADAPTATION_FAIR_SHARE, ADAPTATION_MAX_RESIST, ADAPTATION_START_WAVE, ADAPTATION_WEAKNESS_RATIO } from "@/config/hordeAdaptation";
 import { CITY_BUILDINGS, CITY_REBUILD_WAVES } from "@/config/city";
+import { DAILY_EPIC_AMOUNT, DAILY_RARE_AMOUNT, DAILY_SKIN_DISCOUNT_PCT, MOMENT_OFFERS, VIP_DAILY_GEMS, VIP_DAYS, VIP_EXTRA_SCOUT_GROUPS, VIP_PRICE_BRL } from "@/config/shopOffers";
+import { CASTLE_SKINS } from "@/config/castleSkins";
+import { dualGemPrice } from "@/config/gemsEconomy";
+import { getInventoryExpansionPrice, INVENTORY_EXPANSION_SLOTS, MAX_INVENTORY_EXPANSIONS } from "@/config/inventoryExpansion";
 
 const pct = (x: number) => Math.round(x * 100);
 
@@ -289,6 +293,113 @@ export function StorePage() {
         <p className="wk-prose">
           {t("wiki.store.skinsBody", { each: pct(SKIN_REWARD_BONUS_PER_TYPE), top: pct(SKIN_REWARD_BONUS_PER_TYPE * 4), mana: pct(SKIN_MANA_GAIN_BONUS) })}
         </p>
+      </section>
+
+      <section className="wk-block" id="store-vip">
+        <h3 className="wk-h3">{t("store.vipTitle")}</h3>
+        <p className="wk-prose">{t("wiki.store.vipBody", { price: money(VIP_PRICE_BRL), days: VIP_DAYS })}</p>
+        <ul className="wk-list">
+          <li><div><p>{t("store.vipPerkGems", { gems: VIP_DAILY_GEMS })}</p></div></li>
+          <li><div><p>{t("store.vipPerkGroup", { n: VIP_EXTRA_SCOUT_GROUPS })}</p></div></li>
+          <li><div><p>{t("store.vipPerkFair")}</p></div></li>
+        </ul>
+      </section>
+
+      <section className="wk-block" id="store-daily">
+        <h3 className="wk-h3">{t("store.dailyTitle")}</h3>
+        <p className="wk-prose">{t("wiki.store.dailyBody", { pct: DAILY_SKIN_DISCOUNT_PCT, rare: DAILY_RARE_AMOUNT, epic: DAILY_EPIC_AMOUNT })}</p>
+      </section>
+
+      <section className="wk-block" id="store-moment">
+        <h3 className="wk-h3">{t("wiki.store.momentTitle")}</h3>
+        <p className="wk-prose">{t("wiki.store.momentBody")}</p>
+        <div className="wk-table-wrap">
+          <table className="wk-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("wiki.store.packCol")}</th>
+                <th scope="col">{t("wiki.store.whenCol")}</th>
+                <th scope="col">{t("wiki.store.contentsCol")}</th>
+                <th scope="col">{t("wiki.store.priceCol")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {MOMENT_OFFERS.map((o) => (
+                <tr key={o.id}>
+                  <th scope="row">{t(`store.moment.${o.id}.name` as TranslationKey)}</th>
+                  <td className="wk-wrap">{t(`store.moment.${o.id}.why` as TranslationKey)}</td>
+                  <td className="wk-wrap">{t("wiki.store.momentContents", { gems: o.purchasedGems, splinters: o.splinters, hours: o.hours })}</td>
+                  <td>{money(o.priceBrl)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="wk-block" id="store-castles">
+        <h3 className="wk-h3">{t("wiki.store.castleSkinsTitle")}</h3>
+        <p className="wk-prose">{t("wiki.store.castleSkinsBody")}</p>
+        <div className="wk-table-wrap">
+          <table className="wk-table">
+            <thead>
+              <tr>
+                <th scope="col">{t("wiki.store.skinCol")}</th>
+                <th scope="col">{t("wiki.store.howCol")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CASTLE_SKINS.map((c) => (
+                <tr key={c.id}>
+                  <th scope="row">{t(`castleSkins.${c.i18nKey}.name` as TranslationKey)}</th>
+                  <td>
+                    {c.source === "STORE" && c.priceGems
+                      ? t("wiki.store.castleBuy", { purchased: dualGemPrice(c.priceGems).purchased, free: dualGemPrice(c.priceGems).free })
+                      : t(`wiki.store.castleSource.${c.source}` as TranslationKey)}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="wk-block" id="store-gem-uses">
+        <h3 className="wk-h3">{t("wiki.store.gemUsesTitle")}</h3>
+        <p className="wk-prose">{t("wiki.store.gemUsesBody")}</p>
+        <ul className="wk-list">
+          <li>
+            <div>
+              <h4>{t("gemSinks.INVENTORY_EXPANSION.name")}</h4>
+              <p>
+                {t("wiki.store.inventoryExpansion", {
+                  slots: INVENTORY_EXPANSION_SLOTS,
+                  max: MAX_INVENTORY_EXPANSIONS,
+                  first: getInventoryExpansionPrice(0)!.purchased,
+                  last: getInventoryExpansionPrice(MAX_INVENTORY_EXPANSIONS - 1)!.purchased,
+                })}
+              </p>
+            </div>
+          </li>
+          <li>
+            <div>
+              <h4>{t("gemSinks.TOWER_FUSION.name")}</h4>
+              <p>{t("gemSinks.TOWER_FUSION.description")}</p>
+            </div>
+          </li>
+          <li>
+            <div>
+              <h4>{t("gemSinks.SPECIALIZATION_UNLOCK.name")}</h4>
+              <p>{t("gemSinks.SPECIALIZATION_UNLOCK.description")}</p>
+            </div>
+          </li>
+          <li>
+            <div>
+              <h4>{t("gemSinks.TOWER_SKIN.name")}</h4>
+              <p>{t("gemSinks.TOWER_SKIN.description")}</p>
+            </div>
+          </li>
+        </ul>
       </section>
     </div>
   );

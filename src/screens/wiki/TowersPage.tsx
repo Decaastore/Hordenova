@@ -17,7 +17,8 @@ import {
 import { SPECIALIZATIONS_BY_TOWER, SPECIALIZATION_UNLOCK_TOWER_LEVEL } from "@/config/specializations";
 import { dualGemPrice } from "@/config/gemsEconomy";
 import { PRESTIGE_MILESTONE_REWARDS } from "@/config/prestige";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
+import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { skinsForTower } from "./wikiData";
 
 type Translate = ReturnType<typeof useLanguage>["t"];
@@ -86,7 +87,7 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
       <div className="wk-tower-tabs" role="tablist">
         {TOWER_TYPES.map((type) => (
           <button key={type} role="tab" aria-selected={type === tower} className={`wk-tower-tab${type === tower ? " is-active" : ""}`} onClick={() => onTower(type)}>
-            <TowerPortrait type={type} level={MAX_TOWER_LEVEL} width={64} height={64} zoom={1.2} baseY={0.8} />
+            <Tower3DPortrait type={type} level={MAX_TOWER_LEVEL} width={64} height={64} spin={false} />
             <span>{t(`towers.${type}.name` as TranslationKey)}</span>
           </button>
         ))}
@@ -94,7 +95,7 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
 
       <article className="wk-tower" id={`tower-${tower}`}>
         <div className="wk-tower-stage">
-          <TowerPortrait key={tower} type={tower} level={level} width={300} height={300} zoom={3.1} baseY={0.74} />
+          <Tower3DPortrait key={tower} type={tower} level={level} width={300} height={300} />
           <label className="wk-slider">
             <span className="wk-slider-head">
               <span>{t("wiki.towerLevel")}</span>
@@ -109,6 +110,7 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
               ))}
             </span>
             <span className="wk-slider-note">{t("wiki.visualStage", { stage, total: TOWER_VISUAL_STAGE_COUNT })}</span>
+            <span className="wk-slider-note">{t("wiki.towers3dNote")}</span>
           </label>
         </div>
 
@@ -200,7 +202,7 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
             return (
               <div key={skin.id} id={`skin-${skin.id}`} className="wk-skin">
                 <div className="wk-skin-art">
-                  <TowerPortrait type={tower} level={MAX_TOWER_LEVEL} skinId={skin.id} width={180} height={180} zoom={2} baseY={0.7} />
+                  <Tower3DPortrait type={tower} level={MAX_TOWER_LEVEL} skinId={skin.id} width={180} height={180} />
                 </div>
                 <span className={`wk-tier is-${skin.tier.toLowerCase()}`}>{t(`wiki.skinTier.${skin.tier}` as TranslationKey)}</span>
                 <h4>{t(`towerSkins.${skin.i18nKey}.name` as TranslationKey)}</h4>
@@ -210,6 +212,15 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
                     : t("wiki.skinPrice", { purchased: price.purchased.toLocaleString(locale), free: price.free.toLocaleString(locale), level: skin.unlockLevel })}
                 </p>
                 <p className="wk-skin-desc">{t(`towerSkins.${skin.i18nKey}.description` as TranslationKey)}</p>
+                {formatGameplayEffectLines(skin.gameplayEffect, t).length > 0 && (
+                  <ul className="wk-skin-effects">
+                    {formatGameplayEffectLines(skin.gameplayEffect, t).map((line) => (
+                      <li key={line} className={line.startsWith("-") ? "is-down" : "is-up"}>
+                        {line}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             );
           })}

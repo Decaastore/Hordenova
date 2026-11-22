@@ -21,7 +21,7 @@ import { REAL_MONEY_PAYMENTS_ENABLED } from "@/config/store";
 import { PURCHASE_MIN_AGE } from "@/config/ageGate";
 import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { MAX_TOWER_LEVEL } from "@/config/towerStats";
-import { TowerPortrait } from "@/ui/TowerPortrait";
+import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { LevelMedallion, RewardArt, RewardIcon } from "@/ui/PassArt";
 import { RewardPartsLabel, REWARD_CSS } from "@/ui/RewardPartsLabel";
 
@@ -142,7 +142,7 @@ export function PassScreen({ onNavigate, onPlay }: PassScreenProps) {
                     const sk = getTowerSkinDefinition(id);
                     return sk ? (
                       <figure key={id}>
-                        <TowerPortrait type={sk.towerType} level={MAX_TOWER_LEVEL} skinId={sk.id} width={110} height={110} zoom={1.75} baseY={0.6} />
+                        <Tower3DPortrait type={sk.towerType} level={MAX_TOWER_LEVEL} skinId={sk.id} width={110} height={110} />
                         <figcaption>{t(`towerSkins.${sk.id}.name` as TranslationKey)}</figcaption>
                       </figure>
                     ) : null;
