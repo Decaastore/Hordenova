@@ -108,6 +108,16 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
         <div className="pg-wrap">
           {CLOUD_ENABLED && <CloudAccountSection />}
 
+          <section className="ac-block ac-help" data-testid="account-support">
+            <div>
+              <h2 className="pg-h2">{t("support.accountTitle")}</h2>
+              <p className="pg-sub">{t("support.accountLead")}</p>
+            </div>
+            <button className="pg-btn-ghost" onClick={() => onNavigate("SUPPORT")}>
+              {t("support.accountCta")}
+            </button>
+          </section>
+
           <section className="ac-block">
             <h2 className="pg-h2">{t("account.walletTitle")}</h2>
             <p className="pg-sub">{t("account.walletLead")}</p>
@@ -271,6 +281,8 @@ const ACCOUNT_CSS = `
 .ac-rank strong { font-family: var(--display); font-size: 28px; color: var(--gold-hi); line-height: 1.05; }
 .ac-rank span { font-size: 14px; color: var(--bone); }
 .ac-block { padding: 30px 0 6px; }
+.ac-help { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px 28px; }
+.ac-help .pg-sub { margin: 6px 0 0; }
 .ac-block .pg-sub { margin: 4px 0 0; }
 .ac-last { padding-bottom: 96px; }
 .ac-wallet { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 16px; }

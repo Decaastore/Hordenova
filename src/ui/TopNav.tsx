@@ -7,7 +7,7 @@ import { BrandLogo } from "./BrandLogo";
 import { getPassView } from "@/engine/SeasonPassService";
 import { PASS_CHANGED_EVENT } from "./SeasonPassSection";
 
-export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE" | "ACCOUNT";
+export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE" | "ACCOUNT" | "SUPPORT";
 
 interface TopNavProps {
   active: NavView;

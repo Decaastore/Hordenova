@@ -217,6 +217,16 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   }
 }
 
+/** The Supabase client (null while the online account is off) — for other online features like support tickets. */
+export async function getCloudClient(): Promise<SupabaseClient | null> {
+  return CLOUD_ENABLED ? client() : null;
+}
+
+/** The signed-in player's account id and e-mail, or null. */
+export function getCloudUser(): { id: string; email: string | null } | null {
+  return currentUser ? { id: currentUser.id, email: currentUser.email ?? null } : null;
+}
+
 export async function syncNow(): Promise<void> {
   if (currentUser) await upload();
 }
