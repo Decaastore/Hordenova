@@ -239,3 +239,46 @@ nav.tn .tn-play:hover::after, .pg-btn:hover::after, .hn-play:hover::after { anim
 @media (prefers-reduced-motion: reduce) {
   .hn-med-sweep, .hh-btn.is-live .hh-emb { animation: none !important; }
 }
+
+/*
+ * PHONES — every in-game window (missions, expeditions, forge, talents, rift,
+ * city, garrison, bestiary, the tower panel…) shares .hn-pop[role=dialog].
+ * Held upright, a window becomes a sheet rising from the bottom over the tower
+ * bar, up to 82% of the screen, so its buttons are never hidden below the
+ * map; held sideways it becomes a side sheet on the right, leaving the map
+ * visible on the left.
+ */
+/* the map area is its own stacking layer (z-index 0); while a window is open as a sheet it must rise above the HUD and the tower bar */
+@media (max-width: 720px), (max-height: 520px) {
+  .gs-map:has(.hn-pop[role="dialog"]) { z-index: 5 !important; }
+}
+@keyframes hn-sheet-up { from { transform: translateY(40px); opacity: 0; } }
+@keyframes hn-sheet-left { from { transform: translateX(40px); opacity: 0; } }
+@media (max-width: 720px) and (min-height: 521px) {
+  .gs-map > .hn-pop[role="dialog"], .gs-map .hn-pop[role="dialog"][data-testid="tower-info-panel"] {
+    position: fixed !important; left: 0 !important; right: 0 !important; top: auto !important; bottom: 0 !important;
+    width: auto !important; max-width: none !important; max-height: 82dvh !important; transform: none !important;
+    border-radius: 18px 18px 0 0 !important; border-bottom: none !important; z-index: 60 !important;
+    padding-top: 22px !important; padding-bottom: calc(16px + env(safe-area-inset-bottom)) !important;
+    overflow-y: auto !important; overscroll-behavior: contain;
+    box-shadow: 0 -12px 40px rgba(0,0,0,0.65) !important;
+    animation: hn-sheet-up 240ms var(--hn-ease-out, ease-out) backwards !important;
+  }
+  .gs-map > .hn-pop[role="dialog"]::before, .gs-map .hn-pop[role="dialog"][data-testid="tower-info-panel"]::before {
+    content: ""; position: absolute; top: 8px; left: 50%; width: 42px; height: 4px; margin-left: -21px; border-radius: 2px; background: rgba(255,226,170,0.35);
+  }
+}
+@media (max-height: 520px) {
+  .gs-map > .hn-pop[role="dialog"], .gs-map .hn-pop[role="dialog"][data-testid="tower-info-panel"] {
+    position: fixed !important; top: 0 !important; bottom: 0 !important; right: 0 !important; left: auto !important;
+    width: min(440px, 62vw) !important; max-width: none !important; max-height: none !important; transform: none !important;
+    border-radius: 16px 0 0 16px !important; z-index: 60 !important; overflow-y: auto !important; overscroll-behavior: contain;
+    padding-right: calc(14px + env(safe-area-inset-right)) !important;
+    box-shadow: -12px 0 40px rgba(0,0,0,0.65) !important;
+    animation: hn-sheet-left 240ms var(--hn-ease-out, ease-out) backwards !important;
+  }
+}
+/* close buttons inside windows: finger-sized on touch screens */
+@media (pointer: coarse) {
+  .gs-map .hn-pop[role="dialog"] > button[aria-label]:first-child, .gs-map .hn-pop[role="dialog"] button[aria-label="Close"], .gs-map .hn-pop[role="dialog"] button[aria-label="Fechar"] { min-width: 40px; min-height: 40px; }
+}

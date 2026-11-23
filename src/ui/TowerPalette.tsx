@@ -90,7 +90,13 @@ const TP_CSS = `
   .tp-card { flex: 1 1 calc(25% - 6px) !important; }
   .tp-bar > [data-testid=specials-panel] { flex: 1 1 100% !important; width: auto !important; height: 46px !important; padding: 5px 6px 5px 10px !important; margin-left: 0 !important; }
 }
+@media (max-width: 380px) {
+  .tp-card { padding: 6px 5px !important; gap: 4px !important; }
+  .tp-name { font-size: 11px !important; letter-spacing: -0.2px; text-overflow: clip !important; }
+  .tp-swatch { display: none; }
+}
 @media (max-height: 520px) {
+  .tp-bar > [data-testid=specials-panel] > div > div:first-child > span:last-child { display: none; }
   .tp-bar { flex-wrap: nowrap !important; }
   .tp-card { flex: 1 1 0 !important; }
   .tp-bar > [data-testid=specials-panel] { flex: 0 0 auto !important; width: 220px !important; height: 44px !important; padding: 4px 6px 4px 10px !important; }

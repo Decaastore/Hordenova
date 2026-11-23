@@ -161,6 +161,11 @@ nav.tn .tn-play:active { transform: translateY(1px); }
   nav.tn .tn-links { order: 3; flex: 0 0 100%; justify-content: flex-start; min-height: 44px; }
   nav.tn .tn-brand img { height: 24px !important; }
 }
+/* touch screens (any size): every control in the bar is finger-sized */
+@media (pointer: coarse) {
+  nav.tn .tn-brand { min-height: 40px; display: inline-flex; align-items: center; }
+  .tn-tools button { min-height: 38px; }
+}
 /* phones: logo and tools share one row (music as an icon, volume hidden), the links scroll under them with a fade at the edges */
 @media (max-width: 560px) {
   .tn { padding: 6px 12px 0; gap: 0 8px; min-height: 0; }

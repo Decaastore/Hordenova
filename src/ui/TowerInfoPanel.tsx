@@ -152,7 +152,7 @@ export function TowerInfoPanel({
   const unlock = nextLevel !== null ? getMilestoneUnlockForLevel(tower.type, nextLevel) : null;
 
   return (
-    <div style={{ ...panelStyle, borderColor: theme.primary, boxShadow: `0 0 22px ${theme.glow}, 0 8px 24px rgba(0,0,0,0.5)` }}>
+    <div className="hn-pop" role="dialog" aria-label={t(`towers.${tower.type}.name`)} data-testid="tower-info-panel" style={{ ...panelStyle, borderColor: theme.primary, boxShadow: `0 0 22px ${theme.glow}, 0 8px 24px rgba(0,0,0,0.5)` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ ...dotStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />

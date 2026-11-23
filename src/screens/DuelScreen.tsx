@@ -1154,7 +1154,7 @@ function DuelMatch({ engine, arenaId, biome, banner, frame, result, rankName, on
   };
 
   return (
-    <div style={{ ...matchRoot, ...(frame ? { ["--fr1" as string]: frame.color, ["--fr2" as string]: frame.color2 } : null) }} className={frame ? "has-frame" : undefined}>
+    <div style={{ ...matchRoot, ...(frame ? { ["--fr1" as string]: frame.color, ["--fr2" as string]: frame.color2 } : null) }} className={`dm-match${frame ? " has-frame" : ""}`}>
       <style>{MATCH_CSS}</style>
       <div className="dm-top">
         <div className="dm-side">
@@ -1868,6 +1868,28 @@ const LOBBY_CSS = `
 `;
 
 const MATCH_CSS = `
+/* PHONE HELD SIDEWAYS: the hand moves to a column on the right (two cards a row) and the battlefield takes the rest of the screen */
+@media (max-height: 520px) and (orientation: landscape) {
+  .dm-match { grid-template-rows: auto minmax(0, 1fr) !important; grid-template-columns: minmax(0, 1fr) auto !important; }
+  .dm-match .dm-top { grid-column: 1 / -1; padding: 3px 12px calc(3px) max(12px, env(safe-area-inset-left)); gap: 10px; }
+  .dm-match .dm-crest { display: none; }
+  .dm-match .dm-side strong { font-size: 13px; }
+  .dm-match .dm-hp-segs i { width: 6px; height: 8px; }
+  .dm-match .dm-clock-face { width: 44px; height: 44px; padding: 3px; }
+  .dm-match .dm-clock-face span { font-size: 14px; }
+  .dm-match .dm-stage { grid-row: 2; grid-column: 1; padding: 4px; }
+  .dm-match .dm-canvas { width: min(100%, calc((100dvh - 64px) * ${W / H})); }
+  .dm-match .dm-hand { grid-row: 2; grid-column: 2; flex-direction: column; flex-wrap: nowrap; justify-content: flex-start; align-items: stretch; gap: 6px; width: 172px; padding: 6px 8px max(6px, env(safe-area-inset-bottom)) 8px; padding-right: max(8px, env(safe-area-inset-right)); border-top: none; border-left: 2px solid #5a4226; overflow-y: auto; }
+  .dm-match .dm-mana { grid-auto-flow: column; align-items: center; justify-content: start; }
+  .dm-match .dm-mana > span { width: 30px; height: 30px; font-size: 14px; }
+  .dm-match .dm-mana-bar i { width: 8px; height: 7px; }
+  .dm-match .dm-cards { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; }
+  .dm-match .dc-face { width: 74px; padding: 4px 2px; }
+  .dm-match .dc-face canvas { width: 42px !important; height: 42px !important; }
+  .dm-match .dc-name { font-size: 10.5px !important; line-height: 1.1; }
+  .dm-match .dc-kind { font-size: 8px !important; }
+}
+@media (pointer: coarse) { .dm-match .dm-btn { min-height: 40px; } }
 .has-frame .dc-face { box-shadow: 0 0 0 1px var(--fr2), 0 0 14px color-mix(in srgb, var(--fr1) 45%, transparent), inset 0 1px 0 rgba(255,230,180,0.15) !important; }
 .dm-tr { font-size: 20px !important; font-weight: 700; }
 .dm-rankchange { display: flex; align-items: center; gap: 12px; padding: 10px 18px; border-radius: 12px; background: rgba(0,0,0,0.45); font-family: Georgia, serif; font-size: 22px; font-weight: 700; animation: dmIn 0.6s ease-out; }

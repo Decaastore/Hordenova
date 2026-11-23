@@ -524,7 +524,7 @@ export function GameScreen({ mode = "SEASON", onExitToMenu, onOpenStore, openMer
         other child here keeps its default `auto` z-index and stacks by
         DOM order exactly as before — this changes nothing for them.
       */}
-      <div ref={mapAreaRef} style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
+      <div ref={mapAreaRef} className="gs-map" style={{ position: "relative", flex: 1, minHeight: 0, zIndex: 0 }}>
         {enableWorldLayer && (
           <Enemy3DErrorBoundary
             onError={() => {
