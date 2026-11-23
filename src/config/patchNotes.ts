@@ -70,6 +70,107 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v164",
+    dateIso: "2026-11-23",
+    category: "INTERFACE",
+    title: {
+      en: "Made for Phones",
+      ptBR: "Feito para o Celular",
+    },
+    description: {
+      en: "The game and the site were reviewed screen by screen on phones, upright and sideways. The map gets far more room, every window opens as a sheet with all its buttons in reach, and the Duel can now be played with the phone sideways.",
+      ptBR: "O jogo e o site foram revisados tela por tela no celular, em pé e deitado. O mapa ganhou muito mais espaço, toda janela abre como uma gaveta com todos os botões ao alcance, e o Duelo agora dá para jogar com o celular deitado.",
+    },
+    highlights: [
+      {
+        en: "Phone held sideways: the battle HUD and tower bar shrink to slim strips and the map fills the screen (before, only a thin strip of map was left). Held upright, the map is about twice as tall.",
+        ptBR: "Celular deitado: o topo da batalha e a barra de torres viram faixas finas e o mapa ocupa a tela (antes sobrava só uma faixa fina de mapa). Em pé, o mapa ficou cerca de duas vezes mais alto.",
+      },
+      {
+        en: "Every in-game window — the tower panel, Missions, Expeditions, Forge, Talents, Rift, City, Garrison, Bestiary — opens as a sheet from the bottom (upright) or from the side (sideways), so Upgrade, Train and the other buttons are never hidden.",
+        ptBR: "Toda janela do jogo — painel da torre, Missões, Expedições, Forja, Talentos, Fenda, Cidade, Guarnição, Bestiário — abre como gaveta de baixo (em pé) ou de lado (deitado), então Evoluir, Treinar e os outros botões nunca ficam escondidos.",
+      },
+      {
+        en: "Duel with the phone sideways: your hand moves to a column on the right and the battlefield fills the rest of the screen.",
+        ptBR: "Duelo com o celular deitado: a mão de cartas vai para uma coluna à direita e o campo de batalha ocupa o resto da tela.",
+      },
+      {
+        en: "Site on phones: a slimmer header (logo and buttons on one row), tables that no longer cut text, the 7-day login in two rows, and finger-sized buttons and links everywhere.",
+        ptBR: "Site no celular: cabeçalho mais baixo (logo e botões numa linha só), tabelas que não cortam mais o texto, login de 7 dias em duas fileiras e botões e links do tamanho do dedo em todo lugar.",
+      },
+    ],
+  },
+  {
+    id: "v163",
+    dateIso: "2026-11-23",
+    category: "BOSSES",
+    title: {
+      en: "Boss Fury: Stunning Roars and Phase Barriers",
+      ptBR: "Fúria dos Chefes: Rugido Atordoante e Barreira de Fase",
+    },
+    description: {
+      en: "Bosses and mini-bosses now fight back: they roar to stun your towers, and bosses raise a barrier mid-fight. Every move is announced on the ground first, so you can see it coming.",
+      ptBR: "Chefes e mini-chefes agora revidam: rugem para atordoar suas torres, e os chefes erguem uma barreira no meio da luta. Cada golpe é avisado no chão antes, para você ver chegando.",
+    },
+    highlights: [
+      {
+        en: "Stunning Roar (every boss and mini-boss): a red ring the exact size of its reach fills on the ground, then the roar lands with a shockwave and stuns the nearest towers inside it — up to 4 for 2.2 s from a boss, up to 3 for 1.4 s from a mini-boss (30% longer when enraged). Stunned towers show golden stars.",
+        ptBR: "Rugido Atordoante (todo chefe e mini-chefe): um anel vermelho do tamanho exato do alcance se enche no chão, então o rugido cai com uma onda de choque e atordoa as torres mais próximas dentro dele — até 4 por 2,2 s no chefe, até 3 por 1,4 s no mini-chefe (30% a mais enfurecido). Torres atordoadas mostram estrelas douradas.",
+      },
+      {
+        en: "No stun-lock: a tower just stunned by a roar can't be stunned by the next one for a few seconds.",
+        ptBR: "Sem travamento: uma torre recém-atordoada por um rugido não pode ser atordoada pelo próximo por alguns segundos.",
+      },
+      {
+        en: "Phase Barrier: at 60% life a boss raises a golden dome that blocks almost all damage for 3.5 s, calls two guards and roars at once. Mini-bosses harden their hide for 2.2 s at half life.",
+        ptBR: "Barreira de Fase: com 60% de vida o chefe ergue uma cúpula dourada que bloqueia quase todo o dano por 3,5 s, chama dois guardas e ruge na hora. Os mini-chefes endurecem a pele por 2,2 s com metade da vida.",
+      },
+    ],
+  },
+  {
+    id: "v162",
+    dateIso: "2026-11-23",
+    category: "SYSTEMS",
+    title: {
+      en: "Ranking Prizes: Exclusive Collections, Relics and Titles",
+      ptBR: "Prêmios de Ranking: Coleções Exclusivas, Relíquias e Títulos",
+    },
+    description: {
+      en: "The Eternal (yearly), Duel (monthly) and Season rankings now have prizes that can't be bought anywhere: three exclusive collections of tower and castle skins, unique relics, Duel looks and champion titles, plus Free Gems. Prizes are paid from the final online ranking.",
+      ptBR: "Os rankings do Eterno (anual), do Duelo (mensal) e da Season agora têm prêmios que não se compram em lugar nenhum: três coleções exclusivas de skins de torre e de castelo, relíquias únicas, visuais do Duelo e títulos de campeão, além de Gemas Grátis. Os prêmios são pagos pelo ranking online final.",
+    },
+    highlights: [
+      {
+        en: "Three collections, each a castle plus all four towers, never sold: Eternity (the tower floats on an amethyst island under a golden hourglass), Arena Crown (inside its own little colosseum) and Royal Standard (on a stepped royal dais). Each of the 12 tower skins has its own shot, impact and aura, and their crests move.",
+        ptBR: "Três coleções, cada uma com castelo e as quatro torres, nunca vendidas: Eternidade (a torre flutua sobre uma ilha de ametista sob uma ampulheta dourada), Coroa da Arena (dentro do seu próprio mini-coliseu) e Estandarte Real (sobre um pedestal real em degraus). Cada uma das 12 skins de torre tem tiro, impacto e aura próprios, e os enfeites se movem.",
+      },
+      {
+        en: "Eternal ranking (once a year): the top 10 win the Eternity collection, the Stardust kill effect and 800 to 2,500 Free Gems; #1 also wins the Hourglass of the Immortal and #2–3 the Eternal Sand — account-bound relics that exist nowhere else.",
+        ptBR: "Ranking do Eterno (uma vez por ano): o top 10 ganha a coleção Eternidade, o efeito de abate Poeira de Estrelas e de 800 a 2.500 Gemas Grátis; o 1º ganha também a Ampulheta do Imortal e o 2º e o 3º a Areia Eterna — relíquias presas à conta que não existem em nenhum outro lugar.",
+      },
+      {
+        en: "Duel ranking (every month): the top 10 win the Arena Crown collection, the Arena Crown frame, 300 to 1,500 Duel Coins and 180 to 600 Free Gems; the top 3 also get the Victor's Laurels kill effect and #1 the Banner of the Arena King.",
+        ptBR: "Ranking do Duelo (todo mês): o top 10 ganha a coleção Coroa da Arena, a moldura Coroa da Arena, de 300 a 1.500 Moedas do Duelo e de 180 a 600 Gemas Grátis; o top 3 ganha também o efeito de abate Louros do Vencedor e o 1º o Estandarte do Rei da Arena.",
+      },
+      {
+        en: "Season ranking (every Season): prizes now go to the top 20 — the Royal Standard collection for the top 5, its castle for places 6–10, and 80 to 500 Free Gems. Finishing a Season you played still pays 150 Free Gems for taking part.",
+        ptBR: "Ranking da Season (toda Season): os prêmios agora vão até o 20º — a coleção Estandarte Real para o top 5, o castelo dela do 6º ao 10º e de 80 a 500 Gemas Grátis. Terminar uma Season em que você jogou ainda paga 150 Gemas Grátis de participação.",
+      },
+      {
+        en: "Champion titles (Immortal, Arena Champion, Season Sovereign and more) appear next to your name, and your profile keeps a trophy for every placement and shows each collection, lit where you own it.",
+        ptBR: "Títulos de campeão (Imortal, Campeão da Arena, Soberano da Season e outros) aparecem ao lado do seu nome, e o seu perfil guarda um troféu de cada colocação e mostra cada coleção, acesa onde você já tem.",
+      },
+      {
+        en: "Fix: a Season that ended while playing offline used to count you as #1 and pay the top prize. Places now come only from the online ranking.",
+        ptBR: "Correção: uma Season que terminava jogando offline te contava como 1º lugar e pagava o prêmio máximo. As colocações agora vêm só do ranking online.",
+      },
+      {
+        en: "The News page was redesigned: the latest update up front, search, category filters and the full version history.",
+        ptBR: "A página de Novidades foi refeita: a atualização mais recente em destaque, busca, filtros por categoria e o histórico completo de versões.",
+      },
+    ],
+  },
+  {
     id: "v161",
     dateIso: "2026-11-23",
     category: "SYSTEMS",
