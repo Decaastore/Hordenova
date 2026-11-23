@@ -84,6 +84,14 @@ export const PAGE_CSS = `
 .pg-table th, .pg-table td { padding: 13px 14px 13px 0; text-align: left; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
 .pg-table thead th { font-size: 12px; font-weight: 500; color: var(--ash); padding-top: 10px; padding-bottom: 10px; }
 .pg-table .is-num { text-align: right; }
+/* phones: tables wrap instead of hiding columns off the edge; links and small buttons get a finger-sized hit area */
+@media (max-width: 560px) {
+  .pg-table { font-size: 13.5px; }
+  .pg-table th, .pg-table td { white-space: normal; padding-right: 10px; }
+}
+@media (pointer: coarse) {
+  .pg-link, .nv-more, .gm-extra, .rk-name { min-height: 40px; display: inline-flex; align-items: center; }
+}
 .pg-table tbody th { font-family: var(--display); font-weight: 700; font-size: 20px; color: var(--gold-hi); font-variant-numeric: lining-nums tabular-nums; }
 
 .pg-aside { display: grid; gap: 0; }

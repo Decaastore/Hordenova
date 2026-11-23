@@ -21,7 +21,8 @@ interface TowerPaletteProps {
 export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false, mapFullLabel, trailing, typeCounts, typeLimit }: TowerPaletteProps) {
   const { t } = useLanguage();
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} className="tp-bar">
+      <style>{TP_CSS}</style>
       {mapFull && mapFullLabel && <div style={fullStyle}>{mapFullLabel}</div>}
       {TOWER_TYPES.map((type) => {
         const def = TOWER_DEFINITIONS[type];
@@ -36,6 +37,7 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
             data-tutorial={`tower-${type}`}
             disabled={!affordable}
             onClick={() => onSelect(active ? null : type)}
+            className="tp-card"
             title={atLimit && typeLimit !== undefined ? t("deploy.typeLimitReached", { max: typeLimit }) : t(`towers.${type}.description`)}
             style={{
               ...cardStyle,
@@ -44,10 +46,10 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
               opacity: affordable ? 1 : 0.4,
             }}
           >
-            <div style={{ ...swatchStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
+            <div className="tp-swatch" style={{ ...swatchStyle, background: theme.primary, boxShadow: `0 0 8px ${theme.glow}` }} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontWeight: 700, fontSize: 13, color: PALETTE.uiText }}>{t(`towers.${type}.name`)}</div>
-              <div style={{ fontSize: 9.5, color: PALETTE.uiTextDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(`towers.${type}.role`)}</div>
+              <div className="tp-name" style={{ fontWeight: 700, fontSize: 13, color: PALETTE.uiText }}>{t(`towers.${type}.name`)}</div>
+              <div className="tp-role" style={{ fontSize: 9.5, color: PALETTE.uiTextDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t(`towers.${type}.role`)}</div>
               <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 3 }}>
                 <CoinIcon size={10} color={PALETTE.gold} />
                 <span style={{ fontSize: 11, color: PALETTE.gold, fontWeight: 700 }}>{def.buildCost}</span>
@@ -68,6 +70,32 @@ export function TowerPalette({ gold, pendingTowerType, onSelect, mapFull = false
     </div>
   );
 }
+
+/**
+ * PHONES — the bar must leave the map room to play: in portrait the four towers
+ * fit one row (name, cost and count, no role line) with the specials as a slim
+ * strip under them; on a phone held sideways (short screen) everything is one
+ * slim row.
+ */
+const TP_CSS = `
+@media (max-width: 720px), (max-height: 520px) {
+  .tp-bar { gap: 6px !important; padding: 6px 8px calc(6px + env(safe-area-inset-bottom)) !important; }
+  .tp-card { min-width: 0 !important; max-width: none !important; padding: 6px 7px !important; gap: 6px !important; min-height: 44px; }
+  .tp-role { display: none; }
+  .tp-name { font-size: 12px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tp-swatch { width: 12px !important; height: 12px !important; }
+}
+@media (max-width: 720px) and (min-height: 521px) {
+  .tp-bar { flex-wrap: wrap !important; }
+  .tp-card { flex: 1 1 calc(25% - 6px) !important; }
+  .tp-bar > [data-testid=specials-panel] { flex: 1 1 100% !important; width: auto !important; height: 46px !important; padding: 5px 6px 5px 10px !important; margin-left: 0 !important; }
+}
+@media (max-height: 520px) {
+  .tp-bar { flex-wrap: nowrap !important; }
+  .tp-card { flex: 1 1 0 !important; }
+  .tp-bar > [data-testid=specials-panel] { flex: 0 0 auto !important; width: 220px !important; height: 44px !important; padding: 4px 6px 4px 10px !important; }
+}
+`;
 
 const containerStyle: CSSProperties = {
   display: "flex",

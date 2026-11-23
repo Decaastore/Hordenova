@@ -327,5 +327,6 @@ const REWARDS_CSS = `
 .rw-modal p { margin: 6px 0 0; color: #d8ccb8; }
 .rw-modal-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 16px; }
 .rw-got { color: #9be37a; font-weight: 800; }
+@media (max-width: 560px) { .rw-login { grid-template-columns: repeat(4, minmax(0, 1fr)); overflow-x: visible; } .rw-day { min-height: 74px; padding: 8px 4px; } }
 @media (max-width: 640px) { .rw-missions li { grid-template-columns: 26px 1fr; } .rw-missions li .rw-bundle, .rw-missions li .rw-btn { grid-column: 2; justify-self: start; } }
 `;

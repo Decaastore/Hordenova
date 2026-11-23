@@ -429,6 +429,12 @@ const HOME_CSS = `
 .hn-stats dt { font-size: 12px; color: var(--ash); }
 .hn-stats dd { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1; color: var(--bone); font-variant-numeric: lining-nums tabular-nums; }
 .hn-stats dd small { font-size: 16px; color: var(--ash); font-weight: 600; }
+@media (max-width: 560px) {
+  .hn-stats { display: grid; grid-template-columns: 1fr 1fr; row-gap: 16px; }
+  .hn-stats > div { padding: 0 0 0 16px; }
+  .hn-stats > div:nth-child(odd) { padding-left: 0; border-left: none; }
+  .hn-stats dd { font-size: 26px; }
+}
 
 .hn-scene {
   position: absolute; z-index: 2; right: clamp(20px, 4vw, 56px); bottom: clamp(36px, 7vh, 72px);

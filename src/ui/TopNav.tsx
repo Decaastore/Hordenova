@@ -161,4 +161,26 @@ nav.tn .tn-play:active { transform: translateY(1px); }
   nav.tn .tn-links { order: 3; flex: 0 0 100%; justify-content: flex-start; min-height: 44px; }
   nav.tn .tn-brand img { height: 24px !important; }
 }
+/* phones: logo and tools share one row (music as an icon, volume hidden), the links scroll under them with a fade at the edges */
+@media (max-width: 560px) {
+  .tn { padding: 6px 12px 0; gap: 0 8px; min-height: 0; }
+  nav.tn .tn-brand img { height: 15px !important; }
+  .tn-tools { gap: 5px; }
+  .tn-tools [data-testid=music-toggle] > span:not([aria-hidden]) { display: none; }
+  .tn-tools [data-testid=music-toggle] + button { display: none !important; }
+  .tn-tools button[aria-haspopup=listbox] > span:not(:first-child) { display: none; }
+  .tn-tools button[aria-haspopup=listbox] { padding-left: 8px !important; padding-right: 8px !important; min-height: 34px; }
+  .tn-tools [data-testid=music-toggle] { min-height: 34px; min-width: 34px; justify-content: center; }
+  nav.tn .tn-play { margin-left: 2px; padding: 9px 12px; letter-spacing: 1.2px; font-size: 12px; }
+  .tn-acct { height: 34px; }
+  nav.tn .tn-links { min-height: 42px; gap: 2px; -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); mask-image: linear-gradient(90deg, transparent 0, #000 14px, #000 calc(100% - 22px), transparent); padding: 0 10px; }
+  nav.tn .tn-link { font-size: 12px; letter-spacing: 1.2px; padding: 0 9px; }
+  nav.tn .tn-link.is-active::after { bottom: 6px; }
+}
+@media (max-width: 380px) {
+  .tn { padding-left: 8px; padding-right: 8px; gap: 0 4px; }
+  nav.tn .tn-brand img { height: 11px !important; }
+  .tn-tools { gap: 3px; }
+  nav.tn .tn-play { padding: 9px 9px; letter-spacing: 0.8px; }
+}
 `;

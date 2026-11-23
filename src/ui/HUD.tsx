@@ -672,6 +672,50 @@ div.hh-brand { cursor: default; }
   .hh-controls::-webkit-scrollbar { display: none; }
   .hh-hide-sm { display: none; }
 }
+/*
+ * PHONES — the HUD gives the map its room. Portrait: the logo (the way home)
+ * shares the first row with the wallet (icons and numbers, no labels), the
+ * wave and castle share the second, the place line goes. A phone held
+ * sideways (short screen): everything on one slim row, then status + buttons
+ * on another.
+ */
+@media (max-width: 720px) {
+  .hh-main { padding: 6px 10px 5px; gap: 6px 12px; }
+  .hh-brand { flex: 0 0 auto; order: 0; }
+  .hh-brand img { height: 16px !important; }
+  .hh-wallet { flex: 1 1 auto; order: 1; justify-content: flex-end; gap: 10px; flex-wrap: nowrap; margin-left: auto; }
+  .hh-wallet .hh-lbl { display: none; }
+  .hh-wallet .hh-stat { min-width: 0; gap: 4px; }
+  .hh-wallet .hh-val { font-size: 14px; }
+  .hh-wave, .hh-castle { order: 2; }
+  .hh-wave-place { display: none; }
+  .hh-wave-phase { font-size: 15px; }
+  .hh-sub { padding: 4px 10px 5px; row-gap: 3px; }
+  .hh-status { flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+  .hh-threat { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .hh-controls { padding-top: 2px; }
+  .hh-btn { height: 34px; }
+  .hh-speed-btn { padding: 6px 10px; }
+}
+@media (max-height: 520px) {
+  .hh-main { flex-wrap: nowrap; padding: 4px 10px 3px; gap: 14px; }
+  .hh-brand { flex: 0 0 auto; order: 0; }
+  .hh-brand img { height: 15px !important; }
+  .hh-wave, .hh-castle { order: 1; flex: 1 1 0; min-width: 0; }
+  .hh-wave-place, .hh-ticks { display: none; }
+  .hh-wave-phase { font-size: 14px; }
+  .hh-castle-bar { margin-top: 3px; height: 6px; }
+  .hh-wallet { order: 2; flex: 0 0 auto; gap: 10px; flex-wrap: nowrap; margin-left: 0; }
+  .hh-wallet .hh-lbl { display: none; }
+  .hh-wallet .hh-stat { min-width: 0; gap: 4px; }
+  .hh-wallet .hh-val { font-size: 13px; }
+  .hh-sub { flex-wrap: nowrap; padding: 3px 10px 4px; gap: 10px; }
+  .hh-status { flex: 0 1 auto; flex-wrap: nowrap; min-width: 0; font-size: 11px; }
+  .hh-threat, .hh-status .hh-sep { display: none; }
+  .hh-controls { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding: 2px; -webkit-mask-image: linear-gradient(90deg, #000 88%, transparent); mask-image: linear-gradient(90deg, #000 88%, transparent); }
+  .hh-controls::-webkit-scrollbar { display: none; }
+  .hh-btn { height: 30px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .hh-castle-fill, .hh-tick, .hh-speed-btn, .hh-btn { transition: none; }
   .hh-btn, .hh-btn:hover, .hh-emb, .hh-btn:hover .hh-emb { transform: none !important; }
