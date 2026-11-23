@@ -813,11 +813,39 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       }
     }
     moundGeo.computeVertexNormals();
-    const mound = new THREE.Mesh(moundGeo, stoneMat("mound", 8, 0.6, { rows: 3, cols: 12, mossy: 1 }));
-    mound.position.y = -2.5;
-    mound.name = "mound";
-    mound.receiveShadow = true;
-    root.add(mound);
+    if (SD) {
+      // SKINS — a cut, two-step octagonal plinth with lit trim slits (the same language as the modern tower bases)
+      const plinth = new THREE.Group();
+      plinth.name = "mound";
+      const pm = new THREE.MeshStandardMaterial({ color: new THREE.Color(D.stoneB).lerp(new THREE.Color(0x000000), 0.3), roughness: 0.72, metalness: 0.15 });
+      const low = new THREE.Mesh(new THREE.CylinderGeometry(54, 57, 4.4, 8), pm);
+      low.rotation.y = Math.PI / 8;
+      low.position.y = -2.4;
+      low.receiveShadow = true;
+      plinth.add(low);
+      const lip = new THREE.Mesh(new THREE.CylinderGeometry(51, 53, 1.4, 8), trimMetal());
+      lip.rotation.y = Math.PI / 8;
+      lip.position.y = -0.6;
+      plinth.add(lip);
+      const slit = glowMat(D.core, 2.2);
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const ap = 55.2 * Math.cos(Math.PI / 8);
+        for (const off of [-9, 0, 9]) {
+          const m = new THREE.Mesh(new THREE.BoxGeometry(off === 0 ? 7 : 3.2, 0.55, 0.4), slit);
+          m.position.set(Math.cos(a) * ap - Math.sin(a) * off, -2.2, Math.sin(a) * ap + Math.cos(a) * off);
+          m.rotation.y = -a + Math.PI / 2;
+          plinth.add(m);
+        }
+      }
+      root.add(plinth);
+    } else {
+      const mound = new THREE.Mesh(moundGeo, stoneMat("mound", 8, 0.6, { rows: 3, cols: 12, mossy: 1 }));
+      mound.position.y = -2.5;
+      mound.name = "mound";
+      mound.receiveShadow = true;
+      root.add(mound);
+    }
     const yardMat = stoneMat("yard", 6, 6, { rows: 12, cols: 12, mossy: 0.8 });
     yardMat.color = new THREE.Color(D.ground).lerp(new THREE.Color(0xffffff), 0.35);
     const yard = new THREE.Mesh(new THREE.CylinderGeometry(50, 50, 0.4, 48), yardMat);
@@ -1030,7 +1058,60 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       if (!broken) arrowSlit(tx, 40, tz + tr + 0.1, 0, 1.6, 3.2);
       if (!rear) anchors[sx < 0 ? "towerWindowL" : "towerWindowR"] = new THREE.Vector3(tx, 28, tz + tr);
       // GUARNIÇÃO — an archers' balcony round the tower, below the roof, where its soldiers stand
-      {
+      if (SD) {
+        // SKINS — a slim metal gallery with a lit underside instead of the old timber deck
+        const by = Math.round((broken ? th - 9 : th) * 0.66);
+        const br = tr + 3.2;
+        const metal = trimMetal();
+        const deck = new THREE.Mesh(new THREE.CylinderGeometry(br, br - 0.8, 1.1, 32), metal);
+        deck.position.set(tx, by, tz);
+        deck.castShadow = deck.receiveShadow = true;
+        root.add(deck);
+        const under = new THREE.Mesh(new THREE.TorusGeometry(br - 0.5, 0.3, 6, 40), glowMat(D.core, 2.4));
+        under.rotation.x = Math.PI / 2;
+        under.position.set(tx, by - 0.65, tz);
+        root.add(under);
+        // two slender struts per quarter, swept up into the wall
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.45, 5, 6), metal);
+          strut.position.set(tx + Math.cos(a) * (tr + 1.3), by - 2.4, tz + Math.sin(a) * (tr + 1.3));
+          strut.rotation.set(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55);
+          root.add(strut);
+        }
+        const rail = new THREE.Mesh(new THREE.TorusGeometry(br - 0.2, 0.2, 6, 40), metal);
+        rail.rotation.x = Math.PI / 2;
+        rail.position.set(tx, by + 2.4, tz);
+        root.add(rail);
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2;
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 2.4, 5), metal);
+          post.position.set(tx + Math.cos(a) * (br - 0.2), by + 1.2, tz + Math.sin(a) * (br - 0.2));
+          root.add(post);
+        }
+        // a glowing ring at the tower's foot, and a slow orbit of three motes above the gallery
+        const foot = new THREE.Mesh(new THREE.TorusGeometry(tr + 2.1, 0.32, 6, 40), glowMat(D.core, 2));
+        foot.rotation.x = Math.PI / 2;
+        foot.position.set(tx, 5.2, tz);
+        root.add(foot);
+        const orbit = new THREE.Group();
+        orbit.position.set(tx, by + 6.5, tz);
+        const orbitRing = new THREE.Mesh(new THREE.TorusGeometry(br + 1.2, 0.12, 4, 48), glowMat(D.window, 1.4));
+        orbitRing.rotation.x = Math.PI / 2;
+        orbit.add(orbitRing);
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2;
+          const mote = new THREE.Mesh(new THREE.OctahedronGeometry(0.9, 0), glowMat(D.core, 3));
+          mote.position.set(Math.cos(a) * (br + 1.2), 0, Math.sin(a) * (br + 1.2));
+          orbit.add(mote);
+        }
+        orbit.rotation.z = sx * 0.12;
+        anim(orbit, { spin: [0, 0.5 * sx, 0], bob: [0.8, 1.2] });
+        root.add(orbit);
+        anchors[`postTower${side}`] = rear
+          ? new THREE.Vector3(tx + sx * (tr + 1.4) * 0.72, by + 0.7, tz + (tr + 1.4) * 0.72)
+          : new THREE.Vector3(tx, by + 0.7, tz + (tr + 1.4));
+      } else {
         const by = Math.round((broken ? th - 9 : th) * 0.66);
         const br = tr + 3.2;
         const plank = woodSet ?? (woodSet = woodTexture());
@@ -1144,6 +1225,10 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
   // ---------------------------------------------------------------------------
   // Skin dressing — the extra pieces that make each castle skin its own place
   // ---------------------------------------------------------------------------
+  /** The dark, satin metal of the skins' modern trim (galleries, plinth lip) — tinted by the skin's stone. */
+  function trimMetal(): THREE.MeshStandardMaterial {
+    return new THREE.MeshStandardMaterial({ color: new THREE.Color(D.stoneB).lerp(new THREE.Color(D.roofDark), 0.5).lerp(new THREE.Color(0x000000), 0.2), metalness: 0.75, roughness: 0.32 });
+  }
   function glowMat(color: string, intensity = 2): THREE.MeshStandardMaterial {
     return new THREE.MeshStandardMaterial({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: intensity, roughness: 0.25 });
   }

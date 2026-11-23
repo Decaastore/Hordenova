@@ -70,6 +70,56 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v166",
+    dateIso: "2026-11-23",
+    category: "CASTLE",
+    title: {
+      en: "Castle Skins, Modernised",
+      ptBR: "Skins de Castelo Modernizadas",
+    },
+    description: {
+      en: "Every castle skin got the same modern finish as the new towers: the old timber balconies are gone, replaced by slim metal galleries with a lit underside, a glowing ring at each tower's foot and a slow orbit of light above it.",
+      ptBR: "Toda skin de castelo ganhou o mesmo acabamento moderno das torres novas: as varandas de madeira antigas saíram e entraram galerias de metal finas com luz por baixo, um anel brilhando no pé de cada torre e uma órbita de luz girando devagar acima dela.",
+    },
+    highlights: [
+      {
+        en: "Applies to all 18 castle skins — Store, packs, collection, Prestige and ranking prizes — each in its own colours. The biome's own castle keeps its classic look.",
+        ptBR: "Vale para as 18 skins de castelo — Loja, pacotes, coleção, Prestígio e prêmios de ranking — cada uma nas suas cores. O castelo padrão do bioma continua com o visual clássico.",
+      },
+      {
+        en: "In the Store and collection previews the castle now stands on a cut octagonal plinth with lit trim, like the tower bases.",
+        ptBR: "Nas vitrines da Loja e da coleção o castelo agora fica sobre uma base octogonal lapidada com frisos de luz, como as bases das torres.",
+      },
+      {
+        en: "Purely visual: soldiers still stand on the galleries exactly where they did, and no skin changes HP or damage.",
+        ptBR: "Só visual: os soldados continuam nas galerias no mesmo lugar, e nenhuma skin muda vida ou dano.",
+      },
+    ],
+  },
+  {
+    id: "v165",
+    dateIso: "2026-11-23",
+    category: "INTERFACE",
+    title: {
+      en: "See the Items You Win",
+      ptBR: "Veja os Itens que Você Ganha",
+    },
+    description: {
+      en: "The Season Pass and the Store packs now show the real picture and the name of each item they give, instead of a generic rune.",
+      ptBR: "O Passe da Season e os pacotes da Loja agora mostram a imagem de verdade e o nome de cada item que dão, em vez de uma runa genérica.",
+    },
+    highlights: [
+      {
+        en: "Each item reward reads like \"Rare: Ancient Core\", with that item's own art in its rarity frame — on the Pass track, the pass cards, the next-reward box and every pack.",
+        ptBR: "Cada item aparece como \"Raro: Núcleo Ancestral\", com a arte do próprio item na moldura da raridade — na trilha do Passe, nos cartões dos passes, na próxima recompensa e em todos os pacotes.",
+      },
+      {
+        en: "A castle-skin reward now shows the castle itself in 3D.",
+        ptBR: "Uma recompensa de skin de castelo agora mostra o próprio castelo em 3D.",
+      },
+    ],
+  },
+  {
     id: "v164",
     dateIso: "2026-11-23",
     category: "INTERFACE",
