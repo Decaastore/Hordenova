@@ -21,7 +21,9 @@ import { MaterialIcon } from "@/ui/MaterialIcon";
 import { Castle3DPortrait, Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { ChestArt, CrownArt, GemPile, PerkIcon, StoreGem } from "@/ui/StoreArt";
-import { STARTER_PACK_SKIN_ID } from "@/config/seasonPass";
+import { STARTER_PACK_SKIN_ID, type RewardPart } from "@/config/seasonPass";
+import { ItemGlyph } from "@/ui/ItemGlyph";
+import { rewardItemDefinitionId } from "@/engine/RewardGrant";
 import { RewardPartsLabel, REWARD_CSS } from "@/ui/RewardPartsLabel";
 
 interface StoreScreenProps {
@@ -294,9 +296,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                 <ul className="st-contents">
                   {STARTER_PACK.contents.map((part, i) => (
                     <li key={i}>
-                      <span className="st-contents-ico">
-                        <PerkIcon kind={partIcon(part.kind)} />
-                      </span>
+                      <PartIcon part={part} partIcon={partIcon} />
                       <RewardPartsLabel parts={[part]} currentWave={save.currentWave} />
                     </li>
                   ))}
@@ -397,9 +397,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                     <ul className="st-contents">
                       {groupParts(b.contents.filter((part) => part.kind !== "SKIN" && part.kind !== "CASTLE_SKIN")).map(({ part, count }, i) => (
                         <li key={i}>
-                          <span className="st-contents-ico">
-                            <PerkIcon kind={partIcon(part.kind)} />
-                          </span>
+                          <PartIcon part={part} partIcon={partIcon} />
                           <span>
                             {count > 1 && `${count}× `}
                             <RewardPartsLabel parts={[part]} currentWave={save.currentWave} />
@@ -572,6 +570,24 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
   );
 }
 
+/** A pack's content line icon: the real item picture for items, the perk icon for everything else. */
+function PartIcon({ part, partIcon }: { part: RewardPart; partIcon: (kind: string) => "GEMS" | "SKIN" | "ITEM" | "SLOTS" }) {
+  if (part.kind === "ITEM") {
+    const id = rewardItemDefinitionId(part.rarity);
+    if (id)
+      return (
+        <span className="st-contents-ico is-item">
+          <ItemGlyph itemDefinitionId={id} size={40} />
+        </span>
+      );
+  }
+  return (
+    <span className="st-contents-ico">
+      <PerkIcon kind={partIcon(part.kind)} />
+    </span>
+  );
+}
+
 const STORE_CSS = `
 /* ===== STORE =====
  * One material language for every card: dark lacquered panels with a thin
@@ -682,6 +698,7 @@ const STORE_CSS = `
 .st-contents, .st-perks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .st-perks { grid-template-columns: 1fr; margin-top: 14px; }
 .st-contents li, .st-perks li { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(0,0,0,0.28); border: 1px solid rgba(255,236,190,0.08); font-size: 13.5px; font-weight: 600; color: var(--bone); }
+.st-contents-ico.is-item { width: auto; height: auto; background: none; box-shadow: none; }
 .st-contents-ico { flex: none; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; color: var(--gold-hi); background: radial-gradient(circle at 50% 35%, rgba(255,214,140,0.25), rgba(0,0,0,0.3)); box-shadow: inset 0 0 0 1px rgba(255,214,140,0.2); }
 .st-buybox { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-top: auto; padding-top: 18px; }
 .st-buybox .st-price { font-family: var(--display); font-size: 28px; font-weight: 700; color: #fff3d6; font-variant-numeric: lining-nums tabular-nums; }

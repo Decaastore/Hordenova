@@ -1974,6 +1974,7 @@ export const ptBR: TranslationSchema = {
     gems: "{n} Gemas",
     gold: "{n} de ouro",
     slots: "+{n} espaços no inventário",
+    itemNamed: "{rarity}: {name}",
     item: "Item {rarity}",
     skin: "Skin: {name}",
   },

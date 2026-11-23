@@ -1,7 +1,7 @@
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import type { RewardPart } from "@/config/seasonPass";
-import { goldForKills } from "@/engine/RewardGrant";
+import { goldForKills, rewardItemDefinitionId } from "@/engine/RewardGrant";
 
 /** One line per reward part, in plain words ("Lendário: Olho do Guardião", "320 de ouro"). Gold is shown at the player's current wave. */
 export function RewardPartsLabel({ parts, currentWave }: { parts: readonly RewardPart[]; currentWave: number }) {
@@ -33,12 +33,15 @@ export function RewardPartsLabel({ parts, currentWave }: { parts: readonly Rewar
             );
           case "INVENTORY_SLOTS":
             return <span key={i}>{t("reward.slots", { n: part.amount })}</span>;
-          case "ITEM":
+          case "ITEM": {
+            const id = rewardItemDefinitionId(part.rarity);
+            const rarity = t(`rarity.${part.rarity}` as TranslationKey);
             return (
               <span key={i} className={`rw-item rw-${part.rarity.toLowerCase()}`}>
-                {t("reward.item", { rarity: t(`rarity.${part.rarity}` as TranslationKey) })}
+                {id ? t("reward.itemNamed", { rarity, name: t(`items.${id}.name` as TranslationKey) }) : t("reward.item", { rarity })}
               </span>
             );
+          }
           case "SKIN":
             return (
               <span key={i} className="rw-skin">

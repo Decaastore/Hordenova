@@ -3,7 +3,9 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
 import { MAX_TOWER_LEVEL } from "@/config/towerStats";
 import type { PassReward, RewardPart } from "@/config/seasonPass";
 import { StoreGem } from "./StoreArt";
-import { Tower3DPortrait } from "./Tower3DPortrait";
+import { Castle3DPortrait, Tower3DPortrait } from "./Tower3DPortrait";
+import { ItemGlyph } from "./ItemGlyph";
+import { rewardItemDefinitionId } from "@/engine/RewardGrant";
 
 /**
  * PASS ART — a picture for every kind of Season Pass reward, so the track
@@ -95,12 +97,15 @@ export function RewardIcon({ part, size = 40 }: { part: RewardPart; size?: numbe
       return <StoreGem tone="PURCHASED" size={size * 0.85} />;
     case "GOLD":
       return <Gold size={size} />;
-    case "ITEM":
-      return <ItemRune size={size} color={getRarityDefinition(part.rarity).color} />;
+    case "ITEM": {
+      // the exact item this reward gives (always the same one per rarity — see RewardGrant)
+      const id = rewardItemDefinitionId(part.rarity);
+      return id ? <ItemGlyph itemDefinitionId={id} size={Math.round(size * 0.95)} /> : <ItemRune size={size} color={getRarityDefinition(part.rarity).color} />;
+    }
     case "INVENTORY_SLOTS":
       return <Slots size={size} />;
     case "CASTLE_SKIN":
-      return <Slots size={size} />;
+      return <Castle3DPortrait dressing="ANCIENT_FOREST" skin={part.skinId} width={Math.round(size * 1.6)} height={Math.round(size * 1.2)} spin={false} />;
     case "SKIN": {
       const skin = getTowerSkinDefinition(part.skinId);
       return skin ? (

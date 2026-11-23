@@ -1973,6 +1973,7 @@ export const en = {
     gems: "{n} Gems",
     gold: "{n} Gold",
     slots: "+{n} inventory slots",
+    itemNamed: "{rarity}: {name}",
     item: "{rarity} item",
     skin: "Skin: {name}",
   },

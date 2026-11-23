@@ -169,7 +169,9 @@ export function PassScreen({ onNavigate, onPlay }: PassScreenProps) {
                   </span>
                 </div>
                 <div className="ps-tier-art is-supreme">
-                  {sample([{ kind: "ITEM", rarity: "RARE" }, { kind: "ITEM", rarity: "EPIC" }, { kind: "ITEM", rarity: "LEGENDARY" }])}
+                  {([["RARE", 46], ["EPIC", 54], ["LEGENDARY", 66]] as const).map(([rarity, size]) => (
+                    <RewardIcon key={rarity} part={{ kind: "ITEM", rarity }} size={size} />
+                  ))}
                 </div>
                 <p className="ps-tier-desc">{t("pass.supremeDesc")}</p>
                 <ul className="ps-tier-list">
@@ -243,7 +245,8 @@ const PASS_PAGE_CSS = `
 .ps-tier-art svg { filter: drop-shadow(0 4px 6px rgba(0,0,0,0.55)); transition: transform 300ms var(--hn-ease-back); }
 .ps-tier-art svg:nth-child(odd) { animation: hn-float 3.4s ease-in-out infinite; }
 .ps-tier-art svg:nth-child(even) { animation: hn-float 3.4s ease-in-out -1.7s infinite; }
-.ps-tier-art.is-supreme svg:last-child { width: 64px; height: 64px; }
+.ps-tier-art > div:nth-child(odd) { animation: hn-float 3.4s ease-in-out infinite; }
+.ps-tier-art > div:nth-child(even) { animation: hn-float 3.4s ease-in-out -1.7s infinite; }
 .ps-tier-skins { display: flex; justify-content: center; gap: 4px; height: 120px; margin: 10px 0 4px; border-radius: 12px; background: radial-gradient(55% 60% at 50% 45%, rgba(120,190,255,0.16), transparent 70%); }
 .ps-tier-skins figure { margin: 0; display: grid; justify-items: center; }
 .ps-tier-skins canvas { display: block; }
@@ -264,7 +267,7 @@ const PASS_PAGE_CSS = `
 .ps-adult { display: flex; align-items: center; gap: 10px; margin: 14px 0 0; font-size: 12.5px; color: var(--ash); }
 .ps-adult span { flex: none; display: inline-grid; place-items: center; min-width: 36px; height: 24px; border-radius: 6px; border: 1.5px solid #e0644b; color: #ff9a85; font-weight: 800; font-size: 12px; }
 @media (prefers-reduced-motion: reduce) {
-  .pa-medal, .ps-xp-fill, .ps-next-art .pa-art, .ps-tier.is-supreme, .ps-badge.is-sale, .ps-tier-art svg { animation: none !important; }
+  .pa-medal, .ps-xp-fill, .ps-next-art .pa-art, .ps-tier.is-supreme, .ps-badge.is-sale, .ps-tier-art svg, .ps-tier-art > div { animation: none !important; }
   .ps-tier:hover { transform: none; }
 }
 @media (max-width: 720px) {
