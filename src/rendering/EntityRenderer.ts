@@ -3571,6 +3571,84 @@ export function drawBossAura(
 }
 
 /**
+ * BOSS FURY (config/bossFury.ts) in the 2D view — the roar's warning ring at
+ * the exact radius it will hit (a disc fills it as the roar winds up), the
+ * shockwave when it lands, and the barrier (gold) / harden (stone) shell.
+ * Drawn on the ground under the creature.
+ */
+export function drawBossFury(ctx: CanvasRenderingContext2D, enemy: EnemyInstance, timeMs: number): void {
+  const st = enemy.boss;
+  if (!st || st.nextRoarAtMs === undefined) return;
+  const { x, y } = enemy.position;
+  const R = st.roarRadius ?? 200;
+  const tele = st.roarTelegraphRemainingMs ?? 0;
+  ctx.save();
+  if (tele > 0) {
+    const k = 1 - tele / Math.max(1, st.roarTelegraphTotalMs ?? 1);
+    ctx.fillStyle = `rgba(255,90,30,${0.08 + 0.14 * k})`;
+    ctx.beginPath();
+    ctx.ellipse(x, y, R * k, R * k * 0.62, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255,60,20,${0.55 + 0.4 * Math.abs(Math.sin(timeMs / 90))})`;
+    ctx.lineWidth = 3;
+    ctx.setLineDash([14, 8]);
+    ctx.lineDashOffset = -timeMs / 30;
+    ctx.beginPath();
+    ctx.ellipse(x, y, R, R * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  const since = st.roarSinceMs ?? 99_999;
+  if (since < 600) {
+    const u = since / 600;
+    ctx.strokeStyle = `rgba(255,140,60,${1 - u})`;
+    ctx.lineWidth = 8 * (1 - u) + 1;
+    ctx.beginPath();
+    ctx.ellipse(x, y, R * (0.3 + 0.75 * u), R * (0.3 + 0.75 * u) * 0.62, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  if (st.barrierUntilMs != null) {
+    const r = st.isMainBoss ? 46 : 30;
+    const g = ctx.createRadialGradient(x, y - r * 0.4, r * 0.2, x, y - r * 0.4, r);
+    const c = st.isMainBoss ? "255,216,120" : "200,204,216";
+    g.addColorStop(0, `rgba(${c},0.05)`);
+    g.addColorStop(0.8, `rgba(${c},${0.22 + 0.08 * Math.sin(timeMs / 120)})`);
+    g.addColorStop(1, `rgba(${c},0)`);
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y - r * 0.4, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${c},0.8)`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y - r * 0.4, r * 0.92, Math.PI * 1.05, Math.PI * 1.95);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** BOSS FURY — a tower stunned by a roar: golden stars wheeling over its top. */
+export function drawTowerStun(ctx: CanvasRenderingContext2D, tower: { position: { x: number; y: number }; roarStunMs?: number }, timeMs: number): void {
+  if (!tower.roarStunMs || tower.roarStunMs <= 0) return;
+  const { x, y } = tower.position;
+  ctx.save();
+  for (let k = 0; k < 3; k++) {
+    const a = timeMs / 180 + (k / 3) * Math.PI * 2;
+    const px = x + Math.cos(a) * 13, py = y - 40 + Math.sin(a) * 4;
+    ctx.fillStyle = Math.sin(a) > 0 ? "#ffd040" : "rgba(255,208,64,0.6)";
+    ctx.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const an = (i / 10) * Math.PI * 2 - Math.PI / 2;
+      const r = i % 2 ? 2 : 4.6;
+      ctx.lineTo(px + Math.cos(an) * r, py + Math.sin(an) * r);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+/**
  * SHIELD DURANTE O MODO ENFURECIDO — a slowly-rotating, dashed icy-violet
  * ring drawn on top of an Enraged Boss/Mini-Boss's own body (called after
  * drawEnemy, unlike drawBossAura's glow-behind-the-body treatment) so the

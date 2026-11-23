@@ -91,6 +91,16 @@ export function playGameAudioEvent(event: GameAudioEvent): void {
     case "tower_siege_hit":
       audioManager.play("tower_siege_hit");
       return;
+    // BOSS FURY — the existing boss voices, pitched: a low growl for the wind-up, a deep blast for the roar, a bright toll for the barrier
+    case "boss_roar_windup":
+      audioManager.play("boss_enrage", { volume: 0.55, pitch: 0.75 });
+      return;
+    case "boss_roar":
+      audioManager.play("tower_siege_hit", { volume: 1, pitch: 0.62 });
+      return;
+    case "boss_barrier":
+      audioManager.play("boss_intro", { volume: 0.7, pitch: 1.25 });
+      return;
     case "wave_start":
       audioManager.play("wave_start");
       return;

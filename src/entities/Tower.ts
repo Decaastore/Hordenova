@@ -55,6 +55,10 @@ export interface TowerInstance {
   siteTrait?: SiteTrait;
   /** >0 while jammed by a DISABLER-archetype enemy/mini-boss — see CombatSystem.tickEnemyDisableAbilities. */
   disabledRemainingMs: number;
+  /** BOSS FURY — >0 while stunned by a boss roar (drawn as stars circling the tower); the stun itself is disabledRemainingMs. */
+  roarStunMs?: number;
+  /** BOSS FURY — >0 while immune to another roar stun (config/bossFury.ts ROAR_IMMUNITY_MS). */
+  roarImmuneMs?: number;
   /** Progression 2.0 — the player's chosen build-identity path, null until chosen. Permanent once set (see chooseSpecialization). */
   specializationId: SpecializationId | null;
   /** 0 = not chosen yet. 1..MAX_SPECIALIZATION_LEVEL once chosen — a second, independent gold-sink track from the tower's own level. */
@@ -446,6 +450,8 @@ export function tickTowerCooldown(tower: TowerInstance, dtMs: number): void {
   tower.cooldownRemainingMs = Math.max(0, tower.cooldownRemainingMs - dtMs);
   tower.msSinceAttack += dtMs;
   tower.disabledRemainingMs = Math.max(0, tower.disabledRemainingMs - dtMs);
+  if (tower.roarStunMs) tower.roarStunMs = Math.max(0, tower.roarStunMs - dtMs);
+  if (tower.roarImmuneMs) tower.roarImmuneMs = Math.max(0, tower.roarImmuneMs - dtMs);
 }
 
 export function isTowerReadyToAttack(tower: TowerInstance): boolean {

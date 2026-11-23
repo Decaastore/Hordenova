@@ -46,6 +46,32 @@ const loc = (p: Vector2, y = 0) => {
   return new THREE.Vector3(x, y, z);
 };
 
+let starTex: THREE.Texture | null = null;
+/** A soft five-pointed star (the dizzy stars over a stunned tower). */
+function starTexture() {
+  if (starTex) return starTex;
+  const c = document.createElement("canvas");
+  c.width = c.height = 64;
+  const x = c.getContext("2d")!;
+  const glow = x.createRadialGradient(32, 32, 0, 32, 32, 32);
+  glow.addColorStop(0, "rgba(255,255,255,0.9)");
+  glow.addColorStop(0.35, "rgba(255,220,120,0.35)");
+  glow.addColorStop(1, "rgba(255,200,80,0)");
+  x.fillStyle = glow;
+  x.fillRect(0, 0, 64, 64);
+  x.fillStyle = "#ffffff";
+  x.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+    const r = i % 2 ? 7 : 17;
+    x.lineTo(32 + Math.cos(a) * r, 32 + Math.sin(a) * r);
+  }
+  x.closePath();
+  x.fill();
+  starTex = new THREE.CanvasTexture(c);
+  return starTex;
+}
+
 let blobTex: THREE.Texture | null = null;
 function blobTexture() {
   if (blobTex) return blobTex;
@@ -856,6 +882,8 @@ interface Live {
   frost: number;
   frozen: boolean;
   ice: ArmorPiece[] | null;
+  /** BOSS FURY: the roar's warning on the ground (an edge ring and a filling disc), the barrier dome, and what was already played. */
+  fury?: { ring: THREE.Mesh; fill: THREE.Mesh; dome: THREE.Mesh; windup: boolean; blastAt: number; barrier: boolean };
 }
 
 function Creatures({
@@ -894,6 +922,86 @@ function Creatures({
 
   /** Where a creature stands before the gate: further out the bigger it is. */
   const standPoint = (gate: CastleState, h: number) => gate.gateFront.clone().addScaledVector(gate.gatePlane.normal, 4 + h * 0.22).setY(0);
+
+  /**
+   * BOSS FURY (config/bossFury.ts) — what the player reads of a boss's roar and barrier:
+   * a red ring on the ground at the exact radius it will hit, a disc filling it as the
+   * roar winds up (the boss rears up and roars), then a shockwave; and a golden dome
+   * (main boss barrier) or a stone sheen (mini-boss harden) while it's nearly unhittable.
+   */
+  const fury = (e: Live, en: EnemyInstance, g: THREE.Group) => {
+    const st = en.boss;
+    if (!st || st.nextRoarAtMs === undefined || e.born < 1 || e.enterT >= 0) {
+      if (e.fury) e.fury.ring.visible = e.fury.fill.visible = e.fury.dome.visible = false;
+      return;
+    }
+    if (!e.fury) {
+      const mk = (geo: THREE.BufferGeometry, color: string, opacity: number) => {
+        const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+        m.rotation.x = -Math.PI / 2;
+        m.renderOrder = 4;
+        m.visible = false;
+        g.add(m);
+        return m;
+      };
+      const dome = new THREE.Mesh(
+        new THREE.SphereGeometry(1, 32, 20, 0, Math.PI * 2, 0, Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: "#ffd878", transparent: true, opacity: 0.22, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }),
+      );
+      dome.visible = false;
+      g.add(dome);
+      e.fury = { ring: mk(new THREE.RingGeometry(0.955, 1, 96), "#ff3a1a", 0.9), fill: mk(new THREE.CircleGeometry(1, 64), "#ff5a1a", 0.18), dome, windup: false, blastAt: -1, barrier: false };
+    }
+    const f = e.fury;
+    const feet = e.obj.position.clone().setY(0.8);
+    const r3 = loc({ x: en.position.x + (st.roarRadius ?? 200), y: en.position.y }).distanceTo(loc(en.position));
+    const tele = st.roarTelegraphRemainingMs ?? 0;
+    const now = performance.now();
+    if (tele > 0) {
+      const k = 1 - tele / Math.max(1, st.roarTelegraphTotalMs ?? 1);
+      f.ring.visible = f.fill.visible = true;
+      f.ring.position.copy(feet);
+      f.fill.position.copy(feet).setY(0.7);
+      f.ring.scale.setScalar(r3);
+      f.fill.scale.setScalar(Math.max(0.01, r3 * k));
+      (f.ring.material as THREE.MeshBasicMaterial).opacity = 0.55 + 0.45 * Math.abs(Math.sin(now / 90));
+      (f.fill.material as THREE.MeshBasicMaterial).opacity = 0.12 + 0.18 * k;
+      if (!f.windup) {
+        f.windup = true;
+        e.c.playOnce("roar", 1.25);
+      }
+      if (Math.random() < 0.5) fx.glow.emit(e.obj.position.clone().add(new THREE.Vector3(0, e.h * 0.8, 0)), { count: 1, color: "#ffd0a0", colorEnd: "#ff2a0a", size: 2.2, life: 0.5, speed: 18, up: 10, drag: 1, radius: e.h * 0.15 });
+    } else {
+      f.ring.visible = f.fill.visible = false;
+      f.windup = false;
+    }
+    // the roar lands: a shockwave the size of the warning ring, dust, and a flash in its throat
+    if ((st.roarSinceMs ?? 99_999) < 250 && now - f.blastAt > 800) {
+      f.blastAt = now;
+      fx.rings.ring(feet, "#ff5a1a", 6, r3 / 0.65, 0.55);
+      fx.rings.ring(feet, "#ffd0a0", 3, (r3 * 0.7) / 0.65, 0.4);
+      fx.smoke.emit(feet.clone().setY(3), { count: 18, color: "#7a6a58", colorEnd: "#2a221c", size: e.h * 0.18, life: 1.3, speed: r3 * 1.4, up: 6, grow: 2, alpha: 0.4, drag: 2.2, radius: e.h * 0.2 });
+      fx.glow.emit(e.obj.position.clone().add(new THREE.Vector3(0, e.h * 0.75, 0)), { count: 4, color: "#ffffff", colorEnd: "#ff4a1a", size: e.h * 0.35, life: 0.25, speed: 0, grow: 1.6 });
+    }
+    // the barrier (main) / harden (mini)
+    const up = st.barrierUntilMs != null;
+    f.dome.visible = up;
+    if (up) {
+      const main = st.isMainBoss;
+      const mat = f.dome.material as THREE.MeshBasicMaterial;
+      mat.color.set(main ? "#ffd878" : "#c8ccd8");
+      mat.opacity = (main ? 0.2 : 0.12) + 0.08 * Math.sin(now / 120);
+      f.dome.position.copy(e.obj.position).setY(0);
+      f.dome.scale.set(e.h * 0.55, e.h * 1.05, e.h * 0.55);
+      f.dome.rotation.y += 0.02;
+      if (!f.barrier) {
+        f.barrier = true;
+        fx.rings.ring(feet, main ? "#ffd878" : "#c8ccd8", 4, (e.h * 0.9) / 0.65, 0.6);
+        fx.glow.emit(e.obj.position.clone().add(new THREE.Vector3(0, e.h * 0.5, 0)), { count: 30, color: "#ffffff", colorEnd: main ? "#ffc848" : "#a8b0c0", size: 2, life: 0.8, speed: 40, drag: 2, radius: e.h * 0.3 });
+      }
+      if (Math.random() < 0.3) fx.glow.emit(e.obj.position.clone().add(new THREE.Vector3((Math.random() - 0.5) * e.h * 0.9, Math.random() * e.h, (Math.random() - 0.5) * e.h * 0.9)), { count: 1, color: "#ffffff", colorEnd: main ? "#ffd878" : "#c8ccd8", size: 1.4, life: 0.5, speed: 0, grow: 1.4, radius: 0.5 });
+    } else f.barrier = false;
+  };
 
   /** The menace of an Elite / Mini-Boss / Boss: glowing eyes, a ring of its rank's colour pulsing under it, and — badly hurt or enraged — it burns red and throws sparks. */
   const menace = (e: Live, en: EnemyInstance, dt: number, g: THREE.Group) => {
@@ -1239,6 +1347,7 @@ function Creatures({
       }
       if (en.burn && Math.random() < 0.4) fx.flame(pos.clone().add(new THREE.Vector3((Math.random() - 0.5) * 6, ENEMY_HEIGHT * 0.5, 0)), 0.5, "#ff4a0a");
       menace(e, en, dt, g);
+      fury(e, en, g);
     }
     for (const [id, st] of strides.current)
       if (!strideSeen.has(id)) {
@@ -1274,6 +1383,7 @@ function Creatures({
         {
           e.mode = "dying";
           e.aura.visible = false;
+          if (e.fury) e.fury.ring.visible = e.fury.fill.visible = e.fury.dome.visible = false;
           for (const sp of e.eyes) sp.visible = false;
           for (const a of e.armor) a.obj.visible = false;
           fx.death(e.obj.position.clone().add(new THREE.Vector3(0, ENEMY_HEIGHT * 0.4, 0)), !!e.last?.boss);
@@ -1301,6 +1411,13 @@ function Creatures({
     function remove(id: string, e: Live) {
       g!.remove(e.obj, e.shadow, e.aura, ...e.eyes, ...e.armor.map((a) => a.obj), ...(e.ice ?? []).map((a) => a.obj));
       (e.aura.material as THREE.Material).dispose();
+      if (e.fury) {
+        for (const m of [e.fury.ring, e.fury.fill, e.fury.dome]) {
+          g!.remove(m);
+          m.geometry.dispose();
+          (m.material as THREE.Material).dispose();
+        }
+      }
       for (const sp of e.eyes) sp.material.dispose();
       for (const m of e.fading) m.dispose();
       live.current.delete(id);
@@ -1419,6 +1536,8 @@ interface LiveTower {
   halos: { sprite: THREE.Sprite; base: number; size: number }[];
   /** Frostborn: ice shards circling the orb. */
   orbit: THREE.Group | null;
+  /** BOSS FURY — a crown of stars wheeling over the tower while a roar has it stunned (built on first stun). */
+  stars?: THREE.Group;
   /** Stage 4+: a rune circle turning on the ground under it. */
   rune: THREE.Mesh | null;
   /** Its skin's effect colours and idle particle behaviour. */
@@ -1660,7 +1779,10 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       let e = live.current.get(tw.id);
       if (!e || e.key !== key) {
         const upgraded = !!e && stage > e.stage;
-        if (e) g.remove(e.obj);
+        if (e) {
+          g.remove(e.obj);
+          if (e.stars) g.remove(e.stars);
+        }
         const kit = towerKit(tw.type, stage, skin, fusedType);
         const obj = kit.root.clone(true);
         const turret = obj.children[kit.root.children.indexOf(kit.turret)] ?? null;
@@ -1784,6 +1906,34 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       if (e.rune) e.rune.rotation.y -= dt * 0.35;
       if (!disabled) towerLife(e, tw, dt);
       if (disabled && Math.random() < 0.2) fx.smokePuff(e.obj.position.clone().setY(18), 0.5);
+      // BOSS FURY — stunned by a roar: golden stars wheeling over the tower, and a dizzy wobble
+      if ((tw.roarStunMs ?? 0) > 0) {
+        const top = e.obj.position.y + 38 * TOWER_PRESENTATION_SCALE;
+        for (let k = 0; k < 4; k++) {
+          const a = t * 5 + (k / 4) * Math.PI * 2;
+          fx.glow.emit(new THREE.Vector3(e.obj.position.x + Math.cos(a) * 10, top + Math.sin(a * 2) * 1.5, e.obj.position.z + Math.sin(a) * 10), { count: 1, color: "#ffffff", colorEnd: "#ffc020", size: 4.2, life: 0.12, speed: 0, radius: 0.1 });
+        }
+        if (Math.random() < 0.08) fx.rings.ring(e.obj.position.clone().setY(top - 2), "#ffd040", 2, 18, 0.5);
+        e.obj.rotation.z = Math.sin(t * 14) * 0.03;
+        if (!e.stars) {
+          e.stars = new THREE.Group();
+          for (let k = 0; k < 5; k++) {
+            const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: starTexture(), color: "#ffd040", transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+            const a = (k / 5) * Math.PI * 2;
+            sp.position.set(Math.cos(a) * 13, 0, Math.sin(a) * 13);
+            sp.scale.setScalar(13);
+            e.stars.add(sp);
+          }
+          g.add(e.stars);
+        }
+        e.stars.visible = true;
+        e.stars.position.set(e.obj.position.x, top, e.obj.position.z);
+        e.stars.rotation.y = t * 4;
+        e.stars.children.forEach((c, k) => (c.position.y = Math.sin(t * 6 + k) * 1.4));
+      } else {
+        if (e.obj.rotation.z) e.obj.rotation.z = 0;
+        if (e.stars) e.stars.visible = false;
+      }
       if (tw.mana >= MANA_MAX && Math.random() < 0.25) fx.mote(e.obj.position.clone().setY(10), e.fxc.col, 10, 26);
     }
     // shots fired this frame: recoil, crystal flare and a muzzle flash at the turret
@@ -1838,6 +1988,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
     for (const [id, e] of live.current)
       if (!seen.has(id)) {
         g.remove(e.obj);
+        if (e.stars) g.remove(e.stars);
         for (const gl of e.glows) gl.mat.dispose();
         for (const h of e.halos) h.sprite.material.dispose();
         live.current.delete(id);

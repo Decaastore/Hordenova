@@ -126,7 +126,7 @@ import {
   tickWaveManager,
   type WaveManagerState,
 } from "./WaveManager";
-import { createBossInstance, ENRAGE_HP_THRESHOLD, tickBossAbilities, tickBossSiege } from "./BossManager";
+import { createBossInstance, ENRAGE_HP_THRESHOLD, tickBossAbilities, tickBossFury, tickBossSiege } from "./BossManager";
 import {
   BOSS_RETREAT_RECOVERY,
   bossWeakness,
@@ -3004,6 +3004,14 @@ export class GameEngine {
       if (enemy.boss?.enraged && !this.enrageAudioFired.has(enemy.id)) {
         this.enrageAudioFired.add(enemy.id);
         this.emitAudio({ type: "boss_enrage" });
+      }
+      // BOSS FURY (config/bossFury.ts) — the stun roar and the phase barrier.
+      if (enemy.boss) {
+        const fury = tickBossFury(enemy, nowMs, scaledDt, this.wave.currentWave, this.towers);
+        bossSummons.push(...fury.summons);
+        if (fury.roarWindup) this.emitAudio({ type: "boss_roar_windup" });
+        if (fury.roarStunned) this.emitAudio({ type: "boss_roar" });
+        if (fury.barrierUp) this.emitAudio({ type: "boss_barrier" });
       }
       // Master Implementation Pass spec section 13 — Boss Siege Attack.
       // Fully independent of tickBossAbilities' own cadence above.

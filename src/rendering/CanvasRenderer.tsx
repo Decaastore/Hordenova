@@ -45,7 +45,7 @@ import {
   drawSlot,
   drawVignette,
 } from "./MapRenderer";
-import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower, getEnemyVfxProfile } from "./EntityRenderer";
+import { drawBossAura, drawEliteAura, drawEnemy, drawEnemyHpBar, drawEnrageShieldRing, drawProjectile, drawTower, getEnemyVfxProfile, drawBossFury, drawTowerStun } from "./EntityRenderer";
 import { VfxManager } from "./vfx";
 import { SpecialVfxLayer } from "./specialVfx";
 import { setSpriteBiome } from "./enemySprites";
@@ -547,6 +547,7 @@ export function CanvasRenderer({
         // selection feedback is never lost for it.
         // a 3D layer drawing this tower's body still leaves its ring, level badge and mana bar to the 2D map
         drawTower(ctx, tower, tower.id === snapshot.selectedTowerId, timestamp, attackFlashMs, false, !!hidden3DTowerIds?.current?.has(tower.id));
+        if (!hidden3DTowerIds?.current?.has(tower.id)) drawTowerStun(ctx, tower, timestamp);
         if (tower.id === snapshot.selectedTowerId) {
           drawRangeCircle(ctx, tower.position, getTowerStats(tower).range);
         }
@@ -596,6 +597,8 @@ export function CanvasRenderer({
         // just "two bosses that happen to both be purple."
         const bossColor = enemy.boss ? biome.palette.accentGlow : undefined;
         if (enemy.boss) drawBossAura(ctx, enemy, timestamp, bossColor);
+        // the 3D layer draws its own warning ring and barrier for the creatures it shows
+        if (enemy.boss && !hidden3DEnemyIds?.current?.has(enemy.id)) drawBossFury(ctx, enemy, timestamp);
         else if (enemy.elite) drawEliteAura(ctx, enemy, timestamp);
         const archetypeScale = ARCHETYPE_VISUAL_SCALE[enemy.type] ?? 1;
         // VISUAL POLISH (fase 260 feedback) — regular creatures read as tiny

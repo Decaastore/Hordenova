@@ -28,6 +28,10 @@ export type GameAudioEvent =
   | { type: "castle_damage"; count: number }
   /** Master Implementation Pass spec section 13 — a boss's Siege Attack landing on a tower (distinct from castle_damage's "enemy reached the base"). */
   | { type: "tower_siege_hit" }
+  /** BOSS FURY: the roar winds up, lands (stunning towers), a barrier goes up. */
+  | { type: "boss_roar_windup" }
+  | { type: "boss_roar" }
+  | { type: "boss_barrier" }
   | { type: "wave_start" }
   | { type: "wave_complete" }
   | { type: "defeat" }

@@ -74,6 +74,21 @@ export interface BossState {
   siegeTelegraphRemainingMs: number;
   /** The tower a telegraphed siege will hit, or null when no siege is telegraphing right now. */
   siegeTargetTowerId: string | null;
+
+  // BOSS FURY (config/bossFury.ts) — stun roar, phase barrier, mini-boss harden.
+  /** World-clock time the next roar wind-up starts. */
+  nextRoarAtMs?: number;
+  /** > 0 while the roar is winding up (the warning ring); the stun lands when it reaches 0. */
+  roarTelegraphRemainingMs?: number;
+  /** The wind-up's full length and radius (for drawing the ring at the right size and pace). */
+  roarTelegraphTotalMs?: number;
+  roarRadius?: number;
+  /** Counts up from 0 right after a roar lands (drawn as the shockwave), capped. */
+  roarSinceMs?: number;
+  /** The phase barrier / harden: world-clock time it ends, or null when down. */
+  barrierUntilMs?: number | null;
+  /** Each boss raises its barrier (or hardens) once. */
+  barrierUsed?: boolean;
 }
 
 /** DISABLER-archetype enemies (regular or mini-boss) periodically jam the nearest tower — see CombatSystem.tickEnemyDisableAbilities. */

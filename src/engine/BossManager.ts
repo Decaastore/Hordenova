@@ -9,6 +9,7 @@ import { getActiveMapLayout } from "@/data/mapLayouts";
 import { createEnemyInstance, REGEN_SUPPRESSION_MS, type EnemyInstance } from "@/entities/Enemy";
 import { tryDisableNearestTower } from "./CombatSystem";
 import type { TowerInstance } from "@/entities/Tower";
+import { BARRIER, MINI_HARDEN, ROAR, ROAR_ENRAGED_STUN_MULT, ROAR_IMMUNITY_MS } from "@/config/bossFury";
 import {
   SIEGE_INTERVAL_MS,
   SIEGE_RADIUS,
@@ -83,8 +84,85 @@ export function createBossInstance(def: BossDefinition, waveNumber: number, nowM
       nextSiegeAtMs: def.isMainBoss ? nowMs + SIEGE_INTERVAL_MS : null,
       siegeTelegraphRemainingMs: 0,
       siegeTargetTowerId: null,
+      nextRoarAtMs: nowMs + ROAR[def.isMainBoss ? "main" : "mini"].firstMs,
+      roarTelegraphRemainingMs: 0,
+      roarTelegraphTotalMs: 0,
+      roarRadius: ROAR[def.isMainBoss ? "main" : "mini"].radius,
+      roarSinceMs: 99_999,
+      barrierUntilMs: null,
+      barrierUsed: false,
     },
   };
+}
+
+/** What a boss's fury did this tick, for the caller's audio/VFX (null fields = nothing happened). */
+export interface BossFuryEvent {
+  /** Towers a roar stunned this tick. */
+  roarStunned: string[] | null;
+  /** True on the tick the roar wind-up starts. */
+  roarWindup: boolean;
+  /** True on the tick a barrier / harden goes up. */
+  barrierUp: boolean;
+  /** Guards the barrier called. */
+  summons: EnemyInstance[];
+}
+
+/**
+ * BOSS FURY (config/bossFury.ts) — the stun roar and the phase barrier /
+ * mini-boss harden. Independent of the ability and siege cadences.
+ */
+export function tickBossFury(boss: EnemyInstance, nowMs: number, dtMs: number, waveNumber: number, towers: readonly TowerInstance[]): BossFuryEvent {
+  const ev: BossFuryEvent = { roarStunned: null, roarWindup: false, barrierUp: false, summons: [] };
+  const state = boss.boss;
+  if (!state || state.nextRoarAtMs === undefined) return ev;
+  const cfg = ROAR[state.isMainBoss ? "main" : "mini"];
+  state.roarSinceMs = Math.min(99_999, (state.roarSinceMs ?? 99_999) + dtMs);
+
+  // ---- the barrier / harden: once, when the HP threshold is crossed
+  const hpFrac = boss.maxHp > 0 ? boss.hp / boss.maxHp : 1;
+  const b = state.isMainBoss ? BARRIER : MINI_HARDEN;
+  if (!state.barrierUsed && !state.exhausted && hpFrac > 0 && hpFrac <= b.hpFraction) {
+    state.barrierUsed = true;
+    state.barrierUntilMs = nowMs + b.durationMs;
+    boss.damageReduction = Math.max(boss.damageReduction, b.damageReduction);
+    ev.barrierUp = true;
+    if (state.isMainBoss) {
+      for (let i = 0; i < BARRIER.guards; i++) ev.summons.push(createEnemyInstance("SHIELDBEARER", waveNumber));
+      // the barrier goes up with a roar: start the wind-up now
+      if (!state.roarTelegraphRemainingMs) state.nextRoarAtMs = nowMs;
+    }
+  }
+  if (state.barrierUntilMs != null && nowMs >= state.barrierUntilMs) {
+    state.barrierUntilMs = null;
+    boss.damageReduction = state.shieldUntilMs !== null ? Math.max(state.baseDamageReduction, 0.85) : state.baseDamageReduction;
+  }
+
+  // ---- the roar: wind-up, then the stun
+  if ((state.roarTelegraphRemainingMs ?? 0) > 0) {
+    state.roarTelegraphRemainingMs = Math.max(0, state.roarTelegraphRemainingMs! - dtMs);
+    if (state.roarTelegraphRemainingMs > 0) return ev;
+    const stunMs = Math.round(cfg.stunMs * (state.enraged ? ROAR_ENRAGED_STUN_MULT : 1));
+    const inRange = towers
+      .filter((t) => !(t.roarImmuneMs && t.roarImmuneMs > 0) && distance(boss.position, t.position) <= cfg.radius)
+      .sort((a, c) => distance(boss.position, a.position) - distance(boss.position, c.position))
+      .slice(0, cfg.maxTowers);
+    for (const t of inRange) {
+      t.disabledRemainingMs = Math.max(t.disabledRemainingMs, stunMs);
+      t.roarStunMs = stunMs;
+      t.roarImmuneMs = stunMs + ROAR_IMMUNITY_MS;
+    }
+    state.roarSinceMs = 0;
+    state.nextRoarAtMs = nowMs + cfg.intervalMs;
+    ev.roarStunned = inRange.map((t) => t.id);
+    return ev;
+  }
+  if (nowMs >= state.nextRoarAtMs) {
+    state.roarTelegraphRemainingMs = cfg.telegraphMs;
+    state.roarTelegraphTotalMs = cfg.telegraphMs;
+    state.roarRadius = cfg.radius;
+    ev.roarWindup = true;
+  }
+  return ev;
 }
 
 export interface SiegeHitEvent {
@@ -165,7 +243,8 @@ export function tickBossAbilities(
   if (!state) return [];
 
   if (state.shieldUntilMs !== null && nowMs >= state.shieldUntilMs) {
-    boss.damageReduction = state.baseDamageReduction;
+    // a phase barrier still up keeps its own (higher) reduction
+    boss.damageReduction = state.barrierUntilMs != null ? Math.max(state.baseDamageReduction, BARRIER.damageReduction) : state.baseDamageReduction;
     state.shieldUntilMs = null;
   }
 
@@ -181,7 +260,7 @@ export function tickBossAbilities(
 
   switch (state.ability) {
     case "SHIELD": {
-      boss.damageReduction = 0.85;
+      boss.damageReduction = Math.max(boss.damageReduction, 0.85);
       state.shieldUntilMs = nowMs + 2500;
       return [];
     }
