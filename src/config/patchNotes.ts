@@ -70,6 +70,165 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v161",
+    dateIso: "2026-11-23",
+    category: "SYSTEMS",
+    title: {
+      en: "Exclusive Bundles, Fairer Trading and VIP with Gems",
+      ptBR: "Pacotes Exclusivos, Trocas Equilibradas e VIP com Gemas",
+    },
+    description: {
+      en: "Six bundles with tower and castle skins that exist only in them, each skin with its own attacks and effects. Trading between players got fair, balanced rules, and the VIP can now also be bought with Purchased Gems.",
+      ptBR: "Seis pacotes com skins de torre e de castelo que só existem neles, cada skin com ataques e efeitos próprios. As trocas entre jogadores ganharam regras justas e equilibradas, e o VIP agora também pode ser comprado com Gemas Compradas.",
+    },
+    highlights: [
+      {
+        en: "Six bundles from R$ 19,90 to R$ 299,90 (Ember, Winter, Sentinel, Crimson Storm, Eclipse and Sovereign). Each one carries exclusive tower skins, a matching exclusive castle, Purchased Gems and Rare items; the Sovereign bundle also brings an Epic item. Everything inside is shown before buying, once per account. Purchases open together with real-money payments.",
+        ptBR: "Seis pacotes de R$ 19,90 a R$ 299,90 (Brasa, Inverno, Sentinela, Tempestade Rubra, Eclipse e Soberano). Cada um traz skins de torre exclusivas, um castelo exclusivo que combina, Gemas Compradas e itens Raros; o Soberano traz também um item Épico. Tudo o que vem dentro aparece antes da compra, uma vez por conta. As compras abrem junto com os pagamentos em dinheiro.",
+      },
+      {
+        en: "Eight bundle tower skins built with their own sculpted 3D pieces — a molten heart in a gold cage, a crown of ice, an emerald set in the trunk, a crimson storm, an eclipse, a marble colonnade with golden wings — never sold for Gems or in the daily shop.",
+        ptBR: "Oito skins de torre de pacote com peças 3D próprias — coração de lava numa gaiola de ouro, coroa de gelo, esmeralda cravada no tronco, tempestade carmesim, eclipse, colunata de mármore com asas douradas — nunca vendidas por Gemas nem na loja do dia.",
+      },
+      {
+        en: "Every bundle skin fires its own shot: its own trail, its own impact (fire shockwaves, ice shatter with frost mist, emerald shards, forked crimson lightning, a black eclipse with a golden corona, a column of golden light) and its own aura around the tower. No other skin uses them.",
+        ptBR: "Cada skin de pacote tem tiro próprio: rastro próprio, impacto próprio (ondas de choque de fogo, gelo estilhaçando com névoa, lascas de esmeralda, raios carmesim ramificados, eclipse negro com coroa dourada, coluna de luz dourada) e aura própria em volta da torre. Nenhuma outra skin usa esses efeitos.",
+      },
+      {
+        en: "Auction house: VIP only, fees in Purchased Gems only, 10% tax on each sale. Direct trades: open to VIPs and to anyone who has cleared phase 5, Purchased Gems only, with the same minimum price, fee and weekly limit as the auction house (10 sales a week with VIP, 3 without; 20% tax without VIP). Free Gems never enter trading. Trading opens with the online mode.",
+        ptBR: "Leilão: só para VIP, taxas só em Gemas Compradas e 10% de imposto por venda. Troca direta: aberta para VIPs e para quem já venceu a fase 5, só com Gemas Compradas, com o mesmo preço mínimo, a mesma taxa e o mesmo limite semanal do leilão (10 vendas por semana com VIP, 3 sem; 20% de imposto sem VIP). Gemas Grátis nunca entram nas trocas. As trocas abrem com o modo online.",
+      },
+      {
+        en: "VIP can now be bought with 400 Purchased Gems for 30 days. A VIP bought with Gems pays its daily gift in Free Gems; days paid with money keep paying Purchased Gems.",
+        ptBR: "O VIP agora também pode ser comprado com 400 Gemas Compradas, por 30 dias. O VIP comprado com Gemas paga o presente diário em Gemas Grátis; os dias pagos com dinheiro continuam rendendo Gemas Compradas.",
+      },
+      {
+        en: "Fix: Prestige and Duel skins could no longer be obtained for free through the shop.",
+        ptBR: "Correção: skins de Prestígio e do Duelo não podem mais ser obtidas de graça pela loja.",
+      },
+    ],
+  },
+  {
+    id: "v160",
+    dateIso: "2026-11-23",
+    category: "INTERFACE",
+    title: {
+      en: "3D Towers Everywhere, New Game Modes Page and Marketplace Page",
+      ptBR: "Torres em 3D em Todo Lugar, Página de Modos e Página do Marketplace Novas",
+    },
+    description: {
+      en: "Towers now show in true 3D in the Wiki, Store, Pass, Home, Duel and the tower panel. The game modes page was redone, the Marketplace page now explains how it will work, and the Wiki was updated with the new towers, store and skins.",
+      ptBR: "As torres agora aparecem em 3D de verdade na Wiki, Loja, Passe, Home, Duelo e no painel da torre. A página de modos de jogo foi refeita, a página do Marketplace agora explica como ele vai funcionar, e a Wiki foi atualizada com as torres, a loja e as skins novas.",
+    },
+    highlights: [
+      {
+        en: "Tower pictures use the same 3D model as the battlefield, with its skin, slowly turning. In the tower panel, tapping a skin opens its 3D preview right under its name.",
+        ptBR: "As imagens das torres usam o mesmo modelo 3D do campo de batalha, com a skin, girando devagar. No painel da torre, tocar numa skin abre a prévia 3D logo abaixo do nome.",
+      },
+      {
+        en: "Game modes: every mode in a card of the same shape with the same buttons, the Season and Eternal castles in 3D, and a new Hunts card to pick the phase to hunt in.",
+        ptBR: "Modos de jogo: todos os modos em cartões do mesmo formato e com os mesmos botões, os castelos da Season e do Eterno em 3D, e um cartão novo das Caçadas para escolher a fase.",
+      },
+      {
+        en: "Marketplace page: how auctions and trades will work, with each rarity's minimum bid and fee, who can use it and when it opens.",
+        ptBR: "Página do Marketplace: como vão funcionar o leilão e as trocas, com lance mínimo e taxa de cada raridade, quem pode usar e quando abre.",
+      },
+      {
+        en: "Wiki: skins list what each one changes in play, and the Store page covers VIP, the daily gift, moment offers, castle skins and every use of Gems.",
+        ptBR: "Wiki: as skins mostram o que cada uma muda no jogo, e a página da Loja cobre VIP, presente diário, ofertas do momento, skins de castelo e todos os usos das Gemas.",
+      },
+      {
+        en: "The top menu no longer cuts off on medium screens.",
+        ptBR: "O menu do topo não corta mais em telas médias.",
+      },
+    ],
+  },
+  {
+    id: "v159",
+    dateIso: "2026-11-23",
+    category: "CONTENT",
+    title: {
+      en: "The City in 3D, with Townsfolk",
+      ptBR: "A Cidade em 3D, com Moradores",
+    },
+    description: {
+      en: "The city next to the castle was rebuilt in 3D: realistic houses and buildings, and little townsfolk who walk around, run from fires and fetch water to put them out.",
+      ptBR: "A cidade ao lado do castelo foi refeita em 3D: casas e prédios realistas e moradores pequenos que passeiam, fogem do fogo e buscam água para apagá-lo.",
+    },
+    highlights: [
+      {
+        en: "Half-timbered houses, a barn with its field, market, smithy, tavern, chapel, mage tower and treasury, each with its own stone, timber, tile and thatch surfaces.",
+        ptBR: "Casas de enxaimel, celeiro com plantação, mercado, ferraria, taverna, capela, torre do mago e tesouraria, cada um com pedra, madeira, telha e palha próprias.",
+      },
+      {
+        en: "When a building catches fire, it smokes and burns, townsfolk flee, and others come running with buckets.",
+        ptBR: "Quando um prédio pega fogo, ele solta fumaça e queima, os moradores fogem e outros chegam correndo com baldes.",
+      },
+    ],
+  },
+  {
+    id: "v158",
+    dateIso: "2026-11-23",
+    category: "CASTLE",
+    title: {
+      en: "Four-Tower Castle, the Garrison and Roads into the Gate",
+      ptBR: "Castelo de Quatro Torres, a Guarnição e Estradas até o Portão",
+    },
+    description: {
+      en: "The castle now has four towers and a Garrison of archers who shoot only bosses and mini-bosses. It looks far more realistic, stands square to the road, and every road now ends at its gate, where the creatures go in.",
+      ptBR: "O castelo agora tem quatro torres e uma Guarnição de arqueiros que atiram só em chefes e mini-chefes. Ele ficou muito mais realista, fica reto em relação à estrada, e toda estrada agora termina no portão, onde as criaturas entram.",
+    },
+    highlights: [
+      {
+        en: "Garrison: up to 10 levels bought with gold, up to 12 archers on the towers and walls. They hit Bosses and Mini-Bosses near the gate for 0.4% of their life per second per level (half in Hunts), and a boss reaching the castle knocks them down for 3.5 seconds. It resets with the Season and is kept in the Eternal castle.",
+        ptBR: "Guarnição: até 10 níveis comprados com ouro, até 12 arqueiros nas torres e muralhas. Eles acertam Chefes e Mini-Chefes perto do portão com 0,4% da vida por segundo por nível (metade nas Caçadas), e um chefe que chega ao castelo derruba os arqueiros por 3,5 segundos. Zera com a Season e fica fixa no castelo do Eterno.",
+      },
+      {
+        en: "Realistic castle: cut stone and slate with depth, weathering and moss, framed windows and timber balconies for the archers.",
+        ptBR: "Castelo realista: pedra lavrada e ardósia com relevo, desgaste e musgo, janelas com moldura e sacadas de madeira para os arqueiros.",
+      },
+      {
+        en: "Every map's road now ends in one standard bend and a straight run up into the front of the gate, painted with the map's own road texture. Creatures walk in through the gate and disappear. Build sites that were in the way were moved, keeping each map's difficulty.",
+        ptBR: "A estrada de cada mapa agora termina numa curva padrão e numa reta até a frente do portão, pintada com a textura da própria estrada do mapa. As criaturas entram pelo portão e somem. As bases de torre que estavam no caminho foram mudadas de lugar, mantendo a dificuldade de cada mapa.",
+      },
+    ],
+  },
+  {
+    id: "v157",
+    dateIso: "2026-11-23",
+    category: "SYSTEMS",
+    title: {
+      en: "Hunts, Boss Bestiary and More Inventory Room",
+      ptBR: "Caçadas, Bestiário dos Chefes e Mais Espaço no Inventário",
+    },
+    description: {
+      en: "A new way to replay phases you have already cleared, much harder, to complete the Bestiary — which is now tougher and has its own boss page. Plus more inventory room for Gems, and an easier-to-find item fusion.",
+      ptBR: "Um jeito novo de jogar de novo fases já vencidas, bem mais difíceis, para completar o Bestiário — que ficou mais exigente e ganhou uma página só dos chefes. E mais espaço no inventário com Gemas, e a fusão de itens mais fácil de achar.",
+    },
+    highlights: [
+      {
+        en: "Hunts: replay any phase your Season castle has cleared, in a separate castle, with creatures that have 60% more life, are 12% faster and hit the castle 50% harder. Your Season castle stays as it is.",
+        ptBR: "Caçadas: jogue de novo qualquer fase que o castelo da Season já venceu, num castelo separado, com criaturas com 60% mais vida, 12% mais rápidas e que batem 50% mais forte no castelo. Seu castelo da Season não muda.",
+      },
+      {
+        en: "Bestiary stars now take 25, 250 and 1,000 kills of each creature, and the album that grants a skin needs two stars on every creature.",
+        ptBR: "As estrelas do Bestiário agora pedem 25, 250 e 1.000 abates de cada criatura, e o álbum que dá skin exige duas estrelas em todas.",
+      },
+      {
+        en: "New boss Bestiary: 1, 3 and 10 kills of each boss. Completing it grants the Hunter's Throne castle skin.",
+        ptBR: "Bestiário dos chefes novo: 1, 3 e 10 abates de cada chefe. Completar dá a skin de castelo Trono do Caçador.",
+      },
+      {
+        en: "Inventory expansion: +10 slots at a time, up to 10 times, paid with Gems.",
+        ptBR: "Expansão de inventário: +10 espaços por vez, até 10 vezes, paga com Gemas.",
+      },
+      {
+        en: "Item fusion now has its own glowing button in the inventory, with a badge when you have three matching items ready to fuse.",
+        ptBR: "A fusão de itens agora tem um botão próprio e brilhante no inventário, com um aviso quando você tem três itens iguais prontos para fundir.",
+      },
+    ],
+  },
+  {
     id: "v156",
     dateIso: "2026-11-18",
     category: "INTERFACE",
