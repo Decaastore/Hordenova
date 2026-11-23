@@ -121,6 +121,24 @@ function applySkinParticleStyle(base: FloatingMoteStyle, particleStyle: SkinPart
       return { ...base, color, spreadX: base.spreadX * 1.6, periodMs: base.periodMs * 0.7 };
     case "embers":
       return { ...base, color, flicker: 0.3 };
+    // ranking-prize skins
+    case "hourglass-sand":
+    case "star-fall":
+    case "silver-mist":
+      return { ...base, color, count: base.count + 2, periodMs: base.periodMs * 1.4, flicker: 0.4 };
+    case "nebula-drift":
+    case "banner-motes":
+    case "comet-trail":
+      return { ...base, color, count: base.count + 1, size: (base.size ?? 1.3) * 1.3, flicker: 0.5 };
+    case "clock-glyphs":
+    case "gong-pulse":
+      return { ...base, color, spreadX: base.spreadX * 1.4, periodMs: base.periodMs * 0.8, flicker: 0.6 };
+    case "arena-sparks":
+    case "shield-glints":
+      return { ...base, color, periodMs: base.periodMs * 0.5, flicker: 0.85, size: (base.size ?? 1.3) * 0.8 };
+    case "war-embers":
+    case "blue-flame":
+      return { ...base, color, count: base.count + 2, flicker: 0.3, size: (base.size ?? 1.3) * 1.2 };
     case "spores":
     default:
       return { ...base, color };

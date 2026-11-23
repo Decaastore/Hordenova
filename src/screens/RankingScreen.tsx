@@ -5,7 +5,6 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { ETERNAL_STORAGE_KEY, loadSave } from "@/engine/SaveSystem";
 import { getAscensionStatus } from "@/engine/AscensionManager";
 import { getPrestigeTier } from "@/config/prestige";
-import { getSeasonRewardBundle, type AscensionRank } from "@/config/ascension";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { rankFor } from "@/config/duel";
 import { ACHIEVEMENTS, bestiaryStats } from "@/config/achievements";
@@ -16,15 +15,13 @@ import { PAGE_CSS } from "@/ui/pageChrome";
 import { EMBLEM_COLOR } from "@/ui/hudIcons";
 import { Medallion, type GameIconName } from "@/ui/gameIcons";
 import { CrownArt } from "@/ui/StoreArt";
+import { RankedPrizeCard } from "@/ui/RankedPrizeCard";
 
 interface RankingScreenProps {
   onNavigate: (view: NavView) => void;
   onPlay: () => void;
 }
 
-const REWARD_RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
-/** Bands the full leaderboard will be split into once a server exists. */
-const BANDS = ["#6–10", "#11–25", "#26–50"];
 const ROMAN = ["", "I", "II", "III"];
 
 type BoardId = "SEASON" | "ETERNAL" | "DUEL" | "COLOSSUS" | "RECORD" | "PRESTIGE" | "BOSSES" | "BESTIARY" | "ACHIEVEMENTS";
@@ -300,26 +297,15 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
                 <p>{cur.detail}</p>
                 {!cur.has && board !== "SEASON" && <p className="rk-hint">{t(`ranking.boards.${board}.start` as TranslationKey)}</p>}
               </div>
-              {board === "SEASON" ? (
-                <div className="rk-card">
-                  <h3>{t("ranking.rewardsTitle")}</h3>
-                  <ol className="rk-rewards">
-                    {REWARD_RANKS.map((rank) => {
-                      const bundle = getSeasonRewardBundle(status.seasonNumber, rank);
-                      return (
-                        <li key={rank} className={`is-${rank}`}>
-                          <span className="rk-rank">#{rank}</span>
-                          <span className="rk-rtitle">{t(`ascension.rankTitles.${bundle.rankTitleKey}` as TranslationKey)}</span>
-                          <span className="rk-gems">{t("ranking.gemsValue", { gems: bundle.gems.toLocaleString(locale) })}</span>
-                        </li>
-                      );
-                    })}
-                  </ol>
-                  <p className="rk-small">{t("ranking.bandsNote", { bands: BANDS.join(", ") })}</p>
-                  <button className="pg-link" onClick={() => onNavigate("SEASON")}>
-                    {t("ranking.seasonCta")}
-                  </button>
-                </div>
+              {board === "SEASON" || board === "DUEL" || board === "ETERNAL" ? (
+                <>
+                  <RankedPrizeCard board={board} />
+                  {board === "SEASON" && (
+                    <button className="pg-link" onClick={() => onNavigate("SEASON")}>
+                      {t("ranking.seasonCta")}
+                    </button>
+                  )}
+                </>
               ) : (
                 <div className="rk-card">
                   <h3>{t("ranking.yourPosition")}</h3>

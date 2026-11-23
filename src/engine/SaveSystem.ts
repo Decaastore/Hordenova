@@ -70,6 +70,15 @@ export const ASCENSION_STORAGE_KEY = "hordenova.ascension.save.v1";
  * section 11's future per-phase reward types — carried, unused, gold-only
  * rewards stay the real system for now.
  */
+/** One ranking placement the player won (config/rankedRewards.ts). */
+export interface RankedTrophy {
+  board: "SEASON" | "DUEL" | "ETERNAL";
+  /** The period's id ("2026", "2026-11", "season-23"). */
+  period: string;
+  place: number;
+  atMs: number;
+}
+
 export interface SaveData {
   version: number;
   bestWave: number;
@@ -290,6 +299,10 @@ export interface SaveData {
   vip: VipState;
   /** When this account received Purchased Gems in a direct trade — counted against its weekly sales (config/marketplace.ts). */
   gemTradeLog: number[];
+  /** Ranking prizes already granted, as `${board}:${periodKey}` (engine/RankedRewardsService.ts) — each period pays once. */
+  rankedPrizesGranted: string[];
+  /** Every ranking placement this player has won (shown as trophies on the profile, kept forever). */
+  rankedTrophies: RankedTrophy[];
   /** EVOLUÇÃO DE SKIN — Premium skins this account has evolved (animated). Account-level, permanent. */
   evolvedSkinIds: string[];
   /** DUELO — trophies, record, deck and today's rewarded wins (config/duel.ts). Account-level. */
@@ -420,6 +433,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   momentOffers: createMomentOfferState(),
   vip: createVipState(),
   gemTradeLog: [],
+  rankedPrizesGranted: [],
+  rankedTrophies: [],
   evolvedSkinIds: [],
   duel: createDuelProfile(),
   colossus: createColossusProfile(),
@@ -1001,6 +1016,15 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       dailyShop: sanitizeDailyShopState(parsed.dailyShop),
       momentOffers: sanitizeMomentOfferState(parsed.momentOffers),
       vip: sanitizeVipState(parsed.vip),
+      rankedPrizesGranted: Array.isArray(parsed.rankedPrizesGranted) ? parsed.rankedPrizesGranted.filter((x: unknown): x is string => typeof x === "string").slice(-200) : [],
+      rankedTrophies: Array.isArray(parsed.rankedTrophies)
+        ? parsed.rankedTrophies
+            .filter((x: unknown): x is RankedTrophy => {
+              const o = x as RankedTrophy;
+              return !!o && (o.board === "SEASON" || o.board === "DUEL" || o.board === "ETERNAL") && typeof o.period === "string" && Number.isInteger(o.place) && o.place >= 1 && typeof o.atMs === "number";
+            })
+            .slice(-200)
+        : [],
       gemTradeLog: Array.isArray(parsed.gemTradeLog) ? parsed.gemTradeLog.filter((x: unknown): x is number => typeof x === "number" && Number.isFinite(x)).slice(-50) : [],
       duel: sanitizeDuelProfile(parsed.duel),
       colossus: sanitizeColossusProfile(parsed.colossus),

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
+import { animateTowerParts, buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, type TowerType } from "@/config/towerStats";
 import { buildCastleModel } from "@/battlefield3d/models/castleModel";
 
@@ -85,6 +85,7 @@ function frame(now: number) {
     const { model, size, center } = modelFor(p);
     if (p.spin) p.angle += dt * (p.key.startsWith("castle") ? 0.18 : 0.5);
     model.root.rotation.y = p.angle;
+    animateTowerParts(model.root, now / 1000);
     const w = Math.round(p.width * dpr), h = Math.round(p.height * dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;

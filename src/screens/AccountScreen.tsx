@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { RankedTrophiesSection } from "@/ui/RankedTrophiesSection";
 import { CollectionsSection, DailyLoginSection } from "@/ui/RewardsPanels";
 import { CloudAccountSection } from "@/ui/CloudAccountSection";
 import { CLOUD_ENABLED } from "@/net/cloud";
@@ -214,6 +215,7 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
             </div>
           </section>
 
+          <RankedTrophiesSection />
           <DailyLoginSection />
           <CollectionsSection />
 

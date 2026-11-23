@@ -162,6 +162,15 @@ function grantSeasonRewards(seasonNumber: number, rank: AscensionRank): void {
   });
 }
 
+/** Free Gems for having played a Season at all (no placement). */
+export const SEASON_PARTICIPATION_FREE_GEMS = 150;
+
+function grantParticipation(seasonNumber: number): void {
+  const main = loadSave();
+  updateSave({ freeGems: main.freeGems + SEASON_PARTICIPATION_FREE_GEMS });
+  appendLedgerEvent({ eventType: "GEMS_EARNED", fromOwner: null, toOwner: main.playerId, source: `ascension:season-${seasonNumber}:participation`, amount: SEASON_PARTICIPATION_FREE_GEMS, currency: "FREE" });
+}
+
 /**
  * Idempotency guard AND the actual finalize step. `ascensionHistory` is
  * permanent and never trimmed (unlike the 500-event-capped EconomyLedger),
@@ -175,7 +184,11 @@ function finalizeSeason(seasonNumber: number, seasonBestWaveReached: number): vo
   if (main.ascensionHistory.some((h) => h.seasonNumber === seasonNumber)) return; // already finalized
 
   const participated = seasonBestWaveReached >= PARTICIPATION_MIN_WAVE;
-  const rank: AscensionRank | null = participated ? 1 : null;
+  // A placement only ever comes from the online ranking's final standings
+  // (engine/RankedRewardsService.ts grants the placement prizes of
+  // config/rankedRewards.ts). Here, on this device, there is no placement —
+  // never a "you are #1" by default — only the participation reward.
+  const rank: AscensionRank | null = null;
   const theme = getSeasonTheme(seasonNumber);
 
   const historyEntry: AscensionHistoryEntry = {
@@ -188,6 +201,7 @@ function finalizeSeason(seasonNumber: number, seasonBestWaveReached: number): vo
 
   updateSave({ ascensionHistory: [...main.ascensionHistory, historyEntry] });
   if (rank !== null) grantSeasonRewards(seasonNumber, rank);
+  else if (participated) grantParticipation(seasonNumber);
 }
 
 /**

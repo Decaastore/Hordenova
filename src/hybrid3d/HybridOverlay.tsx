@@ -17,8 +17,8 @@ import { cameraPosition, groundGroupPlacement, worldDirectionToThreeYaw, worldTo
 import { buildCastleModel, type CastleModel } from "@/battlefield3d/models/castleModel";
 import { Garrison } from "./garrison3d";
 import { City3D } from "./city3d";
-import { Effects } from "@/battlefield3d/fx";
-import { buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
+import { Effects, hasSkinShotFx, SKIN_BOLT_COLORS } from "@/battlefield3d/fx";
+import { animateTowerParts, buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, TOWER_PRESENTATION_SCALE } from "@/config/towerStats";
 import { getTowerStats, type TowerInstance } from "@/entities/Tower";
 import { MANA_MAX } from "@/config/towerMana";
@@ -504,6 +504,7 @@ function Castle({
 
   useFrame(({ clock }, dt) => {
     const t = clock.elapsedTime;
+    animateTowerParts(model.root, t);
     const s = state.current;
     hpT.current += dt;
     if (hpT.current > 0.4) {
@@ -1575,6 +1576,64 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         if (Math.random() < 0.16 * rate) fx.glow.emit(at(13, 6 + Math.random() * 22), { count: 1, color: "#ffffff", colorEnd: part, size: 1.8, life: 1.2, speed: 2, up: 6, drag: 0.5, radius: 1 });
         if (Math.random() < (behavior === "royal-rays" ? 0.012 : 0.02) * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), "#ffd878", 4, 30 * S, 0.9);
         break;
+      // ---- ranking-prize auras ----
+      case "hourglass-sand":
+        // golden grains trickling down round the tower, and a slow violet ring of time
+        if (Math.random() < 0.22 * rate) fx.glow.emit(at(11, 26 + Math.random() * 8), { count: 1, color: "#fff0b0", colorEnd: "#c89018", size: 1, life: 1.8, speed: 1, up: -10, drag: 0.2, radius: 1 });
+        if (Math.random() < 0.01 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), part, 3, 26 * S, 1.4);
+        break;
+      case "nebula-drift":
+        if (Math.random() < 0.06 * rate) fx.smoke.emit(at(10, 10 + Math.random() * 14), { count: 1, color: "#8a3aff", colorEnd: "#1a0830", size: 6, life: 2, speed: 2, up: 3, grow: 2, alpha: 0.3, radius: 2 });
+        if (Math.random() < 0.14 * rate) fx.glow.emit(at(13, 6 + Math.random() * 22), { count: 1, color: "#ffffff", colorEnd: part, size: 1.4, life: 1.2, speed: 1, up: 1, drag: 0.5, radius: 1 });
+        break;
+      case "clock-glyphs": {
+        // motes orbiting the tower like the hands of a clock
+        const a = performance.now() / 500;
+        if (Math.random() < 0.3 * rate) fx.glow.emit(new THREE.Vector3(base.x + Math.cos(a) * 13 * S, base.y + 18 * S, base.z + Math.sin(a) * 13 * S), { count: 1, color: "#ffffff", colorEnd: part, size: 1.6, life: 0.9, speed: 0, drag: 1, radius: 0.5 });
+        if (Math.random() < 0.15 * rate) fx.glow.emit(new THREE.Vector3(base.x + Math.cos(-a * 0.3) * 9 * S, base.y + 12 * S, base.z + Math.sin(-a * 0.3) * 9 * S), { count: 1, color: "#fff0b0", colorEnd: "#ffd878", size: 1.2, life: 0.9, speed: 0, radius: 0.5 });
+        break;
+      }
+      case "star-fall":
+        if (Math.random() < 0.1 * rate) fx.glow.emit(at(14, 32 + Math.random() * 6), { count: 1, color: "#ffffff", colorEnd: part, size: 1.8, life: 0.8, speed: 30, dir: new THREE.Vector3(0.3, -1, 0.1).normalize(), spread: 0.05, drag: 0.2, radius: 1 });
+        if (Math.random() < 0.1 * rate) fx.glow.emit(at(12, 6 + Math.random() * 20), { count: 1, color: "#ffffff", colorEnd: "#8a6aff", size: 1, life: 0.6, speed: 0, grow: 1.6, radius: 0.5 });
+        break;
+      case "arena-sparks":
+        if (Math.random() < 0.08 * rate) fx.glow.emit(at(8, 10 + Math.random() * 14), { count: 5, color: "#ffffff", colorEnd: "#ff7a2a", size: 0.9, life: 0.45, speed: 36, gravity: 100, drag: 1, radius: 1 });
+        if (Math.random() < 0.04 * rate) fx.smoke.emit(at(13, 1), { count: 1, color: "#c8a07a", colorEnd: "#7a5a3a", size: 4, life: 1.2, speed: 6, up: 2, grow: 1.8, alpha: 0.3, radius: 2 });
+        break;
+      case "war-embers":
+        if (Math.random() < 0.24 * rate) fx.glow.emit(at(10, 6 + Math.random() * 12), { count: 1, color: "#ffd060", colorEnd: "#c8201a", size: 1.5, life: 1.3, speed: 5, up: 22, drag: 0.4, radius: 1 });
+        if (Math.random() < 0.04 * rate) fx.smoke.emit(at(6, 20), { count: 1, color: "#2a1210", colorEnd: "#0a0404", size: 5, life: 1.6, speed: 3, up: 14, grow: 2.2, alpha: 0.35, radius: 2 });
+        break;
+      case "shield-glints":
+        if (Math.random() < 0.12 * rate) fx.glow.emit(at(14, 4 + Math.random() * 16), { count: 1, color: "#ffffff", colorEnd: "#ffd090", size: 2.4, life: 0.35, speed: 0, grow: 2, radius: 0.5 });
+        if (Math.random() < 0.1 * rate) fx.glow.emit(at(14, 28), { count: 1, color: "#ffffff", colorEnd: part, size: 1.1, life: 2, speed: 2, up: -7, drag: 0.3, radius: 1 });
+        break;
+      case "gong-pulse":
+        // a slow, deep beat: rings ripple out from the foot
+        if (Math.random() < 0.02 * rate) {
+          fx.rings.ring(base.clone().setY(base.y + 0.6), "#ffd070", 4, 28 * S, 0.9);
+          fx.rings.ring(base.clone().setY(base.y + 0.6), "#ff5a2a", 2.5, 16 * S, 0.7);
+        }
+        if (Math.random() < 0.1 * rate) fx.glow.emit(at(8, 8 + Math.random() * 16), { count: 2, color: "#ffffff", colorEnd: part, size: 0.9, life: 0.3, speed: 26, drag: 4, radius: 1 });
+        break;
+      case "banner-motes":
+        if (Math.random() < 0.16 * rate) fx.glow.emit(at(13, 6 + Math.random() * 22), { count: 1, color: Math.random() < 0.5 ? "#ffffff" : "#f0d070", colorEnd: "#2a5ad8", size: 1.5, life: 1.6, speed: 3, up: 5, drag: 0.5, radius: 1 });
+        if (Math.random() < 0.012 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), "#2a5ad8", 3, 26 * S, 0.9);
+        break;
+      case "blue-flame":
+        if (Math.random() < 0.26 * rate) fx.glow.emit(at(7, 8 + Math.random() * 10), { count: 1, color: "#e8f4ff", colorEnd: "#1a3ad8", size: 2.2, life: 0.9, speed: 3, up: 20, grow: 0.6, drag: 0.4, radius: 1 });
+        break;
+      case "silver-mist":
+        if (Math.random() < 0.07 * rate) fx.smoke.emit(at(13, 2), { count: 1, color: "#f0f4ff", colorEnd: "#a8b8d8", size: 6, life: 2.2, speed: 4, up: 1, grow: 2.2, alpha: 0.3, radius: 3 });
+        if (Math.random() < 0.12 * rate) fx.glow.emit(at(12, 6 + Math.random() * 20), { count: 1, color: "#ffffff", colorEnd: part, size: 1.3, life: 1, speed: 1, grow: 1.4, radius: 0.5 });
+        break;
+      case "comet-trail": {
+        // a little comet circling high over the tower
+        const a = performance.now() / 420;
+        if (Math.random() < 0.5 * rate) fx.glow.emit(new THREE.Vector3(base.x + Math.cos(a) * 12 * S, base.y + (26 + Math.sin(a * 2) * 3) * S, base.z + Math.sin(a) * 12 * S), { count: 1, color: "#ffffff", colorEnd: "#4a8aff", size: 2, life: 0.6, speed: 0, drag: 1, radius: 0.3 });
+        break;
+      }
       case "wind-swirl":
         if (Math.random() < 0.18 * rate) {
           const a = performance.now() / 300 + Math.random();
@@ -1707,6 +1766,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         e.turret.position.x = e.kit.turret.position.x - Math.sin(e.yaw) * kick;
         e.turret.position.z = e.kit.turret.position.z - Math.cos(e.yaw) * kick;
       }
+      animateTowerParts(e.obj, t);
       // crystals breathe; flare on a shot or a new stage; go dark while disabled
       e.flash = Math.max(0, e.flash - dt * 3);
       const disabled = tw.disabledRemainingMs > 0;
@@ -1749,7 +1809,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
     seenShots.current = now;
     // PACOTES — bundle-exclusive skins fire real 3D effects over the map: a trail while the shot flies, and their own impact where it lands
     for (const p of snap.projectiles) {
-      if (!p.skinId || !p.skinId.includes("_PACK_")) continue;
+      if (!hasSkinShotFx(p.skinId)) continue;
       const t = 1 - Math.max(0, Math.min(1, p.remainingMs / p.totalMs));
       const arc = p.towerType === "INFERNO" ? Math.sin(t * Math.PI) * 26 : p.towerType === "IRONWOOD" ? Math.sin(t * Math.PI) * 16 : 0;
       const pos = loc({ x: p.from.x + (p.to.x - p.from.x) * t, y: p.from.y + (p.to.y - p.from.y) * t }, 22 * (1 - t) + 8 * t + arc);
@@ -1758,7 +1818,7 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       if (!known) {
         packShots.current.set(p.id, { to: { ...p.to }, skin: p.skinId, special: p.isSpecial, chain: p.chainTargets.map((c) => ({ ...c })) });
         if (p.towerType === "STORMCALLER") {
-          const col = p.skinId === "STORMCALLER_PACK_CRIMSON_STORM" ? "#ff1a2a" : "#ffd878";
+          const col = SKIN_BOLT_COLORS[p.skinId] ?? "#ffd878";
           let prev = loc(p.from, 30);
           for (const h of [p.to, ...p.chainTargets]) {
             const next = loc(h, 8);

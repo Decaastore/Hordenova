@@ -66,6 +66,10 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     CRIMSON_STORM_KEEP: { stoneA: "#5a2228", stoneB: "#22080c", mortar: "#0e0406", roof: "#8a8a96", roofDark: "#2a2a32", ground: "#2a1418", core: "#ff3a4a", window: "#ff5a6a", roofKind: "spire", roofMetal: 0.85 },
     ECLIPSE_SPIRE: { stoneA: "#2a2830", stoneB: "#0c0b10", mortar: "#3a2a10", roof: "#d8a838", roofDark: "#5a3a08", ground: "#14121a", core: "#ffc848", window: "#ffc848", roofKind: "spire", roofMetal: 0.9 },
     SOVEREIGN_PALACE: { stoneA: "#f6f0e2", stoneB: "#c8b898", mortar: "#8a7a58", roof: "#ffd878", roofDark: "#a0781a", ground: "#e8dcc0", core: "#ff4a5a", window: "#ffe2a0", roofKind: "dome", roofMetal: 0.9 },
+    // RANKING (config/rankedRewards.ts) — prizes for the top of each ranking, never sold
+    ETERNITY_CITADEL: { stoneA: "#4a3a6a", stoneB: "#1e1434", mortar: "#d8b050", roof: "#2a1a4a", roofDark: "#0e0820", ground: "#1e1630", core: "#c08aff", window: "#ffd878", roofKind: "spire", roofMetal: 0.6 },
+    ARENA_COLOSSEUM: { stoneA: "#c8a07a", stoneB: "#7a5a3a", mortar: "#3e2a18", roof: "#8a1a14", roofDark: "#3e0806", ground: "#a88a60", sand: true, core: "#ff5a2a", window: "#ffb060", roofKind: "flat" },
+    ROYAL_STANDARD_KEEP: { stoneA: "#e4e8f0", stoneB: "#9aa4b8", mortar: "#5a6478", roof: "#1a3a8a", roofDark: "#0a1a44", ground: "#c8d0dc", core: "#6a9aff", window: "#ffe08a", roofKind: "cone", roofMetal: 0.35 },
   };
   const SD: SkinDress | null = SKIN_DRESS[SKIN] ?? null;
 
@@ -97,6 +101,9 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       CRIMSON_STORM_KEEP: { keep: "box", tower: "needle", keepH: 80, towerH: 66, towerR: 8, wall: "stone" },
       ECLIPSE_SPIRE: { keep: "octagon", tower: "needle", keepH: 88, towerH: 70, towerR: 7, wall: "glass" },
       SOVEREIGN_PALACE: { keep: "round", tower: "octagon", keepH: 70, towerH: 52, towerR: 12, wall: "marble" },
+      ETERNITY_CITADEL: { keep: "octagon", tower: "hex", keepH: 92, towerH: 64, towerR: 9, wall: "glass" },
+      ARENA_COLOSSEUM: { keep: "round", tower: "round", keepH: 58, towerH: 42, towerR: 15, wall: "stone" },
+      ROYAL_STANDARD_KEEP: { keep: "box", tower: "octagon", keepH: 78, towerH: 56, towerR: 11, wall: "marble" },
     } as Record<string, Arch>)[SKIN] ?? { keep: "box", tower: "round", keepH: 70, towerH: 48, towerR: 11, wall: "stone" };
   const D: SkinDress = SD ?? DRESS[BIOME] ?? DRESS.ANCIENT_FOREST!;
 
@@ -1141,6 +1148,11 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
     return new THREE.MeshStandardMaterial({ color: new THREE.Color(color), emissive: new THREE.Color(color), emissiveIntensity: intensity, roughness: 0.25 });
   }
 
+  /** Marks a moving part (spin = radians/second about x/y/z, bob = [height, speed]); played by animateTowerParts in towerModel.ts. */
+  function anim(o: THREE.Object3D, a: { spin?: [number, number, number]; bob?: [number, number] }) {
+    o.userData.anim = { ...a, r0: [o.rotation.x, o.rotation.y, o.rotation.z], y0: o.position.y, ph: Math.random() * 6 };
+  }
+
   function addSkinDressing(): void {
     const rr = rng(77);
     const ring = (n: number, rad: number, fn: (x: number, z: number, a: number, i: number) => void) => {
@@ -1519,6 +1531,215 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
           root.add(vein);
         });
         void gold;
+        break;
+      }
+      // ---- RANKING · Eterno: a great hourglass floats and turns over the keep inside revolving star rings; amethyst obelisks on the mound ----
+      case "ETERNITY_CITADEL": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xffd878, metalness: 0.9, roughness: 0.25 });
+        const glass = new THREE.MeshPhysicalMaterial({ color: 0xd8c0ff, emissive: 0x8a4aff, emissiveIntensity: 0.35, roughness: 0.05, transparent: true, opacity: 0.55, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
+        const hy = ARCH.keepH + 34;
+        const float = new THREE.Group();
+        float.position.set(0, hy, -18);
+        float.scale.setScalar(1.5);
+        root.add(float);
+        anim(float, { bob: [1.6, 1.1] });
+        const hour = new THREE.Group();
+        float.add(hour);
+        anim(hour, { spin: [0, 0.4, 0] });
+        for (const d of [-1, 1]) {
+          const bulb = new THREE.Mesh(new THREE.ConeGeometry(7, 9, 28, 1, true), glass);
+          bulb.position.y = d * 4.5;
+          if (d < 0) bulb.rotation.x = Math.PI;
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(8, 8, 1.4, 32), gold);
+          cap.position.y = d * 9.7;
+          hour.add(bulb, cap);
+        }
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2;
+          const rod = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 19.4, 8), gold);
+          rod.position.set(Math.cos(a) * 7.4, 0, Math.sin(a) * 7.4);
+          hour.add(rod);
+        }
+        const sand = new THREE.Mesh(new THREE.ConeGeometry(5, 4, 24), glowMat("#ffd878", 2.2));
+        sand.position.y = -7;
+        const stream = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 8.6, 6), glowMat("#fff0b0", 3));
+        stream.position.y = -0.6;
+        hour.add(sand, stream);
+        for (let k = 0; k < 3; k++) {
+          const rad = 15 + k * 3.5;
+          const tilt = new THREE.Group();
+          tilt.rotation.set(Math.PI / 2 + (k - 1) * 0.5, k * 0.9, k % 2 ? 0.3 : -0.3);
+          float.add(tilt);
+          const turn = new THREE.Group();
+          tilt.add(turn);
+          anim(turn, { spin: [0, 0, (k % 2 ? -1 : 1) * (0.5 + k * 0.2)] });
+          turn.add(new THREE.Mesh(new THREE.TorusGeometry(rad, 0.3, 6, 100), glowMat(k % 2 ? "#ffd878" : "#b07aff", 1.6)));
+          for (let j = 0; j < 3; j++) {
+            const st = new THREE.Mesh(new THREE.OctahedronGeometry(1.4, 0), glowMat(j ? "#ffffff" : "#c08aff", 3));
+            const a = (j / 3) * Math.PI * 2 + k;
+            st.position.set(Math.cos(a) * rad, Math.sin(a) * rad, 0);
+            turn.add(st);
+          }
+        }
+        const amethyst = new THREE.MeshStandardMaterial({ color: 0x3a2260, emissive: 0x8a4aff, emissiveIntensity: 0.25, roughness: 0.15, metalness: 0.3 });
+        ring(10, 46, (x, z, a, i) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          const h = i % 2 ? 16 : 22;
+          const ob = new THREE.Mesh(new THREE.CylinderGeometry(1, 2.6, h, 4), amethyst);
+          ob.position.set(x, h / 2, z);
+          ob.rotation.y = a + Math.PI / 4;
+          root.add(ob);
+          const tip = new THREE.Mesh(new THREE.ConeGeometry(1.5, 3, 4), gold);
+          tip.position.set(x, h + 1.5, z);
+          root.add(tip);
+          const star = new THREE.Mesh(new THREE.OctahedronGeometry(1, 0), glowMat("#ffffff", 3));
+          star.position.set(x, h + 5, z);
+          root.add(star);
+          anim(star, { spin: [0, 2, 0], bob: [0.8, 1.6 + i * 0.2] });
+        });
+        break;
+      }
+      // ---- RANKING · Arena: shields on crossed spears round the sand, burning braziers, and a bronze laurel with crossed swords turning over the keep ----
+      case "ARENA_COLOSSEUM": {
+        const bronze = new THREE.MeshStandardMaterial({ color: 0xd8963a, metalness: 0.8, roughness: 0.32 });
+        const steel = new THREE.MeshStandardMaterial({ color: 0xc8ccd6, metalness: 0.9, roughness: 0.25 });
+        const crimson = new THREE.MeshStandardMaterial({ color: 0x8a1a14, roughness: 0.55, side: THREE.DoubleSide });
+        const wood = new THREE.MeshStandardMaterial({ color: 0x4a2e1a, roughness: 0.8 });
+        ring(8, 46, (x, z, a, i) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          if (i % 2) {
+            for (const s2 of [-1, 1]) {
+              const sp = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 24, 6), wood);
+              sp.position.set(x, 11, z);
+              sp.rotation.set(0, -a, s2 * 0.4);
+              root.add(sp);
+            }
+            const sh = new THREE.Group();
+            sh.position.set(x + Math.cos(a) * 1.2, 11, z + Math.sin(a) * 1.2);
+            sh.rotation.y = -a + Math.PI / 2;
+            root.add(sh);
+            const face = new THREE.Mesh(new THREE.CylinderGeometry(5.5, 5.5, 0.8, 32), crimson);
+            face.rotation.x = Math.PI / 2;
+            const rim = new THREE.Mesh(new THREE.TorusGeometry(5.5, 0.6, 8, 40), bronze);
+            const boss = new THREE.Mesh(new THREE.SphereGeometry(1.6, 16, 12), bronze);
+            boss.position.z = 0.5;
+            boss.scale.z = 0.6;
+            sh.add(face, rim, boss);
+          } else {
+            const bowl = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 1.6, 3, 16), bronze);
+            bowl.position.set(x, 13, z);
+            const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.4, 12, 8), bronze);
+            leg.position.set(x, 6, z);
+            root.add(bowl, leg);
+            for (let f = 0; f < 3; f++) {
+              const fl = new THREE.Mesh(new THREE.ConeGeometry(2.4 - f * 0.6, 5 - f, 8), glowMat(f ? "#ffd060" : "#ff5a1a", 2.6 - f * 0.3));
+              fl.position.set(x, 16.5 + f * 1.2, z);
+              root.add(fl);
+              anim(fl, { spin: [0, 3 - f, 0], bob: [0.5 + f * 0.2, 5 + f * 2] });
+            }
+          }
+        });
+        const ly = ARCH.keepH + 24;
+        const emblem = new THREE.Group();
+        emblem.position.set(0, ly, -18);
+        root.add(emblem);
+        anim(emblem, { spin: [0, 0.45, 0], bob: [1.2, 1] });
+        const lr = 11;
+        const wreath = new THREE.Mesh(new THREE.TorusGeometry(lr, 0.55, 8, 56, Math.PI * 1.7), bronze);
+        wreath.rotation.z = Math.PI * 1.65;
+        emblem.add(wreath);
+        const leafM = new THREE.MeshStandardMaterial({ color: 0xffd060, metalness: 0.85, roughness: 0.28 });
+        for (let i = 0; i < 20; i++) {
+          const a = Math.PI * 1.65 + (i / 19) * Math.PI * 1.7;
+          for (const side of [-1, 1]) {
+            const leaf = new THREE.Mesh(new THREE.SphereGeometry(1.3, 8, 6), leafM);
+            leaf.position.set(Math.cos(a) * (lr + side * 1.1), Math.sin(a) * (lr + side * 1.1), 0);
+            leaf.scale.set(0.5, 1.4, 0.35);
+            leaf.rotation.z = a + side * 0.5;
+            emblem.add(leaf);
+          }
+        }
+        for (const s2 of [-1, 1]) {
+          const sw = new THREE.Group();
+          sw.rotation.z = s2 * 0.75;
+          sw.scale.setScalar(2.6);
+          emblem.add(sw);
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.7, 11, 0.18), steel);
+          blade.position.y = 1.4;
+          const guard = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.5), bronze);
+          guard.position.y = -4.2;
+          const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 2.2, 8), crimson);
+          grip.position.y = -5.5;
+          const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.16, 9, 0.22), glowMat("#ff5a2a", 2));
+          fuller.position.y = 1.2;
+          sw.add(blade, guard, grip, fuller);
+        }
+        break;
+      }
+      // ---- RANKING · Season: royal standards round the mound and on the towers, a turning royal star with a silver crown over the keep ----
+      case "ROYAL_STANDARD_KEEP": {
+        const gold = new THREE.MeshStandardMaterial({ color: 0xffd060, metalness: 0.9, roughness: 0.25 });
+        const silver = new THREE.MeshStandardMaterial({ color: 0xe4e8f0, metalness: 0.9, roughness: 0.22 });
+        const royal = new THREE.MeshStandardMaterial({ color: 0x1a3a8a, roughness: 0.75, side: THREE.DoubleSide, emissive: 0x1a3a8a, emissiveIntensity: 0.15 });
+        const standard = (x: number, z: number, a: number, ph: number, y0 = 0) => {
+          const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, ph, 8), silver);
+          pole.position.set(x, y0 + ph / 2, z);
+          const fin = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3, 6), gold);
+          fin.position.set(x, y0 + ph + 1.5, z);
+          root.add(pole, fin);
+          const perp = a + Math.PI / 2;
+          const geo = new THREE.PlaneGeometry(7, 15, 1, 10);
+          const pos = geo.attributes.position as THREE.BufferAttribute;
+          for (let k = 0; k < pos.count; k++) pos.setZ(k, Math.sin((pos.getY(k) + 7.5) * 0.5) * 0.7);
+          geo.computeVertexNormals();
+          const ban = new THREE.Mesh(geo, royal);
+          ban.position.set(x + Math.cos(perp) * 3.7, y0 + ph - 8.5, z + Math.sin(perp) * 3.7);
+          ban.rotation.y = -perp;
+          root.add(ban);
+          const trim = new THREE.Mesh(new THREE.BoxGeometry(7.2, 0.8, 0.3), gold);
+          trim.position.set(ban.position.x, y0 + ph - 16.2, ban.position.z);
+          trim.rotation.y = -perp;
+          const star = new THREE.Mesh(new THREE.OctahedronGeometry(2, 0), glowMat("#e8eef8", 2));
+          star.position.set(ban.position.x + Math.cos(a) * 0.4, y0 + ph - 7.5, ban.position.z + Math.sin(a) * 0.4);
+          star.scale.set(1, 1, 0.3);
+          star.rotation.y = -perp;
+          root.add(trim, star);
+        };
+        ring(8, 47, (x, z, a) => {
+          if (z > 12 && Math.abs(x) < 16) return;
+          standard(x, z, a, 32);
+        });
+        for (const [x, z] of towerTops) standard(x, z, Math.PI / 2, 20, ARCH.towerH + 4);
+        const sy = ARCH.keepH + 26;
+        const regal = new THREE.Group();
+        regal.position.set(0, sy, -18);
+        root.add(regal);
+        anim(regal, { spin: [0, 0.35, 0], bob: [1.4, 1.1] });
+        const wheel = new THREE.Group();
+        regal.add(wheel);
+        anim(wheel, { spin: [0, 0, 0.5] });
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const ray = new THREE.Mesh(new THREE.ConeGeometry(2, i % 2 ? 7 : 11, 4), i % 2 ? silver : gold);
+          ray.position.set(Math.cos(a) * (i % 2 ? 7.5 : 9), Math.sin(a) * (i % 2 ? 7.5 : 9), 0);
+          ray.rotation.z = a - Math.PI / 2;
+          ray.scale.z = 0.35;
+          wheel.add(ray);
+        }
+        const orb = new THREE.Mesh(new THREE.SphereGeometry(4.2, 28, 20), glowMat("#8ab8ff", 1.8));
+        const band = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.7, 8, 40), silver);
+        regal.add(orb, band);
+        const crownBand = new THREE.Mesh(new THREE.CylinderGeometry(5, 4.6, 1.8, 28, 1, true), silver);
+        crownBand.position.y = 7.4;
+        regal.add(crownBand);
+        for (let i = 0; i < 5; i++) {
+          const a = (i / 5) * Math.PI * 2;
+          const sp = new THREE.Mesh(new THREE.ConeGeometry(0.9, 3.4, 6), silver);
+          sp.position.set(Math.cos(a) * 5, 9.6, Math.sin(a) * 5);
+          const gem = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 8), glowMat("#4a8aff", 2.8));
+          gem.position.set(Math.cos(a) * 5, 11.6, Math.sin(a) * 5);
+          regal.add(sp, gem);
+        }
         break;
       }
       case "SOVEREIGN_PALACE": {

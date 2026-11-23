@@ -8,7 +8,8 @@ import { RARITIES, getRarityDefinition } from "@/config/rarity";
 import { getMasteryUnlockGoldCost, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS } from "@/config/towerMastery";
 import { GOLD_SINKS } from "@/config/goldSinks";
 import { GEM_SINKS } from "@/config/gemSinks";
-import { getSeasonRewardBundle, type AscensionRank } from "@/config/ascension";
+import { RANKED_PRIZES } from "@/config/rankedRewards";
+import { SEASON_PARTICIPATION_FREE_GEMS } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { ItemGlyph } from "@/ui/ItemGlyph";
 import { bossesDroppingItem } from "./wikiData";
@@ -204,7 +205,6 @@ export function EconomyPage() {
 
 export function AscensionPage() {
   const { t } = useLanguage();
-  const ranks: AscensionRank[] = [1, 2, 3, 4, 5];
   const days = Math.round(SEASON_DURATION_MS / (24 * 60 * 60 * 1000));
   return (
     <div>
@@ -215,31 +215,32 @@ export function AscensionPage() {
         </div>
       </dl>
       <p className="wk-prose">{t("wiki.top5Rewards")}</p>
-      <div className="wk-table-wrap">
-        <table className="wk-table">
-          <thead>
-            <tr>
-              <th scope="col">{t("wiki.rankCol")}</th>
-              <th scope="col">{t("wiki.titleCol")}</th>
-              <th scope="col">{t("wiki.gemsCol")}</th>
-              <th scope="col">{t("wiki.cosmeticsCol")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranks.map((rank) => {
-              const bundle = getSeasonRewardBundle(1, rank);
-              return (
-                <tr key={rank}>
-                  <th scope="row">#{rank}</th>
-                  <td>{t(`ascension.rankTitles.${bundle.rankTitleKey}` as TranslationKey)}</td>
-                  <td>{bundle.gems}</td>
-                  <td>{bundle.cosmetics.length > 0 ? bundle.cosmetics.map((c) => t(`ascension.cosmeticTypes.${c.type}` as TranslationKey)).join(", ") : "—"}</td>
+      {(["SEASON", "DUEL", "ETERNAL"] as const).map((board) => (
+        <div key={board}>
+          <h4 style={{ margin: "18px 0 8px", fontSize: 15, color: "var(--bone, #f2e6cc)" }}>{t(`ranked.board.${board}` as TranslationKey)} · {t(`ranked.period.${board}` as TranslationKey)}</h4>
+          <div className="wk-table-wrap">
+            <table className="wk-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t("wiki.rankCol")}</th>
+                  <th scope="col">{t("season.rewardsCol")}</th>
+                  <th scope="col">{t("wiki.gemsCol")}</th>
                 </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+              </thead>
+              <tbody>
+                {RANKED_PRIZES[board].map((tier) => (
+                  <tr key={tier.from}>
+                    <th scope="row">{tier.from === tier.to ? t("ranked.place", { n: tier.from }) : t("ranked.placeRange", { a: tier.from, b: tier.to })}</th>
+                    <td>{tier.set === "FULL" ? `${t(`ranked.setName.${board}` as TranslationKey)} — ${t("ranked.setFull")}` : tier.set === "CASTLE" ? t("ranked.setCastle") : t("ranked.setNone")}</td>
+                    <td>{t("ranked.gems", { n: tier.freeGems })}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ))}
+      <p className="wk-prose">{t("ranked.setNote")} {t("ranked.howNote", { gems: SEASON_PARTICIPATION_FREE_GEMS })}</p>
     </div>
   );
 }

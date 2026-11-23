@@ -10,7 +10,7 @@ import { getItemDefinition } from "@/config/itemDefinitions";
  * (config/itemDefinitions.ts).
  */
 export interface ItemAcquiredFrom {
-  type: "BOSS_DROP" | "MINI_BOSS_DROP" | "PHASE_MILESTONE" | "TRADE" | "FUSION" | "SEASON_PASS" | "STORE";
+  type: "BOSS_DROP" | "MINI_BOSS_DROP" | "PHASE_MILESTONE" | "TRADE" | "FUSION" | "SEASON_PASS" | "STORE" | "RANKED";
   /** BossDefinition.id, phase-milestone id, the completed TradeSession.id, or "fusion" for a successful Item Fusion result. */
   refId: string;
 }

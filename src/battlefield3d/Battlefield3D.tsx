@@ -18,10 +18,10 @@ import { getFortressAnchor, getPortalAnchor } from "@/rendering/MapRenderer";
 import type { MapPointerBridge } from "@/rendering/CanvasRenderer";
 import { buildTerrain, type TerrainData } from "./terrain";
 import { buildScenery } from "./vegetation";
-import { buildTowerModel } from "./models/towerModel";
+import { animateTowerParts, buildTowerModel } from "./models/towerModel";
 import { buildCastleModel } from "./models/castleModel";
 import { threeToWorld, worldDirToYaw, worldToThree } from "./coords";
-import { Effects } from "./fx";
+import { Effects, SKIN_BOLT_COLORS } from "./fx";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "./creatures";
 import { buildProps } from "./props";
 
@@ -780,6 +780,7 @@ function Towers({ engine, terrain, fx }: { engine: GameEngine; terrain: TerrainD
         fx.rings.ring(disc.position.clone(), TOWER_COLORS[tw.type] ?? "#fff", 6, 46, 0.6);
         fx.glow.emit(obj.position.clone().add(new THREE.Vector3(0, 10, 0)), { count: 40, color: "#ffffff", colorEnd: TOWER_COLORS[tw.type] ?? "#fff", size: 3, life: 0.9, speed: 60, up: 40, gravity: 50 });
       }
+      animateTowerParts(entry.obj, t);
       entry.crystal.rotation.y = t * 1.4;
       entry.crystal.position.y = entry.top + Math.sin(t * 2 + tw.position.x) * 1.2;
       const disabled = tw.disabledRemainingMs > 0;
@@ -972,7 +973,7 @@ function Projectiles({ engine, terrain, fx }: { engine: GameEngine; terrain: Ter
         shots.current.set(p.id, { type: p.towerType, to: { ...p.to }, from: { ...p.from }, chain: p.chainTargets.map((c) => ({ ...c })), special: p.isSpecial, skin: p.skinId ?? null });
         // lightning is instant: the bolt is the shot
         if (p.towerType === "STORMCALLER") {
-          const color = p.skinId === "STORMCALLER_PACK_CRIMSON_STORM" ? "#ff1a2a" : p.skinId === "STORMCALLER_PACK_SOVEREIGN" ? "#ffd878" : TOWER_COLORS.STORMCALLER!;
+          const color = (p.skinId && SKIN_BOLT_COLORS[p.skinId]) || TOWER_COLORS.STORMCALLER!;
           let prev = ground(p.from, 42);
           const hits = [p.to, ...p.chainTargets];
           for (const h of hits) {

@@ -4,7 +4,7 @@ import { MAIN_BOSSES, MINI_BOSSES, type BossDefinition } from "@/config/bossConf
 import { PHASES, type PhaseDefinition } from "@/config/phaseConfig";
 import { ITEM_TYPES } from "@/config/itemDefinitions";
 import { DROP_TABLES } from "@/config/dropTables";
-import { PACK_TOWER_SKINS, PRESTIGE_TOWER_SKINS, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
+import { PACK_TOWER_SKINS, RANKED_TOWER_SKINS, PRESTIGE_TOWER_SKINS, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATIONS_BY_TOWER } from "@/config/specializations";
 
 export type WikiCategory = "TOWERS" | "BESTIARY" | "BATTLE" | "CASTLE" | "ITEMS" | "PROGRESSION" | "DAILY" | "ECONOMY" | "STORE" | "ASCENSION" | "PROJECTIONS";
@@ -14,7 +14,7 @@ export const WIKI_CATEGORIES: readonly WikiCategory[] = ["TOWERS", "BESTIARY", "
 export const CORE_PHASE_COUNT = 6;
 
 export function skinsForTower(type: TowerType): TowerSkinDefinition[] {
-  return [...TOWER_SKINS, ...PACK_TOWER_SKINS, ...PRESTIGE_TOWER_SKINS].filter((s) => s.towerType === type);
+  return [...TOWER_SKINS, ...PACK_TOWER_SKINS, ...RANKED_TOWER_SKINS, ...PRESTIGE_TOWER_SKINS].filter((s) => s.towerType === type);
 }
 
 /** Phases (1-based numbers) a creature type shows up in. */

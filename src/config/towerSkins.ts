@@ -97,7 +97,20 @@ export type SkinParticleBehavior =
   | "eclipse-motes"
   | "black-snow"
   | "royal-rays"
-  | "royal-sparks";
+  | "royal-sparks"
+  // ranking-prize exclusive (RANKED_TOWER_SKINS)
+  | "hourglass-sand"
+  | "nebula-drift"
+  | "clock-glyphs"
+  | "star-fall"
+  | "arena-sparks"
+  | "war-embers"
+  | "shield-glints"
+  | "gong-pulse"
+  | "banner-motes"
+  | "blue-flame"
+  | "silver-mist"
+  | "comet-trail";
 
 export interface SkinParticleStyle {
   color: string;
@@ -161,7 +174,7 @@ export const NO_GAMEPLAY_EFFECT: SkinGameplayEffect = {};
  * price points (see TOWER_SKIN_TIER_PRICES). Purely a pricing classification
  * — never read by combat code, never affects catalog/ownership/equip logic.
  */
-export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE" | "DUEL" | "PACK";
+export type TowerSkinTier = "ENTRY" | "INTERMEDIATE" | "PREMIUM" | "PRESTIGE" | "DUEL" | "PACK" | "RANKED";
 
 /**
  * The three approved commercial price points, in Gems, plus PRESTIGE (0 —
@@ -178,6 +191,8 @@ export const TOWER_SKIN_TIER_PRICES: Record<TowerSkinTier, number> = {
   DUEL: 0,
   /** Only inside a Store bundle bought with real money (config/store.ts SKIN_BUNDLES), never with Gems. */
   PACK: 0,
+  /** Only as a ranking prize (config/rankedRewards.ts): never sold, never in a bundle. */
+  RANKED: 0,
 };
 
 /**
@@ -1185,8 +1200,8 @@ export const DUEL_TOWER_SKINS: readonly TowerSkinDefinition[] = [
  * (`packFlourish`, drawn by battlefield3d/models/towerModel.ts). Like every
  * paid skin, a small trade-off effect and the +5% Gold/shards bonus.
  */
-function packSkin(id: string, towerType: TowerType, palette: TowerSkinPaletteOverride, material: SkinMaterialFinish, particle: SkinParticleStyle, projectileStyle: string, gameplayEffect: SkinGameplayEffect): TowerSkinDefinition {
-  return { id, towerType, i18nKey: id, paletteOverride: palette, unlockLevel: 1, tier: "PACK", gemCost: 0, material, coreShape: "", weaponDetail: "", particleStyle: particle, projectileStyle, cosmeticAttribute: { i18nKey: id }, gameplayEffect };
+function packSkin(id: string, towerType: TowerType, palette: TowerSkinPaletteOverride, material: SkinMaterialFinish, particle: SkinParticleStyle, projectileStyle: string, gameplayEffect: SkinGameplayEffect, tier: TowerSkinTier = "PACK"): TowerSkinDefinition {
+  return { id, towerType, i18nKey: id, paletteOverride: palette, unlockLevel: 1, tier, gemCost: 0, material, coreShape: "", weaponDetail: "", particleStyle: particle, projectileStyle, cosmeticAttribute: { i18nKey: id }, gameplayEffect };
 }
 
 export const PACK_TOWER_SKINS: readonly TowerSkinDefinition[] = [
@@ -1200,7 +1215,37 @@ export const PACK_TOWER_SKINS: readonly TowerSkinDefinition[] = [
   packSkin("STORMCALLER_PACK_SOVEREIGN", "STORMCALLER", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "royal-sparks" }, "sovereign-bolt", { chainFalloffAdd: -0.04, damageMult: 0.97 }),
 ];
 
-const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS, ...PACK_TOWER_SKINS].map((s) => [s.id, s]));
+/**
+ * RANKING PRIZES — tower skins that only the top of a ranking ever gets
+ * (config/rankedRewards.ts): the yearly Eternal ranking ("Eternidade"), the
+ * monthly Duel ranking ("Coroa da Arena") and the monthly Season ranking
+ * ("Estandarte Real"). Never sold, never in a bundle. Each has its own 3D
+ * crest, shot, impact and aura that no other skin uses.
+ */
+export const RANKED_TOWER_SKINS: readonly TowerSkinDefinition[] = [
+  // Eternidade — violet night, gold and starlight
+  packSkin("IRONWOOD_ETERNAL_RANK", "IRONWOOD", { primary: "#2a1a44", secondary: "#0c0816", accent: "#e8c060", glow: "rgba(170,120,255,0.6)" }, "celestial", { color: "#c8a8ff", behavior: "hourglass-sand" }, "eternal-arrow", { critChanceAdd: 0.05, attackSpeedMult: 0.97 }, "RANKED"),
+  packSkin("INFERNO_ETERNAL_RANK", "INFERNO", { primary: "#2a1440", secondary: "#0c0614", accent: "#ffb0f0", glow: "rgba(200,120,255,0.65)" }, "celestial", { color: "#e0a0ff", behavior: "nebula-drift" }, "eternal-nova", { aoeRadiusMult: 1.05, damageMult: 0.97 }, "RANKED"),
+  packSkin("FROSTBORN_ETERNAL_RANK", "FROSTBORN", { primary: "#262040", secondary: "#0a0814", accent: "#a8d8ff", glow: "rgba(150,180,255,0.6)" }, "celestial", { color: "#c8e0ff", behavior: "clock-glyphs" }, "eternal-stasis", { slowPercentAdd: 0.05, damageMult: 0.97 }, "RANKED"),
+  packSkin("STORMCALLER_ETERNAL_RANK", "STORMCALLER", { primary: "#1e1438", secondary: "#08050f", accent: "#d8b0ff", glow: "rgba(190,140,255,0.65)" }, "celestial", { color: "#e8d0ff", behavior: "star-fall" }, "eternal-bolt", { chainFalloffAdd: -0.04, damageMult: 0.97 }, "RANKED"),
+  // Coroa da Arena — arena red, bronze and steel
+  packSkin("IRONWOOD_ARENA_RANK", "IRONWOOD", { primary: "#5a1a14", secondary: "#1e0806", accent: "#e0a050", glow: "rgba(255,140,80,0.55)" }, "armored", { color: "#ffb070", behavior: "arena-sparks" }, "arena-arrow", { critChanceAdd: 0.04, rangeMult: 0.97 }, "RANKED"),
+  packSkin("INFERNO_ARENA_RANK", "INFERNO", { primary: "#6a1a10", secondary: "#200806", accent: "#ffc060", glow: "rgba(255,120,40,0.6)" }, "molten", { color: "#ffa040", behavior: "war-embers" }, "arena-fire", { burnDamageMult: 1.05, rangeMult: 0.97 }, "RANKED"),
+  packSkin("FROSTBORN_ARENA_RANK", "FROSTBORN", { primary: "#5a2026", secondary: "#1a080a", accent: "#d8e8ff", glow: "rgba(220,230,255,0.55)" }, "armored", { color: "#e8f0ff", behavior: "shield-glints" }, "arena-frost", { freezeChanceAdd: 0.04, damageMult: 0.97 }, "RANKED"),
+  packSkin("STORMCALLER_ARENA_RANK", "STORMCALLER", { primary: "#5a1418", secondary: "#1a0608", accent: "#ffd070", glow: "rgba(255,180,90,0.6)" }, "armored", { color: "#ffd890", behavior: "gong-pulse" }, "arena-bolt", { damageMult: 1.05, attackSpeedMult: 0.97 }, "RANKED"),
+  // Estandarte Real — royal blue, silver and laurel gold
+  packSkin("IRONWOOD_SEASON_RANK", "IRONWOOD", { primary: "#1a2a5a", secondary: "#080e20", accent: "#f0d070", glow: "rgba(120,170,255,0.55)" }, "armored", { color: "#a8c8ff", behavior: "banner-motes" }, "standard-arrow", { rangeMult: 1.04, damageMult: 0.98 }, "RANKED"),
+  packSkin("INFERNO_SEASON_RANK", "INFERNO", { primary: "#1e2a60", secondary: "#080c22", accent: "#ffd880", glow: "rgba(110,160,255,0.6)" }, "celestial", { color: "#8ab8ff", behavior: "blue-flame" }, "standard-fire", { burnDamageMult: 1.04, attackSpeedMult: 0.98 }, "RANKED"),
+  packSkin("FROSTBORN_SEASON_RANK", "FROSTBORN", { primary: "#203066", secondary: "#080e22", accent: "#f0f4ff", glow: "rgba(170,200,255,0.6)" }, "glacial", { color: "#d8e8ff", behavior: "silver-mist" }, "standard-frost", { slowPercentAdd: 0.04, rangeMult: 0.98 }, "RANKED"),
+  packSkin("STORMCALLER_SEASON_RANK", "STORMCALLER", { primary: "#1a2860", secondary: "#060a20", accent: "#e8f0ff", glow: "rgba(140,190,255,0.65)" }, "tempest", { color: "#b8d8ff", behavior: "comet-trail" }, "standard-bolt", { chainFalloffAdd: -0.03, damageMult: 0.98 }, "RANKED"),
+];
+
+const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS, ...PACK_TOWER_SKINS, ...RANKED_TOWER_SKINS].map((s) => [s.id, s]));
+
+/** Ranking-prize skins for this tower type (config/rankedRewards.ts). */
+export function getRankedSkinsForTower(type: TowerType): readonly TowerSkinDefinition[] {
+  return RANKED_TOWER_SKINS.filter((s) => s.towerType === type);
+}
 
 export function getTowerSkinDefinition(id: string): TowerSkinDefinition | null {
   return SKINS_BY_ID.get(id) ?? null;

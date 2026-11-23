@@ -216,6 +216,19 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     return o;
   }
 
+  /** An empty group placed under `parent` (moving parts are built inside one). */
+  function group(x = 0, y = 0, z = 0, parent: THREE.Object3D = PARENT) {
+    const g = new THREE.Group();
+    g.position.set(x, y, z);
+    parent.add(g);
+    return g;
+  }
+  /** Marks a part as moving: `spin` = radians/second about x/y/z, `bob` = [height, speed]. Played by animateTowerParts. */
+  function animate(o: THREE.Object3D, a: { spin?: [number, number, number]; bob?: [number, number] }) {
+    o.userData.anim = { ...a, r0: [o.rotation.x, o.rotation.y, o.rotation.z], y0: o.position.y, ph: Math.random() * 6 };
+    return o;
+  }
+
   /** A sharp ice crystal (elongated bipyramid with a hexagonal waist). */
   function crystal(len: number, rad: number, iceMat: THREE.Material, x: number, y: number, z: number, tiltX: number, tiltZ: number) {
     const g = new THREE.Group();
@@ -296,6 +309,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     FROSTBORN_CHAMPION: { plinth: ["#e8e0cc", "#8a826e", "#3e3a30"], obelisk: ["#f0e8d4", "#968c76", "#46402e"], cap: ["#ffd060", "#9a7418", "#4a3608"], flag: ["#1a1a22", "#0c0c10", "#060608"], rune: "#ffe08a", trim: "#ffd060", iron: "#2a2620", snow: "#fffaf0", frost: 0.7, ice: ["#fff0b0", "#ffc83a"], ice2: ["#ffe08a", "#d8a020"], orb: ["#fff4c0", "#ffcc3a"] },
     FROSTBORN_PACK_WINTER_CROWN: { plinth: ["#c8d0dc", "#7a8496", "#3a4250"], obelisk: ["#dce4f0", "#8a96aa", "#424c5c"], cap: ["#3a5aa8", "#1a2e64", "#0a1430"], flag: ["#2a4a9a", "#142a5a", "#08142e"], rune: "#6a9aff", trim: "#e8eef8", iron: "#5a6478", snow: "#ffffff", frost: 1.1, ice: ["#c8dcff", "#4a7aff"], ice2: ["#9ab8ff", "#2a5ae8"], orb: ["#d8e6ff", "#5a8aff"] },
     FROSTBORN_PACK_ECLIPSE: { plinth: ["#1c1a22", "#0a090e", "#040306"], obelisk: ["#22202a", "#0e0c12", "#060508"], cap: ["#d8a838", "#7a5812", "#3a2806"], flag: ["#1a181e", "#0c0a10", "#040306"], rune: "#ffc848", trim: "#ffc848", iron: "#16141a", snow: "#3a3428", frost: 0, ice: ["#ffe08a", "#ffb020"], ice2: ["#2a2430", "#120e18"], orb: ["#fff0b0", "#ffb020"] },
+    FROSTBORN_ETERNAL_RANK: { plinth: ["#3a2a5a", "#1a1030", "#0a0618"], obelisk: ["#44306a", "#20143a", "#0e081c"], cap: ["#e8c060", "#8a6418", "#3a2806"], flag: ["#2a1a4a", "#140a28", "#080414"], rune: "#c08aff", trim: "#ffd878", iron: "#1e1430", snow: "#e8dcff", frost: 0.6, ice: ["#e0c8ff", "#9a5aff"], ice2: ["#c8a8ff", "#6a2ae8"], orb: ["#f0e0ff", "#a060ff"] },
+    FROSTBORN_ARENA_RANK: { plinth: ["#7a4a2e", "#3e2414", "#1e1008"], obelisk: ["#6a3a2a", "#341a10", "#180c06"], cap: ["#d8963a", "#7a4a14", "#3a2206"], flag: ["#8a1a14", "#4a0a08", "#200404"], rune: "#ff7a4a", trim: "#e8a848", iron: "#2e2420", snow: "#f4e8e0", frost: 0.5, ice: ["#f4f0ec", "#e86a4a"], ice2: ["#ffd0b8", "#c83a1a"], orb: ["#ffe0c8", "#ff5a2a"] },
+    FROSTBORN_SEASON_RANK: { plinth: ["#c8d0dc", "#7a8496", "#3a4250"], obelisk: ["#2a4a9a", "#142a5a", "#08142e"], cap: ["#ffd060", "#9a7418", "#4a3608"], flag: ["#1a3a8a", "#0c1e4a", "#060e24"], rune: "#9ac0ff", trim: "#e8eef8", iron: "#3a4458", snow: "#ffffff", frost: 0.9, ice: ["#e0ecff", "#6a9aff"], ice2: ["#b8d0ff", "#3a6ae8"], orb: ["#f0f6ff", "#7aa8ff"] },
     FROSTBORN_LEGEND: { plinth: ["#1e1a20", "#0c0a0e", "#040306"], obelisk: ["#241e26", "#100c12", "#060408"], cap: ["#ffc040", "#8a5a10", "#3a2406"], flag: ["#6a0e1e", "#3a0610", "#1a0208"], rune: "#ff4a6a", trim: "#ffc040", iron: "#141016", snow: "#ffd8e0", frost: 0.5, ice: ["#ff8aa8", "#ff2a5a"], ice2: ["#ffc040", "#c8801a"], orb: ["#ffb0c0", "#ff2a5a"] },
   };
 
@@ -448,6 +464,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     IRONWOOD_CHAMPION: { bark: ["#e8e0cc", "#7a7060"], vein: "#ffd84a", mound: ["#2a2420", "#0e0c0a"], iron: "#1e1c1e", bronze: "#ffd060", wood: ["#f0e8d4", "#9a8e74"], moss: "#c8a040", cloak: ["#1a1a22", "#2a2a36"], leaf: "#e8c050" },
     IRONWOOD_PACK_EMERALD_SENTINEL: { bark: ["#3a5a3e", "#122014"], vein: "#6affa0", mound: ["#2a3a2a", "#0e160e"], iron: "#2a3a2e", bronze: "#e8c050", wood: ["#2e4a32", "#142418"], moss: "#3a8a4a", cloak: ["#1a3a22", "#e8c050"], leaf: "#2aa860" },
     IRONWOOD_PACK_ECLIPSE: { bark: ["#1a181e", "#060508"], vein: "#ffc848", mound: ["#16141a", "#060508"], iron: "#141218", bronze: "#ffc848", wood: ["#201c24", "#0a080c"], moss: "#3a2e14", cloak: ["#0e0c10", "#2a2010"], leaf: "#8a6a1a" },
+    IRONWOOD_ETERNAL_RANK: { bark: ["#3a2a5a", "#100a1e"], vein: "#c08aff", mound: ["#2a1e40", "#0c0818"], iron: "#1e1430", bronze: "#ffd878", wood: ["#4a3670", "#1e1430"], moss: "#6a4aa8", cloak: ["#2a1a4a", "#ffd878"], leaf: "#8a5ae0" },
+    IRONWOOD_ARENA_RANK: { bark: ["#6a2a1e", "#200a06"], vein: "#ff5a2a", mound: ["#5a3a24", "#1e120a"], iron: "#3a2a22", bronze: "#d8963a", wood: ["#7a3a22", "#2e140a"], moss: "#8a4a1a", cloak: ["#8a1a14", "#d8963a"], leaf: "#a83a1a" },
+    IRONWOOD_SEASON_RANK: { bark: ["#2a3a6a", "#0c1430"], vein: "#7ab0ff", mound: ["#2a3450", "#0e1426"], iron: "#c8d0dc", bronze: "#ffd060", wood: ["#34488a", "#141e44"], moss: "#3a5aa8", cloak: ["#1a3a8a", "#ffd060"], leaf: "#4a7ad8" },
     IRONWOOD_LEGEND: { bark: ["#1a1418", "#060406"], vein: "#ff3a5a", mound: ["#1e1a1e", "#08060a"], iron: "#141016", bronze: "#ffc040", wood: ["#241c22", "#0c080c"], moss: "#5a0a1a", cloak: ["#4a0a14", "#6a0e1e"], leaf: "#8a1028" },
   };
 
@@ -595,6 +614,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     base: { iron: "#3a3634", dark: "#24201e", brass: "#8a6a34", brick: ["#6a3a28", "#3a1c12", "#1a0c08"], fire: "#ff7a2a" },
     INFERNO_PACK_EMBERHEART: { iron: "#3a1410", dark: "#160806", brass: "#ffb23a", brick: ["#5a1a14", "#2a0a08", "#120404"], fire: "#ffb23a", lavaBrick: true },
     INFERNO_PACK_SOVEREIGN: { iron: "#c8a850", dark: "#6a5020", brass: "#ffe6a0", brick: ["#f2ead8", "#c0b090", "#7a6a48"], fire: "#ff4a5a" },
+    INFERNO_ETERNAL_RANK: { iron: "#2a1a40", dark: "#120a20", brass: "#ffd878", brick: ["#4a3670", "#24183a", "#0e0818"], fire: "#b06aff" },
+    INFERNO_ARENA_RANK: { iron: "#4a2a1e", dark: "#1e0e08", brass: "#e8a848", brick: ["#7a2a1e", "#3e140c", "#1a0804"], fire: "#ff4a1a" },
+    INFERNO_SEASON_RANK: { iron: "#c8d0dc", dark: "#2a3450", brass: "#ffd060", brick: ["#2a4a9a", "#142a5a", "#08142e"], fire: "#4a9aff" },
     INFERNO_ASHEN_TYRANT: { iron: "#2a1a1c", dark: "#120a0c", brass: "#5a1a1a", brick: ["#3a1a1a", "#1a0a0a", "#0a0404"], fire: "#ff2e2e", lavaBrick: true },
     INFERNO_VOLCANIC_COLOSSUS: { iron: "#3a2e28", dark: "#1c1410", brass: "#4a3428", brick: ["#4a3a30", "#1c1410", "#0e0806"], fire: "#ff8a3a", lavaBrick: true },
     INFERNO_INDUSTRIAL_FORGE: { iron: "#5a5e62", dark: "#2a2c2e", brass: "#b07a40", brick: ["#5a5450", "#2e2a28", "#141210"], fire: "#9ad8ff" },
@@ -723,6 +745,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     base: { dais: ["#6a6470", "#34303c", "#18161c"], pillar: ["#76707e", "#3e3a46", "#1c1a20"], rod: "#b06a3a", band: "#2c2a34", glow: "#a050ff", orb: ["#8a5ad0", "#5a20c0"] },
     STORMCALLER_PACK_CRIMSON_STORM: { dais: ["#4a1a1e", "#1e080a", "#0c0304"], pillar: ["#5a1e24", "#240a0e", "#100406"], rod: "#c8c0c4", band: "#240a0e", glow: "#ff3a4a", orb: ["#ff8a94", "#ff1a2e"] },
     STORMCALLER_PACK_SOVEREIGN: { dais: ["#f2ead8", "#c0b090", "#7a6a48"], pillar: ["#f6f0e2", "#c8b898", "#8a7a58"], rod: "#e8c870", band: "#b01a2a", glow: "#ffe2a0", orb: ["#fff4d0", "#ff4a5a"] },
+    STORMCALLER_ETERNAL_RANK: { dais: ["#3a2a5a", "#1a1030", "#0a0618"], pillar: ["#44306a", "#20143a", "#0e081c"], rod: "#ffd878", band: "#1a1030", glow: "#c08aff", orb: ["#f0e0ff", "#9a4aff"] },
+    STORMCALLER_ARENA_RANK: { dais: ["#7a4a2e", "#3e2414", "#1e1008"], pillar: ["#8a3a24", "#461a10", "#200a06"], rod: "#e8a848", band: "#3e140c", glow: "#ff6a2a", orb: ["#ffd0a0", "#ff4a1a"] },
+    STORMCALLER_SEASON_RANK: { dais: ["#c8d0dc", "#7a8496", "#3a4250"], pillar: ["#2a4a9a", "#142a5a", "#08142e"], rod: "#e8eef8", band: "#ffd060", glow: "#8ab8ff", orb: ["#f0f6ff", "#4a8aff"] },
     STORMCALLER_VOID: { dais: ["#2a2430", "#100c14", "#060408"], pillar: ["#2e2836", "#120e16", "#08060a"], rod: "#2a2234", band: "#120e18", glow: "#5a1fff", orb: ["#1a0a30", "#4a10ff"] },
     STORMCALLER_THUNDER: { dais: ["#4a5a6a", "#1c2834", "#0c141a"], pillar: ["#3a5068", "#182838", "#0a141c"], rod: "#8a96a2", band: "#1c2a3a", glow: "#4ac8ff", orb: ["#6ac0f0", "#1a8aff"] },
     STORMCALLER_CELESTIAL: { dais: ["#ece6d6", "#b4a888", "#7a6e54"], pillar: ["#f4eee0", "#c4b898", "#8a7e60"], rod: "#e8c870", band: "#c8a050", glow: "#ffe9a0", orb: ["#fff4c8", "#ffd060"] },
@@ -3662,7 +3687,112 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   // with gems round its foot, and its own crest above (crown, banners, orbit,
   // eclipse or wings) in the skin's colours.
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // RANKING — each prize collection changes the tower's whole silhouette, so it
+  // can't be mistaken for the premium skin whose structure it starts from:
+  // Eterno floats on a levitating amethyst island, Arena stands inside a small
+  // colosseum, Season rises on a stepped royal dais.
+  // ---------------------------------------------------------------------------
+  function liftBody(lift: number) {
+    const body = new THREE.Group();
+    for (const ch of [...root.children]) body.add(ch);
+    root.add(body);
+    body.position.y = lift;
+    for (const k of Object.keys(anchors)) if (!turretAnchors.has(k)) anchors[k] = anchors[k]!.clone().add(new THREE.Vector3(0, lift, 0));
+    for (const pl of pointLights) pl.pos = pl.pos.clone().add(new THREE.Vector3(0, lift, 0));
+    return body;
+  }
+  function rankedEnvelope(P: PackLook) {
+    PARENT = root;
+    const glowM = (c: string, ei = 2.2) => plainMat(c, { emissive: c, ei, rough: 0.3 });
+    if (P.crest === "eternity") {
+      const lift = 11;
+      const body = liftBody(lift);
+      animate(body, { bob: [0.7, 0.9] });
+      const isle = group(0, lift, 0, body);
+      const rock = plainMat("#2a1e3a", { rough: 0.85, metal: 0.05 });
+      const rockHi = plainMat("#2e2240", { rough: 0.8 });
+      const amethyst = plainMat("#5a2a9a", { rough: 0.12, metal: 0.2, emissive: P.gem, ei: 0.5 });
+      // the island hangs under the tower's own footing: a rough slab and an inverted crag
+      mesh(new THREE.CylinderGeometry(16.5, 15.5, 1.6, 9), rockHi, 0, -0.9, 0, isle);
+      const crag = mesh(new THREE.ConeGeometry(15.5, 13, 9, 3), rock, 0, -8.3, 0, isle);
+      crag.rotation.x = Math.PI;
+      const rb = rng(9090);
+      const cpos = (crag.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+      for (let k = 0; k < cpos.count; k++) {
+        const j = 1 + (rb() - 0.5) * 0.25;
+        cpos.setX(k, cpos.getX(k) * j);
+        cpos.setZ(k, cpos.getZ(k) * j);
+      }
+      crag.geometry.computeVertexNormals();
+      for (let i = 0; i < 7; i++) {
+        const a = (i / 7) * Math.PI * 2 + rb();
+        const d = 4 + rb() * 7;
+        const c = mesh(new THREE.ConeGeometry(1.1 + rb() * 0.8, 5 + rb() * 5, 6), amethyst, Math.cos(a) * d, -4 - rb() * 5 - (d < 7 ? 3 : 0), Math.sin(a) * d, isle);
+        c.rotation.x = Math.PI;
+      }
+      mesh(new THREE.TorusGeometry(16, 0.35, 8, 64), glowM(P.gem, 1.8), 0, -0.1, 0, isle).rotation.x = Math.PI / 2;
+      // loose stones circling the island
+      const orbit = group(0, 0, 0, root);
+      animate(orbit, { spin: [0, 0.35, 0] });
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2;
+        const st = mesh(new THREE.DodecahedronGeometry(1.2 + (i % 3) * 0.5, 0), i % 2 ? rockHi : rock, Math.cos(a) * 20, 4 + (i % 3) * 2.5, Math.sin(a) * 20, orbit);
+        animate(st, { spin: [0.6, 0.9, 0], bob: [0.8, 1 + i * 0.2] });
+      }
+      // a pool of violet light on the ground where the island's shadow falls
+      mesh(new THREE.CircleGeometry(15, 40), new THREE.MeshBasicMaterial({ color: P.gem, transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 0.2, 0).rotation.x = -Math.PI / 2;
+    } else if (P.crest === "arena") {
+      const stone = plainMat("#b89670", { rough: 0.85 });
+      const stoneDk = plainMat("#8a6a48", { rough: 0.9 });
+      const bronze = plainMat(P.metal, { metal: 0.8, rough: 0.32 });
+      const rA = 18.5, n = 14;
+      // the arena floor
+      mesh(new THREE.CylinderGeometry(rA + 1.5, rA + 2.2, 1.2, 40), stoneDk, 0, 0.6, 0);
+      mesh(new THREE.CylinderGeometry(rA - 0.5, rA - 0.5, 0.2, 40), plainMat("#d8bc90", { rough: 1 }), 0, 1.25, 0);
+      // an arcade of arches all round, its top bound by a bronze-capped ring
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        const x = Math.cos(a) * rA, z = Math.sin(a) * rA;
+        mesh(new THREE.BoxGeometry(1.6, 9, 1.6), stone, x, 5.7, z).rotation.y = -a;
+        const a2 = a + Math.PI / n;
+        const arch = mesh(new THREE.TorusGeometry(Math.PI * rA / n - 0.8, 0.6, 6, 12, Math.PI), stone, Math.cos(a2) * rA, 10.2, Math.sin(a2) * rA);
+        arch.rotation.y = -a2 + Math.PI / 2;
+      }
+      const band = mesh(new THREE.CylinderGeometry(rA + 0.9, rA + 0.9, 1.6, 48, 1, true), stone, 0, 12.6, 0);
+      (band.material as THREE.Material).side = THREE.DoubleSide;
+      mesh(new THREE.TorusGeometry(rA + 0.9, 0.45, 8, 64), bronze, 0, 13.4, 0).rotation.x = Math.PI / 2;
+      mesh(new THREE.TorusGeometry(rA + 0.9, 0.45, 8, 64), bronze, 0, 11.8, 0).rotation.x = Math.PI / 2;
+      liftBody(1.3);
+    } else if (P.crest === "royal") {
+      const marble = plainMat("#eef0f4", { rough: 0.3, metal: 0.05 });
+      const gold = plainMat(P.metal, { metal: 0.85, rough: 0.28 });
+      const silver = plainMat("#e4e8f0", { metal: 0.9, rough: 0.22 });
+      const steps: [number, number][] = [[21, 0], [19.2, 1.4], [17.4, 2.8]];
+      for (const [r, y] of steps) {
+        mesh(new THREE.CylinderGeometry(r, r + 0.4, 1.4, 48), marble, 0, y + 0.7, 0);
+        mesh(new THREE.TorusGeometry(r + 0.1, 0.22, 6, 72), gold, 0, y + 1.35, 0).rotation.x = Math.PI / 2;
+      }
+      // a royal-blue carpet running down the front steps
+      const carpet = plainMat(P.cloth, { rough: 0.9, emissive: P.cloth, ei: 0.12 });
+      for (let k = 0; k < 3; k++) {
+        const [r, y] = steps[k]!;
+        mesh(new THREE.BoxGeometry(5, 0.12, r - (steps[k + 1]?.[0] ?? 14) + 0.2), carpet, 0, y + 1.46, (r + (steps[k + 1]?.[0] ?? 14)) / 2);
+      }
+      // a silver balustrade round the top step, open at the carpet
+      for (let i = 0; i < 28; i++) {
+        const a = (i / 28) * Math.PI * 2;
+        if (Math.abs(Math.atan2(Math.sin(a - Math.PI / 2), Math.cos(a - Math.PI / 2))) < 0.3) continue;
+        mesh(new THREE.CylinderGeometry(0.25, 0.32, 2.2, 8), silver, Math.cos(a) * 16.9, 5.3, Math.sin(a) * 16.9);
+      }
+      const rail = mesh(new THREE.TorusGeometry(16.9, 0.25, 6, 80, Math.PI * 2 - 0.6), silver, 0, 6.5, 0);
+      rail.rotation.set(Math.PI / 2, 0, Math.PI / 2 + 0.3);
+      liftBody(4.2);
+    }
+  }
+
   function packFlourish(P: PackLook) {
+    if (P.crest === "eternity" || P.crest === "arena" || P.crest === "royal") rankedEnvelope(P);
     PARENT = root;
     const box = new THREE.Box3().setFromObject(root);
     const top = Math.max(14, box.max.y);
@@ -3714,6 +3844,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         const hy = top + 7;
         const heart = mesh(new THREE.IcosahedronGeometry(4.4, 0), plainMat("#ff6a1a", { emissive: "#ff5a10", ei: 2.4, rough: 0.2 }), 0, hy, 0);
         heart.scale.set(1, 1.25, 1);
+        animate(heart, { spin: [0, 0.8, 0], bob: [0.8, 1.6] });
         mesh(new THREE.IcosahedronGeometry(5.6, 1), new THREE.MeshBasicMaterial({ color: "#ffb23a", transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false }), 0, hy, 0);
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI * 2;
@@ -3724,7 +3855,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
           }
           tube(pts, 0.38, gold, 50);
         }
-        mesh(new THREE.TorusGeometry(8.4, 0.5, 8, 40), gold, 0, hy, 0).rotation.x = Math.PI / 2;
+        const cageRing = mesh(new THREE.TorusGeometry(8.4, 0.5, 8, 40), gold, 0, hy, 0);
+        cageRing.rotation.x = Math.PI / 2;
+        animate(cageRing, { spin: [0, 0, 0.5] });
         crown(top + 16.5, 2.6, gold);
         for (let i = 0; i < 4; i++) {
           const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
@@ -3760,14 +3893,13 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
           mesh(new THREE.SphereGeometry(0.9, 14, 10), glowM("#5a8aff", 2.4), bx, ph + 1.6, bz);
         }
         const fy = top + 9;
+        const flake = group(0, fy, 0);
+        animate(flake, { spin: [0, 0.6, 0], bob: [0.6, 1.2] });
         for (let i = 0; i < 6; i++) {
           const a = (i / 6) * Math.PI;
-          const arm = mesh(new THREE.BoxGeometry(14, 0.35, 0.35), glowM("#d8e8ff", 1.6), 0, fy, 0);
+          const arm = mesh(new THREE.BoxGeometry(14, 0.35, 0.35), glowM("#d8e8ff", 1.6), 0, 0, 0, flake);
           arm.rotation.y = a;
-          for (const d of [-1, 1]) {
-            const tip = mesh(new THREE.OctahedronGeometry(0.6, 0), glowM("#ffffff", 2), Math.cos(a) * 7 * d, fy, -Math.sin(a) * 7 * d);
-            void tip;
-          }
+          for (const d of [-1, 1]) mesh(new THREE.OctahedronGeometry(0.6, 0), glowM("#ffffff", 2), Math.cos(a) * 7 * d, 0, -Math.sin(a) * 7 * d, flake);
         }
         crown(fy + 2.2, 2.2, steel);
         pointLights.push({ pos: new THREE.Vector3(0, fy, 2), color: "#8ab0ff", intensity: 260, dist: 34 });
@@ -3801,6 +3933,9 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         for (let k = 0; k < 3; k++) {
           const t = mesh(new THREE.TorusGeometry(9.5 - k * 2.2, 0.32, 8, 64), red, 0, vy + k * 3.2, 0);
           t.rotation.set(Math.PI / 2 + (k - 1) * 0.22, 0, k * 0.6);
+          const nub = mesh(new THREE.SphereGeometry(0.7, 10, 8), glowM("#ff8a94", 3), 9.5 - k * 2.2, 0, 0, t);
+          void nub;
+          animate(t, { spin: [0, 0, (k % 2 ? -1 : 1) * (1.2 + k * 0.4)] });
         }
         for (let i = 0; i < 4; i++) {
           const a = (i / 4) * Math.PI * 2 + 0.4;
@@ -3834,12 +3969,208 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         const cor = mesh(new THREE.TorusGeometry(4.3, 0.55, 12, 64), glowM(P.gem, 3.2), 0, ey, 0);
         cor.rotation.x = Math.PI / 2.15;
         mesh(new THREE.SphereGeometry(5.4, 24, 16), new THREE.MeshBasicMaterial({ color: P.gem, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false }), 0, ey, 0);
+        const corona = group(0, ey, 0);
+        animate(corona, { spin: [0, 0, 0.35] });
         for (let i = 0; i < 16; i++) {
           const a = (i / 16) * Math.PI * 2;
-          const ray = mesh(new THREE.ConeGeometry(0.28, i % 2 ? 2 : 3.4, 5), glowM(P.gem, 2.4), Math.cos(a) * 6.2, ey + Math.sin(a) * 6.2 * 0.42, Math.sin(a) * 1.2);
+          const ray = mesh(new THREE.ConeGeometry(0.28, i % 2 ? 2 : 3.4, 5), glowM(P.gem, 2.4), Math.cos(a) * 6.2, Math.sin(a) * 6.2, 0, corona);
           ray.rotation.z = a - Math.PI / 2;
         }
         pointLights.push({ pos: new THREE.Vector3(0, ey, 3), color: P.gem, intensity: 260, dist: 34 });
+        break;
+      }
+      // ---- RANKING · Eterno: a floating hourglass of violet glass in a gold frame, orbited by star rings, over amethyst obelisks ----
+      // (moving parts: the hourglass floats and turns, each star ring revolves at its own pace)
+      case "IRONWOOD_ETERNAL_RANK":
+      case "FROSTBORN_ETERNAL_RANK":
+      case "INFERNO_ETERNAL_RANK":
+      case "STORMCALLER_ETERNAL_RANK": {
+        const hy = top + 9;
+        const float = group(0, hy, 0);
+        animate(float, { bob: [0.9, 1.3] });
+        const hour = group(0, 0, 0, float);
+        animate(hour, { spin: [0, 0.45, 0] });
+        PARENT = hour;
+        const glass = new THREE.MeshPhysicalMaterial({ color: "#d8c0ff", emissive: P.gem, emissiveIntensity: 0.35, roughness: 0.05, transparent: true, opacity: 0.55, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
+        for (const d of [-1, 1]) {
+          const bulb = mesh(new THREE.ConeGeometry(3.4, 4.6, 24, 1, true), glass, 0, d * 2.3, 0);
+          if (d < 0) bulb.rotation.x = Math.PI;
+          mesh(new THREE.CylinderGeometry(4, 4, 0.7, 28), gold, 0, d * 4.95, 0);
+          mesh(new THREE.TorusGeometry(4, 0.3, 8, 36), gold, 0, d * 5.3, 0).rotation.x = Math.PI / 2;
+        }
+        for (let i = 0; i < 3; i++) {
+          const a = (i / 3) * Math.PI * 2;
+          mesh(new THREE.CylinderGeometry(0.26, 0.26, 10, 8), gold, Math.cos(a) * 3.7, 0, Math.sin(a) * 3.7);
+          mesh(new THREE.SphereGeometry(0.5, 10, 8), gold, Math.cos(a) * 3.7, 5.8, Math.sin(a) * 3.7);
+        }
+        // the sand: a glowing pile below, a thin falling stream, a sinking cone above
+        mesh(new THREE.ConeGeometry(2.4, 2, 20), glowM("#ffd878", 2.2), 0, -3.6, 0);
+        mesh(new THREE.CylinderGeometry(0.12, 0.12, 4.4, 6), glowM("#fff0b0", 3), 0, -0.4, 0);
+        mesh(new THREE.ConeGeometry(1.6, 1.4, 20), glowM("#ffd878", 2.2), 0, 1.2, 0).rotation.x = Math.PI;
+        // star rings round the hourglass, each tilted its own way and revolving
+        PARENT = float;
+        const orbitN = TYPE === "STORMCALLER" ? 4 : 3;
+        for (let k = 0; k < orbitN; k++) {
+          const rad = 7 + k * 1.6;
+          const tilt = group(0, 0, 0, float);
+          tilt.rotation.set(Math.PI / 2 + (k - 1) * 0.5, k * 0.9, k % 2 ? 0.3 : -0.3);
+          const turn = group(0, 0, 0, tilt);
+          animate(turn, { spin: [0, 0, (k % 2 ? -1 : 1) * (0.7 + k * 0.25)] });
+          mesh(new THREE.TorusGeometry(rad, 0.14, 6, 90), glowM(k % 2 ? "#ffd878" : P.gem, 1.6), 0, 0, 0, turn);
+          for (let j = 0; j < 2; j++) {
+            const st = mesh(new THREE.OctahedronGeometry(0.75, 0), glowM(j ? "#ffffff" : P.gem, 3), Math.cos(j * Math.PI + k) * rad, Math.sin(j * Math.PI + k) * rad, 0, turn);
+            st.scale.set(0.6, 0.6, 1.4);
+          }
+        }
+        mesh(new THREE.SphereGeometry(6.6, 24, 16), new THREE.MeshBasicMaterial({ color: P.gem, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false }), 0, 0, 0, float);
+        PARENT = root;
+        // amethyst obelisks with gold caps and glowing runes
+        const amethyst = plainMat("#3a2260", { rough: 0.15, metal: 0.3, emissive: P.gem, ei: 0.25 });
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + Math.PI / 6;
+          const x = Math.cos(a) * 22, z = Math.sin(a) * 22;
+          const h = i % 2 ? 9 : 12.5;
+          const ob = mesh(new THREE.CylinderGeometry(0.6, 1.5, h, 4), amethyst, x, h / 2, z);
+          ob.rotation.y = a + Math.PI / 4;
+          mesh(new THREE.ConeGeometry(0.85, 1.8, 4), gold, x, h + 0.9, z).rotation.y = a + Math.PI / 4;
+          mesh(new THREE.BoxGeometry(0.18, h * 0.6, 0.18), glowM(P.gem, 2.8), x + Math.cos(a) * 1.05, h * 0.45, z + Math.sin(a) * 1.05);
+          animate(mesh(new THREE.OctahedronGeometry(0.55, 0), glowM("#ffffff", 3), x, h + 2.6, z), { spin: [0, 2, 0], bob: [0.5, 2 + i * 0.3] });
+        }
+        pointLights.push({ pos: new THREE.Vector3(0, hy, 3), color: P.gem, intensity: 300, dist: 38 });
+        break;
+      }
+      // ---- RANKING · Arena: red shields on crossed spears round the foot; above, a bronze laurel pierced by two crossed swords ----
+      case "IRONWOOD_ARENA_RANK":
+      case "FROSTBORN_ARENA_RANK":
+      case "INFERNO_ARENA_RANK":
+      case "STORMCALLER_ARENA_RANK": {
+        const bronze = plainMat(P.metal, { metal: 0.8, rough: 0.32 });
+        const crimson = plainMat(P.cloth, { rough: 0.55, metal: 0.15 });
+        const wood = plainMat("#4a2e1a", { rough: 0.8 });
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const d = 22.5;
+          const x = Math.cos(a) * d, z = Math.sin(a) * d;
+          for (const s2 of [-1, 1]) {
+            const sp = mesh(new THREE.CylinderGeometry(0.16, 0.16, 13, 6), wood, x, 6, z);
+            sp.rotation.set(0, -a, s2 * 0.42);
+            const tipOff = new THREE.Vector3(Math.sin(s2 * 0.42) * -6.4, 6.4 * Math.cos(0.42), 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), -a);
+            const tip = mesh(new THREE.ConeGeometry(0.45, 1.8, 4), steel, x + tipOff.x, 6 + tipOff.y + 0.6, z + tipOff.z);
+            tip.rotation.set(0, -a, s2 * 0.42);
+          }
+          const sh = new THREE.Group();
+          sh.position.set(x + Math.cos(a) * 0.7, 6.2, z + Math.sin(a) * 0.7);
+          sh.rotation.y = -a + Math.PI / 2;
+          PARENT.add(sh);
+          const face = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 0.5, 32), crimson);
+          face.rotation.x = Math.PI / 2;
+          sh.add(face);
+          const rim = new THREE.Mesh(new THREE.TorusGeometry(3, 0.32, 8, 40), bronze);
+          rim.position.z = 0.1;
+          sh.add(rim);
+          const boss = new THREE.Mesh(new THREE.SphereGeometry(0.9, 16, 12), bronze);
+          boss.position.z = 0.35;
+          boss.scale.z = 0.6;
+          sh.add(boss);
+          for (const r2 of [0, Math.PI / 2]) {
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(5.6, 0.35, 0.2), bronze);
+            bar.position.z = 0.3;
+            bar.rotation.z = r2 + Math.PI / 4;
+            sh.add(bar);
+          }
+          for (const m of [face, rim, boss]) m.castShadow = true;
+        }
+        // the laurel and the crossed swords
+        const ly = top + 10;
+        const lr = 6;
+        const emblem = group(0, ly, 0);
+        animate(emblem, { spin: [0, 0.5, 0], bob: [0.7, 1.1] });
+        PARENT = emblem;
+        mesh(new THREE.TorusGeometry(lr, 0.3, 8, 48, Math.PI * 1.7), bronze, 0, 0, 0).rotation.z = Math.PI * 1.65;
+        for (let i = 0; i < 18; i++) {
+          const t = i / 17;
+          const a = Math.PI * 1.65 + t * Math.PI * 1.7;
+          for (const side of [-1, 1]) {
+            const leaf = mesh(new THREE.SphereGeometry(0.75, 8, 6), gold, Math.cos(a) * (lr + side * 0.6), Math.sin(a) * (lr + side * 0.6), 0);
+            leaf.scale.set(0.5, 1.4, 0.35);
+            leaf.rotation.z = a + side * 0.5;
+          }
+        }
+        for (const s2 of [-1, 1]) {
+          const sw = new THREE.Group();
+          sw.position.set(0, 0, 0.6);
+          sw.rotation.z = s2 * 0.75;
+          sw.scale.setScalar(1.45);
+          emblem.add(sw);
+          const blade = new THREE.Mesh(new THREE.BoxGeometry(0.7, 11, 0.18), steel);
+          blade.position.y = 1.4;
+          const edge = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.4, 4), steel);
+          edge.position.y = 7.6;
+          edge.scale.z = 0.3;
+          const guard = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.5, 0.5), bronze);
+          guard.position.y = -4.2;
+          const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.28, 2.2, 8), crimson);
+          grip.position.y = -5.5;
+          const pommel = new THREE.Mesh(new THREE.SphereGeometry(0.55, 12, 10), bronze);
+          pommel.position.y = -6.8;
+          const fuller = new THREE.Mesh(new THREE.BoxGeometry(0.16, 9, 0.22), glowM(P.gem, 2));
+          fuller.position.y = 1.2;
+          sw.add(blade, edge, guard, grip, pommel, fuller);
+        }
+        animate(mesh(new THREE.OctahedronGeometry(1.6, 0), glowM(P.gem, 3), 0, 0, 1.4), { spin: [0, 2.4, 0] });
+        PARENT = root;
+        pointLights.push({ pos: new THREE.Vector3(0, ly, 4), color: P.gem, intensity: 260, dist: 34 });
+        break;
+      }
+      // ---- RANKING · Season: four royal-blue standards on silver poles, a silver crown and a royal star over the tower ----
+      case "IRONWOOD_SEASON_RANK":
+      case "FROSTBORN_SEASON_RANK":
+      case "INFERNO_SEASON_RANK":
+      case "STORMCALLER_SEASON_RANK": {
+        const silver = plainMat("#e4e8f0", { metal: 0.9, rough: 0.22 });
+        const royal = plainMat(P.cloth, { rough: 0.7, metal: 0.05, emissive: P.cloth, ei: 0.15 });
+        for (let i = 0; i < 4; i++) {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          const d = 23.5;
+          const x = Math.cos(a) * d, z = Math.sin(a) * d;
+          const ph = 24;
+          mesh(new THREE.CylinderGeometry(1.4, 1.8, 1.2, 10), silver, x, 0.6, z);
+          mesh(new THREE.CylinderGeometry(0.22, 0.28, ph, 8), silver, x, ph / 2, z);
+          mesh(new THREE.ConeGeometry(0.5, 2, 6), gold, x, ph + 1, z);
+          mesh(new THREE.SphereGeometry(0.45, 10, 8), gold, x, ph, z);
+          const perp = a + Math.PI / 2;
+          const bx = x + Math.cos(perp) * 2.3, bz = z + Math.sin(perp) * 2.3;
+          mesh(new THREE.CylinderGeometry(0.14, 0.14, 4.8, 6), gold, bx, ph - 1.1, bz).rotation.set(0, -perp, Math.PI / 2);
+          const ban = mesh(new THREE.PlaneGeometry(4.4, 11, 1, 8), royal, bx, ph - 6.6, bz);
+          ban.rotation.y = -perp;
+          (ban.material as THREE.Material).side = THREE.DoubleSide;
+          const pos = (ban.geometry as THREE.BufferGeometry).attributes.position as THREE.BufferAttribute;
+          for (let k = 0; k < pos.count; k++) pos.setZ(k, Math.sin((pos.getY(k) + 5.5) * 0.7) * 0.45);
+          pos.needsUpdate = true;
+          ban.geometry.computeVertexNormals();
+          const trim = mesh(new THREE.BoxGeometry(4.5, 0.5, 0.2), gold, bx, ph - 12.1, bz);
+          trim.rotation.y = -perp;
+          const star = mesh(new THREE.OctahedronGeometry(1.3, 0), glowM("#e8eef8", 2.2), bx + Math.cos(a) * 0.3, ph - 6, bz + Math.sin(a) * 0.3);
+          star.scale.set(1, 1, 0.3);
+          star.rotation.y = -perp;
+        }
+        const sy = top + 8;
+        const regal = group(0, sy, 0);
+        animate(regal, { spin: [0, 0.4, 0], bob: [0.8, 1.2] });
+        const wheel = group(0, 0, -0.6, regal);
+        animate(wheel, { spin: [0, 0, 0.6] });
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2;
+          const ray = mesh(new THREE.ConeGeometry(0.9, i % 2 ? 3.4 : 5.4, 4), i % 2 ? silver : gold, Math.cos(a) * (i % 2 ? 3.6 : 4.4), Math.sin(a) * (i % 2 ? 3.6 : 4.4), 0, wheel);
+          ray.rotation.z = a - Math.PI / 2;
+          ray.scale.z = 0.35;
+        }
+        mesh(new THREE.SphereGeometry(2, 24, 18), plainMat("#b8d0ff", { emissive: P.gem, ei: 1.8, rough: 0.1 }), 0, 0, 0, regal);
+        mesh(new THREE.TorusGeometry(2.5, 0.35, 8, 40), silver, 0, 0, 0.2, regal);
+        PARENT = regal;
+        crown(3.6, 2.4, silver, 5);
+        PARENT = root;
+        pointLights.push({ pos: new THREE.Vector3(0, sy, 3), color: P.gem, intensity: 260, dist: 36 });
         break;
       }
       // ---- the Sovereign pair: a marble colonnade with a gold lintel, crimson banners, great wings and a sun disk ----
@@ -3863,9 +4194,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
         const disk = mesh(new THREE.CircleGeometry(5.8, 40), glowM("#ffe2a0", 1.6), 0, sy, -5.4);
         void disk;
         mesh(new THREE.TorusGeometry(6.2, 0.4, 8, 48), gold, 0, sy, -5.3);
+        const sun = group(0, sy, -5.3);
+        animate(sun, { spin: [0, 0, 0.3] });
         for (let i = 0; i < 12; i++) {
           const a = (i / 12) * Math.PI * 2;
-          const ray = mesh(new THREE.ConeGeometry(0.5, 2.6, 5), gold, Math.cos(a) * 7.6, sy + Math.sin(a) * 7.6, -5.3);
+          const ray = mesh(new THREE.ConeGeometry(0.5, 2.6, 5), gold, Math.cos(a) * 7.6, Math.sin(a) * 7.6, 0, sun);
           ray.rotation.z = a - Math.PI / 2;
         }
         for (const side of [-1, 1]) {
@@ -3895,11 +4228,31 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   return { root, turret, anchors, turretAnchors, pointLights, turretMode: TURRET_MODE, turretPivotY: TURRET_PIVOT_Y, turretTilt: TURRET_TILT };
 }
 
+/**
+ * Plays a tower's moving parts (the ones marked by animate() inside buildTowerModel):
+ * call every frame with the time in seconds. The marks live in userData, so they
+ * survive Object3D.clone(); the list of moving parts is gathered once per object.
+ */
+export function animateTowerParts(root: THREE.Object3D, t: number) {
+  const r = root as THREE.Object3D & { __anim?: THREE.Object3D[] };
+  if (!r.__anim) {
+    r.__anim = [];
+    root.traverse((o) => {
+      if (o.userData.anim) r.__anim!.push(o);
+    });
+  }
+  for (const o of r.__anim) {
+    const a = o.userData.anim;
+    if (a.spin) o.rotation.set(a.r0[0] + a.spin[0] * t, a.r0[1] + a.spin[1] * t, a.r0[2] + a.spin[2] * t);
+    if (a.bob) o.position.y = a.y0 + Math.sin(t * a.bob[1] + a.ph) * a.bob[0];
+  }
+}
+
 /** PACOTES — how each bundle-exclusive skin is built (see config/towerSkins.ts PACK_TOWER_SKINS). */
 interface PackLook {
   /** The premium skin of the same tower whose structure it reuses. */
   shape: string;
-  crest: "crown" | "banners" | "orbit" | "eclipse" | "wings";
+  crest: "crown" | "banners" | "orbit" | "eclipse" | "wings" | "eternity" | "arena" | "royal";
   metal: string;
   gem: string;
   cloth: string;
@@ -3914,4 +4267,17 @@ const PACK_LOOKS: Record<string, PackLook> = {
   FROSTBORN_PACK_ECLIPSE: { shape: "FROSTBORN_ARCANE_CRYSTAL", crest: "eclipse", metal: "#d8a838", gem: "#ffc848", cloth: "#141218" },
   INFERNO_PACK_SOVEREIGN: { shape: "INFERNO_SOLAR_ASCENDANT", crest: "wings", metal: "#ffd878", gem: "#ff3a4a", cloth: "#f2ead8" },
   STORMCALLER_PACK_SOVEREIGN: { shape: "STORMCALLER_CELESTIAL", crest: "wings", metal: "#ffd878", gem: "#ff3a4a", cloth: "#f2ead8" },
+  // RANKING (config/rankedRewards.ts) — prizes for the top of each ranking, never sold.
+  IRONWOOD_ETERNAL_RANK: { shape: "IRONWOOD_WARDEN_OF_THE_ABYSS", crest: "eternity", metal: "#ffd878", gem: "#b07aff", cloth: "#2a1a4a" },
+  FROSTBORN_ETERNAL_RANK: { shape: "FROSTBORN_CELESTIAL_ICE", crest: "eternity", metal: "#ffd878", gem: "#9a8aff", cloth: "#2a1a4a" },
+  INFERNO_ETERNAL_RANK: { shape: "INFERNO_PLAGUE_FURNACE", crest: "eternity", metal: "#ffd878", gem: "#d05aff", cloth: "#2a1a4a" },
+  STORMCALLER_ETERNAL_RANK: { shape: "STORMCALLER_ARCANE", crest: "eternity", metal: "#ffd878", gem: "#8a6aff", cloth: "#2a1a4a" },
+  IRONWOOD_ARENA_RANK: { shape: "IRONWOOD_IRONCLAD_JUGGERNAUT", crest: "arena", metal: "#d8963a", gem: "#ff5a2a", cloth: "#8a1a14" },
+  FROSTBORN_ARENA_RANK: { shape: "FROSTBORN_GLACIAL_WARLORD", crest: "arena", metal: "#d8963a", gem: "#ff7a4a", cloth: "#8a1a14" },
+  INFERNO_ARENA_RANK: { shape: "INFERNO_ASHEN_TYRANT", crest: "arena", metal: "#d8963a", gem: "#ff4a1a", cloth: "#8a1a14" },
+  STORMCALLER_ARENA_RANK: { shape: "STORMCALLER_TEMPEST", crest: "arena", metal: "#d8963a", gem: "#ff6a2a", cloth: "#8a1a14" },
+  IRONWOOD_SEASON_RANK: { shape: "IRONWOOD_ARCANE_ENGINE", crest: "royal", metal: "#ffd060", gem: "#5a9aff", cloth: "#1a3a8a" },
+  FROSTBORN_SEASON_RANK: { shape: "FROSTBORN_ANCIENT_GUARDIAN", crest: "royal", metal: "#ffd060", gem: "#7aa8ff", cloth: "#1a3a8a" },
+  INFERNO_SEASON_RANK: { shape: "INFERNO_INDUSTRIAL_FORGE", crest: "royal", metal: "#ffd060", gem: "#4a9aff", cloth: "#1a3a8a" },
+  STORMCALLER_SEASON_RANK: { shape: "STORMCALLER_VOID", crest: "royal", metal: "#ffd060", gem: "#4a8aff", cloth: "#1a3a8a" },
 };

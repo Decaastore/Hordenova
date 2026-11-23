@@ -30,7 +30,8 @@ import {
   SPECIALIZATION_UNLOCK_TOWER_LEVEL,
   type SpecializationId,
 } from "@/config/specializations";
-import { getPackSkinsForTower, getPrestigeSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, isPaidTowerSkin, SKIN_REWARD_BONUS_PER_TYPE, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
+import { rankedBoardForSkin } from "@/config/rankedRewards";
+import { getPackSkinsForTower, getPrestigeSkinsForTower, getRankedSkinsForTower, getSkinsForTower, getTowerSkinDualPrice, isPaidTowerSkin, SKIN_REWARD_BONUS_PER_TYPE, type SkinGameplayEffect, type TowerSkinDefinition } from "@/config/towerSkins";
 import { REPOSITION_GEM_PRICE } from "@/config/repositioning";
 import { TOWER_ITEM_SLOT_COUNT } from "@/config/towerItemSlots";
 import { getItemDefinition } from "@/config/itemDefinitions";
@@ -1034,7 +1035,7 @@ function SkinSection({
   // owned (granted at Prestige level 50), so an unreached one never shows up
   // as a permanently-locked commercial card.
   // PACOTES — bundle-exclusive skins always show (with their preview), but only a Store bundle grants them.
-  const skins = [...getSkinsForTower(tower.type), ...getPackSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
+  const skins = [...getSkinsForTower(tower.type), ...getPackSkinsForTower(tower.type), ...getRankedSkinsForTower(tower.type), ...getPrestigeSkinsForTower(tower.type).filter((s) => isSkinOwned(s.id))];
   const [previewSkinId, setPreviewSkinId] = useState<string | null>(tower.equippedSkinId);
   const [previewLevel, setPreviewLevel] = useState<number>(() => nearestPreviewLevel(tower.level));
   if (skins.length === 0) return null;
@@ -1151,6 +1152,16 @@ function SkinSection({
                 {t("towerInfo.skinEquipAction")}
               </button>
             );
+          } else if (skin.tier === "RANKED") {
+            // a ranking prize: never sold, shown so the player knows what the top places win
+            const board = rankedBoardForSkin(skin.id);
+            badge = { text: t("towerInfo.skinRankedOnly"), tone: "locked" };
+            action = board ? (
+              <span style={{ fontSize: 9, color: PALETTE.gold, fontWeight: 700, textAlign: "right", lineHeight: 1.25, maxWidth: 110 }}>
+                {t(`ranked.board.${board}` as TranslationKey)}
+                <span style={{ display: "block", color: PALETTE.uiTextDim, fontWeight: 600 }}>{t("ranked.topN", { n: board === "SEASON" ? 5 : 10 })}</span>
+              </span>
+            ) : null;
           } else if (skin.tier === "PACK") {
             const bundle = bundleForSkin(skin.id);
             badge = { text: t("towerInfo.skinPackOnly"), tone: "locked" };

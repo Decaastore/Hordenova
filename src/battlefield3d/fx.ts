@@ -303,6 +303,19 @@ class RingPool {
   }
 }
 
+/** The colour a skin's lightning is drawn in (Stormcaller skins with their own bolt). */
+export const SKIN_BOLT_COLORS: Record<string, string> = {
+  STORMCALLER_PACK_CRIMSON_STORM: "#ff1a2a",
+  STORMCALLER_PACK_SOVEREIGN: "#ffd878",
+  STORMCALLER_ETERNAL_RANK: "#c08aff",
+  STORMCALLER_ARENA_RANK: "#ff7a2a",
+  STORMCALLER_SEASON_RANK: "#8ab8ff",
+};
+/** Skins whose shots get their own 3D trail and impact (bundle and ranking skins). */
+export function hasSkinShotFx(skinId: string | null | undefined): skinId is string {
+  return !!skinId && (skinId.includes("_PACK_") || skinId.endsWith("_RANK"));
+}
+
 export class Effects {
   readonly root = new THREE.Group();
   readonly glow: ParticlePool;
@@ -413,6 +426,50 @@ export class Effects {
         this.glow.emit(at, { count: 2, color: "#fff0b0", colorEnd: "#c89018", size: 2 * k, life: 0.6, speed: 9, drag: 1.4, radius: 2 });
         if (skinId === "FROSTBORN_PACK_ECLIPSE") this.glow.emit(at, { count: 1, color: "#ffffff", colorEnd: "#8ab0d8", size: 1.4, life: 0.9, speed: 8, gravity: 30, radius: 1.5 });
         return true;
+      // ---- RANKING prizes ----
+      case "IRONWOOD_ETERNAL_RANK":
+        this.glow.emit(at, { count: 3, color: "#fff0b0", colorEnd: "#c89018", size: 1.4, life: 1, speed: 6, gravity: 40, drag: 1, radius: 1.5 });
+        this.glow.emit(at, { count: 1, color: "#e8d0ff", colorEnd: "#6a2ae8", size: 7 * k, life: 0.35, speed: 3, grow: 0.3 });
+        return true;
+      case "INFERNO_ETERNAL_RANK":
+        this.smoke.emit(at, { count: 1, color: "#8a3aff", colorEnd: "#1a0830", size: 9 * k, life: 0.9, speed: 3, up: 4, grow: 2, alpha: 0.35 });
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#ff8af0", size: 1.6, life: 0.7, speed: 12, drag: 1.4, radius: 2 });
+        this.glow.emit(at, { count: 1, color: "#ffd0f8", colorEnd: "#8a3aff", size: 9 * k, life: 0.3, speed: 2, grow: 0.3 });
+        return true;
+      case "FROSTBORN_ETERNAL_RANK":
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#a8d8ff", size: 5 * k, life: 0.4, speed: 3, grow: 0.3 });
+        this.glow.emit(at, { count: 1, color: "#fff0b0", colorEnd: "#ffd878", size: 1.3, life: 1.2, speed: 4, drag: 2, radius: 3 });
+        return true;
+      case "STORMCALLER_ETERNAL_RANK":
+        return true;
+      case "IRONWOOD_ARENA_RANK":
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#ff7a2a", size: 1.4, life: 0.45, speed: 40, gravity: 120, drag: 1, radius: 1 });
+        this.glow.emit(at, { count: 1, color: "#ffe0b0", colorEnd: "#e0a050", size: 5 * k, life: 0.25, speed: 2, grow: 0.3 });
+        return true;
+      case "INFERNO_ARENA_RANK":
+        this.glow.emit(at, { count: 3, color: "#fff1b0", colorEnd: "#c8201a", size: 9 * k, life: 0.4, speed: 6, up: 8, grow: 0.4, radius: 1.5 });
+        this.smoke.emit(at, { count: 1, color: "#3a1410", colorEnd: "#0e0604", size: 9 * k, life: 1, speed: 4, up: 14, grow: 2.4, alpha: 0.45 });
+        return true;
+      case "FROSTBORN_ARENA_RANK":
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#d8e8ff", size: 4 * k, life: 0.35, speed: 4, grow: 0.25 });
+        this.glow.emit(at, { count: 1, color: "#ffd090", colorEnd: "#d8963a", size: 1.5, life: 0.8, speed: 18, gravity: 60, drag: 1, radius: 1.5 });
+        return true;
+      case "STORMCALLER_ARENA_RANK":
+        return true;
+      case "IRONWOOD_SEASON_RANK":
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#2a5ad8", size: 5 * k, life: 0.35, speed: 3, grow: 0.3 });
+        this.glow.emit(at, { count: 1, color: "#fff0b0", colorEnd: "#f0d070", size: 1.3, life: 0.9, speed: 10, gravity: 30, drag: 1, radius: 1.5 });
+        return true;
+      case "INFERNO_SEASON_RANK":
+        this.glow.emit(at, { count: 3, color: "#e8f4ff", colorEnd: "#1a4ad8", size: 9 * k, life: 0.4, speed: 6, up: 6, grow: 0.35, radius: 1.5 });
+        this.glow.emit(at, { count: 1, color: "#fff6d0", colorEnd: "#ffd880", size: 1.4, life: 0.8, speed: 14, up: 8, drag: 1, radius: 1.5 });
+        return true;
+      case "FROSTBORN_SEASON_RANK":
+        this.smoke.emit(at, { count: 1, color: "#f0f4ff", colorEnd: "#a8c0e8", size: 8 * k, life: 0.9, speed: 3, up: 2, grow: 2, alpha: 0.3 });
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#7aa8ff", size: 1.4, life: 0.9, speed: 9, drag: 1.4, radius: 2 });
+        return true;
+      case "STORMCALLER_SEASON_RANK":
+        return true;
       case "INFERNO_PACK_SOVEREIGN":
       case "STORMCALLER_PACK_SOVEREIGN":
         this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#ffc848", size: 7 * k, life: 0.35, speed: 5, grow: 0.3, radius: 1.5 });
@@ -426,6 +483,96 @@ export class Effects {
     const k = special ? 2 : 1.25;
     const up = new THREE.Vector3(0, 1, 0);
     switch (skinId) {
+      // ---- RANKING prizes ----
+      case "IRONWOOD_ETERNAL_RANK":
+        // the sand runs out: a column of golden grains pours down into a violet ring of time
+        this.glow.emit(at.clone().add(new THREE.Vector3(0, 22, 0)), { count: Math.round(40 * k), color: "#fff0b0", colorEnd: "#c89018", size: 1.8, life: 1.1, speed: 6, gravity: 60, drag: 0.6, radius: 2.5 });
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#8a4aff", size: 22 * k, life: 0.25, speed: 0, grow: 1.6 });
+        this.rings.ring(ground, "#b07aff", 4, 34 * k, 0.7);
+        this.rings.ring(ground, "#ffd878", 2.5, 20 * k, 1);
+        return true;
+      case "INFERNO_ETERNAL_RANK":
+        // a supernova: a white-hot core, a violet nebula shell and a scatter of stars
+        this.glow.emit(at, { count: 4, color: "#ffffff", colorEnd: "#ff8af0", size: 34 * k, life: 0.25, speed: 0, grow: 1.8 });
+        this.glow.emit(at, { count: Math.round(44 * k), color: "#ffd0f8", colorEnd: "#6a1ae8", size: 12 * k, life: 0.8, speed: 70 * k, grow: 1.5, drag: 3, radius: 3 });
+        this.glow.emit(at, { count: Math.round(24 * k), color: "#ffffff", colorEnd: "#c8a8ff", size: 2, life: 1.6, speed: 60 * k, drag: 1.4, sizeJitter: 0.6 });
+        this.smoke.emit(at, { count: Math.round(10 * k), color: "#4a1a8a", colorEnd: "#0e0620", size: 18 * k, life: 1.6, speed: 14, up: 10, grow: 2.2, alpha: 0.35, drag: 1.5, radius: 4 });
+        this.rings.ring(ground, "#ff8af0", 5, 46 * k, 0.5);
+        return true;
+      case "FROSTBORN_ETERNAL_RANK":
+        // time stops: a pale flash, three slow rings frozen in place, motes hanging in the air
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#a8d8ff", size: 26 * k, life: 0.25, speed: 0, grow: 1.5 });
+        this.glow.emit(at, { count: Math.round(26 * k), color: "#fff6d0", colorEnd: "#ffd878", size: 1.8, life: 2, speed: 30 * k, drag: 4, radius: 3 });
+        for (const [r, l] of [[18, 1.2], [30, 1.5], [42, 1.8]] as const) this.rings.ring(ground, r === 30 ? "#ffd878" : "#a8d8ff", 3, r * k, l);
+        return true;
+      case "STORMCALLER_ETERNAL_RANK":
+        // a singularity: a dark knot pulling light inward, then a ring of starlight
+        this.smoke.emit(at, { count: Math.round(10 * k), color: "#0a0614", colorEnd: "#000000", size: 12 * k, life: 0.8, speed: 4, grow: 0.6, alpha: 0.8, radius: 2 });
+        for (let i = 0; i < 14; i++) {
+          const a = (i / 14) * Math.PI * 2, d = 26 * k;
+          const p = at.clone().add(new THREE.Vector3(Math.cos(a) * d, (Math.random() - 0.5) * 10, Math.sin(a) * d));
+          this.glow.emit(p, { count: 2, color: "#ffffff", colorEnd: "#8a6aff", size: 2.4, life: 0.5, speed: 55 * k, dir: at.clone().sub(p).normalize(), spread: 0.1, drag: 0.5 });
+        }
+        this.rings.ring(ground, "#d8b0ff", 4, 38 * k, 0.6);
+        return true;
+      case "IRONWOOD_ARENA_RANK":
+        // steel on steel: a burst of white-hot sparks and a dust ring kicked up from the sand
+        this.glow.emit(at, { count: Math.round(40 * k), color: "#ffffff", colorEnd: "#ff7a2a", size: 1.8, life: 0.6, speed: 130 * k, up: 30, gravity: 220, drag: 0.8, sizeJitter: 0.6 });
+        this.glow.emit(at, { count: 3, color: "#fff0d0", colorEnd: "#e0a050", size: 18 * k, life: 0.15, speed: 0, grow: 1.6 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 2, 0)), { count: Math.round(10 * k), color: "#c8a07a", colorEnd: "#7a5a3a", size: 10 * k, life: 1.2, speed: 30, up: 4, grow: 2, alpha: 0.4, drag: 2, radius: 4 });
+        this.rings.ring(ground, "#e0a050", 4, 30 * k, 0.45);
+        return true;
+      case "INFERNO_ARENA_RANK":
+        // a war-fire blast: a shield of flame breaking into burning shards
+        this.glow.emit(at, { count: Math.round(36 * k), color: "#fff1b0", colorEnd: "#c8201a", size: 12 * k, life: 0.6, speed: 60 * k, up: 18, grow: 1.6, drag: 3, radius: 3 });
+        this.glow.emit(at, { count: Math.round(20 * k), color: "#ffc060", colorEnd: "#8a1a14", size: 3.4, life: 1.2, speed: 110 * k, up: 50, gravity: 160, drag: 0.8, sizeJitter: 0.6 });
+        this.smoke.emit(at, { count: Math.round(12 * k), color: "#2a1210", colorEnd: "#0a0404", size: 16 * k, life: 1.8, speed: 10, up: 24, grow: 2.6, alpha: 0.55, radius: 4 });
+        this.rings.ring(ground, "#c8201a", 5, 42 * k, 0.45);
+        this.rings.ring(ground, "#ffc060", 3, 26 * k, 0.6);
+        return true;
+      case "FROSTBORN_ARENA_RANK":
+        // a frost lance: icy shards and bronze sparks, a cold ring on the sand
+        this.glow.emit(at, { count: Math.round(30 * k), color: "#ffffff", colorEnd: "#a8c8ff", size: 4 * k, life: 0.8, speed: 80 * k, up: 30, gravity: 110, drag: 1.6, sizeJitter: 0.6 });
+        this.glow.emit(at, { count: Math.round(16 * k), color: "#ffd090", colorEnd: "#d8963a", size: 1.8, life: 0.6, speed: 100 * k, gravity: 160, drag: 1 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 3, 0)), { count: Math.round(8 * k), color: "#f0f6ff", colorEnd: "#b8cce8", size: 12 * k, life: 1.4, speed: 14, up: 2, grow: 2, alpha: 0.35 });
+        this.rings.ring(ground, "#d8e8ff", 4, 34 * k, 0.55);
+        return true;
+      case "STORMCALLER_ARENA_RANK":
+        // a thunderclap: the gong rings out — three shockwaves and sparks
+        this.glow.emit(at, { count: 4, color: "#ffffff", colorEnd: "#ffd070", size: 26 * k, life: 0.2, speed: 0, grow: 1.8 });
+        this.glow.emit(at, { count: Math.round(30 * k), color: "#ffffff", colorEnd: "#ff5a2a", size: 2.4, life: 0.5, speed: 120 * k, drag: 2, sizeJitter: 0.6 });
+        for (const [r, l] of [[22, 0.35], [36, 0.5], [50, 0.65]] as const) this.rings.ring(ground, r === 36 ? "#ff5a2a" : "#ffd070", 4, r * k, l);
+        return true;
+      case "IRONWOOD_SEASON_RANK":
+        // the standard is planted: a column of royal light and silver stars rising from the hit
+        this.glow.emit(ground.clone().add(new THREE.Vector3(0, 2, 0)), { count: Math.round(26 * k), color: "#e8f4ff", colorEnd: "#2a5ad8", size: 3, life: 1, speed: 70, dir: up, spread: 0.12, drag: 1.2, radius: 2 });
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#f0d070", size: 20 * k, life: 0.2, speed: 0, grow: 1.5 });
+        this.rings.ring(ground, "#2a5ad8", 4, 34 * k, 0.55);
+        this.rings.ring(ground, "#f0d070", 2.5, 20 * k, 0.8);
+        return true;
+      case "INFERNO_SEASON_RANK":
+        // a blue-fire burst crowned with gold
+        this.glow.emit(at, { count: Math.round(38 * k), color: "#e8f4ff", colorEnd: "#1a3ad8", size: 12 * k, life: 0.6, speed: 60 * k, up: 20, grow: 1.6, drag: 3.5, radius: 3 });
+        this.glow.emit(at, { count: Math.round(22 * k), color: "#fff6d0", colorEnd: "#ffb030", size: 2.4, life: 1.2, speed: 90 * k, up: 40, gravity: 130, drag: 0.8, sizeJitter: 0.6 });
+        this.smoke.emit(at, { count: Math.round(10 * k), color: "#1a2240", colorEnd: "#080c18", size: 15 * k, life: 1.6, speed: 10, up: 22, grow: 2.4, alpha: 0.45, radius: 4 });
+        this.rings.ring(ground, "#4a9aff", 5, 42 * k, 0.45);
+        this.rings.ring(ground, "#ffd880", 3, 24 * k, 0.65);
+        return true;
+      case "FROSTBORN_SEASON_RANK":
+        // a glacier seal: silver mist rolls out, a flash and a slow star-shaped ring
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#7aa8ff", size: 24 * k, life: 0.22, speed: 0, grow: 1.5 });
+        this.glow.emit(at, { count: Math.round(28 * k), color: "#ffffff", colorEnd: "#7aa8ff", size: 3.4 * k, life: 0.9, speed: 70 * k, up: 30, gravity: 100, drag: 1.6, sizeJitter: 0.6 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 3, 0)), { count: Math.round(14 * k), color: "#f4f8ff", colorEnd: "#b8c8e8", size: 15 * k, life: 1.8, speed: 20, up: 2, grow: 2.2, alpha: 0.4, drag: 1.6, radius: 6 });
+        this.rings.ring(ground, "#e8eef8", 4, 38 * k, 0.7);
+        return true;
+      case "STORMCALLER_SEASON_RANK":
+        // a comet strike: it falls from the sky on a white-blue streak and splashes into a crater ring
+        this.bolts.bolt(at.clone().add(new THREE.Vector3(30, 90, -20)), ground, "#8ab8ff", 0.5, 4);
+        this.glow.emit(at, { count: 4, color: "#ffffff", colorEnd: "#4a8aff", size: 30 * k, life: 0.25, speed: 0, grow: 1.7 });
+        this.glow.emit(at, { count: Math.round(34 * k), color: "#e8f0ff", colorEnd: "#2a5ad8", size: 2.6, life: 1, speed: 110 * k, up: 50, gravity: 150, drag: 0.8, sizeJitter: 0.6 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 3, 0)), { count: Math.round(10 * k), color: "#2a3450", colorEnd: "#0e1426", size: 12 * k, life: 1.4, speed: 24, up: 8, grow: 2.2, alpha: 0.45, radius: 4 });
+        this.rings.ring(ground, "#4a8aff", 5, 44 * k, 0.5);
+        return true;
       case "INFERNO_PACK_EMBERHEART":
         // a fireball bursting like a heartbeat: two shockwaves, a fire core, lava spatter and a smoke column
         this.glow.emit(at, { count: Math.round(40 * k), color: "#fff6c8", colorEnd: "#ff2a00", size: 13 * k, life: 0.6, speed: 60 * k, up: 20, grow: 1.7, drag: 3.5, radius: 3 });

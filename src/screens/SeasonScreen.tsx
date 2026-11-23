@@ -20,7 +20,9 @@ import { getPhaseForWave } from "@/config/phaseConfig";
 import { getMainBossForWave } from "@/config/bossConfig";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { canUnlockPrestige, getPrestigeBonuses, getPrestigeTier, getPrestigeUpgradeDualPrice, PRESTIGE_MIN_BEST_WAVE } from "@/config/prestige";
-import { getSeasonRewardBundle, type AscensionRank } from "@/config/ascension";
+import { RANKED_PRIZES } from "@/config/rankedRewards";
+import { RankedPrizeCard } from "@/ui/RankedPrizeCard";
+import { SEASON_PARTICIPATION_FREE_GEMS } from "@/engine/AscensionManager";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { AscensionPanel } from "@/ui/AscensionPanel";
@@ -56,7 +58,6 @@ const THEME_ART: Record<string, string> = {
 /** The 3D castle's dressing for each theme ground (themes without their own dressing use the forest one). */
 const CASTLE_DRESSING: Record<string, string> = { ancient_forest: "ANCIENT_FOREST", volcanic_wastes: "VOLCANIC_WASTES", frozen_tundra: "FROZEN_TUNDRA", abyss: "ABYSS" };
 
-const RANKS: AscensionRank[] = [1, 2, 3, 4, 5];
 
 /**
  * SEASON — the pre-game hub (Home → Play → Season → run). Answers "what's
@@ -292,36 +293,32 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
               <h2 className="pg-h2">{t("season.rewardsTitle")}</h2>
               <p className="pg-sub">{t("season.rewardsSub")}</p>
               <div className="pg-table-wrap">
-                <table className="pg-table">
+                <table className="pg-table" data-testid="season-prize-table">
                   <thead>
                     <tr>
                       <th scope="col">{t("season.rankCol")}</th>
-                      <th scope="col">{t("season.titleCol")}</th>
+                      <th scope="col">{t("season.rewardsCol")}</th>
                       <th scope="col" className="is-num">
                         {t("season.gemsCol")}
                       </th>
-                      <th scope="col">{t("season.rewardsCol")}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {RANKS.map((rank) => {
-                      const bundle = getSeasonRewardBundle(status.seasonNumber, rank);
-                      return (
-                        <tr key={rank}>
-                          <th scope="row">#{rank}</th>
-                          <td>{t(`ascension.rankTitles.${bundle.rankTitleKey}` as TranslationKey)}</td>
-                          <td className="is-num">{bundle.gems.toLocaleString(locale)}</td>
-                          <td style={{ whiteSpace: "normal" }}>{bundle.cosmetics.length > 0 ? bundle.cosmetics.map((c) => t(`ascension.cosmeticTypes.${c.type}` as TranslationKey)).join(", ") : "—"}</td>
-                        </tr>
-                      );
-                    })}
+                    {RANKED_PRIZES.SEASON.map((tier) => (
+                      <tr key={tier.from}>
+                        <th scope="row">{tier.from === tier.to ? t("ranked.place", { n: tier.from }) : t("ranked.placeRange", { a: tier.from, b: tier.to })}</th>
+                        <td style={{ whiteSpace: "normal" }}>{tier.set === "FULL" ? t("ranked.setFull") : tier.set === "CASTLE" ? t("ranked.setCastle") : t("ranked.setNone")}</td>
+                        <td className="is-num">{tier.freeGems.toLocaleString(locale)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-              <p className="pg-note">{t("ascension.topFive.honestNote")}</p>
+              <p className="pg-note">{t("ranked.howNote", { gems: SEASON_PARTICIPATION_FREE_GEMS })}</p>
             </section>
 
             <aside className="pg-aside">
+              <RankedPrizeCard board="SEASON" />
               <div className="pg-block">
                 <h3>{t("season.bossesTitle")}</h3>
                 {bossRecords.length === 0 ? (

@@ -20,7 +20,7 @@ export function rewardItemDefinitionId(rarity: Parameters<typeof getItemDefiniti
   return getItemDefinitionsByRarity(rarity)[0]?.id ?? null;
 }
 
-export function applyRewardParts(save: SaveData, parts: readonly RewardPart[], source: { type: "SEASON_PASS" | "STORE"; refId: string }): Partial<SaveData> {
+export function applyRewardParts(save: SaveData, parts: readonly RewardPart[], source: { type: "SEASON_PASS" | "STORE" | "RANKED"; refId: string }): Partial<SaveData> {
   let { gold, gemShards, freeGems, purchasedGems, inventoryCapacity } = save;
   let inventory: ItemInstance[] = [...save.inventory];
   let overflow: ItemInstance[] = [...save.overflowInventory];

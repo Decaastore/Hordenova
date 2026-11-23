@@ -34,7 +34,7 @@ export interface CastleSkinPaletteOverride {
   rockDark?: string;
 }
 
-export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER" | "PACK";
+export type CastleSkinSource = "ROULETTE" | "PRESTIGE" | "STORE" | "COLLECTION" | "BEGINNER" | "PACK" | "RANKED";
 export type CastleSkinAura = "EMBER" | "FROST" | "SOLAR" | "VERDANT" | "VOID" | "BANNERS" | "SHARDS";
 
 export interface CastleSkinDefinition {
@@ -95,6 +95,10 @@ export const CASTLE_SKINS: readonly CastleSkinDefinition[] = [
   { id: "CRIMSON_STORM_KEEP", i18nKey: "CRIMSON_STORM_KEEP", paletteOverride: { rock: "#4a1a1e", rockDark: "#1a0608" }, source: "PACK", tint: "#e0203a", tintStrength: 0.68, glow: "#ff5a6a", aura: "SHARDS" },
   { id: "ECLIPSE_SPIRE", i18nKey: "ECLIPSE_SPIRE", paletteOverride: { rock: "#1c1a22", rockDark: "#060508" }, source: "PACK", tint: "#141218", tintStrength: 0.75, glow: "#ffc848", aura: "VOID" },
   { id: "SOVEREIGN_PALACE", i18nKey: "SOVEREIGN_PALACE", paletteOverride: { rock: "#f2ead8", rockDark: "#9a7a3a" }, source: "PACK", tint: "#ffe2a0", tintStrength: 0.5, glow: "#ff4a5a", aura: "SOLAR" },
+  // RANKING PRIZES (config/rankedRewards.ts) — only the top of a ranking ever gets these
+  { id: "ETERNITY_CITADEL", i18nKey: "ETERNITY_CITADEL", paletteOverride: { rock: "#2a1e44", rockDark: "#0a0714" }, source: "RANKED", tint: "#7a4aff", tintStrength: 0.68, glow: "#e8c060", aura: "VOID" },
+  { id: "ARENA_COLOSSEUM", i18nKey: "ARENA_COLOSSEUM", paletteOverride: { rock: "#8a5a3a", rockDark: "#3a1e10" }, source: "RANKED", tint: "#c0301e", tintStrength: 0.55, glow: "#ffc060", aura: "EMBER" },
+  { id: "ROYAL_STANDARD_KEEP", i18nKey: "ROYAL_STANDARD_KEEP", paletteOverride: { rock: "#c8ccd8", rockDark: "#3a4460" }, source: "RANKED", tint: "#2a4aa8", tintStrength: 0.55, glow: "#f0d070", aura: "BANNERS" },
   { id: "RECRUIT_KEEP", i18nKey: "RECRUIT_KEEP", paletteOverride: { rock: "#8a6a44", rockDark: "#3a2a16" }, source: "BEGINNER", tint: "#c08a4a", tintStrength: 0.45, glow: "#ffcf8a", aura: "BANNERS" },
 ];
 

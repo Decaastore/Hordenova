@@ -1,10 +1,9 @@
 import { getMapLayout } from "@/data/mapLayouts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded } from "./AscensionManager";
+import { getAscensionStatus, resetSeasonProgressionForTesting, syncSeasonIfNeeded, SEASON_PARTICIPATION_FREE_GEMS } from "./AscensionManager";
 import { loadSave, updateSave } from "./SaveSystem";
 import { LocalSeasonClock, SEASON_DURATION_MS, SEASON_EPOCH_MS, seasonClock } from "./SeasonClock";
 import { GameEngine } from "./GameEngine";
-import { getSeasonRewardBundle } from "@/config/ascension";
 import { RUN_START } from "@/config/gameBalance";
 import { createItemInstance } from "@/entities/Item";
 import type { EnemyInstance } from "@/entities/Enemy";
@@ -43,7 +42,7 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(loadSave().ascensionHistory).toEqual([]);
   });
 
-  it("a season that ended WITH participation gets finalized as rank 1 and grants Gems + cosmetics to the permanent save", () => {
+  it("a season that ended WITH participation is finalized with NO placement (only the online ranking places players) and grants the participation Free Gems", () => {
     mockSeasonNumber(2); // now in season 2 — season 1 has fully ended
     updateSave({
       ascensionLastSyncedSeason: 1,
@@ -59,15 +58,10 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
 
     const main = loadSave();
     expect(main.ascensionHistory).toHaveLength(1);
-    expect(main.ascensionHistory[0]).toMatchObject({ seasonNumber: 1, bestWave: 55, rank: 1 });
-    expect(main.ascensionSeasonsWon).toBe(1);
-    expect(main.ascensionTop3).toBe(1);
-    expect(main.ascensionTop5).toBe(1);
-
-    const expectedBundle = getSeasonRewardBundle(1, 1);
-    expect(main.freeGems).toBe(10 + expectedBundle.gems);
-    for (const cosmetic of expectedBundle.cosmetics) expect(main.ownedCosmetics).toContain(cosmetic.id);
-
+    expect(main.ascensionHistory[0]).toMatchObject({ seasonNumber: 1, bestWave: 55, rank: null });
+    expect(main.ascensionSeasonsWon).toBe(0);
+    expect(main.freeGems).toBe(10 + SEASON_PARTICIPATION_FREE_GEMS);
+    expect(main.ownedCosmetics).toEqual([]);
     expect(main.ascensionLastSyncedSeason).toBe(2);
   });
 
@@ -322,7 +316,9 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(main.ascensionHistory).toHaveLength(4);
     const bySeasonNumber = new Map(main.ascensionHistory.map((h) => [h.seasonNumber, h]));
     expect(bySeasonNumber.get(1)!.bestWave).toBe(20);
-    expect(bySeasonNumber.get(1)!.rank).toBe(1);
+    expect(bySeasonNumber.get(1)!.rank).toBeNull();
+    // Only season 1 had real participation, so only it pays the participation Gems.
+    expect(main.freeGems).toBe(SEASON_PARTICIPATION_FREE_GEMS);
     // Seasons 2/3/4 were fully skipped — no real progress, no participation.
     expect(bySeasonNumber.get(2)!.rank).toBeNull();
     expect(bySeasonNumber.get(3)!.rank).toBeNull();
@@ -344,29 +340,16 @@ describe("AscensionManager — season lifecycle (PRÓXIMA GRANDE FASE)", () => {
     expect(getAscensionStatus()).toEqual(status);
   });
 
-  it("finalizing a placed season records a full SeasonRewardRecord (spec section 24: SeasonId/PlayerId/RewardId/RewardType/Rank/GrantedAt) per reward, Gems included, and never duplicates them on re-sync", () => {
+  it("an offline season end never invents a placement: no placement reward records, and re-syncing never pays the participation twice", () => {
     mockSeasonNumber(2);
     updateSave({ ascensionLastSyncedSeason: 1, freeGems: 0, seasonRewardRecords: [], seasonBestWave: 40 });
 
     syncSeasonIfNeeded();
+    expect(loadSave().seasonRewardRecords).toHaveLength(0);
+    expect(loadSave().freeGems).toBe(SEASON_PARTICIPATION_FREE_GEMS);
 
-    const main = loadSave();
-    const expectedBundle = getSeasonRewardBundle(1, 1);
-    // One record per cosmetic, plus one for the Gems grant.
-    expect(main.seasonRewardRecords).toHaveLength(expectedBundle.cosmetics.length + 1);
-
-    const gemsRecord = main.seasonRewardRecords.find((r) => r.rewardType === "GEMS");
-    expect(gemsRecord).toMatchObject({ seasonId: "season-1", seasonNumber: 1, playerId: main.playerId, rank: 1 });
-    expect(typeof gemsRecord!.grantedAt).toBe("number");
-
-    for (const cosmetic of expectedBundle.cosmetics) {
-      const record = main.seasonRewardRecords.find((r) => r.rewardId === cosmetic.id);
-      expect(record).toMatchObject({ seasonNumber: 1, playerId: main.playerId, rewardType: cosmetic.type, rank: 1 });
-    }
-
-    // Re-syncing (already caught up) must never add duplicate records.
     syncSeasonIfNeeded();
-    expect(loadSave().seasonRewardRecords).toHaveLength(expectedBundle.cosmetics.length + 1);
+    expect(loadSave().freeGems).toBe(SEASON_PARTICIPATION_FREE_GEMS);
   });
 });
 

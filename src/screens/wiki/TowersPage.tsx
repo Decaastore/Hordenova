@@ -21,6 +21,7 @@ import { PRESTIGE_MILESTONE_REWARDS } from "@/config/prestige";
 import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { formatGameplayEffectLines } from "@/ui/TowerInfoPanel";
 import { skinsForTower } from "./wikiData";
+import { rankedBoardForSkin } from "@/config/rankedRewards";
 
 type Translate = ReturnType<typeof useLanguage>["t"];
 
@@ -210,6 +211,8 @@ export function TowersPage({ tower, onTower }: { tower: TowerType; onTower: (t: 
                 <p className="wk-skin-price">
                   {skin.tier === "PRESTIGE"
                     ? t("wiki.prestigeSkinUnlock", { level: PRESTIGE_SKIN_LEVEL })
+                    : skin.tier === "RANKED"
+                    ? t("wiki.rankedSkinSource", { board: t(`ranked.board.${rankedBoardForSkin(skin.id) ?? "SEASON"}` as TranslationKey), n: rankedBoardForSkin(skin.id) === "SEASON" ? 5 : 10 })
                     : skin.tier === "PACK"
                     ? t("wiki.packSkinSource", { bundle: t(`store.bundles.${bundleForSkin(skin.id)?.id ?? ""}.name` as TranslationKey), price: (bundleForSkin(skin.id)?.priceBrl ?? 0).toLocaleString(locale, { style: "currency", currency: "BRL" }) })
                     : t("wiki.skinPrice", { purchased: price.purchased.toLocaleString(locale), free: price.free.toLocaleString(locale), level: skin.unlockLevel })}
