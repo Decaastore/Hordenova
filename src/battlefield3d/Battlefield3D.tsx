@@ -939,6 +939,7 @@ interface ShotState {
   from: { x: number; y: number };
   chain: { x: number; y: number }[];
   special: boolean;
+  skin: string | null;
 }
 
 function Projectiles({ engine, terrain, fx }: { engine: GameEngine; terrain: TerrainData; fx: Effects }) {
@@ -968,10 +969,10 @@ function Projectiles({ engine, terrain, fx }: { engine: GameEngine; terrain: Ter
     for (const p of snap.projectiles) {
       alive.add(p.id);
       if (!shots.current.has(p.id)) {
-        shots.current.set(p.id, { type: p.towerType, to: { ...p.to }, from: { ...p.from }, chain: p.chainTargets.map((c) => ({ ...c })), special: p.isSpecial });
+        shots.current.set(p.id, { type: p.towerType, to: { ...p.to }, from: { ...p.from }, chain: p.chainTargets.map((c) => ({ ...c })), special: p.isSpecial, skin: p.skinId ?? null });
         // lightning is instant: the bolt is the shot
         if (p.towerType === "STORMCALLER") {
-          const color = TOWER_COLORS.STORMCALLER!;
+          const color = p.skinId === "STORMCALLER_PACK_CRIMSON_STORM" ? "#ff1a2a" : p.skinId === "STORMCALLER_PACK_SOVEREIGN" ? "#ffd878" : TOWER_COLORS.STORMCALLER!;
           let prev = ground(p.from, 42);
           const hits = [p.to, ...p.chainTargets];
           for (const h of hits) {
@@ -995,7 +996,7 @@ function Projectiles({ engine, terrain, fx }: { engine: GameEngine; terrain: Ter
       m.material = mats[p.towerType] ?? mats.IRONWOOD!;
       m.scale.setScalar(p.isSpecial ? 2.2 : 1);
       m.visible = true;
-      fx.trail(p.towerType, m.position.clone(), p.isSpecial);
+      if (!fx.packTrail(p.skinId, m.position.clone(), p.isSpecial)) fx.trail(p.towerType, m.position.clone(), p.isSpecial);
     }
     for (; i < pool.current.length; i++) pool.current[i]!.visible = false;
     // shots that just landed
@@ -1003,8 +1004,8 @@ function Projectiles({ engine, terrain, fx }: { engine: GameEngine; terrain: Ter
       if (alive.has(id)) continue;
       shots.current.delete(id);
       const at = ground(s.to, 14);
-      fx.impact(s.type, at, s.special, ground(s.to, 2));
-      if (s.type === "STORMCALLER") for (const c of s.chain) fx.impact("STORMCALLER", ground(c, 14), false, ground(c, 2));
+      if (!fx.packImpact(s.skin, at, s.special, ground(s.to, 2))) fx.impact(s.type, at, s.special, ground(s.to, 2));
+      if (s.type === "STORMCALLER") for (const c of s.chain) if (!fx.packImpact(s.skin, ground(c, 14), false, ground(c, 2))) fx.impact("STORMCALLER", ground(c, 14), false, ground(c, 2));
     }
   });
   return <group ref={group} />;

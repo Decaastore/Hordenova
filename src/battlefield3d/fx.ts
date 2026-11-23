@@ -381,6 +381,113 @@ export class Effects {
     else this.glow.emit(at, { count: 1, color: "#fff0c8", colorEnd: "#c88a3a", size: 3 * k, life: 0.18, speed: 2, grow: 0.2 });
   }
 
+  /**
+   * PACOTES — the bundle-exclusive skins' own shots (config/towerSkins.ts
+   * PACK_TOWER_SKINS): real fire, smoke, sparks under gravity, frost mist,
+   * ground shockwaves and forked lightning, bigger than any normal shot so
+   * they're noticed. Returns false for any other skin (caller falls back).
+   */
+  packTrail(skinId: string | null | undefined, at: THREE.Vector3, special: boolean): boolean {
+    const k = special ? 1.7 : 1;
+    switch (skinId) {
+      case "INFERNO_PACK_EMBERHEART":
+        this.glow.emit(at, { count: 3, color: "#fff1b0", colorEnd: "#ff3a0a", size: 9 * k, life: 0.4, speed: 6, grow: 0.3, radius: 1.5 });
+        this.glow.emit(at, { count: 2, color: "#ffd27a", colorEnd: "#ff2a00", size: 1.6, life: 0.9, speed: 22, up: 10, gravity: 70, drag: 1, radius: 1 });
+        this.smoke.emit(at, { count: 1, color: "#2a1814", colorEnd: "#100806", size: 8 * k, life: 0.9, speed: 4, up: 12, grow: 2.4, alpha: 0.4 });
+        return true;
+      case "FROSTBORN_PACK_WINTER_CROWN":
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#3a6aff", size: 5 * k, life: 0.35, speed: 5, grow: 0.25, radius: 1.5 });
+        this.glow.emit(at, { count: 2, color: "#e8f4ff", colorEnd: "#8ab0ff", size: 1.3, life: 1.1, speed: 10, gravity: 30, drag: 1.2, radius: 2 });
+        this.smoke.emit(at, { count: 1, color: "#e8f0ff", colorEnd: "#a8c0e8", size: 7 * k, life: 0.8, speed: 3, up: 2, grow: 2.2, alpha: 0.28 });
+        return true;
+      case "IRONWOOD_PACK_EMERALD_SENTINEL":
+        this.glow.emit(at, { count: 2, color: "#d8ffe8", colorEnd: "#10c070", size: 5 * k, life: 0.3, speed: 3, grow: 0.3, radius: 1 });
+        this.glow.emit(at, { count: 1, color: "#fff0a0", colorEnd: "#e8a020", size: 1.4, life: 0.8, speed: 12, gravity: 40, drag: 1, radius: 1.5 });
+        return true;
+      case "STORMCALLER_PACK_CRIMSON_STORM":
+        this.glow.emit(at, { count: 2, color: "#ffffff", colorEnd: "#e8101e", size: 4 * k, life: 0.22, speed: 14, grow: 0.3 });
+        return true;
+      case "IRONWOOD_PACK_ECLIPSE":
+      case "FROSTBORN_PACK_ECLIPSE":
+        this.smoke.emit(at, { count: 2, color: "#06050a", colorEnd: "#000000", size: 7 * k, life: 0.7, speed: 3, up: 3, grow: 1.8, alpha: 0.6, radius: 1 });
+        this.glow.emit(at, { count: 2, color: "#fff0b0", colorEnd: "#c89018", size: 2 * k, life: 0.6, speed: 9, drag: 1.4, radius: 2 });
+        if (skinId === "FROSTBORN_PACK_ECLIPSE") this.glow.emit(at, { count: 1, color: "#ffffff", colorEnd: "#8ab0d8", size: 1.4, life: 0.9, speed: 8, gravity: 30, radius: 1.5 });
+        return true;
+      case "INFERNO_PACK_SOVEREIGN":
+      case "STORMCALLER_PACK_SOVEREIGN":
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#ffc848", size: 7 * k, life: 0.35, speed: 5, grow: 0.3, radius: 1.5 });
+        this.glow.emit(at, { count: 2, color: "#fff6d0", colorEnd: "#ff4a5a", size: 1.4, life: 1, speed: 14, up: 6, drag: 1, radius: 2 });
+        return true;
+    }
+    return false;
+  }
+
+  packImpact(skinId: string | null | undefined, at: THREE.Vector3, special: boolean, ground: THREE.Vector3): boolean {
+    const k = special ? 2 : 1.25;
+    const up = new THREE.Vector3(0, 1, 0);
+    switch (skinId) {
+      case "INFERNO_PACK_EMBERHEART":
+        // a fireball bursting like a heartbeat: two shockwaves, a fire core, lava spatter and a smoke column
+        this.glow.emit(at, { count: Math.round(40 * k), color: "#fff6c8", colorEnd: "#ff2a00", size: 13 * k, life: 0.6, speed: 60 * k, up: 20, grow: 1.7, drag: 3.5, radius: 3 });
+        this.glow.emit(at, { count: Math.round(34 * k), color: "#ffd27a", colorEnd: "#c01a00", size: 2.8, life: 1.4, speed: 100 * k, up: 50, gravity: 150, drag: 0.8, sizeJitter: 0.6 });
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#ff7a2a", size: 30 * k, life: 0.2, speed: 0, grow: 1.6 });
+        this.smoke.emit(at.clone().add(new THREE.Vector3(0, 6, 0)), { count: Math.round(14 * k), color: "#2a1a14", colorEnd: "#0e0a08", size: 16 * k, life: 1.8, speed: 12, up: 26, grow: 2.6, alpha: 0.55, drag: 1.4, radius: 4 });
+        this.rings.ring(ground, "#ff6a1a", 5, 44 * k, 0.45);
+        this.rings.ring(ground, "#ffd27a", 3, 26 * k, 0.7);
+        return true;
+      case "FROSTBORN_PACK_WINTER_CROWN":
+        // ice shatter: a crown of shards thrown upward, falling crystals and a rolling frost mist
+        this.glow.emit(at, { count: Math.round(36 * k), color: "#ffffff", colorEnd: "#3a6aff", size: 5 * k, life: 0.9, speed: 80 * k, up: 40, gravity: 110, drag: 1.6, sizeJitter: 0.6 });
+        this.glow.emit(ground.clone().add(new THREE.Vector3(0, 2, 0)), { count: Math.round(18 * k), color: "#e8f4ff", colorEnd: "#6a9aff", size: 3.4, life: 0.8, speed: 70, dir: up, spread: 0.25, gravity: 80, radius: 9 * k });
+        this.glow.emit(at, { count: 4, color: "#ffffff", colorEnd: "#8ab0ff", size: 26 * k, life: 0.22, speed: 0, grow: 1.5 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 3, 0)), { count: Math.round(12 * k), color: "#f0f6ff", colorEnd: "#b8cce8", size: 14 * k, life: 1.6, speed: 18, up: 2, grow: 2.2, alpha: 0.4, drag: 1.6, radius: 6 });
+        this.rings.ring(ground, "#9ab8ff", 5, 40 * k, 0.6);
+        return true;
+      case "IRONWOOD_PACK_EMERALD_SENTINEL":
+        // an emerald shattering: green shards, a golden flash ring, and leaves drifting down
+        this.glow.emit(at, { count: Math.round(30 * k), color: "#d8ffe8", colorEnd: "#0a9a50", size: 3.6 * k, life: 0.7, speed: 90 * k, up: 20, gravity: 100, drag: 1.8, sizeJitter: 0.6 });
+        this.glow.emit(at, { count: 3, color: "#ffffff", colorEnd: "#30e080", size: 22 * k, life: 0.2, speed: 0, grow: 1.6 });
+        this.glow.emit(at.clone().add(new THREE.Vector3(0, 10, 0)), { count: Math.round(14 * k), color: "#8aff6a", colorEnd: "#2a6a1a", size: 2.4, life: 2, speed: 18, up: 4, gravity: 12, drag: 1.2, radius: 8 });
+        this.rings.ring(ground, "#ffd860", 4, 36 * k, 0.5);
+        this.rings.ring(ground, "#2affa0", 3, 22 * k, 0.6);
+        return true;
+      case "STORMCALLER_PACK_CRIMSON_STORM": {
+        // a blood-red strike: forked arcs around the target, a spray of sparks, scorch smoke
+        for (let i = 0; i < 5; i++) {
+          const a = Math.random() * Math.PI * 2, d = 14 + Math.random() * 16 * k;
+          this.bolts.bolt(at, ground.clone().add(new THREE.Vector3(Math.cos(a) * d, 1, Math.sin(a) * d)), "#ff1a2a", 0.16, 6);
+        }
+        this.glow.emit(at, { count: Math.round(34 * k), color: "#ffffff", colorEnd: "#e8101e", size: 3 * k, life: 0.45, speed: 120 * k, gravity: 110, drag: 2, sizeJitter: 0.6 });
+        this.glow.emit(at, { count: 4, color: "#ffd0d4", colorEnd: "#c0101e", size: 24 * k, life: 0.2, speed: 0, grow: 1.8 });
+        this.smoke.emit(ground.clone().add(new THREE.Vector3(0, 3, 0)), { count: Math.round(8 * k), color: "#2a0a0c", colorEnd: "#0a0304", size: 10 * k, life: 1.2, speed: 10, up: 14, grow: 2.2, alpha: 0.5 });
+        this.rings.ring(ground, "#e8101e", 4, 36 * k, 0.4);
+        return true;
+      }
+      case "IRONWOOD_PACK_ECLIPSE":
+      case "FROSTBORN_PACK_ECLIPSE": {
+        // an eclipse: a black sphere of smoke swallowing the light, a golden corona flaring out
+        this.smoke.emit(at, { count: Math.round(18 * k), color: "#05040a", colorEnd: "#000000", size: 14 * k, life: 1, speed: 16, grow: 1.6, alpha: 0.75, drag: 2.5, radius: 3 });
+        this.glow.emit(at, { count: Math.round(40 * k), color: "#fff0b0", colorEnd: "#a87010", size: 2.6 * k, life: 0.6, speed: 110 * k, drag: 2.6, sizeJitter: 0.5 });
+        this.glow.emit(at, { count: 5, color: "#fff4c8", colorEnd: "#c89018", size: 28 * k, life: 0.3, speed: 0, grow: 1.4 });
+        if (skinId === "FROSTBORN_PACK_ECLIPSE") this.glow.emit(at, { count: Math.round(20 * k), color: "#ffffff", colorEnd: "#2a2a3a", size: 3.4, life: 0.9, speed: 70, up: 30, gravity: 100, drag: 1.4 });
+        this.rings.ring(ground, "#ffc848", 5, 42 * k, 0.55);
+        this.rings.ring(ground, "#1a1410", 6, 24 * k, 0.8);
+        return true;
+      }
+      case "INFERNO_PACK_SOVEREIGN":
+      case "STORMCALLER_PACK_SOVEREIGN":
+        // a sovereign's judgement: a column of golden light, a white-gold flare and motes rising
+        this.glow.emit(ground.clone().add(new THREE.Vector3(0, 2, 0)), { count: Math.round(30 * k), color: "#ffffff", colorEnd: "#ffc848", size: 6 * k, life: 0.7, speed: 120, dir: up, spread: 0.05, drag: 1.2, radius: 3 });
+        this.glow.emit(at, { count: Math.round(30 * k), color: "#fff6d0", colorEnd: "#ff4a5a", size: 2.4 * k, life: 0.8, speed: 90 * k, up: 20, gravity: 60, drag: 2, sizeJitter: 0.5 });
+        this.glow.emit(at, { count: 4, color: "#ffffff", colorEnd: "#ffd878", size: 32 * k, life: 0.25, speed: 0, grow: 1.5 });
+        this.glow.emit(at, { count: Math.round(12 * k), color: "#ffe8a0", colorEnd: "#ffc848", size: 1.8, life: 2, speed: 8, up: 22, drag: 0.6, radius: 10 });
+        this.rings.ring(ground, "#ffd878", 5, 46 * k, 0.5);
+        this.rings.ring(ground, "#ffffff", 3, 26 * k, 0.4);
+        return true;
+    }
+    return false;
+  }
+
   death(at: THREE.Vector3, boss: boolean) {
     const k = boss ? 3 : 1;
     this.glow.emit(at, { count: Math.round(18 * k), color: "#ff8a5a", colorEnd: "#5a0a0a", size: 3 * k, life: 0.9, speed: 50 * k, up: 30, gravity: 80, drag: 1.4, radius: 6 * k });

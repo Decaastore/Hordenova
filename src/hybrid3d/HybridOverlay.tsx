@@ -1431,6 +1431,7 @@ interface LiveTower {
 function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: RefObject<Set<string>>; fx: Effects }) {
   const group = useRef<THREE.Group>(null);
   const live = useRef(new Map<string, LiveTower>());
+  const packShots = useRef(new Map<string, { to: Vector2; skin: string; special: boolean; chain: Vector2[] }>());
   const seenShots = useRef(new Set<string>());
   const tmp = useMemo(() => new THREE.Vector3(), []);
   /** A model anchor in the layer's world-unit space (turret anchors follow the turret). */
@@ -1545,6 +1546,34 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
         break;
       case "drifting-leaves":
         if (Math.random() < 0.08 * rate) fx.glow.emit(at(13, 24 + Math.random() * 8), { count: 1, color: part, colorEnd: col, size: 1.8, life: 2.4, speed: 6, up: -6, drag: 0.4, radius: 2 });
+        break;
+      // ---- bundle-exclusive auras ----
+      case "heart-embers":
+        // embers rising in pulses, like a heartbeat
+        if (Math.sin(performance.now() / 160) > 0.7 && Math.random() < 0.5 * rate) fx.glow.emit(at(8, 8 + Math.random() * 10), { count: 2, color: "#ffe08a", colorEnd: part, size: 1.8, life: 1, speed: 6, up: 22, drag: 0.5, radius: 1 });
+        if (Math.random() < 0.006 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), part, 3, 20 * S, 0.7);
+        break;
+      case "crown-snow":
+        if (Math.random() < 0.2 * rate) fx.glow.emit(at(15, 30 + Math.random() * 8), { count: 1, color: "#ffffff", colorEnd: part, size: 1.3, life: 2.2, speed: 1.5, up: -7, drag: 0.3, radius: 1 });
+        if (Math.random() < 0.05 * rate) fx.glow.emit(at(4, 34), { count: 1, color: "#6a9aff", colorEnd: "#ffffff", size: 2.6, life: 0.6, speed: 0, up: 0, grow: 1.6, radius: 0.5 });
+        break;
+      case "emerald-glints":
+        if (Math.random() < 0.14 * rate) fx.glow.emit(at(12, 4 + Math.random() * 22), { count: 1, color: "#ffffff", colorEnd: part, size: 2, life: 0.5, speed: 0, up: 1, grow: 1.8, radius: 0.5 });
+        if (Math.random() < 0.05 * rate) fx.glow.emit(at(12, 26), { count: 1, color: "#ffd860", colorEnd: part, size: 1.6, life: 2.4, speed: 4, up: -5, drag: 0.4, radius: 2 });
+        break;
+      case "blood-sparks":
+        if (Math.random() < 0.2 * rate) fx.glow.emit(at(10, 8 + Math.random() * 18), { count: 3, color: "#ffffff", colorEnd: "#c0101e", size: 1, life: 0.35, speed: 34, drag: 4, radius: 1 });
+        if (Math.random() < 0.012 * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), "#e8101e", 3, 24 * S, 0.5);
+        break;
+      case "eclipse-motes":
+      case "black-snow":
+        if (Math.random() < 0.12 * rate) fx.smoke.emit(at(9, 4 + Math.random() * 14), { count: 1, color: "#0a080c", colorEnd: "#000000", size: 4, life: 1.6, speed: 3, up: 5, grow: 1.8, alpha: 0.5, radius: 2 });
+        if (Math.random() < 0.14 * rate) fx.glow.emit(at(12, 6 + Math.random() * 20), { count: 1, color: part, colorEnd: "#3a2a08", size: 1.4, life: 1.6, speed: 2, up: behavior === "black-snow" ? -5 : 4, drag: 0.4, radius: 1 });
+        break;
+      case "royal-rays":
+      case "royal-sparks":
+        if (Math.random() < 0.16 * rate) fx.glow.emit(at(13, 6 + Math.random() * 22), { count: 1, color: "#ffffff", colorEnd: part, size: 1.8, life: 1.2, speed: 2, up: 6, drag: 0.5, radius: 1 });
+        if (Math.random() < (behavior === "royal-rays" ? 0.012 : 0.02) * rate) fx.rings.ring(base.clone().setY(base.y + 0.6), "#ffd878", 4, 30 * S, 0.9);
         break;
       case "wind-swirl":
         if (Math.random() < 0.18 * rate) {
@@ -1718,6 +1747,34 @@ function Towers3D({ engine, hiddenIds, fx }: { engine: GameEngine; hiddenIds: Re
       }
     }
     seenShots.current = now;
+    // PACOTES — bundle-exclusive skins fire real 3D effects over the map: a trail while the shot flies, and their own impact where it lands
+    for (const p of snap.projectiles) {
+      if (!p.skinId || !p.skinId.includes("_PACK_")) continue;
+      const t = 1 - Math.max(0, Math.min(1, p.remainingMs / p.totalMs));
+      const arc = p.towerType === "INFERNO" ? Math.sin(t * Math.PI) * 26 : p.towerType === "IRONWOOD" ? Math.sin(t * Math.PI) * 16 : 0;
+      const pos = loc({ x: p.from.x + (p.to.x - p.from.x) * t, y: p.from.y + (p.to.y - p.from.y) * t }, 22 * (1 - t) + 8 * t + arc);
+      if (p.towerType !== "STORMCALLER") fx.packTrail(p.skinId, pos, p.isSpecial);
+      const known = packShots.current.get(p.id);
+      if (!known) {
+        packShots.current.set(p.id, { to: { ...p.to }, skin: p.skinId, special: p.isSpecial, chain: p.chainTargets.map((c) => ({ ...c })) });
+        if (p.towerType === "STORMCALLER") {
+          const col = p.skinId === "STORMCALLER_PACK_CRIMSON_STORM" ? "#ff1a2a" : "#ffd878";
+          let prev = loc(p.from, 30);
+          for (const h of [p.to, ...p.chainTargets]) {
+            const next = loc(h, 8);
+            fx.bolts.bolt(prev, next, col, p.isSpecial ? 0.32 : 0.22, p.isSpecial ? 14 : 10);
+            fx.bolts.bolt(prev, next, "#ffffff", 0.14, 5);
+            prev = next;
+          }
+        }
+      } else known.to = { ...p.to };
+    }
+    for (const [id, s] of packShots.current) {
+      if (now.has(id)) continue;
+      packShots.current.delete(id);
+      fx.packImpact(s.skin, loc(s.to, 8), s.special, loc(s.to, 0.6));
+      for (const c of s.chain) fx.packImpact(s.skin, loc(c, 8), false, loc(c, 0.6));
+    }
     for (const [id, e] of live.current)
       if (!seen.has(id)) {
         g.remove(e.obj);

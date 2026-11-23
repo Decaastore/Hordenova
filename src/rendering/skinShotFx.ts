@@ -12,8 +12,12 @@ import { getTowerSkinDefinition } from "@/config/towerSkins";
  * (`drawSkinImpacts`, called once per frame after the projectiles).
  */
 
-type Trail = "smoke" | "sparkles" | "rings" | "shards" | "runes" | "spiral" | "bubbles" | "leaves" | "feathers" | "stars" | "zigzag" | "ghost" | "embers" | "petals" | "snow" | "drip";
-type Impact = "rays" | "ring" | "shards" | "splash" | "star" | "pillar" | "puff" | "fork" | "cross" | "nova" | "petals" | "crack" | "flower" | "vortex" | "crown" | "skull";
+type Trail = "smoke" | "sparkles" | "rings" | "shards" | "runes" | "spiral" | "bubbles" | "leaves" | "feathers" | "stars" | "zigzag" | "ghost" | "embers" | "petals" | "snow" | "drip"
+  // bundle-exclusive (config/store.ts SKIN_BUNDLES): no other skin uses these
+  | "heartfire" | "frostcrown" | "emerald" | "bloodstorm" | "eclipse" | "blackfrost" | "royal" | "royalbolt";
+type Impact = "rays" | "ring" | "shards" | "splash" | "star" | "pillar" | "puff" | "fork" | "cross" | "nova" | "petals" | "crack" | "flower" | "vortex" | "crown" | "skull"
+  // bundle-exclusive
+  | "heartburst" | "icecrown" | "emeraldbloom" | "bloodfork" | "eclipse" | "blackcorona" | "sovereign" | "sovereignstrike";
 
 interface Signature {
   trail: Trail;
@@ -79,7 +83,50 @@ const SIGNATURES: Record<string, Signature> = {
   STORMCALLER_GLADIATOR: { trail: "embers", impact: "crack", c2: "#ffd060" },
   STORMCALLER_CHAMPION: { trail: "stars", impact: "crown", c2: "#ffffff" },
   STORMCALLER_LEGEND: { trail: "ghost", impact: "skull", c2: "#ff9ab0" },
+  // ---- PACOTES: each bundle skin has a trail and an impact no other skin has ----
+  INFERNO_PACK_EMBERHEART: { trail: "heartfire", impact: "heartburst", c2: "#ffe08a" },
+  FROSTBORN_PACK_WINTER_CROWN: { trail: "frostcrown", impact: "icecrown", c2: "#ffffff" },
+  IRONWOOD_PACK_EMERALD_SENTINEL: { trail: "emerald", impact: "emeraldbloom", c2: "#ffd860" },
+  STORMCALLER_PACK_CRIMSON_STORM: { trail: "bloodstorm", impact: "bloodfork", c2: "#2a0408" },
+  IRONWOOD_PACK_ECLIPSE: { trail: "eclipse", impact: "eclipse", c2: "#0a080c" },
+  FROSTBORN_PACK_ECLIPSE: { trail: "blackfrost", impact: "blackcorona", c2: "#0a080c" },
+  INFERNO_PACK_SOVEREIGN: { trail: "royal", impact: "sovereign", c2: "#ffffff" },
+  STORMCALLER_PACK_SOVEREIGN: { trail: "royalbolt", impact: "sovereignstrike", c2: "#ffffff" },
 };
+
+function heart(ctx: CanvasRenderingContext2D, x: number, y: number, r: number) {
+  ctx.beginPath();
+  ctx.moveTo(x, y + r * 0.9);
+  ctx.bezierCurveTo(x - r * 1.4, y - r * 0.1, x - r * 0.6, y - r * 1.2, x, y - r * 0.4);
+  ctx.bezierCurveTo(x + r * 0.6, y - r * 1.2, x + r * 1.4, y - r * 0.1, x, y + r * 0.9);
+  ctx.closePath();
+}
+function diamond(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - h);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x, y + h);
+  ctx.lineTo(x - w, y);
+  ctx.closePath();
+}
+function crownShape(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+  ctx.beginPath();
+  ctx.moveTo(x - w, y + h);
+  ctx.lineTo(x - w, y);
+  ctx.lineTo(x - w / 2, y + h * 0.5);
+  ctx.lineTo(x, y - h * 0.3);
+  ctx.lineTo(x + w / 2, y + h * 0.5);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + h);
+  ctx.closePath();
+}
+
+const PACK_TRAILS = new Set<Trail>(["heartfire", "frostcrown", "emerald", "bloodstorm", "eclipse", "blackfrost", "royal", "royalbolt"]);
+function hexA(hex: string, a: number) {
+  const h = hex.replace("#", "");
+  const n = parseInt(h.length === 3 ? h.split("").map((x) => x + x).join("") : h.slice(0, 6), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${Math.max(0, Math.min(1, a))})`;
+}
 
 export function skinShotSignature(skinId: string | null | undefined): Signature | null {
   return skinId ? SIGNATURES[skinId] ?? null : null;
@@ -139,6 +186,18 @@ export function drawSkinTrail(ctx: CanvasRenderingContext2D, p: ProjectileInstan
     const fade = (1 - i / N) * 0.9;
     const jx = (R() - 0.5) * 6, jy = (R() - 0.5) * 6;
     const c = i % 2 ? col : c2;
+    // bundle skins: a soft light around the shot, so it reads as glowing energy rather than flat shapes
+    if (PACK_TRAILS.has(sig.trail) && i < 3) {
+      const gr = (9 - i * 2) * k;
+      const g = ctx.createRadialGradient(q.x, q.y, 0, q.x, q.y, gr);
+      g.addColorStop(0, hexA(col, 0.55 * fade));
+      g.addColorStop(1, hexA(col, 0));
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(q.x, q.y, gr, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.globalAlpha = fade;
     ctx.fillStyle = c;
     ctx.strokeStyle = c;
@@ -238,6 +297,96 @@ export function drawSkinTrail(ctx: CanvasRenderingContext2D, p: ProjectileInstan
         ctx.beginPath();
         ctx.ellipse(q.x + jx, q.y + jy + i * 1.2, 1 * k, 1.8 * k, 0, 0, Math.PI * 2);
         ctx.fill();
+        break;
+      // ---- bundle-exclusive trails ----
+      case "heartfire": {
+        const pulse = 1 + Math.sin(now * 18 + i) * 0.25;
+        ctx.fillStyle = i % 2 ? col : c2;
+        heart(ctx, q.x + jx * 0.6, q.y + jy * 0.6 - i, (2.6 - i * 0.22) * k * pulse);
+        ctx.fill();
+        break;
+      }
+      case "frostcrown":
+        if (i === 0) {
+          ctx.fillStyle = c2;
+          crownShape(ctx, q.x, q.y - 6 * k, 3.6 * k, 2.8 * k);
+          ctx.fill();
+        }
+        ctx.fillStyle = i % 2 ? col : c2;
+        diamond(ctx, q.x + jx, q.y + jy, 1.1 * k, 2.6 * k);
+        ctx.fill();
+        break;
+      case "emerald":
+        ctx.fillStyle = col;
+        diamond(ctx, q.x + jx, q.y + jy, 1.8 * k * fade + 0.5, 2.8 * k * fade + 0.8);
+        ctx.fill();
+        ctx.strokeStyle = c2;
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+        break;
+      case "bloodstorm":
+        if (i > 0) {
+          const q0 = pointAt(p, Math.max(0, progress - (i - 1) * 0.07));
+          const mx = (q0.x + q.x) / 2 + (R() - 0.5) * 12, my = (q0.y + q.y) / 2 + (R() - 0.5) * 12;
+          ctx.globalCompositeOperation = "source-over";
+          ctx.strokeStyle = c2;
+          ctx.lineWidth = 3.4 * k;
+          ctx.beginPath();
+          ctx.moveTo(q0.x, q0.y);
+          ctx.lineTo(mx, my);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+          ctx.globalCompositeOperation = "lighter";
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.6 * k;
+          ctx.stroke();
+        }
+        break;
+      case "eclipse":
+      case "blackfrost":
+        ctx.globalCompositeOperation = "source-over";
+        ctx.fillStyle = c2;
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, (3.4 - i * 0.3) * k, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = "lighter";
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(q.x, q.y, (3.4 - i * 0.3) * k + 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+        if (sig.trail === "blackfrost") {
+          ctx.fillStyle = "#e8f4ff";
+          diamond(ctx, q.x + jx * 1.6, q.y + jy * 1.6, 0.9 * k, 2.2 * k);
+          ctx.fill();
+        }
+        break;
+      case "royal":
+      case "royalbolt":
+        if (sig.trail === "royalbolt" && i > 0) {
+          const q0 = pointAt(p, Math.max(0, progress - (i - 1) * 0.07));
+          ctx.strokeStyle = col;
+          ctx.lineWidth = 1.8 * k;
+          ctx.beginPath();
+          ctx.moveTo(q0.x, q0.y);
+          ctx.lineTo((q0.x + q.x) / 2 + (R() - 0.5) * 7, (q0.y + q.y) / 2 + (R() - 0.5) * 7);
+          ctx.lineTo(q.x, q.y);
+          ctx.stroke();
+        }
+        if (i % 2) {
+          ctx.fillStyle = c2;
+          star(ctx, q.x + jx, q.y + jy, 2.6 * k * fade + 0.6, 4, 0.3, now * 5 + i);
+          ctx.fill();
+        } else if (sig.trail === "royal") {
+          ctx.save();
+          ctx.translate(q.x + jx, q.y + jy);
+          ctx.rotate(now * 3 + i);
+          ctx.fillStyle = col;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 4 * k, 1.3 * k, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
         break;
     }
   }
@@ -491,6 +640,153 @@ function drawImpact(ctx: CanvasRenderingContext2D, im: LiveImpact, t: number) {
       ctx.beginPath();
       ctx.ellipse(x, y, (4 + e * 16) * S, (2 + e * 8) * S, 0, 0, Math.PI * 2);
       ctx.stroke();
+      break;
+    }
+    // ---- bundle-exclusive impacts ----
+    case "heartburst": {
+      ctx.lineWidth = 2.4 * S * a + 0.6;
+      ctx.strokeStyle = c2;
+      heart(ctx, x, y - 4 * S, (4 + e * 12) * S);
+      ctx.stroke();
+      for (let i = 0; i < 10; i++) {
+        const an = (i / 10) * Math.PI * 2 + R();
+        const d = (5 + e * 18) * S;
+        ctx.fillStyle = i % 2 ? col : c2;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(an) * d, y + Math.sin(an) * d * 0.6 - e * 6, 1.6 * S * a + 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      break;
+    }
+    case "icecrown":
+      for (let i = 0; i < 8; i++) {
+        const an = (i / 8) * Math.PI * 2;
+        const px = x + Math.cos(an) * 12 * S, py = y + Math.sin(an) * 6 * S;
+        const h = (i % 2 ? 7 : 11) * S * Math.min(1, e * 2);
+        ctx.fillStyle = i % 2 ? col : c2;
+        diamond(ctx, px, py - h / 2, 1.8 * S, h / 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = c2;
+      crownShape(ctx, x, y - 14 * S - e * 8, 6 * S, 4.5 * S);
+      ctx.fill();
+      break;
+    case "emeraldbloom":
+      for (let i = 0; i < 8; i++) {
+        const an = (i / 8) * Math.PI * 2;
+        const d = (3 + e * 15) * S;
+        ctx.save();
+        ctx.translate(x + Math.cos(an) * d, y + Math.sin(an) * d * 0.6);
+        ctx.rotate(an + Math.PI / 2);
+        ctx.fillStyle = col;
+        diamond(ctx, 0, 0, 2.2 * S, 4.2 * S);
+        ctx.fill();
+        ctx.strokeStyle = c2;
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.strokeStyle = c2;
+      ctx.lineWidth = 1.6 * S * a;
+      ctx.beginPath();
+      ctx.ellipse(x, y, (5 + e * 20) * S, (3 + e * 11) * S, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    case "bloodfork":
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = c2;
+      ctx.globalAlpha = a * 0.6;
+      ctx.beginPath();
+      ctx.ellipse(x, y, (6 + e * 14) * S, (3 + e * 7) * S, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = a;
+      for (let i = 0; i < 6; i++) {
+        const an = (i / 6) * Math.PI * 2 + R();
+        let px = x, py = y;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 2 * S * a + 0.5;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        for (let k2 = 0; k2 < 3; k2++) {
+          px += Math.cos(an + (R() - 0.5)) * 7 * S * (0.4 + e);
+          py += Math.sin(an + (R() - 0.5)) * 4 * S * (0.4 + e);
+          ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+      break;
+    case "eclipse":
+    case "blackcorona": {
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = c2;
+      ctx.beginPath();
+      ctx.arc(x, y - 4 * S, 6 * S * (1 - e * 0.4), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 2.2 * S * a + 0.5;
+      ctx.beginPath();
+      ctx.arc(x, y - 4 * S, (7 + e * 10) * S, 0, Math.PI * 2);
+      ctx.stroke();
+      const n = im.sig.impact === "eclipse" ? 12 : 8;
+      for (let i = 0; i < n; i++) {
+        const an = (i / n) * Math.PI * 2 + e;
+        const r0 = (8 + e * 10) * S, r1 = r0 + (i % 2 ? 4 : 8) * S;
+        if (im.sig.impact === "eclipse") {
+          ctx.beginPath();
+          ctx.moveTo(x + Math.cos(an) * r0, y - 4 * S + Math.sin(an) * r0);
+          ctx.lineTo(x + Math.cos(an) * r1, y - 4 * S + Math.sin(an) * r1);
+          ctx.stroke();
+        } else {
+          ctx.fillStyle = i % 2 ? "#e8f4ff" : col;
+          ctx.save();
+          ctx.translate(x + Math.cos(an) * r0, y - 4 * S + Math.sin(an) * r0);
+          ctx.rotate(an + Math.PI / 2);
+          diamond(ctx, 0, 0, 1.6 * S, 4 * S);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      break;
+    }
+    case "sovereign":
+    case "sovereignstrike": {
+      const sy = y - 10 * S - e * 6;
+      if (im.sig.impact === "sovereignstrike") {
+        ctx.fillStyle = col;
+        ctx.globalAlpha = a * 0.7;
+        ctx.fillRect(x - 3 * S * a, sy - 40 * S, 6 * S * a, 44 * S);
+        ctx.globalAlpha = a;
+      }
+      ctx.fillStyle = c2;
+      ctx.beginPath();
+      ctx.arc(x, sy, 5 * S, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = col;
+      ctx.lineWidth = 1.8 * S * a + 0.4;
+      for (let i = 0; i < 12; i++) {
+        const an = (i / 12) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(x + Math.cos(an) * 6 * S, sy + Math.sin(an) * 6 * S);
+        ctx.lineTo(x + Math.cos(an) * (9 + e * 10) * S, sy + Math.sin(an) * (9 + e * 10) * S);
+        ctx.stroke();
+      }
+      for (const sd of [-1, 1]) {
+        for (let k2 = 0; k2 < 4; k2++) {
+          ctx.save();
+          ctx.translate(x + sd * (8 + k2 * 4) * S, sy + 2 * S - k2 * 1.5 * S);
+          ctx.rotate(sd * (0.4 + k2 * 0.25));
+          ctx.fillStyle = k2 % 2 ? col : c2;
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 1.2 * S, (6 - k2) * S * Math.min(1, e * 2), 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+      ctx.fillStyle = col;
+      crownShape(ctx, x, sy - 12 * S, 4.5 * S, 3.4 * S);
+      ctx.fill();
       break;
     }
     case "skull": {

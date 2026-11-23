@@ -758,7 +758,7 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
       }
       case "STORMCALLER_THUNDER": {
         // ceramic insulator stacks and a heavy central conductor spike
-        const ceramic = plainMat("#e8eef4", { rough: 0.3 });
+        const ceramic = LOOK === "STORMCALLER_PACK_CRIMSON_STORM" ? plainMat("#2a2a32", { rough: 0.25, metal: 0.8 }) : plainMat("#e8eef4", { rough: 0.3 });
         for (let i = 0; i < 4; i++) {
           const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
           for (let k = 0; k < 5; k++) mesh(new THREE.CylinderGeometry(1.4 - k * 0.05, 1.4, 0.6, 14), ceramic, Math.cos(a) * 11, 4 + k * 1.1, Math.sin(a) * 11);
@@ -3120,8 +3120,10 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
       case "STORMCALLER_THUNDER": {
         mesh(new THREE.CylinderGeometry(3.6, 4.6, 12, 12), st(401, 4, 6, true), 0, 9, 0);
         mesh(new THREE.CylinderGeometry(5, 4, 1.6, 12), metal(L.band, 0.5, 0.6), 0, 15.6, 0);
-        const cloudM = plainMat("#5a6878", { rough: 1, emissive: L.glow, ei: 0.08 });
-        const darkM = plainMat("#3a4450", { rough: 1 });
+        // Tempestade Rubra (bundle skin): a blood-red stormcloud lit from within
+        const rubra = LOOK === "STORMCALLER_PACK_CRIMSON_STORM";
+        const cloudM = rubra ? plainMat("#7a141c", { rough: 0.9, emissive: "#c0101e", ei: 0.35 }) : plainMat("#5a6878", { rough: 1, emissive: L.glow, ei: 0.08 });
+        const darkM = rubra ? plainMat("#24070a", { rough: 0.95, emissive: "#5a0a10", ei: 0.25 }) : plainMat("#3a4450", { rough: 1 });
         const puffs = s >= 4 ? 16 : 11;
         for (let i = 0; i < puffs; i++) {
           const a = (i / puffs) * Math.PI * 2 + r();

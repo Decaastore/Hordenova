@@ -88,7 +88,16 @@ export type SkinParticleBehavior =
   | "prism-sparkles"
   | "starlight"
   | "frost-shards"
-  | "wind-swirl";
+  | "wind-swirl"
+  // bundle-exclusive (PACK_TOWER_SKINS): no other skin uses these
+  | "heart-embers"
+  | "crown-snow"
+  | "emerald-glints"
+  | "blood-sparks"
+  | "eclipse-motes"
+  | "black-snow"
+  | "royal-rays"
+  | "royal-sparks";
 
 export interface SkinParticleStyle {
   color: string;
@@ -1181,14 +1190,14 @@ function packSkin(id: string, towerType: TowerType, palette: TowerSkinPaletteOve
 }
 
 export const PACK_TOWER_SKINS: readonly TowerSkinDefinition[] = [
-  packSkin("INFERNO_PACK_EMBERHEART", "INFERNO", { primary: "#5a1a14", secondary: "#1a0606", accent: "#ffb23a", glow: "rgba(255,120,40,0.65)" }, "molten", { color: "#ffb23a", behavior: "embers" }, "magma-orb", { burnDamageMult: 1.05, attackSpeedMult: 0.97 }),
-  packSkin("FROSTBORN_PACK_WINTER_CROWN", "FROSTBORN", { primary: "#c8d4e4", secondary: "#2a3a5a", accent: "#4a7aff", glow: "rgba(90,140,255,0.6)" }, "glacial", { color: "#bcd4ff", behavior: "frost-shards" }, "glacial-bolt", { slowPercentAdd: 0.05, damageMult: 0.97 }),
-  packSkin("IRONWOOD_PACK_EMERALD_SENTINEL", "IRONWOOD", { primary: "#2a4a2e", secondary: "#0e1a10", accent: "#e8c050", glow: "rgba(80,230,140,0.55)" }, "natural", { color: "#6affa0", behavior: "drifting-leaves" }, "jade-bolt", { rangeMult: 1.05, attackSpeedMult: 0.97 }),
-  packSkin("STORMCALLER_PACK_CRIMSON_STORM", "STORMCALLER", { primary: "#3a1014", secondary: "#14060a", accent: "#ff3a4a", glow: "rgba(255,58,74,0.6)" }, "tempest", { color: "#ff5a6a", behavior: "sparks" }, "thunder-bolt", { damageMult: 1.06, rangeMult: 0.96 }),
-  packSkin("IRONWOOD_PACK_ECLIPSE", "IRONWOOD", { primary: "#141218", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "void-wisps" }, "void-bolt", { critChanceAdd: 0.05, damageMult: 0.97 }),
-  packSkin("FROSTBORN_PACK_ECLIPSE", "FROSTBORN", { primary: "#16141c", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "void-wisps" }, "black-frost-bolt", { freezeChanceAdd: 0.04, attackSpeedMult: 0.97 }),
-  packSkin("INFERNO_PACK_SOVEREIGN", "INFERNO", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "solar-flares" }, "solar-orb", { aoeRadiusMult: 1.05, burnDamageMult: 0.97 }),
-  packSkin("STORMCALLER_PACK_SOVEREIGN", "STORMCALLER", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "light-motes" }, "divine-bolt", { chainFalloffAdd: -0.04, damageMult: 0.97 }),
+  packSkin("INFERNO_PACK_EMBERHEART", "INFERNO", { primary: "#5a1a14", secondary: "#1a0606", accent: "#ffb23a", glow: "rgba(255,120,40,0.65)" }, "molten", { color: "#ffb23a", behavior: "heart-embers" }, "heart-orb", { burnDamageMult: 1.05, attackSpeedMult: 0.97 }),
+  packSkin("FROSTBORN_PACK_WINTER_CROWN", "FROSTBORN", { primary: "#c8d4e4", secondary: "#2a3a5a", accent: "#4a7aff", glow: "rgba(90,140,255,0.6)" }, "glacial", { color: "#bcd4ff", behavior: "crown-snow" }, "crown-shard", { slowPercentAdd: 0.05, damageMult: 0.97 }),
+  packSkin("IRONWOOD_PACK_EMERALD_SENTINEL", "IRONWOOD", { primary: "#2a4a2e", secondary: "#0e1a10", accent: "#e8c050", glow: "rgba(80,230,140,0.55)" }, "natural", { color: "#6affa0", behavior: "emerald-glints" }, "emerald-arrow", { rangeMult: 1.05, attackSpeedMult: 0.97 }),
+  packSkin("STORMCALLER_PACK_CRIMSON_STORM", "STORMCALLER", { primary: "#3a1014", secondary: "#14060a", accent: "#ff3a4a", glow: "rgba(255,58,74,0.6)" }, "tempest", { color: "#ff5a6a", behavior: "blood-sparks" }, "blood-bolt", { damageMult: 1.06, rangeMult: 0.96 }),
+  packSkin("IRONWOOD_PACK_ECLIPSE", "IRONWOOD", { primary: "#141218", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "eclipse-motes" }, "eclipse-arrow", { critChanceAdd: 0.05, damageMult: 0.97 }),
+  packSkin("FROSTBORN_PACK_ECLIPSE", "FROSTBORN", { primary: "#16141c", secondary: "#060508", accent: "#ffc848", glow: "rgba(255,200,72,0.6)" }, "voidtouched", { color: "#ffc848", behavior: "black-snow" }, "black-frost-shard", { freezeChanceAdd: 0.04, attackSpeedMult: 0.97 }),
+  packSkin("INFERNO_PACK_SOVEREIGN", "INFERNO", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "royal-rays" }, "sovereign-sun", { aoeRadiusMult: 1.05, burnDamageMult: 0.97 }),
+  packSkin("STORMCALLER_PACK_SOVEREIGN", "STORMCALLER", { primary: "#f2ead8", secondary: "#9a7a3a", accent: "#e0203a", glow: "rgba(255,220,140,0.7)" }, "celestial", { color: "#ffe2a0", behavior: "royal-sparks" }, "sovereign-bolt", { chainFalloffAdd: -0.04, damageMult: 0.97 }),
 ];
 
 const SKINS_BY_ID = new Map([...TOWER_SKINS, ...PRESTIGE_TOWER_SKINS, ...DUEL_TOWER_SKINS, ...PACK_TOWER_SKINS].map((s) => [s.id, s]));
