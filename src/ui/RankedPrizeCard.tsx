@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
-import { RANKED_PRIZES, RANKED_SETS, rankedPeriod, type RankedBoard } from "@/config/rankedRewards";
+import { RANKED_PRIZES, RANKED_SETS, rankedPeriod, rankedTitleFor, type RankedBoard, type RankedPrizeTier } from "@/config/rankedRewards";
+import { ItemGlyph } from "@/ui/ItemGlyph";
 import { SEASON_PARTICIPATION_FREE_GEMS } from "@/engine/AscensionManager";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { Castle3DPortrait, Tower3DPortrait } from "@/ui/Tower3DPortrait";
@@ -45,6 +46,16 @@ export function RankedPrizeCard({ board, compact = false }: { board: RankedBoard
             ))}
           </div>
           <figcaption>{t(`ranked.setName.${board}` as TranslationKey)}</figcaption>
+          {board === "ETERNAL" && (
+            <div className="rp-relics">
+              {["immortal_hourglass", "eternal_sand"].map((id) => (
+                <span key={id} className="rp-relic">
+                  <ItemGlyph itemDefinitionId={id} size={46} />
+                  <small>{t(`items.${id}.name` as TranslationKey)}</small>
+                </span>
+              ))}
+            </div>
+          )}
         </figure>
       )}
       <ol className="rp-list">
@@ -53,7 +64,11 @@ export function RankedPrizeCard({ board, compact = false }: { board: RankedBoard
             <span className="rp-place">{place(tier.from, tier.to)}</span>
             <span className="rp-prize">
               <span className="rp-gems">{t("ranked.gems", { n: tier.freeGems.toLocaleString(locale) })}</span>
-              {tier.set && <span className="rp-what">+ {tier.set === "FULL" ? t("ranked.setFull") : t("ranked.setCastle")}</span>}
+              {tierExtras(board, tier, t, locale).map((line) => (
+                <span key={line} className={`rp-what${line.startsWith("★") ? " is-relic" : ""}`}>
+                  {line}
+                </span>
+              ))}
             </span>
           </li>
         ))}
@@ -62,6 +77,18 @@ export function RankedPrizeCard({ board, compact = false }: { board: RankedBoard
       <p className="rp-note">{t("ranked.howNote", { gems: SEASON_PARTICIPATION_FREE_GEMS })}</p>
     </div>
   );
+}
+
+/** Everything a prize tier gives besides its Gems, one plain line each (relic lines start with ★). */
+export function tierExtras(board: RankedBoard, tier: RankedPrizeTier, t: (k: TranslationKey, v?: Record<string, string | number>) => string, locale: string): string[] {
+  const out: string[] = [];
+  if (tier.set) out.push(`+ ${tier.set === "FULL" ? t("ranked.setFull") : t("ranked.setCastle")}`);
+  if (tier.relic) out.push(`★ ${t("ranked.relic", { name: t(`items.${tier.relic}.name` as TranslationKey) })}`);
+  if (tier.looks?.length) out.push(`+ ${t("ranked.looks", { list: tier.looks.map((id) => t(`duel.shop.${id}` as TranslationKey)).join(", ") })}`);
+  if (tier.duelCoins) out.push(`+ ${t("ranked.coins", { n: tier.duelCoins.toLocaleString(locale) })}`);
+  const title = rankedTitleFor(board, tier.from);
+  if (title) out.push(`+ ${t("ranked.titleLine", { title: t(`ranked.titles.${title}` as TranslationKey) })}`);
+  return out;
 }
 
 const RP_CSS = `
@@ -86,5 +113,9 @@ const RP_CSS = `
 .rp-prize { display: grid; gap: 1px; min-width: 0; }
 .rp-what { font-size: 12px; color: color-mix(in srgb, var(--rp) 45%, #e8dcc4); line-height: 1.3; }
 .rp-gems { font-size: 14px; font-weight: 800; color: #a8dcff; font-variant-numeric: tabular-nums; }
+.rp-what.is-relic { color: #ffd878; font-weight: 700; }
+.rp-relics { display: flex; justify-content: center; gap: 14px; margin-top: 8px; }
+.rp-relic { display: grid; justify-items: center; gap: 2px; max-width: 110px; text-align: center; }
+.rp-relic small { font-size: 11.5px; color: #ffd878; line-height: 1.25; }
 .rp-note { margin: 10px 0 0; font-size: 12px; color: var(--ash); line-height: 1.5; }
 `;

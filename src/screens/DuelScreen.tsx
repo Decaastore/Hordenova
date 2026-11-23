@@ -834,6 +834,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                               if (how.league) return t("duel.earnedLeague", { name: t(`duel.league.${how.league}` as TranslationKey) });
                               if (how.tourney || item.id === TOURNEY_BANNER) return t("duel.tourneyOnly");
                               if (how.weekly) return t("duel.earnedWeekly");
+                              if (how.ranked) return t("duel.earnedRanked", { board: t(`ranked.board.${how.ranked}` as TranslationKey) });
                               return t("duel.earnedOnly");
                             })()}
                           </button>

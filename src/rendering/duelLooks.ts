@@ -88,6 +88,34 @@ export function drawKillFx(ctx: CanvasRenderingContext2D, fx: KillFxId, x: numbe
         ctx.lineTo(px, py);
       }
       ctx.stroke();
+    } else if (fx === "LAUREL") {
+      // golden laurel leaves thrown up in a ring, turning as they fall
+      const px = x + Math.cos(a) * sp * t;
+      const py = y - 8 + Math.sin(a) * sp * t * 0.5 - (30 * t - 34 * t * t) * s;
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(a + t * 6);
+      ctx.fillStyle = i % 3 === 0 ? `rgba(224,90,50,${fade})` : `rgba(255,${200 + 30 * rnd(seed, i)},90,${fade})`;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 1.5 * s, 4 * s, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (fx === "STARDUST") {
+      // violet stars and golden dust spiralling up into the night
+      const sw = a + t * 5;
+      const r = sp * 0.55 * (1 - t * 0.4);
+      const px = x + Math.cos(sw) * r;
+      const py = y - 8 + Math.sin(sw) * r * 0.45 - t * 40 * s;
+      const rr = (i % 2 ? 3.2 : 1.6) * s * (1 - t * 0.6);
+      ctx.fillStyle = i % 2 ? `rgba(200,150,255,${fade})` : `rgba(255,220,120,${fade})`;
+      ctx.beginPath();
+      for (let k = 0; k < 8; k++) {
+        const an = (k / 8) * Math.PI * 2 + t * 3;
+        const d = k % 2 ? rr * 0.38 : rr;
+        ctx.lineTo(px + Math.cos(an) * d, py + Math.sin(an) * d);
+      }
+      ctx.closePath();
+      ctx.fill();
     } else if (fx === "BLOOD") {
       // a blood-red mist that rises and a dark splash on the ground
       const px = x + Math.cos(a) * sp * t * 0.7;
@@ -112,7 +140,7 @@ export function drawKillFx(ctx: CanvasRenderingContext2D, fx: KillFxId, x: numbe
   }
   if (fx !== "SOULS") {
     const g = ctx.createRadialGradient(x, y - 6, 0, x, y - 6, 22 * s * (0.5 + t));
-    const c = fx === "EMBERS" ? "255,140,40" : fx === "FROST" ? "150,220,255" : fx === "LIGHTNING" ? "180,160,255" : fx === "BLOOD" ? "220,30,50" : "255,220,90";
+    const c = fx === "EMBERS" ? "255,140,40" : fx === "FROST" ? "150,220,255" : fx === "LIGHTNING" ? "180,160,255" : fx === "BLOOD" ? "220,30,50" : fx === "LAUREL" ? "255,190,80" : fx === "STARDUST" ? "170,120,255" : "255,220,90";
     g.addColorStop(0, `rgba(${c},${0.45 * (1 - t)})`);
     g.addColorStop(1, `rgba(${c},0)`);
     ctx.globalCompositeOperation = "lighter";

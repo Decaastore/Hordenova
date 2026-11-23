@@ -65,6 +65,17 @@ describe("ranking prizes", () => {
     expect(grantRankedPlacement("DUEL", "2026-11", 42).granted).toBe(false);
     // the profile keeps one trophy per placement won — none for a place outside the prizes
     expect(loadSave().rankedTrophies).toEqual([expect.objectContaining({ board: "ETERNAL", period: "2026", place: 1 })]);
+    // the Eternal #1 also gets its one-of-a-kind relic, account-bound, and the Eternal Duel looks
+    const relic = [...loadSave().inventory, ...loadSave().overflowInventory].find((i) => i.itemDefinitionId === "immortal_hourglass");
+    expect(relic?.tradable).toBe(false);
+    expect(loadSave().duel.owned).toEqual(expect.arrayContaining(["BANNER_ETERNITY", "KILL_STARDUST"]));
+  });
+
+  it("a Duel placement pays its Duel Coins and Duel looks", () => {
+    const coins = loadSave().duel.coins;
+    grantRankedPlacement("DUEL", "2026-10", 1);
+    expect(loadSave().duel.coins).toBe(coins + RANKED_PRIZES.DUEL[0]!.duelCoins!);
+    expect(loadSave().duel.owned).toEqual(expect.arrayContaining(["BANNER_ARENA_KING", "FRAME_ARENA_CROWN", "KILL_LAUREL"]));
   });
 
   it("periods: Eternal by calendar year, Duel by calendar month (Brasília time), Season by the Season clock", () => {

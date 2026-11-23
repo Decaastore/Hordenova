@@ -16,6 +16,7 @@ import { EMBLEM_COLOR } from "@/ui/hudIcons";
 import { Medallion, type GameIconName } from "@/ui/gameIcons";
 import { CrownArt } from "@/ui/StoreArt";
 import { RankedPrizeCard } from "@/ui/RankedPrizeCard";
+import { bestTrophy, rankedTitleFor } from "@/config/rankedRewards";
 
 interface RankingScreenProps {
   onNavigate: (view: NavView) => void;
@@ -49,6 +50,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const num = useMemo(() => new Intl.NumberFormat(locale), [locale]);
   const save = useMemo(() => loadSave(), []);
+  const champion = useMemo(() => bestTrophy(save.rankedTrophies), [save]);
   const eternal = useMemo(() => loadSave(ETERNAL_STORAGE_KEY), []);
   const status = useMemo(() => getAscensionStatus(), []);
   const profiles = getProfileService();
@@ -275,6 +277,7 @@ export function RankingScreen({ onNavigate, onPlay }: RankingScreenProps) {
                           {row.name}
                         </button>
                         {row.me && <span className="rk-you">{t("ranking.you")}</span>}
+                        {row.me && champion && <span className="rk-title is-champion">{t(`ranked.titles.${rankedTitleFor(champion.board, champion.place)!}` as TranslationKey)}</span>}
                         {row.me && save.equippedTitle && <span className="rk-title">{t(`achievements.list.${save.equippedTitle}.title` as TranslationKey)}</span>}
                       </span>
                       <span role="cell">
@@ -394,6 +397,7 @@ const RANKING_CSS = `
 .rk-name:hover { color: var(--gold-hi); text-decoration: underline; text-underline-offset: 3px; }
 .rk-you { font-size: 11.5px; font-weight: 800; color: #2b1906; background: var(--gold); padding: 1px 8px; border-radius: 999px; }
 .rk-title { font-size: 11.5px; font-style: italic; color: var(--gold); opacity: 0.85; }
+.rk-title.is-champion { font-style: normal; font-weight: 800; color: #2b1906; background: linear-gradient(180deg, #f6cf7a, #e8b04b); padding: 1px 8px; border-radius: 999px; opacity: 1; }
 .rk-dim { color: var(--ash-2); font-size: 13px; }
 
 /* side */

@@ -1,7 +1,7 @@
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadSave } from "@/engine/SaveSystem";
-import { RANKED_SETS, type RankedBoard } from "@/config/rankedRewards";
+import { RANKED_SETS, rankedTitleFor, type RankedBoard } from "@/config/rankedRewards";
 import { Castle3DPortrait, Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { MAX_TOWER_LEVEL, type TowerType } from "@/config/towerStats";
 
@@ -40,6 +40,7 @@ export function RankedTrophiesSection() {
           {trophies.map((tr) => (
             <li key={`${tr.board}:${tr.period}`} className={`is-${tr.board.toLowerCase()}${tr.place <= 3 ? ` is-p${tr.place}` : ""}`}>
               <b>{t("ranked.place", { n: tr.place })}</b>
+              <em>{t(`ranked.titles.${rankedTitleFor(tr.board, tr.place) ?? "SEASON_TOP20"}` as TranslationKey)}</em>
               <span>{t(`ranked.board.${tr.board}` as TranslationKey)}</span>
               <small>{periodLabel(tr.period, locale)}</small>
             </li>
@@ -85,6 +86,7 @@ const RT_CSS = `
 .rt-trophies li.is-season { --rt: #5a8aff; }
 .rt-trophies b { font-family: var(--display); font-size: 26px; line-height: 1; color: #fff3d6; }
 .rt-trophies li.is-p1 b { color: #ffe08a; }
+.rt-trophies em { font-style: normal; font-family: var(--display); font-size: 17px; color: color-mix(in srgb, var(--rt) 45%, #fff3d6); }
 .rt-trophies span { font-size: 13.5px; font-weight: 700; color: var(--bone); }
 .rt-trophies small { font-size: 12px; color: var(--ash); }
 .rt-sets { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 16px; }

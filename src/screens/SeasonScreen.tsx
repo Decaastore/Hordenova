@@ -21,7 +21,7 @@ import { getMainBossForWave } from "@/config/bossConfig";
 import { phaseNumberFromWave, waveInPhase } from "@/config/wavePhase";
 import { canUnlockPrestige, getPrestigeBonuses, getPrestigeTier, getPrestigeUpgradeDualPrice, PRESTIGE_MIN_BEST_WAVE } from "@/config/prestige";
 import { RANKED_PRIZES } from "@/config/rankedRewards";
-import { RankedPrizeCard } from "@/ui/RankedPrizeCard";
+import { RankedPrizeCard, tierExtras } from "@/ui/RankedPrizeCard";
 import { SEASON_PARTICIPATION_FREE_GEMS } from "@/engine/AscensionManager";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -307,7 +307,7 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
                     {RANKED_PRIZES.SEASON.map((tier) => (
                       <tr key={tier.from}>
                         <th scope="row">{tier.from === tier.to ? t("ranked.place", { n: tier.from }) : t("ranked.placeRange", { a: tier.from, b: tier.to })}</th>
-                        <td style={{ whiteSpace: "normal" }}>{tier.set === "FULL" ? t("ranked.setFull") : tier.set === "CASTLE" ? t("ranked.setCastle") : t("ranked.setNone")}</td>
+                        <td style={{ whiteSpace: "normal" }}>{tierExtras("SEASON", tier, t, locale).map((l) => l.replace(/^\+ /, "")).join(" · ") || t("ranked.setNone")}</td>
                         <td className="is-num">{tier.freeGems.toLocaleString(locale)}</td>
                       </tr>
                     ))}

@@ -43,7 +43,7 @@ export interface ItemEffect {
 
 /** Where an item's definition can be obtained — descriptive metadata; the DropTable in dropTables.ts is what actually rolls it. */
 export interface ItemSource {
-  type: "BOSS_DROP" | "MINI_BOSS_DROP" | "PHASE_MILESTONE";
+  type: "BOSS_DROP" | "MINI_BOSS_DROP" | "PHASE_MILESTONE" | "RANKED";
   /** BossDefinition.id or a phase milestone id. */
   refId: string;
 }
@@ -79,6 +79,8 @@ export const ITEM_TYPES = [
   "hollow_sigil",
   "wardens_eye",
   "crown_of_the_hollow_king",
+  "immortal_hourglass",
+  "eternal_sand",
 ] as const;
 
 export type ItemId = (typeof ITEM_TYPES)[number];
@@ -185,7 +187,44 @@ export const ITEM_DEFINITIONS: Record<ItemId, ItemDefinition> = {
     tradable: true,
     visualAssetId: "crown_of_the_hollow_king",
   },
+  // RANKING · ETERNO (config/rankedRewards.ts) — relics that exist ONLY as the
+  // yearly Eternal ranking's prize: account-bound (never sold or traded),
+  // never a fusion or reward result (getItemDefinitionsByRarity skips them),
+  // and never stronger than a regular item of the same rarity (itemDefinitions
+  // test) so the winner gets a one-of-a-kind trophy, not a power gap.
+  immortal_hourglass: {
+    id: "immortal_hourglass",
+    i18nKey: "immortal_hourglass",
+    rarity: "LEGENDARY",
+    category: "ARTIFACT",
+    effects: [
+      { kind: "TOWER_DAMAGE_PERCENT", value: 8 },
+      { kind: "BOSS_DAMAGE_PERCENT", value: 10 },
+      { kind: "TOWER_ATTACK_SPEED_PERCENT", value: 6 },
+    ],
+    source: { type: "RANKED", refId: "ETERNAL:1" },
+    tradable: false,
+    visualAssetId: "immortal_hourglass",
+  },
+  eternal_sand: {
+    id: "eternal_sand",
+    i18nKey: "eternal_sand",
+    rarity: "EPIC",
+    category: "RELIC",
+    effects: [
+      { kind: "TOWER_DAMAGE_PERCENT", value: 7 },
+      { kind: "CRIT_CHANCE_PERCENT", value: 7 },
+    ],
+    source: { type: "RANKED", refId: "ETERNAL:2-3" },
+    tradable: false,
+    visualAssetId: "eternal_sand",
+  },
 };
+
+/** A ranking-prize relic — never dropped, fused, sold or handed out by any other reward. */
+export function isRankedItemDefinition(def: Pick<ItemDefinition, "source">): boolean {
+  return def.source.type === "RANKED";
+}
 
 export function getItemDefinition(id: string): ItemDefinition | null {
   return (ITEM_DEFINITIONS as Record<string, ItemDefinition>)[id] ?? null;
@@ -193,5 +232,5 @@ export function getItemDefinition(id: string): ItemDefinition | null {
 
 /** Every real item definition at `rarity` — SISTEMA DE FUSÃO DE ITENS reads this to pick the superior item a successful fusion creates. Today exactly 1 per rarity (see file header); if a future catalog expansion adds more than one, the caller picks among these rather than this file inventing a tie-break rule. */
 export function getItemDefinitionsByRarity(rarity: Rarity): ItemDefinition[] {
-  return Object.values(ITEM_DEFINITIONS).filter((def) => def.rarity === rarity);
+  return Object.values(ITEM_DEFINITIONS).filter((def) => def.rarity === rarity && !isRankedItemDefinition(def));
 }

@@ -367,7 +367,7 @@ export function missionStep(m: DuelMission, st: DuelMatchStats): number {
 // ── Duel shop ───────────────────────────────────────────────────────────
 export type DuelCosmeticKind = "BANNER" | "FRAME" | "TOWER_SKIN" | "KILL_FX";
 /** Kill effects: what a creature leaves when it falls, in the Duel and the Eternal castle. */
-export type KillFxId = "EMBERS" | "FROST" | "SOULS" | "GOLD" | "LIGHTNING" | "BLOOD";
+export type KillFxId = "EMBERS" | "FROST" | "SOULS" | "GOLD" | "LIGHTNING" | "BLOOD" | "LAUREL" | "STARDUST";
 export interface DuelShopItem {
   id: string;
   price: number;
@@ -393,6 +393,12 @@ export const DUEL_SHOP: readonly DuelShopItem[] = [
   { id: "BANNER_MASTER", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#e0a0ff", color2: "#3a0a6a" } },
   { id: "KILL_BLOOD", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#ff3a4a", color2: "#3a0608", fx: "BLOOD" } },
   { id: "FRAME_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#ff3a5a", color2: "#ffc040" } },
+  // RANKING prizes (config/rankedRewards.ts) — only for the top of the monthly Duel / yearly Eternal ranking, never sold
+  { id: "BANNER_ARENA_KING", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#8a1a14", color2: "#e8a848" } },
+  { id: "FRAME_ARENA_CROWN", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#e05a32", color2: "#ffd070" } },
+  { id: "KILL_LAUREL", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#ffd070", color2: "#8a1a14", fx: "LAUREL" } },
+  { id: "BANNER_ETERNITY", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#3a1a6a", color2: "#ffd878" } },
+  { id: "KILL_STARDUST", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#c08aff", color2: "#ffd878", fx: "STARDUST" } },
   { id: "SKIN_IRONWOOD_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "IRONWOOD_LEGEND", tower: "IRONWOOD" } },
   { id: "SKIN_INFERNO_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "INFERNO_LEGEND", tower: "INFERNO" } },
   { id: "SKIN_FROSTBORN_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "FROSTBORN_LEGEND", tower: "FROSTBORN" } },
@@ -1072,7 +1078,9 @@ export const LEAGUE_UNLOCKS: Partial<Record<LeagueId, readonly string[]>> = {
 export const WEEKLY_TOP_UNLOCK = "KILL_BLOOD";
 
 /** Where an exclusive look comes from (for the shop label). */
-export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; weekly?: boolean } {
+export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; weekly?: boolean; ranked?: "DUEL" | "ETERNAL" } {
+  if (id === "BANNER_ARENA_KING" || id === "FRAME_ARENA_CROWN" || id === "KILL_LAUREL") return { ranked: "DUEL" };
+  if (id === "BANNER_ETERNITY" || id === "KILL_STARDUST") return { ranked: "ETERNAL" };
   for (const [l, ids] of Object.entries(LEAGUE_UNLOCKS)) if (ids?.includes(id)) return { league: l as LeagueId };
   if (id === "BANNER_CHAMPION") return { tourney: true };
   if (id === WEEKLY_TOP_UNLOCK) return { weekly: true };

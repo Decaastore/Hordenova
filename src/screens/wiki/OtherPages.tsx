@@ -9,6 +9,7 @@ import { getMasteryUnlockGoldCost, getMasteryUpgradeCost, MASTERY_COSMETIC_TIERS
 import { GOLD_SINKS } from "@/config/goldSinks";
 import { GEM_SINKS } from "@/config/gemSinks";
 import { RANKED_PRIZES } from "@/config/rankedRewards";
+import { tierExtras } from "@/ui/RankedPrizeCard";
 import { SEASON_PARTICIPATION_FREE_GEMS } from "@/engine/AscensionManager";
 import { SEASON_DURATION_MS } from "@/engine/SeasonClock";
 import { ItemGlyph } from "@/ui/ItemGlyph";
@@ -204,7 +205,7 @@ export function EconomyPage() {
 }
 
 export function AscensionPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const days = Math.round(SEASON_DURATION_MS / (24 * 60 * 60 * 1000));
   return (
     <div>
@@ -231,7 +232,7 @@ export function AscensionPage() {
                 {RANKED_PRIZES[board].map((tier) => (
                   <tr key={tier.from}>
                     <th scope="row">{tier.from === tier.to ? t("ranked.place", { n: tier.from }) : t("ranked.placeRange", { a: tier.from, b: tier.to })}</th>
-                    <td>{tier.set === "FULL" ? `${t(`ranked.setName.${board}` as TranslationKey)} — ${t("ranked.setFull")}` : tier.set === "CASTLE" ? t("ranked.setCastle") : t("ranked.setNone")}</td>
+                    <td>{tierExtras(board, tier, t, language === "ptBR" ? "pt-BR" : "en-US").map((l) => l.replace(/^[+★] /, "")).join(" · ") || t("ranked.setNone")}</td>
                     <td>{t("ranked.gems", { n: tier.freeGems })}</td>
                   </tr>
                 ))}

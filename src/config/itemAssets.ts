@@ -62,6 +62,9 @@ export const ITEM_VISUAL_ASSETS: Record<string, ItemVisualAsset> = {
   hollow_sigil: { imageSrc: "/items/amulets/hollow_sigil.png" },
   wardens_eye: { imageSrc: "/items/amulets/wardens_eye.png" },
   crown_of_the_hollow_king: { imageSrc: "/items/artifacts/crown_of_the_hollow_king.png" },
+  // RANKING · ETERNO relics — vector art drawn for the game (public/items/relics)
+  immortal_hourglass: { imageSrc: "/items/relics/immortal_hourglass.svg" },
+  eternal_sand: { imageSrc: "/items/relics/eternal_sand.svg" },
 };
 
 export function getItemVisualAsset(visualAssetId: string): ItemVisualAsset {

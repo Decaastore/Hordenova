@@ -57,7 +57,7 @@ export const COLLECTIONS: readonly CollectionDef[] = [
     id: "ARSENAL",
     entries: (s) => {
       const have = discoveredItems(s);
-      return Object.values(ITEM_DEFINITIONS).map((d) => ({ id: d.id, labelKey: `items.${d.i18nKey}.name`, owned: have.has(d.id) }));
+      return Object.values(ITEM_DEFINITIONS).filter((d) => d.source.type !== "RANKED").map((d) => ({ id: d.id, labelKey: `items.${d.i18nKey}.name`, owned: have.has(d.id) }));
     },
     milestones: [
       { count: 2, reward: { shards: 10 } },

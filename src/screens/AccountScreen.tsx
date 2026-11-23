@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { bestTrophy, rankedTitleFor } from "@/config/rankedRewards";
 import { RankedTrophiesSection } from "@/ui/RankedTrophiesSection";
 import { CollectionsSection, DailyLoginSection } from "@/ui/RewardsPanels";
 import { CloudAccountSection } from "@/ui/CloudAccountSection";
@@ -60,6 +61,7 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
 
   const items = [...save.inventory, ...save.overflowInventory];
   const byRarity = RARITY_ORDER.map((r) => ({ r, n: items.filter((i) => ITEM_DEFINITIONS[i.itemDefinitionId as keyof typeof ITEM_DEFINITIONS]?.rarity === r).length }));
+  const champion = bestTrophy(save.rankedTrophies);
   const gemSkinsOwned = TOWER_SKINS.filter((s) => save.ownedTowerSkinIds.includes(s.id)).length;
   const duelSkinsOwned = DUEL_TOWER_SKINS.filter((s) => save.duel.owned.includes(`SKIN_${s.id}`)).length;
   const ledger = useMemo(
@@ -83,6 +85,11 @@ export function AccountScreen({ onNavigate, onPlay }: AccountScreenProps) {
               <p className="pg-lead">{t("account.lead")}</p>
               <div className="ac-tags">
                 <span>{t("account.player", { id: save.playerId.slice(0, 8) })}</span>
+                {champion && (
+                  <span className="is-champion" data-testid="ranked-title">
+                    {t(`ranked.titles.${rankedTitleFor(champion.board, champion.place)!}` as TranslationKey)}
+                  </span>
+                )}
                 {save.equippedTitle && <span className="is-title">{t(`achievements.list.${save.equippedTitle}.title` as TranslationKey)}</span>}
                 <span className={vip ? "is-vip" : ""}>{vip ? t("account.vipOn", { date: new Date(save.vip.until).toLocaleDateString(language === "ptBR" ? "pt-BR" : "en-US") }) : t("account.vipOff")}</span>
                 <span>{t(`account.age.${save.ageVerification.status}` as TranslationKey)}</span>
@@ -256,6 +263,7 @@ const ACCOUNT_CSS = `
 .ac-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .ac-tags span { padding: 5px 12px; border-radius: 20px; border: 1px solid var(--line); background: rgba(0,0,0,0.3); font-size: 13px; color: var(--ash); }
 .ac-tags span.is-title { color: var(--gold-hi); border-color: rgba(232,176,75,0.5); }
+.ac-tags span.is-champion { color: #2b1906; font-weight: 800; border-color: #f2c873; background: linear-gradient(180deg, #f6cf7a, #e8b04b 55%, #c58a2c); }
 .ac-tags span.is-vip { color: #cfe8ff; border-color: rgba(159,211,255,0.5); }
 .ac-rank { display: flex; align-items: center; gap: 14px; }
 .ac-rank div { display: grid; gap: 2px; }
