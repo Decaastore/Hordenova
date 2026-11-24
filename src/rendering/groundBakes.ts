@@ -1,6 +1,7 @@
 import type { BiomeDefinition } from "./biomes";
 import type { DecorationKind } from "./mapDecorations";
-import { getMapDecorations } from "./mapDecorations";
+import { drawnRadius, getMapDecorations, getStrayBakedDecorations } from "./mapDecorations";
+import { BAKED_DECORATIONS, BAKED_SITES } from "./bakedDecorations";
 import type { VisibleBounds } from "./MapRenderer";
 import { getMapLayout } from "@/data/mapLayouts";
 import type { Vector2 } from "@/utils/geometry";
@@ -165,6 +166,114 @@ export function withoutLavaPools(bake: LoadedGroundBake, biome: BiomeDefinition)
   }
   const out: LoadedGroundBake = { def, ground, emissive, skipKinds: bake.skipKinds };
   poolless.set(biome.id, out);
+  return out;
+}
+
+const tidy = new Map<string, LoadedGroundBake>();
+
+/**
+ * The baked ground with the painted scenery that the newer roads, build sites
+ * or castle now sit on painted over (rendering/mapDecorations.ts
+ * getStrayBakedDecorations): each stray rock, ruin or tree is covered with a
+ * soft round patch of plain ground taken from right beside it — ground that
+ * is clear of the road, the sites and every other painted piece. Made once per map.
+ */
+export function withoutStrayScenery(bake: LoadedGroundBake, biome: BiomeDefinition): LoadedGroundBake {
+  const hit = tidy.get(biome.id);
+  if (hit) return hit;
+  const layout = getMapLayout(biome.id);
+  // painted build platforms whose site has since moved are painted over too
+  const oldPads = (BAKED_SITES[biome.id] ?? []).filter((o) => !layout.sites.some((c) => Math.hypot(c.position.x - o.x, c.position.y - o.y) < 12));
+  const stray: { position: { x: number; y: number }; R: number }[] = [
+    ...getStrayBakedDecorations(biome.id).map((d) => ({ position: d.position, R: drawnRadius(d) * 1.35 + 6 })),
+    ...oldPads.map((p) => ({ position: p, R: 34 })),
+  ];
+  if (!stray.length || typeof document === "undefined") {
+    tidy.set(biome.id, bake);
+    return bake;
+  }
+  const { def } = bake;
+  const W = def.x1 - def.x0, H = def.y1 - def.y0;
+  const gw = imgW(bake.ground), gh = imgH(bake.ground);
+  const kx = gw / W, ky = gh / H;
+  const ground = document.createElement("canvas");
+  ground.width = gw;
+  ground.height = gh;
+  const g = ground.getContext("2d")!;
+  g.drawImage(bake.ground, 0, 0);
+  const painted = BAKED_DECORATIONS[biome.id] ?? [];
+  const nearPath = (x: number, y: number, r: number) => {
+    const road = layout.path;
+    for (let i = 1; i < road.length; i++) {
+      const a = road[i - 1]!, b = road[i]!;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      if (Math.hypot(a.x + dx * t - x, a.y + dy * t - y) < r + 30) return true;
+    }
+    return false;
+  };
+  const cleanAt = (x: number, y: number, R: number) =>
+    x - R >= def.x0 && y - R >= def.y0 && x + R <= def.x1 && y + R <= def.y1 &&
+    !nearPath(x, y, R) &&
+    !layout.sites.some((s) => Math.hypot(s.position.x - x, s.position.y - y) < R + 32) &&
+    !painted.some((o) => Math.hypot(o.position.x - x, o.position.y - y) < R + drawnRadius(o) + 4) &&
+    !oldPads.some((o) => Math.hypot(o.x - x, o.y - y) < R + 34);
+  const tmp = document.createElement("canvas");
+  for (const d of stray) {
+    const R = d.R;
+    let best: { x: number; y: number } | null = null;
+    for (let ring = 2.2; ring <= 6 && !best; ring += 0.9) {
+      for (let i = 0; i < 20 && !best; i++) {
+        const a = (i / 20) * Math.PI * 2 + ring;
+        const x = d.position.x + Math.cos(a) * R * ring, y = d.position.y + Math.sin(a) * R * ring;
+        if (cleanAt(x, y, R)) best = { x, y };
+      }
+    }
+    if (!best) continue;
+    const pw = Math.ceil(R * 2 * kx), ph = Math.ceil(R * 2 * ky);
+    tmp.width = pw;
+    tmp.height = ph;
+    const t = tmp.getContext("2d")!;
+    t.clearRect(0, 0, pw, ph);
+    t.drawImage(ground, (best.x - R - def.x0) * kx, (best.y - R - def.y0) * ky, pw, ph, 0, 0, pw, ph);
+    t.globalCompositeOperation = "destination-in";
+    const gr = t.createRadialGradient(pw / 2, ph / 2, Math.min(pw, ph) * 0.32, pw / 2, ph / 2, Math.min(pw, ph) / 2);
+    gr.addColorStop(0, "rgba(0,0,0,1)");
+    gr.addColorStop(1, "rgba(0,0,0,0)");
+    t.fillStyle = gr;
+    t.fillRect(0, 0, pw, ph);
+    t.globalCompositeOperation = "source-over";
+    // stamped twice, a little apart, so no hard copy of the donor shows
+    for (const [ox, oy] of [[0, 0], [R * 0.25, -R * 0.15]] as const) {
+      g.save();
+      g.translate((d.position.x + ox - def.x0) * kx, (d.position.y + oy - def.y0) * ky);
+      g.drawImage(tmp, -pw / 2, -ph / 2);
+      g.restore();
+    }
+  }
+  let emissive = bake.emissive;
+  if (bake.emissive) {
+    const ew = imgW(bake.emissive), eh = imgH(bake.emissive);
+    const e2 = document.createElement("canvas");
+    e2.width = ew;
+    e2.height = eh;
+    const e = e2.getContext("2d")!;
+    e.drawImage(bake.emissive, 0, 0);
+    e.globalCompositeOperation = "destination-out";
+    const ex = ew / W, ey = eh / H;
+    for (const d of stray) {
+      const R = d.R;
+      const cx = (d.position.x - def.x0) * ex, cy = (d.position.y - def.y0) * ey;
+      const gr = e.createRadialGradient(cx, cy, R * ex * 0.5, cx, cy, R * ex);
+      gr.addColorStop(0, "rgba(0,0,0,1)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      e.fillStyle = gr;
+      e.fillRect(cx - R * ex, cy - R * ey, R * 2 * ex, R * 2 * ey);
+    }
+    emissive = e2;
+  }
+  const out: LoadedGroundBake = { def, ground, emissive, skipKinds: bake.skipKinds };
+  tidy.set(biome.id, out);
   return out;
 }
 

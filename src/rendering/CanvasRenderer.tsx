@@ -27,7 +27,7 @@ import { getCreatureVfxProfile } from "@/config/creatureVfxProfile";
 import { getBiome } from "./biomes";
 import { drawGarrison2D } from "./garrison2d";
 import { getActiveMapLayout } from "@/data/mapLayouts";
-import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools, withoutRoadPastGate } from "./groundBakes";
+import { drawBakedGround, drawGroundEmissive, getGroundBake, hasGroundBake, withoutLavaPools, withoutRoadPastGate, withoutStrayScenery } from "./groundBakes";
 import { drawRealisticAtmosphere } from "./atmosphere";
 import { emergenceProgress } from "./riftPortal";
 import { pruneTowerAims, steerTowerAim } from "./towerSprites";
@@ -482,7 +482,7 @@ export function CanvasRenderer({
       // biomes that have one; the 3D terrain layer stands down for them too.
       // every road ends at the castle gate now: the painted stretch past the castle comes out of the ground image
       const loadedBake = getGroundBake(biome.id);
-      const rawBake = loadedBake ? withoutRoadPastGate(loadedBake, biome) : null;
+      const rawBake = loadedBake ? withoutStrayScenery(withoutRoadPastGate(loadedBake, biome), biome) : null;
       // with the 3D lava pools showing, the painted ones come out of the ground image
       const groundBake = rawBake && PROPS_3D.active && biome.liquidGlows ? withoutLavaPools(rawBake, biome) : rawBake;
       // the hybrid 3D layer builds the light towers and lava pools itself: leave the flat ones out

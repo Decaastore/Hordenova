@@ -2,6 +2,8 @@ import { WORLD_SIZE } from "@/config/gameBalance";
 import { fortressAnchorFor, getMapLayout, type MapLayout } from "@/data/mapLayouts";
 import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
 import type { BiomeDefinition } from "./biomes";
+import { BAKED_DECORATIONS, BAKED_KINDS } from "./bakedDecorations";
+import { PATH_VISUAL_WIDTH } from "@/config/gameBalance";
 
 /**
  * Purely decorative scenery — trees, rocks, roots, ruins, crystals, grass,
@@ -107,21 +109,6 @@ function isClearOfPlayArea(point: Vector2, footprint: number, layout: MapLayout)
   return true;
 }
 
-/**
- * Prevents one decoration's drawn shape from visually overlapping another's
- * — the direct fix for "água aparece uma sobre a outra" / duplicate-looking
- * lakes. The 0.8 factor allows a little natural closeness (a rock nudged
- * right up against a pond's edge still reads fine) without permitting the
- * near-total overlap the bug reports described.
- */
-function overlapsExistingDecoration(point: Vector2, footprint: number, placed: readonly Decoration[]): boolean {
-  for (const other of placed) {
-    const otherFootprint = DECORATION_FOOTPRINT_RADIUS[other.kind] * other.scale;
-    if (distance(point, other.position) < (footprint + otherFootprint) * 0.8) return true;
-  }
-  return false;
-}
-
 const ALL_DECORATION_KINDS: readonly DecorationKind[] = [
   "TREE",
   "ROCK",
@@ -175,44 +162,93 @@ function samplePlacement(kind: DecorationKind, rng: () => number, anchors: reado
   return { x: rng() * WORLD_SIZE.width, y: rng() * WORLD_SIZE.height };
 }
 
+/**
+ * ONE SPACING STANDARD (owner's call, Nov 2026: "sem encostar em rocha… tudo
+ * realista de um só padrão"). Every piece's real drawn size on the map —
+ * not the looser placement footprint above — and a fixed strip of free
+ * ground that must separate any two pieces, and any piece from the road,
+ * a build site, the castle and the rift.
+ */
+export const DRAWN_RADIUS: Record<DecorationKind, number> = {
+  TREE: 24,
+  ROCK: 16,
+  ROOT: 12,
+  RUIN: 22,
+  CRYSTAL: 15,
+  GRASS: 6,
+  FLOWER: 5,
+  WATER: 52,
+  TORCH: 10,
+  FISSURE: 26,
+};
+export const FREE_GROUND_GAP = 6;
+/** Build sites' platform radius and the castle body's radius on the map (world units). */
+const SITE_RADIUS = 30;
+const CASTLE_RADIUS = 80;
+const RIFT_RADIUS = 40;
+
+export const drawnRadius = (d: Pick<Decoration, "kind" | "scale">) => DRAWN_RADIUS[d.kind] * d.scale;
+
+/** True when a piece of scenery would sit on (or touch) the road, a build site, the castle or the rift. */
+export function touchesPlayArea(point: Vector2, radius: number, layout: MapLayout): boolean {
+  const gap = radius + FREE_GROUND_GAP;
+  if (distanceToPolyline(point, layout.path) < PATH_VISUAL_WIDTH / 2 + 6 + gap) return true;
+  if (distance(point, fortressAnchorFor(layout.path).position) < CASTLE_RADIUS + gap) return true;
+  if (distance(point, layout.path[0]!) < RIFT_RADIUS + gap) return true;
+  return layout.sites.some((slot) => distance(point, slot.position) < SITE_RADIUS + gap);
+}
+
+/** True when two pieces would touch (closer than both their drawn sizes plus the free strip). */
+function touchesAny(point: Vector2, radius: number, placed: readonly Decoration[]): boolean {
+  return placed.some((o) => distance(point, o.position) < radius + drawnRadius(o) + FREE_GROUND_GAP);
+}
+
+/** The scenery painted into this biome's ground image that the current roads, sites or castle now sit on — painted over by groundBakes.ts. */
+export function getStrayBakedDecorations(biomeId: string): readonly Decoration[] {
+  const baked = BAKED_DECORATIONS[biomeId];
+  if (!baked) return [];
+  const layout = getMapLayout(biomeId);
+  return baked.filter(
+    (d) => (touchesPlayArea(d.position, drawnRadius(d) * 0.6, layout) || !isClearOfPlayArea(d.position, DECORATION_FOOTPRINT_RADIUS[d.kind] * d.scale, layout)),
+  );
+}
+
 function generate(biome: BiomeDefinition): Decoration[] {
   // Scenery keeps clear of THIS biome's own road and build sites.
   const layout = getMapLayout(biome.id);
   const rng = mulberry32(20260831 + hashSeed(biome.id));
-  const decorations: Decoration[] = [];
+  const bakedKinds = new Set(BAKED_KINDS[biome.id] ?? []);
+  // what is painted into the ground image stays exactly where it is painted (minus what had to be painted over)
+  const stray = new Set(getStrayBakedDecorations(biome.id));
+  const decorations: Decoration[] = (BAKED_DECORATIONS[biome.id] ?? []).filter((d) => !stray.has(d));
 
   const counts: Record<DecorationKind, number> = Object.fromEntries(
-    ALL_DECORATION_KINDS.map((kind) => [kind, biome.decorationWeights[kind] ?? 0]),
+    ALL_DECORATION_KINDS.map((kind) => [kind, bakedKinds.has(kind) ? 0 : (biome.decorationWeights[kind] ?? 0)]),
   ) as Record<DecorationKind, number>;
 
-  // VISUAL POLISH (fase 260 feedback) — "parece confete": every kind used
-  // to be sprinkled uniformly across the whole map, so small props read as
-  // noise competing with the combat. Most props now gather into a handful
-  // of per-biome clusters biased toward the map's outer margins (natural
-  // rock outcrops / thickets framing the play area), leaving breathing room
-  // where the fighting happens. Torches line the trail instead of floating
-  // in random spots. Still fully deterministic per biome.
+  // VISUAL POLISH (fase 260 feedback) — "parece confete": most props
+  // gather into a handful of per-biome clusters biased toward the map's
+  // outer margins, leaving breathing room where the fighting happens.
+  // Torches line the trail. Everything placed here keeps the one spacing
+  // standard above from the road, the sites, the castle, the rift, the
+  // painted scenery and each other. Still fully deterministic per biome.
   const anchors = pickClusterAnchors(rng);
 
   (Object.entries(counts) as [DecorationKind, number][]).forEach(([kind, count]) => {
     let placed = 0;
     let attempts = 0;
-    while (placed < count && attempts < count * 60) {
+    while (placed < count && attempts < count * 80) {
       attempts++;
       const point = samplePlacement(kind, rng, anchors);
       const scale = 0.7 + rng() * 0.9;
+      const rotation = rng() * Math.PI * 2;
+      const variant = Math.floor(rng() * 3);
       const footprint = DECORATION_FOOTPRINT_RADIUS[kind] * scale;
-      if (!isClearOfPlayArea(point, footprint, layout)) continue;
+      const radius = DRAWN_RADIUS[kind] * scale;
+      if (!isClearOfPlayArea(point, footprint, layout) || touchesPlayArea(point, radius, layout)) continue;
       if (kind === "TORCH" && distanceToPolyline(point, layout.path) > MIN_DISTANCE_FROM_PATH + footprint + 34) continue;
-      if (overlapsExistingDecoration(point, footprint, decorations)) continue;
-
-      decorations.push({
-        kind,
-        position: point,
-        scale,
-        rotation: rng() * Math.PI * 2,
-        variant: Math.floor(rng() * 3),
-      });
+      if (touchesAny(point, radius, decorations)) continue;
+      decorations.push({ kind, position: point, scale, rotation, variant });
       placed++;
     }
   });

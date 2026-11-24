@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v167",
+    dateIso: "2026-11-23",
+    category: "FIXES",
+    title: {
+      en: "Tidier Maps: Nothing Sits on a Rock",
+      ptBR: "Mapas Arrumados: Nada em Cima de Rocha",
+    },
+    description: {
+      en: "On every map, torches, crystals and the other scenery now follow one spacing rule: nothing touches the road, a build site, the castle, the rift, a rock or anything else. Leftovers from older layouts are gone.",
+      ptBR: "Em todos os mapas, tochas, cristais e o resto do cenário agora seguem uma regra só de distância: nada encosta na estrada, numa base de torre, no castelo, no portal, numa rocha ou em qualquer outra coisa. As sobras de layouts antigos sumiram.",
+    },
+    highlights: [
+      {
+        en: "Torches and crystals no longer stand on top of rocks — they keep a strip of free ground from every painted rock, ruin, tree and pool.",
+        ptBR: "Tochas e cristais não ficam mais em cima de rochas — eles mantêm uma faixa de chão livre de toda rocha, ruína, árvore e lago do mapa.",
+      },
+      {
+        en: "Rocks, ruins and pools that ended up under the castle, on a build site or by the road after the castles moved to the end of the road are painted over with the ground around them.",
+        ptBR: "Rochas, ruínas e lagos que tinham ficado embaixo do castelo, numa base de torre ou na beira da estrada depois que os castelos foram para o fim da estrada foram cobertos pelo chão ao redor.",
+      },
+      {
+        en: "Old build platforms left behind where a site used to be (on 13 of the 16 maps) are gone, so every platform you see is a real build site.",
+        ptBR: "Plataformas velhas que tinham ficado onde antes havia uma base (em 13 dos 16 mapas) sumiram — toda plataforma que aparece agora é uma base de verdade.",
+      },
+    ],
+  },
+  {
     id: "v166",
     dateIso: "2026-11-23",
     category: "CASTLE",
