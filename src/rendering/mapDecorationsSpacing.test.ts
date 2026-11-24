@@ -4,6 +4,7 @@ import { BAKED_DECORATIONS, BAKED_KINDS } from "./bakedDecorations";
 import { getBiome } from "./biomes";
 import { getMapLayout, MAP_LAYOUTS } from "@/data/mapLayouts";
 import { distance } from "@/utils/geometry";
+import { CITY_PLOT_RADIUS, getCityPlots } from "@/data/cityPlots";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -24,6 +25,14 @@ describe("map scenery — one spacing standard", () => {
       }
     });
   }
+
+  it("the city's buildings never stand on scenery, and nothing is placed on the city's ground (its buildings rise there later)", () => {
+    for (const id of Object.keys(MAP_LAYOUTS)) {
+      const plots = getCityPlots(getMapLayout(id));
+      for (const d of getMapDecorations(getBiome(id)))
+        for (const p of plots) expect(distance(d.position, p.position), `${id} ${p.id} / ${d.kind}`).toBeGreaterThanOrEqual(CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP - 1e-6);
+    }
+  });
 
   it("painted scenery that a road, site or castle now sits on is taken off the map (and painted over), never kept", () => {
     for (const id of Object.keys(MAP_LAYOUTS)) {

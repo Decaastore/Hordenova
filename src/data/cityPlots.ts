@@ -2,6 +2,7 @@ import { WORLD_SIZE } from "@/config/gameBalance";
 import { CITY_BUILDINGS, type CityBuildingId } from "@/config/city";
 import { fortressAnchorFor, type MapLayout } from "./mapLayouts";
 import { distance, type Vector2 } from "@/utils/geometry";
+import { drawnRadius, FREE_GROUND_GAP, getPaintedScenery } from "@/rendering/mapDecorations";
 
 /**
  * Where each city building stands on a map (config/city.ts). Plots are found
@@ -17,6 +18,8 @@ const BASE_CLEAR_OF_ROAD = 50;
 const CLEAR_OF_SITE = 62;
 const PLOT_SPACING = 78;
 const MAX_RADIUS = 440;
+/** A building's ground (its yard included) on the map, in world units — painted rocks, ruins, pools… keep this clear. */
+export const CITY_PLOT_RADIUS = 34;
 
 function distanceToSegment(p: Vector2, a: Vector2, b: Vector2): number {
   const dx = b.x - a.x;
@@ -33,6 +36,10 @@ function distanceToPath(p: Vector2, path: readonly Vector2[]): number {
 }
 
 function isFreeGround(p: Vector2, layout: MapLayout, castle: Vector2, relax: number): boolean {
+  // never on a painted rock, ruin, tree or pool (one spacing standard: rendering/mapDecorations.ts)
+  for (const d of getPaintedScenery(layout.id)) {
+    if (distance(p, d.position) < CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP) return false;
+  }
   const CLEAR_OF_ROAD = BASE_CLEAR_OF_ROAD - relax;
   if (p.x < 34 || p.x > WORLD_SIZE.width - 34 || p.y < 60 || p.y > WORLD_SIZE.height - 26) return false;
   const dx = p.x - castle.x;

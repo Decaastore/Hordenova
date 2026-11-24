@@ -111,7 +111,7 @@ function surfaceTexture(kind: "flag" | "plank" | "earth", color: string): THREE.
 }
 
 /** Soft earth patch the foundation sits in: blends into the map and hides the painted platform. */
-function earthPatch(biome: BiomeDefinition, radius: number): THREE.Mesh {
+export function earthPatch(biome: BiomeDefinition, radius: number): THREE.Mesh {
   const key = `patch|${biome.id}`;
   let tex = texCache.get(key);
   if (!tex) {

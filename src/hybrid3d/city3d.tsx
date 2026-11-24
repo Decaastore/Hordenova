@@ -8,6 +8,8 @@ import { getCityPlots, type CityPlot } from "@/data/cityPlots";
 import { getMapLayout } from "@/data/mapLayouts";
 import { buildCityModel, setCharred, type CityModel } from "@/battlefield3d/models/cityModels";
 import { worldToLocalGround } from "@/rendering3d/enemyProjection";
+import { getBiome } from "@/rendering/biomes";
+import { earthPatch } from "./foundations";
 
 /**
  * THE CITY IN 3D (config/city.ts, data/cityPlots.ts) — the buildings behind
@@ -136,6 +138,10 @@ export function City3D({ engine, fx }: { engine: GameEngine; fx: Effects }) {
       if (built.has(plot.id) && !have) {
         const model = buildCityModel(plot.id, plot.id.length * 31 + Math.round(plot.position.x));
         const group = new THREE.Group();
+        // its own trodden yard under it, so the building stands planted in the ground (not pasted on the map)
+        const yard = earthPatch(getBiome(snap0.biomeId), 21);
+        yard.name = "yard";
+        group.add(yard);
         group.add(model.root);
         const at = ground(plot.position);
         group.position.copy(at);
@@ -147,6 +153,7 @@ export function City3D({ engine, fx }: { engine: GameEngine; fx: Effects }) {
         const toScene = (v: THREE.Vector3) => v.clone().applyMatrix4(model.root.matrixWorld).applyMatrix4(new THREE.Matrix4().copy(root.matrixWorld).invert());
         root.updateMatrixWorld(true);
         const fresh = placed.current.size > 0 || performance.now() > 4000;
+        if (fresh) model.root.scale.y = 0.15;
         placed.current.set(plot.id, {
           id: plot.id,
           plot,
@@ -177,7 +184,7 @@ export function City3D({ engine, fx }: { engine: GameEngine; fx: Effects }) {
       if (p.rise < 1) {
         p.rise = Math.min(1, p.rise + dt / 1.4);
         const e = 1 - Math.pow(1 - p.rise, 3);
-        p.group.scale.set(CITY_SCALE, CITY_SCALE * (0.15 + 0.85 * e), CITY_SCALE);
+        p.model.root.scale.y = 0.15 + 0.85 * e;
       }
       const isBurning = (burning[p.id] ?? 0) > 0;
       p.char += ((isBurning ? 1 : 0) - p.char) * Math.min(1, dt * (isBurning ? 1.6 : 0.4));

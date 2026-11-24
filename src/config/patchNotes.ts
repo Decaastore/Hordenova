@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v168",
+    dateIso: "2026-11-23",
+    category: "FIXES",
+    title: {
+      en: "The City Stands on Clear Ground",
+      ptBR: "A Cidade em Chão Livre",
+    },
+    description: {
+      en: "The city follows the maps' spacing rule too: each building gets its own patch of ground away from rocks, ruins and lava, and stands planted in a trodden yard instead of looking pasted on the map.",
+      ptBR: "A cidade também segue a regra de distância dos mapas: cada construção tem o seu pedaço de chão longe de rochas, ruínas e lava, e fica firme num terreiro de terra batida em vez de parecer colada no mapa.",
+    },
+    highlights: [
+      {
+        en: "No building rises on a rock, a ruin or a lava pool any more (the Farm on the Volcanic Wastes used to sit in the lava).",
+        ptBR: "Nenhuma construção nasce mais em cima de rocha, ruína ou lago de lava (a Fazenda das Terras Vulcânicas ficava dentro da lava).",
+      },
+      {
+        en: "The city's ground is kept free from the start: torches and crystals never stand where a building will rise later in the Season.",
+        ptBR: "O chão da cidade fica livre desde o começo: tochas e cristais nunca ficam onde uma construção vai aparecer mais tarde na Season.",
+      },
+      {
+        en: "When a building is raised, its yard is laid flat on the ground at once and only the building itself grows up out of it, so it reads as fixed in place.",
+        ptBR: "Quando uma construção aparece, o terreiro já surge assentado no chão e só a construção cresce a partir dele, então ela parece fixa no lugar.",
+      },
+    ],
+  },
+  {
     id: "v167",
     dateIso: "2026-11-23",
     category: "FIXES",

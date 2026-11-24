@@ -4,6 +4,7 @@ import { distanceToPolyline, distance, type Vector2 } from "@/utils/geometry";
 import type { BiomeDefinition } from "./biomes";
 import { BAKED_DECORATIONS, BAKED_KINDS } from "./bakedDecorations";
 import { PATH_VISUAL_WIDTH } from "@/config/gameBalance";
+import { CITY_PLOT_RADIUS, getCityPlots } from "@/data/cityPlots";
 
 /**
  * Purely decorative scenery — trees, rocks, roots, ruins, crystals, grass,
@@ -213,14 +214,21 @@ export function getStrayBakedDecorations(biomeId: string): readonly Decoration[]
   );
 }
 
+/** The scenery painted into this biome's ground image that stays on the map (what the roads, sites and castle now cover is painted over). */
+export function getPaintedScenery(biomeId: string): readonly Decoration[] {
+  const stray = new Set(getStrayBakedDecorations(biomeId));
+  return (BAKED_DECORATIONS[biomeId] ?? []).filter((d) => !stray.has(d));
+}
+
 function generate(biome: BiomeDefinition): Decoration[] {
   // Scenery keeps clear of THIS biome's own road and build sites.
   const layout = getMapLayout(biome.id);
   const rng = mulberry32(20260831 + hashSeed(biome.id));
   const bakedKinds = new Set(BAKED_KINDS[biome.id] ?? []);
   // what is painted into the ground image stays exactly where it is painted (minus what had to be painted over)
-  const stray = new Set(getStrayBakedDecorations(biome.id));
-  const decorations: Decoration[] = (BAKED_DECORATIONS[biome.id] ?? []).filter((d) => !stray.has(d));
+  const decorations: Decoration[] = [...getPaintedScenery(biome.id)];
+  // the city's ground stays free too: its buildings rise there as the Season goes on
+  const plots = getCityPlots(layout).map((p) => p.position);
 
   const counts: Record<DecorationKind, number> = Object.fromEntries(
     ALL_DECORATION_KINDS.map((kind) => [kind, bakedKinds.has(kind) ? 0 : (biome.decorationWeights[kind] ?? 0)]),
@@ -248,6 +256,7 @@ function generate(biome: BiomeDefinition): Decoration[] {
       if (!isClearOfPlayArea(point, footprint, layout) || touchesPlayArea(point, radius, layout)) continue;
       if (kind === "TORCH" && distanceToPolyline(point, layout.path) > MIN_DISTANCE_FROM_PATH + footprint + 34) continue;
       if (touchesAny(point, radius, decorations)) continue;
+      if (plots.some((p) => distance(point, p) < CITY_PLOT_RADIUS + radius + FREE_GROUND_GAP)) continue;
       decorations.push({ kind, position: point, scale, rotation, variant });
       placed++;
     }
