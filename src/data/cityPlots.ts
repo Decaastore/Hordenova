@@ -1,4 +1,4 @@
-import { WORLD_SIZE } from "@/config/gameBalance";
+import { PATH_VISUAL_WIDTH, WORLD_SIZE } from "@/config/gameBalance";
 import { CITY_BUILDINGS, type CityBuildingId } from "@/config/city";
 import { fortressAnchorFor, type MapLayout } from "./mapLayouts";
 import { distance, type Vector2 } from "@/utils/geometry";
@@ -15,7 +15,8 @@ import { drawnRadius, FREE_GROUND_GAP, getPaintedScenery } from "@/rendering/map
 /** A building's sprite rises this far above its plot (world units) — checked against the road and sites too. */
 const SPRITE_RISE = 44;
 const BASE_CLEAR_OF_ROAD = 50;
-const CLEAR_OF_SITE = 62;
+/** A build site's platform (30) + a building's ground + the free strip: buildings never touch a platform. */
+const CLEAR_OF_SITE = 70;
 const PLOT_SPACING = 78;
 const MAX_RADIUS = 440;
 /** A building's ground (its yard included) on the map, in world units — painted rocks, ruins, pools… keep this clear. */
@@ -40,14 +41,15 @@ function isFreeGround(p: Vector2, layout: MapLayout, castle: Vector2, relax: num
   for (const d of getPaintedScenery(layout.id)) {
     if (distance(p, d.position) < CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP) return false;
   }
-  const CLEAR_OF_ROAD = BASE_CLEAR_OF_ROAD - relax;
+  // where the creatures walk is never built on: the road's full width, the building's own ground and the free strip (never relaxed)
+  const CLEAR_OF_ROAD = Math.max(BASE_CLEAR_OF_ROAD - relax, PATH_VISUAL_WIDTH / 2 + CITY_PLOT_RADIUS + FREE_GROUND_GAP);
   if (p.x < 34 || p.x > WORLD_SIZE.width - 34 || p.y < 60 || p.y > WORLD_SIZE.height - 26) return false;
   const dx = p.x - castle.x;
   const dy = p.y - castle.y;
   if (Math.abs(dx) < 118 && dy > -190 && dy < 70) return false;
   if (distance(p, layout.path[0]!) < 95) return false;
   const top = { x: p.x, y: p.y - SPRITE_RISE };
-  if (distanceToPath(p, layout.path) < CLEAR_OF_ROAD || distanceToPath(top, layout.path) < CLEAR_OF_ROAD - 10) return false;
+  if (distanceToPath(p, layout.path) < CLEAR_OF_ROAD || distanceToPath(top, layout.path) < BASE_CLEAR_OF_ROAD - relax - 10) return false;
   for (const site of layout.sites) {
     if (distance(p, site.position) < CLEAR_OF_SITE || distance(top, site.position) < CLEAR_OF_SITE - 8) return false;
   }
@@ -68,22 +70,25 @@ export function getCityPlots(layout: MapLayout): readonly CityPlot[] {
   if (cached) return cached;
   const castle = fortressAnchorFor(layout.path, 130).position;
   let chosen: Vector2[] = [];
-  // Tight maps relax the clearances a little (never onto the road or a site) until all buildings fit.
-  for (let relax = 0; relax <= 16 && chosen.length < CITY_BUILDINGS.length; relax += 4) {
-    const candidates: Vector2[] = [];
-    for (let r = 125; r <= MAX_RADIUS; r += 16) {
-      const steps = Math.max(12, Math.round((2 * Math.PI * r) / 22));
-      for (let k = 0; k < steps; k++) {
-        const a = (k / steps) * Math.PI * 2;
-        const p = { x: Math.round(castle.x + Math.cos(a) * r), y: Math.round(castle.y + Math.sin(a) * r * 0.8) };
-        if (isFreeGround(p, layout, castle, relax)) candidates.push(p);
+  // Tight maps relax the clearances a little (never onto the road or a site) until all buildings fit,
+  // and when the ground round the castle is still too tight, the town spreads further out over the map.
+  for (const maxR of [MAX_RADIUS, 700, 1200]) {
+    for (let relax = 0; relax <= 16 && chosen.length < CITY_BUILDINGS.length; relax += 4) {
+      const candidates: Vector2[] = [];
+      for (let r = 125; r <= maxR; r += 16) {
+        const steps = Math.max(12, Math.round((2 * Math.PI * r) / 22));
+        for (let k = 0; k < steps; k++) {
+          const a = (k / steps) * Math.PI * 2;
+          const p = { x: Math.round(castle.x + Math.cos(a) * r), y: Math.round(castle.y + Math.sin(a) * r * 0.8) };
+          if (isFreeGround(p, layout, castle, relax)) candidates.push(p);
+        }
       }
-    }
-    candidates.sort((a, b) => distance(a, castle) - distance(b, castle));
-    chosen = [];
-    for (const c of candidates) {
-      if (chosen.length >= CITY_BUILDINGS.length) break;
-      if (chosen.every((o) => Math.hypot(o.x - c.x, (o.y - c.y) * 1.3) >= PLOT_SPACING - relax)) chosen.push(c);
+      candidates.sort((a, b) => distance(a, castle) - distance(b, castle));
+      chosen = [];
+      for (const c of candidates) {
+        if (chosen.length >= CITY_BUILDINGS.length) break;
+        if (chosen.every((o) => Math.hypot(o.x - c.x, (o.y - c.y) * 1.3) >= PLOT_SPACING - relax)) chosen.push(c);
+      }
     }
   }
   const plots = chosen.map((position, i) => ({ id: CITY_BUILDINGS[i]!.id, position, flip: position.x > castle.x }));

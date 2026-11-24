@@ -3,7 +3,9 @@ import { drawnRadius, FREE_GROUND_GAP, getMapDecorations, getStrayBakedDecoratio
 import { BAKED_DECORATIONS, BAKED_KINDS } from "./bakedDecorations";
 import { getBiome } from "./biomes";
 import { getMapLayout, MAP_LAYOUTS } from "@/data/mapLayouts";
-import { distance } from "@/utils/geometry";
+import { distance, distanceToPolyline } from "@/utils/geometry";
+import { CITY_BUILDINGS } from "@/config/city";
+import { PATH_VISUAL_WIDTH } from "@/config/gameBalance";
 import { CITY_PLOT_RADIUS, getCityPlots } from "@/data/cityPlots";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -31,6 +33,18 @@ describe("map scenery — one spacing standard", () => {
       const plots = getCityPlots(getMapLayout(id));
       for (const d of getMapDecorations(getBiome(id)))
         for (const p of plots) expect(distance(d.position, p.position), `${id} ${p.id} / ${d.kind}`).toBeGreaterThanOrEqual(CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP - 1e-6);
+    }
+  });
+
+  it("the city never stands where the creatures walk or on a build platform, and every map has room for all its buildings", () => {
+    for (const id of Object.keys(MAP_LAYOUTS)) {
+      const layout = getMapLayout(id);
+      const plots = getCityPlots(layout);
+      expect(plots.length, id).toBe(CITY_BUILDINGS.length);
+      for (const p of plots) {
+        expect(distanceToPolyline(p.position, layout.path), `${id} ${p.id}`).toBeGreaterThanOrEqual(PATH_VISUAL_WIDTH / 2 + CITY_PLOT_RADIUS + FREE_GROUND_GAP);
+        for (const s of layout.sites) expect(distance(p.position, s.position), `${id} ${p.id} / ${s.id}`).toBeGreaterThanOrEqual(30 + CITY_PLOT_RADIUS + FREE_GROUND_GAP);
+      }
     }
   });
 

@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v169",
+    dateIso: "2026-11-23",
+    category: "FIXES",
+    title: {
+      en: "No Building on the Creatures' Road",
+      ptBR: "Nenhuma Construção na Estrada dos Monstros",
+    },
+    description: {
+      en: "City buildings now always keep off the road the creatures walk and off the build platforms, with the same free strip of ground as the rest of the map.",
+      ptBR: "As construções da cidade agora sempre ficam fora da estrada por onde os monstros passam e fora das plataformas de torre, com a mesma faixa de chão livre do resto do mapa.",
+    },
+    highlights: [
+      {
+        en: "The rule is never loosened: on maps where the ground round the castle is tight, the town spreads further out instead of crowding onto the road.",
+        ptBR: "A regra nunca é afrouxada: nos mapas com pouco espaço em volta do castelo, a cidade se espalha mais para longe em vez de invadir a estrada.",
+      },
+      {
+        en: "Checked on all 16 maps: every map still fits all 8 buildings.",
+        ptBR: "Conferido nos 16 mapas: todos continuam com espaço para as 8 construções.",
+      },
+    ],
+  },
+  {
     id: "v168",
     dateIso: "2026-11-23",
     category: "FIXES",
