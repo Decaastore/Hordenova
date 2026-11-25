@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v171",
+    dateIso: "2026-11-25",
+    category: "BOSSES",
+    title: {
+      en: "New Page: Bosses",
+      ptBR: "Página Nova: Bosses",
+    },
+    description: {
+      en: "A page of its own in the menu for every boss in the game: the weekly Global Boss, how bosses fight, and every region boss and mini-boss with your own stars.",
+      ptBR: "Uma página própria no menu com todos os chefes do jogo: o Chefe Global da semana, como os chefes lutam e cada chefe de região e mini-chefe com as suas estrelas.",
+    },
+    highlights: [
+      {
+        en: "Global Boss: the Serpent of the Eclipse live — its shared life, time left, your attempts today, the room and prize rules, its three acts and a button straight into the raid.",
+        ptBR: "Chefe Global: a Serpente do Eclipse ao vivo — a vida compartilhada, o tempo que falta, as suas tentativas de hoje, as regras da sala e dos prêmios, os três atos e um botão direto para o raide.",
+      },
+      {
+        en: "How bosses fight: the Stun Roar, the Phase Barrier, the mini-bosses' Hardened Hide and Fury, with their real numbers.",
+        ptBR: "Como os chefes lutam: o Rugido Atordoante, a Barreira de Fase, o Couro Endurecido dos mini-chefes e a Fúria, com os números de verdade.",
+      },
+      {
+        en: "All 16 region bosses in the order you meet them (region and wave) and all 16 mini-bosses, each with its ability and your 1 / 3 / 10-kill stars.",
+        ptBR: "Os 16 chefes de região na ordem em que você os encontra (região e onda) e os 16 mini-chefes, cada um com a sua habilidade e as suas estrelas de 1 / 3 / 10 abates.",
+      },
+      {
+        en: "The Global Boss preview now also runs lighter: at most ~30 frames a second, and not at all while off screen.",
+        ptBR: "A animação do Chefe Global também ficou mais leve: no máximo ~30 quadros por segundo, e parada quando está fora da tela.",
+      },
+    ],
+  },
+  {
     id: "v170",
     dateIso: "2026-11-25",
     category: "FIXES",

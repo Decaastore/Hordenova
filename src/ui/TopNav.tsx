@@ -7,7 +7,7 @@ import { BrandLogo } from "./BrandLogo";
 import { getPassView } from "@/engine/SeasonPassService";
 import { PASS_CHANGED_EVENT } from "./SeasonPassSection";
 
-export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE" | "ACCOUNT" | "SUPPORT";
+export type NavView = "HOME" | "SEASON" | "PASS" | "RANKING" | "WIKI" | "NOVIDADES" | "MARKETPLACE" | "STORE" | "ACCOUNT" | "SUPPORT" | "BOSSES";
 
 interface TopNavProps {
   active: NavView;
@@ -73,6 +73,7 @@ export function TopNav({ active, onNavigate, onPlay }: TopNavProps) {
       <div className="tn-links" ref={linksRef}>
         {link("SEASON", t("nav.season"))}
         {link("PASS", t("nav.pass"), { dot: passClaimable > 0, dotTitle: t("nav.passReady", { n: passClaimable }) })}
+        {link("BOSSES", t("nav.bosses"))}
         {link("RANKING", t("nav.ranking"))}
         {link("STORE", t("nav.store"))}
         {link("MARKETPLACE", t("nav.marketplace"))}

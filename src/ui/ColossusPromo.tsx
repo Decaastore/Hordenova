@@ -28,11 +28,18 @@ export function ColossusShowcase({ className, testId }: { className?: string; te
   const ref = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
     let raf = 0;
+    let lastDraw = 0;
+    let visible = true;
+    const observer = typeof IntersectionObserver !== "undefined" && ref.current ? new IntersectionObserver(([e]) => (visible = e?.isIntersecting ?? true)) : null;
+    if (ref.current) observer?.observe(ref.current);
     const loop = (now: number) => {
       const cv = ref.current;
       const ctx = cv?.getContext("2d");
-      if (cv && ctx && cv.clientWidth > 0) {
-        const dpr = Math.min(2, window.devicePixelRatio || 1);
+      // light on any PC: ~30 frames/s, and nothing while off screen or in a hidden tab
+      const due = visible && !document.hidden && now - lastDraw >= 32;
+      if (due && cv && ctx && cv.clientWidth > 0) {
+        lastDraw = now;
+        const dpr = Math.min(1.5, window.devicePixelRatio || 1);
         const w = cv.clientWidth;
         if (cv.width !== Math.round(w * dpr)) {
           cv.width = Math.round(w * dpr);
@@ -44,7 +51,10 @@ export function ColossusShowcase({ className, testId }: { className?: string; te
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      observer?.disconnect();
+    };
   }, []);
   return <canvas ref={ref} className={className} data-testid={testId} style={{ display: "block", width: "100%", aspectRatio: `${COLOSSUS_VIEW_W} / ${COLOSSUS_VIEW_H}` }} />;
 }
