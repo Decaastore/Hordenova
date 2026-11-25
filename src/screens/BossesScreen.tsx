@@ -3,7 +3,6 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
-import { BossPortrait } from "@/ui/CreaturePortrait";
 import { ColossusShowcase } from "@/ui/ColossusPromo";
 import { loadSave } from "@/engine/SaveSystem";
 import { MAIN_BOSSES, MINI_BOSSES, type BossDefinition } from "@/config/bossConfig";
@@ -38,6 +37,7 @@ interface BossesScreenProps {
   onPlayColossus: () => void;
 }
 
+const assetBase = (import.meta.env?.BASE_URL ?? "/").replace(/\/?$/, "/");
 const sec = (ms: number) => Math.round(ms / 100) / 10;
 const pct = (f: number) => Math.round(f * 100);
 
@@ -237,7 +237,8 @@ function BossCard({ boss, kills, where, wave }: { boss: BossDefinition; kills: n
   return (
     <article className={`bs-card${boss.isMainBoss ? " is-main" : ""}${met ? "" : " is-unmet"}`} data-testid={`boss-card-${boss.id}`}>
       <div className="bs-card-art">
-        <BossPortrait bossId={boss.id} size={boss.isMainBoss ? 104 : 84} />
+        {/* the boss exactly as it walks the road in its region (a frame of the real battle, public/bosses/) */}
+        <img src={`${assetBase}bosses/${boss.id}.webp`} alt={t(`bosses.${boss.i18nKey}.name` as TranslationKey)} loading="lazy" width={460} height={400} />
       </div>
       <div className="bs-card-body">
         <p className="bs-where">{where}</p>
@@ -340,11 +341,14 @@ const BOSSES_CSS = `
 .bs-rule dd { margin: 1px 0 0; font-size: 13.5px; }
 .bs-rule .bs-fine { color: var(--ash); }
 .bs-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.bs-card { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; padding: 14px; border-radius: 14px; background: var(--night-2); border: 1px solid var(--line-soft); }
-.bs-grid.is-mini .bs-card { grid-template-columns: 92px minmax(0, 1fr); }
+.bs-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; padding: 0 0 14px; border-radius: 14px; overflow: hidden; background: var(--night-2); border: 1px solid var(--line-soft); }
+.bs-card > *:not(.bs-card-art) { margin-left: 14px; margin-right: 14px; }
+
 .bs-card.is-main { background: linear-gradient(180deg, rgba(60,22,18,0.55), var(--night-2) 60%); border-color: rgba(224,100,75,0.3); }
-.bs-card.is-unmet .bs-card-art { filter: grayscale(0.7) brightness(0.75); }
-.bs-card-art { display: grid; place-items: center; min-height: 92px; border-radius: 10px; background: radial-gradient(60% 60% at 50% 55%, rgba(255,255,255,0.06), transparent); }
+
+.bs-card-art { position: relative; aspect-ratio: 16 / 10; background: #0d0a07; border-bottom: 1px solid var(--line-soft); }
+.bs-card-art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+.bs-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(13,10,7,0.65)); pointer-events: none; }
 .bs-where { margin: 0; font-size: 12.5px; color: var(--ash); }
 .bs-card h3 { margin: 2px 0 0; font-family: var(--display); font-size: 20px; line-height: 1.15; color: var(--bone); }
 .bs-ability { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: #d9cdb6; }
@@ -369,8 +373,6 @@ const BOSSES_CSS = `
 @media (max-width: 520px) {
   .bs-facts { grid-template-columns: 1fr; }
   .bs-grid { grid-template-columns: 1fr; }
-  .bs-card { grid-template-columns: 84px minmax(0, 1fr); }
-  .bs-grid.is-mini .bs-card { grid-template-columns: 76px minmax(0, 1fr); }
   .bs-cta { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .bs-dot { animation: none; } }
