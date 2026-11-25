@@ -1199,7 +1199,7 @@ function Creatures({
       const tier = rankScale(!!en.elite, en.boss);
       if (!e) {
         if (live.current.size >= MAX_3D_CREATURES) continue; // a huge wave: the rest stay as 2D sprites
-        const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss);
+        const cid = creatureFor(en.type, !!en.boss, !!en.boss?.isMainBoss, en.boss?.bossId);
         const h = ENEMY_HEIGHT * tier * RANKED_SIZE * heightFactor(en.type);
         const fresh = Math.hypot(en.position.x - portal.x, en.position.y - portal.y) < 90;
         // no ink outline: lit and shaded, these read as solid 3D monsters, not drawings

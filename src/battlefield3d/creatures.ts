@@ -36,7 +36,7 @@ const MOVE_IDS = Object.keys(MOVE_FILES) as MoveId[];
 export const CREATURE_URLS = [...Object.values(CREATURE_FILES), ...DEATH_FILES, ...Object.values(MOVE_FILES)];
 const IDS = Object.keys(CREATURE_FILES) as CreatureId[];
 
-/** Which creature plays each enemy type (a Boss is the Mutant, a Mini-Boss the Pumpkin Hulk, both bigger). */
+/** Which creature plays each enemy type (bosses: see BOSS_CREATURE). */
 const FOR_TYPE: Record<string, CreatureId> = {
   BRUTE: "warrok",
   CRAWLER: "parasite",
@@ -48,8 +48,51 @@ const FOR_TYPE: Record<string, CreatureId> = {
   REGENERATOR: "yaku",
 };
 
-export function creatureFor(type: string, boss: boolean, mainBoss = false): CreatureId {
-  if (boss) return mainBoss ? "mutant" : "pumpkin";
+/**
+ * CHEFES — every Boss and Mini-Boss is one of the owner's Mixamo monsters,
+ * spread so that neighbouring regions never show the same body and a
+ * region's Mini-Boss never looks like its Boss. (Bigger, armoured, tinted
+ * and glowing on top — that's what sets a boss apart from the horde.)
+ */
+export const BOSS_CREATURE: Record<string, CreatureId> = {
+  // region bosses, in the order of the regions
+  "hollow-warden": "warrok",
+  "molten-colossus": "mutant",
+  "glacial-sovereign": "brute2",
+  "sand-devourer": "parasite",
+  "grave-tyrant": "yaku",
+  "abyssal-maw": "vampire",
+  "iron-burrower-sovereign": "goblin",
+  "ancestral-colossus": "pumpkin",
+  "aether-drake-elder": "mremireh",
+  "raithar-ascendant": "vampire",
+  "crystal-behemoth-prime": "brute2",
+  "abyssal-warden-eternal": "mutant",
+  "ashen-colossus-forsaken": "warrok",
+  "moonroot-matriarch-elder": "mremireh",
+  "cathedral-abomination-apex": "yaku",
+  "leviathan-elder": "parasite",
+  // mini-bosses
+  "ashfen-warlord": "brute2",
+  "briar-summoner": "vampire",
+  "mossback-regenerator": "yaku",
+  "gloom-jammer": "mremireh",
+  "stonebound-sentinel": "pumpkin",
+  "ferocious-berserker": "goblin",
+  "iron-burrower": "brute2",
+  "colossus-spawn": "mutant",
+  "aether-drake": "vampire",
+  raithar: "goblin",
+  "crystal-behemoth": "pumpkin",
+  "abyssal-warden": "yaku",
+  "ashen-colossus": "parasite",
+  "moonroot-matriarch": "goblin",
+  "cathedral-abomination": "warrok",
+  "leviathan-spawn": "mremireh",
+};
+
+export function creatureFor(type: string, boss: boolean, mainBoss = false, bossId?: string): CreatureId {
+  if (boss) return (bossId && BOSS_CREATURE[bossId]) || (mainBoss ? "mutant" : "pumpkin");
   return FOR_TYPE[type] ?? IDS[(type.charCodeAt(0) + type.length) % IDS.length]!;
 }
 
