@@ -205,19 +205,32 @@ function touchesAny(point: Vector2, radius: number, placed: readonly Decoration[
 }
 
 /** The scenery painted into this biome's ground image that the current roads, sites or castle now sit on — painted over by groundBakes.ts. */
+const strayCache = new Map<string, readonly Decoration[]>();
+const paintedCache = new Map<string, readonly Decoration[]>();
+
 export function getStrayBakedDecorations(biomeId: string): readonly Decoration[] {
+  const hit = strayCache.get(biomeId);
+  if (hit) return hit;
   const baked = BAKED_DECORATIONS[biomeId];
-  if (!baked) return [];
-  const layout = getMapLayout(biomeId);
-  return baked.filter(
-    (d) => (touchesPlayArea(d.position, drawnRadius(d) * 0.6, layout) || !isClearOfPlayArea(d.position, DECORATION_FOOTPRINT_RADIUS[d.kind] * d.scale, layout)),
-  );
+  let out: readonly Decoration[] = [];
+  if (baked) {
+    const layout = getMapLayout(biomeId);
+    out = baked.filter(
+      (d) => touchesPlayArea(d.position, drawnRadius(d) * 0.6, layout) || !isClearOfPlayArea(d.position, DECORATION_FOOTPRINT_RADIUS[d.kind] * d.scale, layout),
+    );
+  }
+  strayCache.set(biomeId, out);
+  return out;
 }
 
 /** The scenery painted into this biome's ground image that stays on the map (what the roads, sites and castle now cover is painted over). */
 export function getPaintedScenery(biomeId: string): readonly Decoration[] {
+  const hit = paintedCache.get(biomeId);
+  if (hit) return hit;
   const stray = new Set(getStrayBakedDecorations(biomeId));
-  return (BAKED_DECORATIONS[biomeId] ?? []).filter((d) => !stray.has(d));
+  const out = (BAKED_DECORATIONS[biomeId] ?? []).filter((d) => !stray.has(d));
+  paintedCache.set(biomeId, out);
+  return out;
 }
 
 function generate(biome: BiomeDefinition): Decoration[] {

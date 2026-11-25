@@ -66,7 +66,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   /** Dressed stone blocks with chiselled edges, speckle, grime; optional frost rime and glowing rune lines. */
+  /** Cached across every model built on the page (the canvases are only read: each material clones them). */
   function stoneTex(seed: number, a: string, b: string, mortar: string, rows: number, cols: number, opts: { frost?: number; runes?: string; runeRows?: number[] } = {}): TexSet {
+    return cachedTex("stoneTex", [seed, a, b, mortar, rows, cols, opts], () => stoneTexRaw(seed, a, b, mortar, rows, cols, opts));
+  }
+  function stoneTexRaw(seed: number, a: string, b: string, mortar: string, rows: number, cols: number, opts: { frost?: number; runes?: string; runeRows?: number[] } = {}): TexSet {
     const S = 512;
     const { c, g, b: bc, h } = canvasPair(S);
     const r = rng(seed);
@@ -156,7 +160,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     return finish(c, bc, e);
   }
 
+  /** Cached across every model built on the page (the canvases are only read: each material clones them). */
   function metalTex(seed: number, base: string, opts: { rivets?: boolean } = {}): TexSet {
+    return cachedTex("metalTex", [seed, base, opts], () => metalTexRaw(seed, base, opts));
+  }
+  function metalTexRaw(seed: number, base: string, opts: { rivets?: boolean } = {}): TexSet {
     const S = 256;
     const { c, g, b, h } = canvasPair(S);
     const r = rng(seed);
@@ -243,7 +251,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   /** Flagstone paving for horizontal tops (a side-wall brick texture stretched over a disc reads as planks). */
+  /** Cached across every model built on the page (the canvases are only read: each material clones them). */
   function flagTex(seed: number, a: string, b: string, mortar: string, frost = 0): TexSet {
+    return cachedTex("flagTex", [seed, a, b, mortar, frost], () => flagTexRaw(seed, a, b, mortar, frost));
+  }
+  function flagTexRaw(seed: number, a: string, b: string, mortar: string, frost = 0): TexSet {
     const S = 512;
     const { c, g, b: bc, h } = canvasPair(S);
     const r = rng(seed);
@@ -1461,7 +1473,11 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   /** Bark: deep vertical furrows, knots, optional glowing sap veins (emissive). */
+  /** Cached across every model built on the page (the canvases are only read: each material clones them). */
   function barkTex(seed: number, a: string, b: string, veins?: string): TexSet {
+    return cachedTex("barkTex", [seed, a, b, veins], () => barkTexRaw(seed, a, b, veins));
+  }
+  function barkTexRaw(seed: number, a: string, b: string, veins?: string): TexSet {
     const S = 512;
     const { c, g, b: bc, h } = canvasPair(S);
     const r = rng(seed);
@@ -4280,4 +4296,21 @@ const PACK_LOOKS: Record<string, PackLook> = {
   FROSTBORN_SEASON_RANK: { shape: "FROSTBORN_ANCIENT_GUARDIAN", crest: "royal", metal: "#ffd060", gem: "#7aa8ff", cloth: "#1a3a8a" },
   INFERNO_SEASON_RANK: { shape: "INFERNO_INDUSTRIAL_FORGE", crest: "royal", metal: "#ffd060", gem: "#4a9aff", cloth: "#1a3a8a" },
   STORMCALLER_SEASON_RANK: { shape: "STORMCALLER_VOID", crest: "royal", metal: "#ffd060", gem: "#4a8aff", cloth: "#1a3a8a" },
-};
+};/**
+ * LIGHT ON ANY PC: the procedural stone/metal/bark textures (512×512 canvases
+ * painted pixel by pixel) are the costliest part of building a tower. The
+ * same textures recur across towers, levels and skins, so each is painted
+ * once per page and reused (every material takes its own clone).
+ */
+const TEX_CACHE = new Map<string, unknown>();
+function cachedTex<T>(kind: string, args: unknown[], make: () => T): T {
+  const key = kind + JSON.stringify(args);
+  let hit = TEX_CACHE.get(key) as T | undefined;
+  if (!hit) {
+    hit = make();
+    TEX_CACHE.set(key, hit);
+  }
+  return hit;
+}
+
+

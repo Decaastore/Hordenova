@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v170",
+    dateIso: "2026-11-25",
+    category: "FIXES",
+    title: {
+      en: "The Site Opens Fast, Even on Weak PCs",
+      ptBR: "O Site Abre Rápido, Até em PC Fraco",
+    },
+    description: {
+      en: "Fixed the freeze when opening the site (the \"page not responding\" warning on some laptops) and made the whole site lighter for weaker computers.",
+      ptBR: "Corrigido o travamento ao abrir o site (o aviso de \"página sem resposta\" em alguns notebooks) e o site inteiro ficou mais leve para computadores mais fracos.",
+    },
+    highlights: [
+      {
+        en: "The cause of the freeze: working out where the city's buildings stand took tens of seconds on load. It now takes a fraction of a second, with exactly the same result.",
+        ptBR: "A causa do travamento: calcular onde ficam as construções da cidade levava dezenas de segundos ao abrir. Agora leva uma fração de segundo, com exatamente o mesmo resultado.",
+      },
+      {
+        en: "3D tower and castle previews build one at a time, redraw only when something moves (about 30 times a second instead of every frame) and reuse their stone and metal textures.",
+        ptBR: "As vitrines 3D de torres e castelos são montadas uma de cada vez, só se redesenham quando algo se mexe (cerca de 30 vezes por segundo em vez de todo quadro) e reaproveitam as texturas de pedra e metal.",
+      },
+      {
+        en: "On a weak computer (or one that can't keep up), the Home battle and the 3D previews switch to a lighter mode on their own: lower resolution and fewer frames per second.",
+        ptBR: "Num computador fraco (ou que não dá conta), a batalha da Home e as vitrines 3D passam sozinhas para um modo mais leve: menos resolução e menos quadros por segundo.",
+      },
+      {
+        en: "The Home music (2.4 MB) is only downloaded after your first click — browsers keep it silent until then anyway.",
+        ptBR: "A música da Home (2,4 MB) só é baixada depois do seu primeiro clique — o navegador já a deixava muda até lá.",
+      },
+    ],
+  },
+  {
     id: "v169",
     dateIso: "2026-11-23",
     category: "FIXES",

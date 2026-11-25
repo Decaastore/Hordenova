@@ -11,6 +11,10 @@ interface HomeDioramaProps {
 /** World rectangle the camera frames: the battlefield plus the castle on its right edge. */
 const FOCUS = { x0: 190, y0: 48, x1: 1080, y1: 604 };
 const MAX_DPR = 1.5;
+/** A weak machine (few cores / little memory) starts in light mode: 1× resolution, ~30 frames/s. */
+const LOW_END =
+  typeof navigator !== "undefined" &&
+  ((navigator.hardwareConcurrency ?? 8) <= 4 || ((navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8) <= 4);
 
 /**
  * Full-bleed canvas running the Home screen's live battle (see
@@ -47,13 +51,24 @@ export function HomeDiorama({ sceneIndex, entering }: HomeDioramaProps) {
 
     let raf = 0;
     let last: number | null = null;
+    // LIGHT ON ANY PC: the scene measures its own cost and steps down
+    // (resolution, then frame rate) on a machine that can't keep up.
+    let tier = LOW_END ? 1 : 0; // 0 full · 1 = 1× and 30 fps · 2 = 1× and 20 fps
+    let costAvg = 0;
+    let lastDrawn = 0;
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
+      if (!visible || document.hidden) {
+        last = null;
+        return;
+      }
+      if (tier > 0 && now - lastDrawn < (tier === 1 ? 32 : 48)) return;
+      lastDrawn = now;
       const dt = last === null ? 16 : Math.min(now - last, 100);
       last = now;
-      if (!visible || document.hidden) return;
+      const t0 = performance.now();
 
-      const dpr = Math.min(window.devicePixelRatio || 1, MAX_DPR);
+      const dpr = tier > 0 ? 1 : Math.min(window.devicePixelRatio || 1, MAX_DPR);
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       if (w === 0 || h === 0) return;
@@ -95,6 +110,11 @@ export function HomeDiorama({ sceneIndex, entering }: HomeDioramaProps) {
       ctx.setTransform(s, 0, 0, s, (w / 2 - cx * scale) * dpr, (h / 2 - cy * scale) * dpr);
       const bounds = { x0: cx - viewW / 2, y0: cy - viewH / 2, x1: cx + viewW / 2, y1: cy + viewH / 2 };
       scene.draw(ctx, now, bounds);
+      costAvg = costAvg * 0.9 + (performance.now() - t0) * 0.1;
+      if (tier < 2 && costAvg > (tier === 0 ? 14 : 24)) {
+        tier++;
+        costAvg = 0;
+      }
     };
     raf = requestAnimationFrame(frame);
     return () => {

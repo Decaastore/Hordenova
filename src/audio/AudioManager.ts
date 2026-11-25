@@ -405,20 +405,37 @@ function playLoopingTrackFile(ctx: AudioContext, url: string, loopSeconds: numbe
       while (!stopped && nextPassAt < ctx.currentTime + 20) schedulePass();
     }, 5000);
   };
-  try {
-    if (typeof fetch !== "function") {
+  const load = () => {
+    if (stopped) return;
+    try {
+      if (typeof fetch !== "function") {
+        fail();
+      } else {
+        fetch(url)
+          .then((r) => {
+            if (!r.ok) throw new Error(`HTTP ${r.status}`);
+            return r.arrayBuffer();
+          })
+          .then((data) => ctx.decodeAudioData(data))
+          .then(start, fail);
+      }
+    } catch {
       fail();
-    } else {
-      fetch(url)
-        .then((r) => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
-          return r.arrayBuffer();
-        })
-        .then((data) => ctx.decodeAudioData(data))
-        .then(start, fail);
     }
-  } catch {
-    fail();
+  };
+  // LIGHT ON ANY PC: browsers keep music silent until the player's first
+  // click/key anyway, so the (multi-MB) track is only downloaded and decoded
+  // then — never while the page is still opening.
+  const nav = typeof navigator !== "undefined" ? (navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }) : null;
+  if (typeof window === "undefined" || nav?.userActivation?.hasBeenActive) {
+    load();
+  } else {
+    const events = ["pointerdown", "keydown", "touchstart"] as const;
+    const onGesture = () => {
+      for (const e of events) window.removeEventListener(e, onGesture, true);
+      window.setTimeout(load, 0);
+    };
+    for (const e of events) window.addEventListener(e, onGesture, { capture: true, passive: true });
   }
   return {
     stop: () => {

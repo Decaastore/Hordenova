@@ -37,10 +37,6 @@ function distanceToPath(p: Vector2, path: readonly Vector2[]): number {
 }
 
 function isFreeGround(p: Vector2, layout: MapLayout, castle: Vector2, relax: number): boolean {
-  // never on a painted rock, ruin, tree or pool (one spacing standard: rendering/mapDecorations.ts)
-  for (const d of getPaintedScenery(layout.id)) {
-    if (distance(p, d.position) < CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP) return false;
-  }
   // where the creatures walk is never built on: the road's full width, the building's own ground and the free strip (never relaxed)
   const CLEAR_OF_ROAD = Math.max(BASE_CLEAR_OF_ROAD - relax, PATH_VISUAL_WIDTH / 2 + CITY_PLOT_RADIUS + FREE_GROUND_GAP);
   if (p.x < 34 || p.x > WORLD_SIZE.width - 34 || p.y < 60 || p.y > WORLD_SIZE.height - 26) return false;
@@ -52,6 +48,10 @@ function isFreeGround(p: Vector2, layout: MapLayout, castle: Vector2, relax: num
   if (distanceToPath(p, layout.path) < CLEAR_OF_ROAD || distanceToPath(top, layout.path) < BASE_CLEAR_OF_ROAD - relax - 10) return false;
   for (const site of layout.sites) {
     if (distance(p, site.position) < CLEAR_OF_SITE || distance(top, site.position) < CLEAR_OF_SITE - 8) return false;
+  }
+  // never on a painted rock, ruin, tree or pool (one spacing standard: rendering/mapDecorations.ts)
+  for (const d of getPaintedScenery(layout.id)) {
+    if (distance(p, d.position) < CITY_PLOT_RADIUS + drawnRadius(d) + FREE_GROUND_GAP) return false;
   }
   return true;
 }

@@ -303,10 +303,34 @@ describe("AudioManager — ambient music, with a fake Web Audio API available", 
   beforeEach(() => {
     originalAudioContext = (window as unknown as { AudioContext?: unknown }).AudioContext;
     (window as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    // the player has already clicked somewhere (the track only loads after a first gesture)
+    Object.defineProperty(navigator, "userActivation", { value: { hasBeenActive: true }, configurable: true });
   });
 
   afterEach(() => {
     (window as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+    delete (navigator as unknown as { userActivation?: unknown }).userActivation;
+  });
+
+  it("before the player's first click/key the recorded track isn't downloaded at all; the first gesture starts it", () => {
+    Object.defineProperty(navigator, "userActivation", { value: { hasBeenActive: false }, configurable: true });
+    vi.useFakeTimers();
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(() => new Promise<Response>(() => undefined));
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    try {
+      const manager = new AudioManager();
+      manager.playAmbientMusic();
+      vi.advanceTimersByTime(5000);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      window.dispatchEvent(new Event("pointerdown"));
+      vi.advanceTimersByTime(10);
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      manager.stopMusic();
+    } finally {
+      globalThis.fetch = originalFetch;
+      vi.useRealTimers();
+    }
   });
 
   it("playAmbientMusic() actually starts playing when a Web Audio API is available", () => {
