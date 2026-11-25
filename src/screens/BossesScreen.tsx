@@ -3,6 +3,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
 import { PAGE_CSS } from "@/ui/pageChrome";
+import { BossPortrait } from "@/ui/CreaturePortrait";
 import { ColossusShowcase } from "@/ui/ColossusPromo";
 import { loadSave } from "@/engine/SaveSystem";
 import { MAIN_BOSSES, MINI_BOSSES, type BossDefinition } from "@/config/bossConfig";
@@ -225,6 +226,13 @@ export function BossesScreen({ onNavigate, onPlay, onPlayColossus }: BossesScree
   );
 }
 
+/** The boss's frame from the real battle; while a frame is missing, its bestiary portrait stands in. */
+function BossArt({ boss, alt }: { boss: BossDefinition; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) return <div className="bs-card-fallback"><BossPortrait bossId={boss.id} size={boss.isMainBoss ? 120 : 100} /></div>;
+  return <img src={`${assetBase}bosses/${boss.id}.webp`} alt={alt} loading="lazy" width={460} height={400} onError={() => setFailed(true)} />;
+}
+
 function BossCard({ boss, kills, where, wave }: { boss: BossDefinition; kills: number; where: string; wave?: number }) {
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
@@ -238,7 +246,7 @@ function BossCard({ boss, kills, where, wave }: { boss: BossDefinition; kills: n
     <article className={`bs-card${boss.isMainBoss ? " is-main" : ""}${met ? "" : " is-unmet"}`} data-testid={`boss-card-${boss.id}`}>
       <div className="bs-card-art">
         {/* the boss exactly as it walks the road in its region (a frame of the real battle, public/bosses/) */}
-        <img src={`${assetBase}bosses/${boss.id}.webp`} alt={t(`bosses.${boss.i18nKey}.name` as TranslationKey)} loading="lazy" width={460} height={400} />
+        <BossArt boss={boss} alt={t(`bosses.${boss.i18nKey}.name` as TranslationKey)} />
       </div>
       <div className="bs-card-body">
         <p className="bs-where">{where}</p>
@@ -347,6 +355,7 @@ const BOSSES_CSS = `
 .bs-card.is-main { background: linear-gradient(180deg, rgba(60,22,18,0.55), var(--night-2) 60%); border-color: rgba(224,100,75,0.3); }
 
 .bs-card-art { position: relative; aspect-ratio: 16 / 10; background: #0d0a07; border-bottom: 1px solid var(--line-soft); }
+.bs-card-fallback { display: grid; place-items: center; height: 100%; }
 .bs-card-art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
 .bs-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(13,10,7,0.65)); pointer-events: none; }
 .bs-where { margin: 0; font-size: 12.5px; color: var(--ash); }
