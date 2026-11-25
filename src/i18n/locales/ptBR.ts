@@ -748,6 +748,7 @@ export const ptBR: TranslationSchema = {
     passReady: "{n} recompensa(s) do Passe para resgatar",
     support: "Suporte",
     bosses: "Bosses",
+    faq: "Perguntas",
   },
   modes: {
     title: "Modos de jogo",
@@ -3222,5 +3223,63 @@ export const ptBR: TranslationSchema = {
     starsTitle: "{n} abates",
     kills: "{n} abates",
     notMet: "Ainda não encontrado",
+  },
+  faq: {
+    title: "Perguntas Frequentes",
+    decimal: ",",
+    lead: "O que todo mundo pergunta antes de entrar na horda, respondido direto.",
+    moreTitle: "Não achou a sua dúvida?",
+    moreLead: "Mande pelo Suporte: escolha o assunto e a resposta aparece lá mesmo.",
+    moreCta: "Abrir o Suporte",
+    items: {
+      INSTALL: {
+        q: "Preciso instalar alguma coisa?",
+        a: "Não. O HORDE NOVA roda direto no navegador, no computador e no celular. É só abrir o site e clicar em Jogar.",
+      },
+      FREE: {
+        q: "O jogo é grátis?",
+        a: "Sim. Todas as regiões, torres e modos (Season, Eterno, Caçadas, Duelo e Chefe Global) são grátis. As Gemas também se ganham jogando: presente do dia, login diário, Duelo e Chefe Global.",
+      },
+      PHONE: {
+        q: "Funciona no celular?",
+        a: "Sim. O site e o jogo funcionam no celular, em pé ou deitado. Com o celular deitado o mapa ocupa a tela toda, e o Duelo fica melhor assim.",
+      },
+      SAVE: {
+        q: "Onde fica salvo o meu progresso?",
+        aLocal: "Fica salvo automaticamente neste navegador. Se você limpar os dados do navegador ou trocar de aparelho, o progresso não vai junto.",
+        aCloud: "Fica salvo automaticamente neste navegador. Com a Conta online (na página Conta) ele também fica salvo na nuvem e vai junto para outro aparelho.",
+        link: "Ir para a Conta",
+      },
+      SEASON: {
+        q: "O que recomeça a cada Season?",
+        a: "Cada Season dura {days} dias. Recomeçam a campanha da Season (o castelo e a melhor onda), o Passe ({levels} níveis), os talentos, a cidade e o nível de Maestria das torres. Ficam para sempre: as skins, o Prestígio, o castelo do Modo Eterno, o Bestiário, o ranqueado do Duelo e os desbloqueios de Maestria.",
+        link: "Ver a Season atual",
+      },
+      GEMS: {
+        q: "Qual a diferença entre Gemas Grátis e Gemas Compradas?",
+        a: "As duas compram as mesmas coisas: skins, ofertas e conveniência. Com Gemas Grátis o preço é {mult}×. Gemas nunca compram dano nem vantagem no Duelo.",
+        link: "Ir para a Loja",
+      },
+      PAYMENTS: {
+        q: "Dá para comprar com dinheiro de verdade?",
+        aOff: "Ainda não. A Loja mostra os pacotes, mas as compras com dinheiro real só abrem quando o pagamento for ligado; até lá ninguém é cobrado. Quando abrirem, serão só para maiores de {age} anos.",
+        aOn: "Sim, na Loja, só para maiores de {age} anos. Nada comprado dá vantagem no Duelo.",
+      },
+      GLOBAL_BOSS: {
+        q: "O que é o Chefe Global?",
+        a: "Toda semana chega um chefe gigante com uma vida só para todos os jogadores. Você tem {attempts} tentativas por dia, em salas de {room} com uma torre cada, e se a comunidade derrubar o chefe, quem participou ganha Gemas. Enquanto o servidor online não está no ar, os outros jogadores da sala são simulados.",
+        link: "Ver os Bosses",
+      },
+      RANKING: {
+        q: "Os rankings são de verdade?",
+        a: "Os seus números são. As posições entre jogadores aparecem quando o servidor online estiver no ar; até lá o ranking mostra \"Aguardando o online\". Nenhum jogador é inventado.",
+        link: "Ver o Ranking",
+      },
+      SUPPORT: {
+        q: "Achei um bug ou tenho uma sugestão. Como falo com a equipe?",
+        a: "Pela página Suporte: escolha o assunto (bug, sugestão, balanceamento, compras, conta…), escreva e envie. A resposta aparece lá mesmo, em Meus tickets. Se o envio ainda não estiver ligado, a página avisa.",
+        link: "Abrir o Suporte",
+      },
+    },
   },
 };

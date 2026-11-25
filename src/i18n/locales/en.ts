@@ -747,6 +747,7 @@ export const en = {
     passReady: "{n} Pass reward(s) to claim",
     support: "Support",
     bosses: "Bosses",
+    faq: "FAQ",
   },
   modes: {
     title: "Game modes",
@@ -3221,6 +3222,64 @@ export const en = {
     starsTitle: "{n} kills",
     kills: "{n} kills",
     notMet: "Not met yet",
+  },
+  faq: {
+    title: "FAQ",
+    decimal: ".",
+    lead: "What everyone asks before joining the horde, answered straight.",
+    moreTitle: "Didn't find your question?",
+    moreLead: "Send it through Support: pick the topic and the answer shows up right there.",
+    moreCta: "Open Support",
+    items: {
+      INSTALL: {
+        q: "Do I need to install anything?",
+        a: "No. HORDE NOVA runs right in the browser, on computer and phone. Just open the site and click Play.",
+      },
+      FREE: {
+        q: "Is the game free?",
+        a: "Yes. Every region, tower and mode (Season, Eternal, Hunts, Duel and Global Boss) is free. Gems are earned by playing too: the daily gift, the daily login, the Duel and the Global Boss.",
+      },
+      PHONE: {
+        q: "Does it work on a phone?",
+        a: "Yes. The site and the game work on phones, upright or sideways. Held sideways the map fills the screen, and the Duel plays best that way.",
+      },
+      SAVE: {
+        q: "Where is my progress saved?",
+        aLocal: "It's saved automatically in this browser. If you clear the browser's data or switch devices, the progress doesn't come along.",
+        aCloud: "It's saved automatically in this browser. With an Online account (on the Account page) it's also saved in the cloud and goes with you to another device.",
+        link: "Go to Account",
+      },
+      SEASON: {
+        q: "What starts over each Season?",
+        a: "Each Season lasts {days} days. The Season campaign (the castle and your best wave), the Pass ({levels} levels), talents, the city and your towers' Mastery level start over. These stay forever: skins, Prestige, the Eternal Mode castle, the Bestiary, Duel ranked and Mastery unlocks.",
+        link: "See the current Season",
+      },
+      GEMS: {
+        q: "What's the difference between Free and Purchased Gems?",
+        a: "Both buy the same things: skins, offers and convenience. With Free Gems the price is {mult}×. Gems never buy damage or an edge in the Duel.",
+        link: "Go to the Store",
+      },
+      PAYMENTS: {
+        q: "Can I buy with real money?",
+        aOff: "Not yet. The Store shows the packs, but real-money purchases only open once payments are switched on; until then nobody is charged. When they open they'll be for {age}+ only.",
+        aOn: "Yes, in the Store, {age}+ only. Nothing bought gives an edge in the Duel.",
+      },
+      GLOBAL_BOSS: {
+        q: "What is the Global Boss?",
+        a: "Every week a giant boss arrives with one life bar shared by every player. You get {attempts} attempts a day, in rooms of {room} with one tower each, and if the community brings it down, everyone who took part wins Gems. While the online server isn't up, the other players in the room are simulated.",
+        link: "See the Bosses",
+      },
+      RANKING: {
+        q: "Are the rankings real?",
+        a: "Your own numbers are. Places between players show up once the online server is up; until then the ranking shows \"Waiting for online\". No player is ever made up.",
+        link: "See the Ranking",
+      },
+      SUPPORT: {
+        q: "I found a bug or have an idea. How do I reach the team?",
+        a: "Through the Support page: pick the topic (bug, suggestion, balance, purchases, account…), write and send. The answer shows up right there, under My tickets. If sending isn't switched on yet, the page says so.",
+        link: "Open Support",
+      },
+    },
   },
 } as const;
 

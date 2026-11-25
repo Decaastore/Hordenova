@@ -12,6 +12,7 @@ import { WikiScreen } from "./screens/WikiScreen";
 import { NovidadesScreen } from "./screens/NovidadesScreen";
 import { SupportScreen } from "./screens/SupportScreen";
 import { BossesScreen } from "./screens/BossesScreen";
+import { FaqScreen } from "./screens/FaqScreen";
 import { MarketplaceScreen } from "./screens/MarketplaceScreen";
 import { StoreScreen } from "./screens/StoreScreen";
 import { PassScreen } from "./screens/PassScreen";
@@ -127,6 +128,8 @@ export default function App() {
         <NovidadesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "BOSSES" ? (
         <BossesScreen onNavigate={navigate} onPlay={() => setView("SEASON")} onPlayColossus={() => setView("COLOSSUS")} />
+      ) : view === "FAQ" ? (
+        <FaqScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "SUPPORT" ? (
         <SupportScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "ACCOUNT" ? (
