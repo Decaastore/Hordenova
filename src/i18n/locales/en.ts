@@ -2584,10 +2584,47 @@ export const en = {
     COLLAPSED: "Collapsed",
   },
   wiki: {
+    gallery: {
+      open: "Open {name}",
+      prev: "Previous",
+      next: "Next",
+      close: "Close",
+      shots: {
+        map: {
+          title: "The battlefield",
+          text: "The horde pours out of the rift and follows the road to the castle; you raise and upgrade towers on the sites along it.",
+        },
+        forge: {
+          title: "The Forge",
+          text: "Pick the item you want to forge with the materials bosses, Rifts and expeditions leave behind.",
+        },
+        city: {
+          title: "The city",
+          text: "As your best wave climbs, buildings rise near the castle and each one adds a share of every wave's gold.",
+        },
+        garrison: {
+          title: "The Garrison",
+          text: "Archers on the castle's towers and walls who strike bosses and mini-bosses near the gate.",
+        },
+        expeditions: {
+          title: "Expeditions",
+          text: "Send battalions to regions you've already beaten while you play, and come back for the prize.",
+        },
+        bestiary: {
+          title: "Bestiary and Achievements",
+          text: "Every creature and boss you defeat counts toward its page, with bronze, silver and gold stars.",
+        },
+        colossus: {
+          title: "The Global Boss",
+          text: "The Serpent of the Eclipse: one life for everyone, in rooms of 12 players with one tower each.",
+        },
+      },
+    },
     towers3dNote: "Towers are shown here as the same 3D model as in battle. Drag the level to see each stage of evolution.",
     title: "WIKI",
     subtitle: "Everything below is pulled directly from Horde Nova's own game data — nothing here is invented.",
     categories: {
+      GALLERY: "Inside the game",
       TOWERS: "Towers",
       BESTIARY: "Bestiary",
       CASTLE: "Castle",
@@ -2756,6 +2793,7 @@ export const en = {
       skinsBody: "Beyond the look, every tower type with a paid skin equipped earns +{each}% Gold and shards (up to +{top}% with all four types), and its towers charge their special {mana}% faster. Each skin also brings a small style tweak, always with a trade-off. Bought skins are yours forever.",
     },
     categoryIntro: {
+      GALLERY: "Real pictures of the game, taken from the live version. Click one to see it large and step through with ‹ ›.",
       TOWERS: "Four towers, each with sixty levels, three specializations and its own skins. Drag the level slider to see how a tower looks and performs at any level.",
       BESTIARY: "Every creature you will face, phase by phase, plus the bosses waiting at the end of each phase. Hover a creature to watch it walk.",
       CASTLE: "The castle is what you defend. Its look changes as it loses HP; skins change only its stone, never its strength.",

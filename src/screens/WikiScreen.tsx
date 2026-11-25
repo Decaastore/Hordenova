@@ -11,6 +11,7 @@ import { ENEMY_TYPES } from "@/config/enemyStats";
 import { MAIN_BOSSES, MINI_BOSSES } from "@/config/bossConfig";
 import { ITEM_TYPES } from "@/config/itemDefinitions";
 import { CREATURE_PORTRAIT_CSS } from "@/ui/CreaturePortrait";
+import { GalleryPage } from "./wiki/GalleryPage";
 import { buildSearchIndex, normalize, WIKI_CATEGORIES, type SearchEntry, type WikiCategory } from "./wiki/wikiData";
 import { TowersPage } from "./wiki/TowersPage";
 import { BestiaryPage } from "./wiki/BestiaryPage";
@@ -147,6 +148,7 @@ export function WikiScreen({ onNavigate, onPlay }: WikiScreenProps) {
                   <p>{t(`wiki.categoryIntro.${category}` as TranslationKey)}</p>
                 </header>
                 {category === "TOWERS" && <TowersPage tower={tower} onTower={setTower} />}
+                {category === "GALLERY" && <GalleryPage />}
                 {category === "BESTIARY" && <BestiaryPage />}
                 {category === "CASTLE" && <CastlePage />}
                 {category === "ITEMS" && <ItemsPage />}

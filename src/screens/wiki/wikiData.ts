@@ -7,8 +7,8 @@ import { DROP_TABLES } from "@/config/dropTables";
 import { PACK_TOWER_SKINS, RANKED_TOWER_SKINS, PRESTIGE_TOWER_SKINS, TOWER_SKINS, type TowerSkinDefinition } from "@/config/towerSkins";
 import { SPECIALIZATIONS_BY_TOWER } from "@/config/specializations";
 
-export type WikiCategory = "TOWERS" | "BESTIARY" | "BATTLE" | "CASTLE" | "ITEMS" | "PROGRESSION" | "DAILY" | "ECONOMY" | "STORE" | "ASCENSION" | "PROJECTIONS";
-export const WIKI_CATEGORIES: readonly WikiCategory[] = ["TOWERS", "BESTIARY", "BATTLE", "CASTLE", "ITEMS", "PROGRESSION", "DAILY", "ECONOMY", "STORE", "ASCENSION", "PROJECTIONS"];
+export type WikiCategory = "TOWERS" | "GALLERY" | "BESTIARY" | "BATTLE" | "CASTLE" | "ITEMS" | "PROGRESSION" | "DAILY" | "ECONOMY" | "STORE" | "ASCENSION" | "PROJECTIONS";
+export const WIKI_CATEGORIES: readonly WikiCategory[] = ["TOWERS", "GALLERY", "BESTIARY", "BATTLE", "CASTLE", "ITEMS", "PROGRESSION", "DAILY", "ECONOMY", "STORE", "ASCENSION", "PROJECTIONS"];
 
 /** The six original phases share one roster of 8 archetypes (each biome has its own creature for each). */
 export const CORE_PHASE_COUNT = 6;

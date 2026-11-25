@@ -2585,10 +2585,47 @@ export const ptBR: TranslationSchema = {
     COLLAPSED: "Em Ruínas",
   },
   wiki: {
+    gallery: {
+      open: "Abrir {name}",
+      prev: "Anterior",
+      next: "Próxima",
+      close: "Fechar",
+      shots: {
+        map: {
+          title: "O campo de batalha",
+          text: "A horda sai do portal e segue a estrada até o castelo; você ergue e evolui as torres nas bases ao longo dela.",
+        },
+        forge: {
+          title: "A Forja",
+          text: "Escolha o item que quer forjar com os materiais que os chefes, as Fendas e as expedições deixam.",
+        },
+        city: {
+          title: "A cidade",
+          text: "Conforme a sua melhor onda sobe, prédios surgem perto do castelo e cada um rende uma parte do ouro de cada onda.",
+        },
+        garrison: {
+          title: "A Guarnição",
+          text: "Arqueiros nas torres e nas muralhas do castelo, que atacam chefes e mini-chefes perto do portão.",
+        },
+        expeditions: {
+          title: "Expedições",
+          text: "Mande batalhões para regiões já vencidas enquanto você joga, e volte para buscar o prêmio.",
+        },
+        bestiary: {
+          title: "Bestiário e Conquistas",
+          text: "Toda criatura e chefe derrotado conta para a página dele, com estrelas de bronze, prata e ouro.",
+        },
+        colossus: {
+          title: "O Chefe Global",
+          text: "A Serpente do Eclipse: uma vida só para todos, em salas de 12 jogadores com uma torre cada.",
+        },
+      },
+    },
     towers3dNote: "As torres aparecem aqui no mesmo modelo 3D da batalha. Arraste o nível para ver cada estágio de evolução.",
     title: "WIKI",
     subtitle: "Tudo abaixo vem diretamente dos dados reais do jogo Horde Nova — nada aqui foi inventado.",
     categories: {
+      GALLERY: "Por dentro do jogo",
       TOWERS: "Torres",
       BESTIARY: "Bestiário",
       CASTLE: "Castelo",
@@ -2757,6 +2794,7 @@ export const ptBR: TranslationSchema = {
       skinsBody: "Além do visual, cada tipo de torre com skin paga equipada rende +{each}% de ouro e de fragmentos (até +{top}% com os quatro tipos), e as torres com ela carregam o especial {mana}% mais rápido. Cada skin também traz um pequeno ajuste de estilo, sempre com uma troca. Skins compradas ficam com você para sempre.",
     },
     categoryIntro: {
+      GALLERY: "Imagens de verdade do jogo, tiradas da versão que está no ar. Clique numa para ver grande e passar com ‹ ›.",
       TOWERS: "Quatro torres, cada uma com sessenta níveis, três especializações e skins próprias. Arraste o nível para ver como a torre fica e quanto rende em qualquer nível.",
       BESTIARY: "Todas as criaturas que você vai enfrentar, fase por fase, e os chefes que esperam no fim de cada fase. Passe o mouse numa criatura para vê-la andar.",
       CASTLE: "O castelo é o que você defende. O visual dele muda conforme perde vida; as skins mudam só a pedra, nunca a força.",
