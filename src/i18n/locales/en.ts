@@ -3183,6 +3183,11 @@ export const en = {
     accountCta: "Open Support",
   },
   bossesPage: {
+    weakness: "Weak to: {tower} (+{pct}% damage)",
+    weaknessShield: "Weak to: {tower} (+{pct}% damage, and it goes through its shield)",
+    hpAt: "Life at wave {wave}",
+    hpMini: "Life × Brute",
+    drops: "May drop:",
     title: "Bosses",
     lead: "Every region ends in its own boss — {regions} of them — and {minis} mini-bosses guard the way. Above them all, once a week, the Global Boss that every player fights together.",
     progress: "Your boss bestiary: {met} met · {mastered} mastered · {total} bosses in all.",

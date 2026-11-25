@@ -27,6 +27,10 @@ import {
 } from "@/config/colossus";
 import { formatDurationShort } from "@/utils/formatDuration";
 import { phaseOfMiniBoss } from "./wiki/wikiData";
+import { bossWeakness, mainBossHp, WEAKNESS_DAMAGE_MULTIPLIER } from "@/config/bossAssault";
+import { previousWaveTotalHp } from "@/engine/BossManager";
+import { DROP_TABLES } from "@/config/dropTables";
+import { ItemGlyph } from "@/ui/ItemGlyph";
 
 interface BossesScreenProps {
   onNavigate: (view: NavView) => void;
@@ -189,6 +193,7 @@ export function BossesScreen({ onNavigate, onPlay, onPlayColossus }: BossesScree
                 <BossCard
                   key={boss.id}
                   boss={boss}
+                  wave={ph.endWave}
                   kills={kills[boss.id] ?? 0}
                   where={t("bossesPage.regionWhere", { n, region: t(`phases.${ph.i18nKey}.name` as TranslationKey), wave: ph.endWave.toLocaleString(locale) })}
                 />
@@ -220,10 +225,15 @@ export function BossesScreen({ onNavigate, onPlay, onPlayColossus }: BossesScree
   );
 }
 
-function BossCard({ boss, kills, where }: { boss: BossDefinition; kills: number; where: string }) {
-  const { t } = useLanguage();
+function BossCard({ boss, kills, where, wave }: { boss: BossDefinition; kills: number; where: string; wave?: number }) {
+  const { t, language } = useLanguage();
+  const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const stars = bossStars(kills);
   const met = kills > 0;
+  // the boss's real life at its own wave (the same formula the battle uses), before Season rules
+  const hp = boss.isMainBoss && wave ? mainBossHp(boss.id, previousWaveTotalHp(wave)) : null;
+  const weak = boss.isMainBoss ? bossWeakness(boss.id) : null;
+  const drops = boss.dropTableId ? (DROP_TABLES[boss.dropTableId]?.entries ?? []) : [];
   return (
     <article className={`bs-card${boss.isMainBoss ? " is-main" : ""}${met ? "" : " is-unmet"}`} data-testid={`boss-card-${boss.id}`}>
       <div className="bs-card-art">
@@ -235,16 +245,55 @@ function BossCard({ boss, kills, where }: { boss: BossDefinition; kills: number;
         <p className="bs-ability">
           <strong>{t(`wiki.abilities.${boss.ability}.name` as TranslationKey)}.</strong> {t(`wiki.abilities.${boss.ability}.description` as TranslationKey, { seconds: sec(boss.abilityIntervalMs) })}
         </p>
-        <div className="bs-card-foot">
-          <span className="bs-stars" title={t("bossesPage.starsTitle", { n: kills })} aria-label={t("bossesPage.starsTitle", { n: kills })}>
-            {BOSS_STARS.map((_, i) => (
-              <i key={i} className={i < stars ? "is-on" : ""} aria-hidden="true">
-                ★
-              </i>
-            ))}
-          </span>
-          <span className="bs-kills">{met ? t("bossesPage.kills", { n: kills }) : t("bossesPage.notMet")}</span>
+        {weak && (
+          <p className="bs-weak" data-testid={`boss-weak-${boss.id}`}>
+            {t(boss.ability === "SHIELD" ? "bossesPage.weaknessShield" : "bossesPage.weakness", { tower: t(`towers.${weak}.name` as TranslationKey), pct: Math.round((WEAKNESS_DAMAGE_MULTIPLIER - 1) * 100) })}
+          </p>
+        )}
+      </div>
+      <dl className="bs-stats">
+        <div>
+          <dt>{hp !== null ? t("bossesPage.hpAt", { wave: (wave ?? 0).toLocaleString(locale) }) : t("bossesPage.hpMini")}</dt>
+          <dd>{hp !== null ? hp.toLocaleString(locale) : `×${boss.hpMultiplierVsBrute}`}</dd>
         </div>
+        <div>
+          <dt>{t("wiki.speed")}</dt>
+          <dd>{boss.speed}</dd>
+        </div>
+        <div>
+          <dt>{t("wiki.resistance")}</dt>
+          <dd>{boss.resistance > 0 ? `${Math.round(boss.resistance * 100)}%` : "—"}</dd>
+        </div>
+        <div>
+          <dt>{t("wiki.regen")}</dt>
+          <dd>{boss.regenPercentPerSecond > 0 ? `${(boss.regenPercentPerSecond * 100).toFixed(1)}%/s` : "—"}</dd>
+        </div>
+        <div>
+          <dt>{t("wiki.goldShort")}</dt>
+          <dd>{boss.goldReward.toLocaleString(locale)}</dd>
+        </div>
+      </dl>
+      {drops.length > 0 && (
+        <div className="bs-drops" aria-label={t("bossesPage.drops")}>
+          <span className="bs-drops-title">{t("bossesPage.drops")}</span>
+          {drops.map((d) => (
+            <span key={d.itemId} className="bs-drop" title={t(`items.${d.itemId}.name` as TranslationKey)}>
+              <ItemGlyph itemDefinitionId={d.itemId} size={26} />
+              <span>{t(`items.${d.itemId}.name` as TranslationKey)}</span>
+              <small>{d.weightPercent}%</small>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="bs-card-foot">
+        <span className="bs-stars" title={t("bossesPage.starsTitle", { n: kills })} aria-label={t("bossesPage.starsTitle", { n: kills })}>
+          {BOSS_STARS.map((_, i) => (
+            <i key={i} className={i < stars ? "is-on" : ""} aria-hidden="true">
+              ★
+            </i>
+          ))}
+        </span>
+        <span className="bs-kills">{met ? t("bossesPage.kills", { n: kills }) : t("bossesPage.notMet")}</span>
       </div>
     </article>
   );
@@ -299,7 +348,16 @@ const BOSSES_CSS = `
 .bs-where { margin: 0; font-size: 12.5px; color: var(--ash); }
 .bs-card h3 { margin: 2px 0 0; font-family: var(--display); font-size: 20px; line-height: 1.15; color: var(--bone); }
 .bs-ability { margin: 6px 0 0; font-size: 13.5px; line-height: 1.5; color: #d9cdb6; }
-.bs-card-foot { margin-top: 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.bs-card > .bs-stats, .bs-card > .bs-drops, .bs-card > .bs-card-foot { grid-column: 1 / -1; }
+.bs-weak { margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #ffb38a; }
+.bs-stats { margin: 4px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(84px, 1fr)); gap: 8px 10px; padding: 10px 0 0; border-top: 1px solid var(--line-soft); }
+.bs-stats dt { font-size: 11.5px; color: var(--ash-2); }
+.bs-stats dd { margin: 2px 0 0; font-family: var(--display); font-weight: 700; font-size: 19px; line-height: 1.1; color: var(--bone); font-variant-numeric: lining-nums tabular-nums; }
+.bs-drops { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.bs-drops-title { font-size: 11.5px; color: var(--ash-2); margin-right: 2px; }
+.bs-drop { display: inline-flex; align-items: center; gap: 6px; padding: 3px 8px 3px 3px; border-radius: 999px; background: rgba(0,0,0,0.3); border: 1px solid var(--line-soft); font-size: 12px; color: #d9cdb6; }
+.bs-drop small { color: var(--ash); font-variant-numeric: tabular-nums; }
+.bs-card-foot { margin-top: 2px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .bs-stars { display: inline-flex; gap: 2px; font-size: 16px; }
 .bs-stars i { font-style: normal; color: rgba(255,255,255,0.18); }
 .bs-stars i.is-on { color: #ffd35a; text-shadow: 0 0 8px rgba(255,211,90,0.5); }

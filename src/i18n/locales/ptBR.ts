@@ -3184,6 +3184,11 @@ export const ptBR: TranslationSchema = {
     accountCta: "Abrir o Suporte",
   },
   bossesPage: {
+    weakness: "Ponto fraco: {tower} (+{pct}% de dano)",
+    weaknessShield: "Ponto fraco: {tower} (+{pct}% de dano, e atravessa o escudo dele)",
+    hpAt: "Vida na onda {wave}",
+    hpMini: "Vida × Bruto",
+    drops: "Pode deixar cair:",
     title: "Bosses",
     lead: "Toda região termina no seu próprio chefe — são {regions} — e {minis} mini-chefes guardam o caminho. Acima de todos, uma vez por semana, o Chefe Global que todos os jogadores enfrentam juntos.",
     progress: "Seu bestiário de chefes: {met} encontrados · {mastered} dominados · {total} chefes no total.",
