@@ -4,7 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
 import { appendLedgerEvent } from "@/engine/EconomyLedger";
-import { ColossusEngine, COLOSSUS_SLOTS, LAP_MS, MOVE_COOLDOWN_MS, type ColossusSnapshot } from "@/engine/ColossusEngine";
+import { ColossusEngine, COLOSSUS_SLOTS, LAP_MS, LONG_SHOT_MULT, MOVE_COOLDOWN_MS, type ColossusSnapshot } from "@/engine/ColossusEngine";
 import {
   applyAttempt,
   attemptsLeft,
@@ -536,7 +536,8 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
   const venomed = !!snap && !!you && snap.venoms.some((v) => v.slot === you.slot);
   const swept = !!snap && !!you && snap.sweeps.some((w) => w.slots.includes(you.slot));
   const poisoned = !!you && time < you.poisonedUntil;
-  const outOfRange = !!engine && !!you && time > 1_500 && time < COLOSSUS_LENGTH_MS && !snap?.shots.some((sh) => sh.from === 0) && !stunned && time >= you.movingUntil;
+  // no part of the Serpent in range: the tower fires long shots for less damage
+  const outOfRange = !!engine && !!you && time > 1_500 && time < COLOSSUS_LENGTH_MS && engine.isFar() && !stunned && time >= you.movingUntil;
   // the moment a scale shield drops: the window for the Star Strike
   const shieldDown = !!snap && !shielded && snap.shieldUntil > 0 && time - snap.shieldUntil < 2_500;
   // a phase starts: its name and what to do, big, for a few seconds
@@ -626,7 +627,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
                         : poisoned
                         ? t("colossus.alertPoisoned")
                         : outOfRange
-                          ? t("colossus.alertOutOfRange")
+                          ? t("colossus.alertOutOfRange", { pct: Math.round(LONG_SHOT_MULT * 100) })
                           : null;
           if (!msg) return null;
           const tone = !danger && !stunned && !shielded && !shieldDown && finalIn <= 15_000 ? " is-go" : danger ? (venomed && !marked && !swept ? " is-venom" : " is-danger") : shieldDown && !stunned && !shielded ? " is-go" : poisoned && !shielded ? " is-venom-soft" : "";
@@ -675,7 +676,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
               <span>✦</span>
               <div>
                 <strong>{t("colossus.strike")}</strong>
-                <small>{you.charge >= 1 ? (shielded ? t("colossus.strikeShield") : t("colossus.strikeReady")) : `${Math.floor(you.charge * 100)}%`}</small>
+                <small>{you.charge >= 1 ? (shielded ? t("colossus.strikeShield") : outOfRange ? t("colossus.strikeFar", { pct: Math.round(LONG_SHOT_MULT * 100) }) : t("colossus.strikeReady")) : `${Math.floor(you.charge * 100)}%`}</small>
               </div>
             </button>
             <div className="cr-move">

@@ -1375,8 +1375,9 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
     const to = roadAt(sh.s);
     ctx.globalAlpha = 1 - k;
     const weak = sh.head && !sh.shielded;
-    ctx.font = `800 ${sh.strike ? 22 : sh.crit || weak ? 15 : 12}px system-ui, sans-serif`;
-    ctx.fillStyle = sh.shielded ? "#9fe4ff" : sh.strike ? "#fff1c4" : weak ? "#ff9a4a" : sh.crit ? "#ffcf5a" : "#ffe6a8";
+    ctx.font = `800 ${sh.strike ? 22 : sh.crit || weak ? 15 : sh.far ? 10.5 : 12}px system-ui, sans-serif`;
+    // a long shot from out of range: a smaller, paler number
+    ctx.fillStyle = sh.shielded ? "#9fe4ff" : sh.strike ? "#fff1c4" : weak ? "#ff9a4a" : sh.crit ? "#ffcf5a" : sh.far ? "#cfc2a8" : "#ffe6a8";
     ctx.strokeStyle = "rgba(0,0,0,0.7)";
     ctx.lineWidth = 3;
     const txt = formatShort(sh.amount);

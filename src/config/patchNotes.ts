@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v176",
+    dateIso: "2026-11-26",
+    category: "BOSSES",
+    title: {
+      en: "Global Boss: Every Slot Fights From the First Second",
+      ptBR: "Chefe Global: Toda Vaga Luta Desde o Primeiro Segundo",
+    },
+    description: {
+      en: "Towers on the slots near the Core used to wait up to about 40 seconds before the Serpent came into range. Now, while no part of it is in range, your tower fires long shots at the nearest part of its body.",
+      ptBR: "As torres nas vagas perto do Núcleo esperavam até cerca de 40 segundos até a Serpente entrar no alcance. Agora, enquanto nenhuma parte dela está ao alcance, sua torre dá tiros de longo alcance na parte do corpo mais próxima.",
+    },
+    highlights: [
+      {
+        en: "Long shots deal 40% of the damage and never get the head's weak-point bonus, so having the Serpent in range is still better.",
+        ptBR: "Os tiros de longo alcance causam 40% do dano e nunca ganham o bônus da cabeça (ponto fraco), então ter a Serpente ao alcance continua sendo melhor.",
+      },
+      {
+        en: "A message tells you when your tower is on long shots, and the Star Strike button warns you it would only deal 40% from there.",
+        ptBR: "Um aviso mostra quando a sua torre está nos tiros de longo alcance, e o botão do Golpe Estelar avisa que dali ele só causaria 40%.",
+      },
+      {
+        en: "Every slot is still worth the same total damage over a full attempt.",
+        ptBR: "Toda vaga continua valendo o mesmo dano total numa tentativa completa.",
+      },
+    ],
+  },
+  {
     id: "v175",
     dateIso: "2026-11-26",
     category: "BOSSES",

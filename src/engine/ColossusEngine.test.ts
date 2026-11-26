@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COLOSSUS_LENGTH_MS, COLOSSUS_ROOM_SIZE } from "@/config/colossus";
-import { BODY_LENGTH, ColossusEngine, headAt, LAP_MS, ROUTE_END, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS, SWEEP_WARN_MS, VENOM_MS, VENOM_WARN_MS } from "./ColossusEngine";
+import { BODY_LENGTH, ColossusEngine, headAt, LAP_MS, LONG_SHOT_MULT, ROUTE_END, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS, SWEEP_WARN_MS, VENOM_MS, VENOM_WARN_MS } from "./ColossusEngine";
 
 const setup = (seed = 7, slot = 3) => ({ seed, you: { name: "Eu", type: "IRONWOOD" as const, power: 2000, skin: null }, slot });
 
@@ -115,6 +115,35 @@ describe("ColossusEngine — fair play", () => {
       e.advance(15_000);
       expect(e.snapshot().players[0]!.damage, `slot ${slot}`).toBeGreaterThan(before);
     }
+  });
+
+  it("every slot fights from the first seconds: out of range, the tower fires weaker long shots", () => {
+    let farSeen = 0;
+    for (let slot = 0; slot < COLOSSUS_SLOTS.length; slot++) {
+      const e = new ColossusEngine(setup(11, slot));
+      e.advance(5_000);
+      const s = e.snapshot();
+      expect(s.players[0]!.damage, `slot ${slot}`).toBeGreaterThan(0);
+      for (const sh of s.shots.filter((x) => x.from === 0 && x.far)) {
+        farSeen++;
+        expect(sh.head).toBe(false);
+        expect(e.isFar()).toBe(true);
+      }
+    }
+    // the inner slots can't reach the Serpent yet: they really are on long shots
+    expect(farSeen).toBeGreaterThan(0);
+    expect(LONG_SHOT_MULT).toBeLessThan(1);
+  });
+
+  it("simulated allies never waste their Star Strike on a long shot", () => {
+    const strikes: { from: number; far: boolean }[] = [];
+    const e2 = new ColossusEngine(setup(5));
+    for (let t = 0; t < COLOSSUS_LENGTH_MS; t += 500) {
+      e2.advance(500);
+      for (const sh of e2.snapshot().shots) if (sh.strike && sh.from !== 0) strikes.push({ from: sh.from, far: sh.far });
+    }
+    expect(strikes.length).toBeGreaterThan(0);
+    expect(strikes.every((s) => !s.far)).toBe(true);
   });
 
   it("keeps moving the whole attempt (two laps, lap 1 faster) and then dives into the Core for good", () => {

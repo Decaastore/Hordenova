@@ -165,8 +165,36 @@ export function roadAt(s: number): { x: number; y: number; angle: number } {
 
 /** Whether a tower on `slot` can reach the body part at distance `s` (same test for every tower). */
 function inRange(slot: Pt, s: number): boolean {
+  return reach(slot, s) <= TOWER_RANGE;
+}
+
+function reach(slot: Pt, s: number): number {
   const pt = roadAt(s);
-  return Math.hypot(pt.x - slot.x, (pt.y - slot.y) * 1.15) <= TOWER_RANGE;
+  return Math.hypot(pt.x - slot.x, (pt.y - slot.y) * 1.15);
+}
+
+/**
+ * LONG SHOT — a tower with no part of the Serpent in range still shoots: a
+ * long-range bolt at the nearest part of the body, for a share of the damage
+ * (never the head's weak-point bonus). So every slot fights from the first
+ * second; getting the Serpent in range is still clearly better.
+ */
+export const LONG_SHOT_MULT = 0.4;
+
+/** The part of the body nearest a slot (the head when tied), or null while none is on the island. */
+function nearestPart(slot: Pt, head: number): number | null {
+  let best: number | null = null;
+  let bestD = Infinity;
+  for (let k = 0; k <= BODY_SEGMENTS; k++) {
+    const s = head - k * SEGMENT_GAP;
+    if (!onIsland(s)) continue;
+    const d = reach(slot, s);
+    if (d < bestD) {
+      bestD = d;
+      best = s;
+    }
+  }
+  return best;
 }
 
 /**
@@ -180,14 +208,17 @@ export const SLOT_FAIRNESS: readonly number[] = (() => {
     let e = 0;
     for (let t = 0; t <= COLOSSUS_LENGTH_MS; t += 250) {
       const head = headAt(t);
+      let got = false;
       for (let k = 0; k <= BODY_SEGMENTS; k++) {
         const s = head - k * SEGMENT_GAP;
         if (!onIsland(s)) continue;
         if (inRange(slot, s)) {
           e += k === 0 ? HEAD_WEAK_POINT : 1;
+          got = true;
           break;
         }
       }
+      if (!got && nearestPart(slot, head) !== null) e += LONG_SHOT_MULT;
     }
     return Math.max(1, e);
   });
@@ -227,6 +258,8 @@ export interface RaidShot {
   head: boolean;
   amount: number;
   shielded: boolean;
+  /** A long shot from out of range (LONG_SHOT_MULT of the damage). */
+  far: boolean;
 }
 
 export interface FallingStar {
@@ -380,7 +413,13 @@ export class ColossusEngine {
     return true;
   }
 
-  /** Fires the charged Star Strike at the best body part in range. */
+  /** Whether this player's tower can only reach the Serpent with a long shot right now. */
+  isFar(who = 0): boolean {
+    const p = this.players[who];
+    return !!p && !!this.targetFor(p)?.far;
+  }
+
+  /** Fires the charged Star Strike at the best body part in range (a long shot when none is). */
   strike(who = 0): boolean {
     const p = this.players[who];
     if (!p || p.charge < 1 || this.ended || this.t >= COLOSSUS_LENGTH_MS) return false;
@@ -393,21 +432,22 @@ export class ColossusEngine {
   }
 
   /** The body part this player's tower shoots: the head when in range, else the part nearest the head. */
-  private targetFor(p: RaidPlayer): { s: number; head: boolean } | null {
+  private targetFor(p: RaidPlayer): { s: number; head: boolean; far: boolean } | null {
     const slot = COLOSSUS_SLOTS[p.slot]!;
     const head = this.headS();
     for (let k = 0; k <= BODY_SEGMENTS; k++) {
       const s = head - k * SEGMENT_GAP;
       if (!onIsland(s)) continue;
-      if (inRange(slot, s)) return { s, head: k === 0 };
+      if (inRange(slot, s)) return { s, head: k === 0, far: false };
     }
-    return null;
+    const s = nearestPart(slot, head);
+    return s === null ? null : { s, head: false, far: true };
   }
 
-  private hit(who: number, target: { s: number; head: boolean }, mult: number, strike: boolean): void {
+  private hit(who: number, target: { s: number; head: boolean; far: boolean }, mult: number, strike: boolean): void {
     const p = this.players[who]!;
     const interval = ATTACK_MS[p.type] / 1000;
-    let amount = p.power * interval * mult * (target.head ? HEAD_WEAK_POINT : 1);
+    let amount = p.power * interval * mult * (target.head ? HEAD_WEAK_POINT : 1) * (target.far ? LONG_SHOT_MULT : 1);
     // FAIR PLAY — every tower type deals the same damage on average (Ironwood's
     // crits are paid for by a lower base hit), and every slot is evened out
     // by SLOT_FAIRNESS, so no tower and no slot starts ahead.
@@ -428,7 +468,7 @@ export class ColossusEngine {
     if (p.type === "FROSTBORN") this.frostUntil = Math.max(this.frostUntil, this.t + 2_500);
     p.damage += amount;
     this.roomDamage += amount;
-    this.shots.push({ from: who, s: target.s, type: p.type, at: this.t, crit, strike, head: target.head, amount, shielded });
+    this.shots.push({ from: who, s: target.s, type: p.type, at: this.t, crit, strike, head: target.head, amount, shielded, far: target.far });
   }
 
   /** Advances the attempt by `ms` (a multiple of 50 ms). */
@@ -529,7 +569,8 @@ export class ColossusEngine {
       if (!busy) p.charge = Math.min(1, p.charge + DT / STRIKE_CHARGE_MS);
       if (busy) return;
       // simulated allies fire their Strike when charged — usually not into a shield
-      if (!p.isYou && p.charge >= 1 && (!this.shielded() || this.rng() < 0.004)) {
+      // and only with the Serpent in range (a long shot would waste most of it)
+      if (!p.isYou && p.charge >= 1 && !this.targetFor(p)?.far && (!this.shielded() || this.rng() < 0.004)) {
         if (this.strike(i)) return;
       }
       p.attackInMs -= DT;
