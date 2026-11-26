@@ -494,7 +494,7 @@ export const en = {
     pickRegion: "Region",
     pickTime: "Time",
     hours: "{n}h",
-    noRegion: "Beat the first region (wave 31) to open expeditions.",
+    noRegion: "Beat the first region's boss (wave 30) to open expeditions.",
     noGroupFree: "Every group is away.",
     prize: "Prize",
     gold: "{n} gold",

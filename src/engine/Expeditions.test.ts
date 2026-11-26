@@ -15,8 +15,9 @@ import {
 
 describe("expeditions config", () => {
   it("opens a region once the record has passed it, deeper ones pay more", () => {
-    expect(unlockedRegions(30)).toEqual([]);
-    expect(unlockedRegions(31).map((r) => r.index)).toEqual([0]);
+    // the record is the last wave cleared: beating the first region's boss (wave 30) opens it
+    expect(unlockedRegions(29)).toEqual([]);
+    expect(unlockedRegions(30).map((r) => r.index)).toEqual([0]);
     const regions = expeditionRegions();
     expect(regions[regions.length - 1]!.tier).toBe(4);
     expect(expeditionPrize(4, 24).gold).toBeGreaterThan(expeditionPrize(1, 24).gold);

@@ -26,7 +26,7 @@ export interface ExpeditionRegion {
   /** PHASES index. */
   index: number;
   i18nKey: string;
-  /** Record needed: the wave after the region ends. */
+  /** Record needed: the region's last wave (its boss) cleared. */
   unlockWave: number;
   /** 1..4 — how much the region pays. */
   tier: number;
@@ -36,7 +36,7 @@ export function expeditionRegions(): ExpeditionRegion[] {
   return PHASES.map((p, i) => ({
     index: i,
     i18nKey: p.i18nKey,
-    unlockWave: PHASES[i + 1]?.startWave ?? p.startWave + 20,
+    unlockWave: p.endWave,
     tier: Math.min(4, 1 + Math.floor(i / 3)),
   }));
 }

@@ -495,7 +495,7 @@ export const ptBR: TranslationSchema = {
     pickRegion: "Região",
     pickTime: "Tempo",
     hours: "{n}h",
-    noRegion: "Vença a primeira região (onda 31) para liberar as expedições.",
+    noRegion: "Vença o chefe da primeira região (onda 30) para liberar as expedições.",
     noGroupFree: "Todos os grupos estão fora.",
     prize: "Prêmio",
     gold: "{n} ouro",
