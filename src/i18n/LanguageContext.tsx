@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { DEFAULT_LANGUAGE, isLanguageCode, LOCALES, type LanguageCode } from "./index";
+import { browserLanguage, isLanguageCode, LOCALES, type LanguageCode } from "./index";
 import { translate, type TranslationKey } from "./translate";
 
 const STORAGE_KEY = "hordenova.language";
@@ -11,7 +11,7 @@ function loadStoredLanguage(): LanguageCode {
   } catch {
     // localStorage unavailable (private browsing, disabled storage, ...) — fall back to default.
   }
-  return DEFAULT_LANGUAGE;
+  return browserLanguage();
 }
 
 interface LanguageContextValue {

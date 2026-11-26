@@ -3,6 +3,7 @@
 // @ts-nocheck — mechanically wrapped from the offline bake script; type-checked there.
 /* eslint-disable */
 import * as THREE from "three";
+import { fitCanvas, LOW_TEXTURE_MEMORY, TEX_MAX } from "./texBudget";
 
 export interface CastleModel {
   root: THREE.Group;
@@ -163,6 +164,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       g.drawImage(n, 0, 0, S, S);
       g.restore();
     }
+    n.width = n.height = 0;
   }
   /** A tangent-space normal map from a greyscale height canvas (Sobel). */
   function normalFromHeight(h: HTMLCanvasElement, strength: number): THREE.CanvasTexture {
@@ -386,15 +388,19 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       }
       g.globalCompositeOperation = "source-over";
     }
-    const map = new THREE.CanvasTexture(c);
+    // painted at full size, kept at the device's budget (see texBudget.ts); the relief keeps its depth
+    // the height field only feeds the normal map (the material never uses it as a bump), so it's released after
+    const hb = fitCanvas(b);
+    const normal = normalFromHeight(hb, 2.6 * (hb.width / S));
+    hb.width = hb.height = 0;
+    const map = new THREE.CanvasTexture(fitCanvas(c));
     map.colorSpace = THREE.SRGBColorSpace;
     map.wrapS = map.wrapT = THREE.RepeatWrapping;
     map.anisotropy = 8;
-    const bump = new THREE.CanvasTexture(b);
-    bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    const rough = new THREE.CanvasTexture(rc);
+    // roughness is a soft, low-detail map: half the colour map's size is plenty
+    const rough = new THREE.CanvasTexture(fitCanvas(rc, Math.max(256, TEX_MAX / 2)));
     rough.wrapS = rough.wrapT = THREE.RepeatWrapping;
-    return { map, bump, normal: normalFromHeight(b, 2.6), rough };
+    return { map, normal, rough };
   }
 
   function roofTexture(seed: number): TexSet {
@@ -470,13 +476,14 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       g.fillStyle = grd;
       g.fillRect(x, 0, 8 + r() * 24, S);
     }
-    const map = new THREE.CanvasTexture(c);
+    const hb = fitCanvas(b);
+    const normal = normalFromHeight(hb, 3.2 * (hb.width / S));
+    hb.width = hb.height = 0;
+    const map = new THREE.CanvasTexture(fitCanvas(c));
     map.colorSpace = THREE.SRGBColorSpace;
     map.wrapS = map.wrapT = THREE.RepeatWrapping;
     map.anisotropy = 8;
-    const bump = new THREE.CanvasTexture(b);
-    bump.wrapS = bump.wrapT = THREE.RepeatWrapping;
-    return { map, bump, normal: normalFromHeight(b, 3.2) };
+    return { map, normal };
   }
 
   /**
@@ -584,15 +591,19 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
     const setKey = `${BIOME}|${SKIN}|${TIER}|${key}:${opts.rows ?? 10}:${opts.cols ?? 5}:${opts.mossy ?? 0}`;
     let set = stoneSets.get(setKey);
     if (!set) {
+      // on low-memory devices only the castles of the last two looks stay painted; older ones are
+      // dropped from the cache (any scene still showing them keeps its own copy until it closes)
+      if (LOW_TEXTURE_MEMORY) {
+        const castle = `${BIOME}|${SKIN}|${TIER}|`;
+        const looks = [...new Set([...stoneSets.keys()].map((k) => k.slice(0, k.indexOf("|", k.indexOf("|", k.indexOf("|") + 1) + 1) + 1)))].filter((l) => l !== castle);
+        for (const old of looks.slice(0, Math.max(0, looks.length - 1))) for (const k of [...stoneSets.keys()]) if (k.startsWith(old)) stoneSets.delete(k);
+      }
       set = stoneTexture(key.length * 31 + (opts.rows ?? 10), { rows: opts.rows ?? 10, cols: opts.cols ?? 5, mossy: opts.mossy, cracks, lava: D.lava });
       stoneSets.set(setKey, set);
     }
     const map = set.map.clone();
     map.repeat.set(repeatX, repeatY);
     map.needsUpdate = true;
-    const bump = set.bump.clone();
-    bump.repeat.set(repeatX, repeatY);
-    bump.needsUpdate = true;
     const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0.0 });
     if (set.normal) {
       const nm = set.normal.clone();
@@ -600,7 +611,10 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       nm.needsUpdate = true;
       mat.normalMap = nm;
       mat.normalScale = new THREE.Vector2(1.15, 1.15);
-    } else {
+    } else if (set.bump) {
+      const bump = set.bump.clone();
+      bump.repeat.set(repeatX, repeatY);
+      bump.needsUpdate = true;
       mat.bumpMap = bump;
       mat.bumpScale = 2.2;
     }
@@ -711,9 +725,6 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
     const map = roofSet.map.clone();
     map.repeat.set(repX, repY);
     map.needsUpdate = true;
-    const bump = roofSet.bump.clone();
-    bump.repeat.set(repX, repY);
-    bump.needsUpdate = true;
     const m = new THREE.MeshStandardMaterial({ map, roughness: D.roofMetal ? 0.35 : 0.82, metalness: D.roofMetal ?? 0.0 });
     if (roofSet.normal) {
       const nm = roofSet.normal.clone();
@@ -721,8 +732,8 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       nm.needsUpdate = true;
       m.normalMap = nm;
       m.normalScale = new THREE.Vector2(1.3, 1.3);
-    } else {
-      m.bumpMap = bump;
+    } else if (roofSet.bump) {
+      m.bumpMap = roofSet.bump;
       m.bumpScale = 1.6;
     }
     weather(m, "roof");

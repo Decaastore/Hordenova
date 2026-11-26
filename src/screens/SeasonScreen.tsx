@@ -7,7 +7,8 @@ import { PRESTIGE_CASTLE_SKIN_ID } from "@/config/castleSkins";
 import { GameModes, type GameModeCard } from "@/ui/GameModes";
 import { attemptsLeft, COLOSSUS_ATTEMPTS_PER_DAY, worldState } from "@/config/colossus";
 import { ColossusAlert } from "@/ui/ColossusPromo";
-import { BeginnerSection } from "@/ui/RewardsPanels";
+import { BeginnerSection, DailyLoginSection } from "@/ui/RewardsPanels";
+import { canClaimLogin } from "@/config/dailyLogin";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave } from "@/engine/SaveSystem";
@@ -73,6 +74,8 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
   const { t, language } = useLanguage();
   const locale = language === "ptBR" ? "pt-BR" : "en-US";
   const [panelOpen, setPanelOpen] = useState(false);
+  // the 7-day reward shows here while today's is waiting (claimed → stays until you leave the page)
+  const [loginDue] = useState(() => canClaimLogin(loadSave().dailyLogin, Date.now()));
   const [refreshTick, setRefreshTick] = useState(0);
   const [confirmingReset, setConfirmingReset] = useState(false);
 
@@ -261,6 +264,8 @@ export function SeasonScreen({ onNavigate, onPlay, onPlayEternal, onOpenEternalM
         </header>
 
         <div className="pg-wrap">
+          {/* the 7-day reward lives here (not as a Home pop-up): a first-time visitor sees the site and the language switch first */}
+          {loginDue && <DailyLoginSection />}
           <GameModes cards={modeCards} sub={t("modes.sub")} />
           <BeginnerSection />
           <dl className="pg-figures">

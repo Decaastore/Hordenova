@@ -795,6 +795,7 @@ export const en = {
     seasonLive: "Season {number} is live",
     seasonEnds: "{theme}, ends in {time}",
     seeTowers: "Meet the towers",
+    platforms: "Play on PC and on your phone, right in the browser. Nothing to install.",
     statSeasonBest: "Season best",
     statPrestige: "Prestige",
     statSkins: "Skins owned",

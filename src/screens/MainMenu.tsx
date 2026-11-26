@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { DailyLoginModal } from "@/ui/RewardsPanels";
-import { canClaimLogin } from "@/config/dailyLogin";
 import { setActiveCastleSkin } from "@/rendering/castleSkinFx";
 import { ColossusAlert, ColossusHeroCard } from "@/ui/ColossusPromo";
 import { BrandLogo } from "@/ui/BrandLogo";
@@ -52,7 +50,6 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
   const [entering, setEntering] = useState(false);
   const [sceneIndex, setSceneIndex] = useState(0);
   // LOGIN DE 7 DIAS — today's reward pops up first; the Global Boss alert waits for it
-  const [loginOpen, setLoginOpen] = useState(() => canClaimLogin(save.dailyLogin, Date.now()));
   // SKINS DE CASTELO — the Home castle wears the equipped skin too
   setActiveCastleSkin(save.equippedCastleSkinId && save.unlockedCastleSkinIds.includes(save.equippedCastleSkinId) ? save.equippedCastleSkinId : null);
   const towersRef = useRef<HTMLElement>(null);
@@ -68,8 +65,13 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
     if (entering) return;
     // Unlock audio synchronously inside the real click (browsers require a
     // user gesture) — clicking Play alone must be enough to start the music.
-    audioManager.unlock();
-    audioManager.playAmbientMusic();
+    // never let a sound problem (some Safari versions) stop the click from entering the game
+    try {
+      audioManager.unlock();
+      audioManager.playAmbientMusic();
+    } catch {
+      /* the game opens without music */
+    }
     setEntering(true);
     window.setTimeout(onStart, TRANSITION_DURATION_MS);
   };
@@ -86,8 +88,7 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
   return (
     <div className="hn-home">
       <style>{HOME_CSS}</style>
-      {loginOpen && <DailyLoginModal onClosed={() => setLoginOpen(false)} />}
-      {onPlayColossus && !loginOpen && <ColossusAlert onOpen={onPlayColossus} />}
+      {onPlayColossus && <ColossusAlert onOpen={onPlayColossus} />}
 
       <section className={`hn-hero${entering ? " is-entering" : ""}`}>
         <HomeDiorama sceneIndex={sceneIndex} entering={entering} />
@@ -119,6 +120,14 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
               {t("menu.seeTowers")}
             </button>
           </div>
+          <p className="hn-platforms">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <rect x="2" y="4" width="15" height="10" rx="1.5" />
+              <path d="M6 18h7M9.5 14v4" />
+              <rect x="17.5" y="8" width="5" height="11" rx="1.2" />
+            </svg>
+            {t("menu.platforms")}
+          </p>
 
           <dl className="hn-stats">
             <div>
@@ -404,6 +413,8 @@ const HOME_CSS = `
 .hn-pitch { margin: 10px 0 0; max-width: 46ch; font-size: clamp(14px, 1.2vw, 16px); line-height: 1.6; color: #d9cdb6; }
 
 .hn-cta-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+.hn-platforms { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; font-size: 13.5px; line-height: 1.4; color: #c9bba0; }
+.hn-platforms svg { flex: none; width: 22px; height: 22px; fill: none; stroke: var(--gold-hi); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: 0.85; }
 .hn-play {
   position: relative; padding: 16px 36px; border-radius: 8px; cursor: pointer;
   border: 1px solid #e8b04b; color: #fff2c9 !important; font-weight: 800; letter-spacing: 0.04em;

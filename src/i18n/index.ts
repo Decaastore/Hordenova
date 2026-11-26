@@ -30,3 +30,24 @@ export const LANGUAGE_CODES: readonly LanguageCode[] = ["en", "ptBR"];
 export function isLanguageCode(value: string): value is LanguageCode {
   return value === "en" || value === "ptBR";
 }
+
+/**
+ * The language a first-time visitor sees, before choosing one: the
+ * browser's own (Portuguese → ptBR, English → en). Any other browser
+ * language gets Portuguese, the game's main audience. A language the player
+ * picked in the selector (stored) always wins over this.
+ */
+export function browserLanguage(): LanguageCode {
+  try {
+    const nav = typeof navigator !== "undefined" ? navigator : undefined;
+    const list = nav ? (nav.languages?.length ? nav.languages : [nav.language]) : [];
+    for (const raw of list) {
+      const l = (raw ?? "").toLowerCase();
+      if (l.startsWith("pt")) return "ptBR";
+      if (l.startsWith("en")) return "en";
+    }
+  } catch {
+    /* no navigator */
+  }
+  return "ptBR";
+}

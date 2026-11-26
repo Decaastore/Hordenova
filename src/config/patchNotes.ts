@@ -70,6 +70,45 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v177",
+    dateIso: "2026-11-26",
+    category: "FIXES",
+    title: {
+      en: "The Game Opens on iPhone and Mac",
+      ptBR: "O Jogo Abre no iPhone e no Mac",
+    },
+    description: {
+      en: "On iPhone, iPad and Mac (Safari), the Play page could stay blank or reload, and the Play button seemed to do nothing. The site used more image memory than Safari allows; it now uses a fraction of it.",
+      ptBR: "No iPhone, iPad e Mac (Safari), a página de Jogar podia ficar em branco ou recarregar, e o botão Jogar parecia não fazer nada. O site usava mais memória de imagem do que o Safari permite; agora usa só uma fração disso.",
+    },
+    highlights: [
+      {
+        en: "Image memory on a phone: Home from ~270 MB to ~40 MB, the Play page from ~780 MB to ~110 MB, a battle to ~220 MB (Safari's limit on iPhone is about 384 MB).",
+        ptBR: "Memória de imagem no celular: a Home caiu de ~270 MB para ~40 MB, a página de Jogar de ~780 MB para ~110 MB e a batalha ficou em ~220 MB (o limite do Safari no iPhone é cerca de 384 MB).",
+      },
+      {
+        en: "The 3D castle looks the same: on phones and Safari its stone is kept at a lighter size, and the frozen/burning tints of creatures are only made when a creature is actually frozen or burning.",
+        ptBR: "O castelo 3D continua igual: no celular e no Safari as pedras ficam num tamanho mais leve, e o brilho de gelo e fogo das criaturas só é criado quando uma criatura está mesmo congelada ou queimando.",
+      },
+      {
+        en: "Older Safari versions (iPhones and Macs that can't update) also draw the battle now, and a sound problem can no longer stop the Play button.",
+        ptBR: "Versões mais antigas do Safari (iPhones e Macs que não atualizam mais) também desenham a batalha agora, e um problema de som não trava mais o botão Jogar.",
+      },
+      {
+        en: "First visit in your language: the site now starts in Portuguese on a Portuguese browser and in English on an English one, instead of always in English. You can still switch at any time.",
+        ptBR: "Primeira visita no seu idioma: o site agora começa em português num navegador em português e em inglês num navegador em inglês, em vez de sempre em inglês. Você ainda pode trocar quando quiser.",
+      },
+      {
+        en: "The 7-day reward no longer pops up over the Home: it now waits for you at the top of the Play page (and in your Account) whenever today's reward is ready.",
+        ptBR: "A recompensa de 7 dias não abre mais por cima da Home: agora ela fica no alto da página de Jogar (e na sua Conta) sempre que a recompensa do dia estiver pronta.",
+      },
+      {
+        en: "Home now says it plainly: play on PC and on your phone, right in the browser, nothing to install.",
+        ptBR: "A Home agora diz com todas as letras: jogue no PC e no celular, direto no navegador, sem instalar nada.",
+      },
+    ],
+  },
+  {
     id: "v176",
     dateIso: "2026-11-26",
     category: "BOSSES",

@@ -453,6 +453,15 @@ function playLoopingTrackFile(ctx: AudioContext, url: string, loopSeconds: numbe
 }
 
 /** Suspends an AudioContext without ever throwing (older/fake contexts may lack suspend()). */
+/** Resumes an AudioContext without ever throwing (old Safari contexts may not return a promise). */
+function resumeQuietly(ctx: AudioContext): void {
+  try {
+    ctx.resume?.()?.catch?.(() => {});
+  } catch {
+    // still blocked — the next gesture retries
+  }
+}
+
 function suspendQuietly(ctx: AudioContext): void {
   try {
     ctx.suspend?.()?.catch?.(() => {});
@@ -608,9 +617,8 @@ export class AudioManager {
         // focus) — `resume()` is the correct response to both, and is a
         // harmless no-op if it's already running.
         if (this.musicGraph.ctx.state === "suspended" && !this.musicMuted) {
-          this.musicGraph.ctx.resume().catch(() => {
-            // Still blocked — stays silent until the next gesture retries.
-          });
+          // Still blocked — stays silent until the next gesture retries.
+          resumeQuietly(this.musicGraph.ctx);
         }
         return;
       }
@@ -649,9 +657,8 @@ export class AudioManager {
       };
 
       if (ctx.state === "suspended" && !this.musicMuted) {
-        ctx.resume().catch(() => {
-          // Still blocked — stays silent until the next user gesture calls this again.
-        });
+        // Still blocked — stays silent until the next user gesture calls this again.
+        resumeQuietly(ctx);
       } else if (this.musicMuted && ctx.state === "running") {
         // Paused by the player: keep the clock stopped until they press play.
         suspendQuietly(ctx);
@@ -748,9 +755,8 @@ export class AudioManager {
         if (this.musicGraph === graph && this.musicMuted && graph.ctx.state === "running") suspendQuietly(graph.ctx);
       }, 160);
     } else if (graph.ctx.state === "suspended") {
-      graph.ctx.resume().catch(() => {
-        // Still blocked by autoplay — the next gesture resumes it.
-      });
+      // Still blocked by autoplay — the next gesture resumes it.
+      resumeQuietly(graph.ctx);
     }
   }
 

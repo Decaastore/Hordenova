@@ -42,10 +42,10 @@ export interface LoadedSprite {
   def: SheetDef;
   image: HTMLImageElement;
   /** Pre-tinted copies for status effects (null if offscreen canvas isn't available). */
-  ice: HTMLCanvasElement | null;
-  fire: HTMLCanvasElement | null;
+  readonly ice: HTMLCanvasElement | null;
+  readonly fire: HTMLCanvasElement | null;
   /** Bosses only: a copy tinted in the boss's glow color, drawn behind the body as its aura outline. */
-  glow: HTMLCanvasElement | null;
+  readonly glow: HTMLCanvasElement | null;
 }
 
 /** Fraction of a sheet cell (from the top) where the creature's top and feet land — fixed by the baker's tight framing. */
@@ -88,6 +88,31 @@ function tinted(image: HTMLImageElement, color: string): HTMLCanvasElement | nul
   }
 }
 
+/**
+ * A loaded sheet whose ice/fire/glow tinted copies are only painted the
+ * first time they are drawn (a frozen or burning creature, a boss aura).
+ * Each copy is a full-size canvas; painting all of them up front for every
+ * sheet used hundreds of MB of canvas memory and broke the site on iPhone
+ * and Mac Safari, which cap canvas memory.
+ */
+function makeSprite(def: SheetDef, image: HTMLImageElement, glowColor: string | null): LoadedSprite {
+  const memo: { ice?: HTMLCanvasElement | null; fire?: HTMLCanvasElement | null; glow?: HTMLCanvasElement | null } = {};
+  return {
+    def,
+    image,
+    get ice() {
+      return memo.ice !== undefined ? memo.ice : (memo.ice = tinted(image, ICE));
+    },
+    get fire() {
+      return memo.fire !== undefined ? memo.fire : (memo.fire = tinted(image, FIRE));
+    },
+    get glow() {
+      if (!glowColor) return null;
+      return memo.glow !== undefined ? memo.glow : (memo.glow = tinted(image, glowColor));
+    },
+  };
+}
+
 function loadSheet(file: string, onLoad: (image: HTMLImageElement) => void): void {
   const image = new Image();
   image.decoding = "async";
@@ -110,7 +135,7 @@ export function preloadSpriteBiome(biomeId: string): void {
     for (const [type, entry] of Object.entries(entries) as [EnemyType, NonNullable<(typeof entries)[EnemyType]>][]) {
       loadSheet(entry.file, (image) => {
         const def: SheetDef = { file: entry.file, frames: entry.frames, rows: 3, worldHeight: entry.worldHeight, stride: entry.stride, hover: entry.hover };
-        biomeLoaded.set(`${biomeId}:${type}`, { def, image, ice: tinted(image, ICE), fire: tinted(image, FIRE), glow: null });
+        biomeLoaded.set(`${biomeId}:${type}`, makeSprite(def, image, null));
       });
     }
   }
@@ -128,7 +153,7 @@ export function preloadBossSheet(bossId: string): void {
   if (!entry) return;
   bossRequested.add(bossId);
   loadSheet(entry.file, (image) => {
-    bossLoaded.set(bossId, { def: bossDef(entry), image, ice: tinted(image, ICE), fire: tinted(image, FIRE), glow: tinted(image, entry.glow) });
+    bossLoaded.set(bossId, makeSprite(bossDef(entry), image, entry.glow));
   });
 }
 
@@ -282,7 +307,7 @@ export function drawEnemySprite(
     const pivotY = footY - cellWorld * 0.45; // grow around the body's middle
     ctx.drawImage(src, sx, sy, cell, cell, -w / 2, pivotY + (dy - pivotY) * grow, w, w);
   };
-  if (sprite.glow && (options.glowAlpha ?? 0) > 0) {
+  if ((options.glowAlpha ?? 0) > 0 && sprite.glow) {
     const prev = ctx.globalCompositeOperation;
     ctx.globalCompositeOperation = "lighter";
     blit(sprite.glow, options.glowAlpha!, options.glowScale ?? 1.08);

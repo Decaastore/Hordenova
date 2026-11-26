@@ -796,6 +796,7 @@ export const ptBR: TranslationSchema = {
     seasonLive: "Season {number} no ar",
     seasonEnds: "{theme}, termina em {time}",
     seeTowers: "Conhecer as torres",
+    platforms: "Jogue no PC e no celular, direto no navegador. Não precisa instalar nada.",
     statSeasonBest: "Melhor da season",
     statPrestige: "Prestígio",
     statSkins: "Skins",

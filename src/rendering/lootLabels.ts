@@ -1,4 +1,4 @@
-import { DEFAULT_LANGUAGE, isLanguageCode, LOCALES, type LanguageCode } from "@/i18n";
+import { browserLanguage, isLanguageCode, LOCALES, type LanguageCode } from "@/i18n";
 import { translate, type TranslationKey } from "@/i18n/translate";
 
 /**
@@ -12,7 +12,7 @@ let cached: { lang: LanguageCode; at: number } | null = null;
 function language(): LanguageCode {
   const now = typeof performance !== "undefined" ? performance.now() : 0;
   if (cached && now - cached.at < 1000) return cached.lang;
-  let lang: LanguageCode = DEFAULT_LANGUAGE;
+  let lang: LanguageCode = browserLanguage();
   try {
     const raw = localStorage.getItem("hordenova.language");
     if (raw && isLanguageCode(raw)) lang = raw;

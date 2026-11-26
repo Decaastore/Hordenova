@@ -83,11 +83,23 @@ export class GameAmbience {
   private wantedBed: AmbienceBed | null = null;
   private lastThunderCycle = -1;
   private stopped = false;
-  private readonly onGesture = () => void this.ctx?.resume().catch(() => undefined);
+  private readonly onGesture = () => {
+    try {
+      void this.ctx?.resume?.()?.catch?.(() => undefined);
+    } catch {
+      /* old Safari */
+    }
+  };
   private readonly onVisibility = () => {
     if (!this.ctx) return;
     if (document.hidden) void this.ctx.suspend().catch(() => undefined);
-    else void this.ctx.resume().catch(() => undefined);
+    else {
+      try {
+        void this.ctx.resume?.()?.catch?.(() => undefined);
+      } catch {
+        /* old Safari */
+      }
+    }
   };
 
   start(): void {
