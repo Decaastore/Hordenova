@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { TopNav, type NavView } from "@/ui/TopNav";
@@ -226,11 +226,51 @@ export function BossesScreen({ onNavigate, onPlay, onPlayColossus }: BossesScree
   );
 }
 
-/** The boss's frame from the real battle; while a frame is missing, its bestiary portrait stands in. */
+function prefersStill(): boolean {
+  try {
+    return typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The boss's own Mixamo monster, alive: a short silent loop (region bosses
+ * roar, mini-bosses stalk) that only downloads and plays while its card is
+ * on screen, and pauses when scrolled away. The still frame (the loop's
+ * first frame) shows until then, and always for players who turned motion
+ * off. While the still is missing, the bestiary portrait stands in.
+ */
 function BossArt({ boss, alt }: { boss: BossDefinition; alt: string }) {
   const [failed, setFailed] = useState(false);
+  const [still] = useState(prefersStill);
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const v = ref.current;
+    if (!v || still || typeof IntersectionObserver === "undefined") return;
+    v.muted = true; // iPhone only autoplays muted video
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (e?.isIntersecting) {
+          v.preload = "auto";
+          v.play()?.catch(() => {});
+        } else v.pause();
+      },
+      { rootMargin: "160px 0px" },
+    );
+    io.observe(v);
+    return () => io.disconnect();
+  }, [still]);
   if (failed) return <div className="bs-card-fallback"><BossPortrait bossId={boss.id} size={boss.isMainBoss ? 120 : 100} /></div>;
-  return <img src={`${assetBase}bosses/${boss.id}.webp`} alt={alt} loading="lazy" width={460} height={400} onError={() => setFailed(true)} />;
+  const poster = `${assetBase}bosses/${boss.id}.webp`;
+  if (still) return <img src={poster} alt={alt} loading="lazy" width={460} height={400} onError={() => setFailed(true)} />;
+  return (
+    <>
+      {/* the still underneath: if the clip can't play, the card still shows the boss */}
+      <img src={poster} alt="" aria-hidden="true" loading="lazy" width={460} height={400} onError={() => setFailed(true)} />
+      <video ref={ref} className="bs-card-clip" src={`${assetBase}bosses/${boss.id}.mp4`} poster={poster} aria-label={alt} width={460} height={400} muted loop playsInline preload="none" disablePictureInPicture />
+    </>
+  );
 }
 
 function BossCard({ boss, kills, where, wave }: { boss: BossDefinition; kills: number; where: string; wave?: number }) {
@@ -356,7 +396,17 @@ const BOSSES_CSS = `
 
 .bs-card-art { position: relative; aspect-ratio: 16 / 10; background: #0d0a07; border-bottom: 1px solid var(--line-soft); }
 .bs-card-fallback { display: grid; place-items: center; height: 100%; }
-.bs-card-art img { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+.bs-card-art { overflow: hidden; }
+.bs-card-art img, .bs-card-art video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+.bs-card-art video { position: absolute; inset: 0; background: transparent; transition: transform 0.6s ease; }
+/* the card answers the pointer: it lifts, its border catches the boss's light and the monster steps closer */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .bs-card { transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease; }
+  .bs-card:hover { transform: translateY(-3px); border-color: rgba(255,138,26,0.45); box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 22px rgba(255,138,26,0.12); }
+  .bs-card.is-main:hover { border-color: rgba(192,90,255,0.5); box-shadow: 0 10px 28px rgba(0,0,0,0.45), 0 0 26px rgba(192,90,255,0.16); }
+  .bs-card:hover .bs-card-art video, .bs-card:hover .bs-card-art img { transform: scale(1.04); }
+  .bs-card-art img { transition: transform 0.6s ease; }
+}
 .bs-card-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 60%, rgba(13,10,7,0.65)); pointer-events: none; }
 .bs-where { margin: 0; font-size: 12.5px; color: var(--ash); }
 .bs-card h3 { margin: 2px 0 0; font-family: var(--display); font-size: 20px; line-height: 1.15; color: var(--bone); }
