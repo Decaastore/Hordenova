@@ -389,15 +389,15 @@ const BOSSES_CSS = `
 .bs-rule dd { margin: 1px 0 0; font-size: 13.5px; }
 .bs-rule .bs-fine { color: var(--ash); }
 .bs-grid { margin-top: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.bs-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; padding: 0 0 14px; border-radius: 14px; overflow: hidden; background: var(--night-2); border: 1px solid var(--line-soft); }
+.bs-card { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; align-content: start; padding: 0 0 14px; border-radius: 14px; overflow: hidden; background: var(--night-2); border: 1px solid var(--line-soft); }
 .bs-card > *:not(.bs-card-art) { margin-left: 14px; margin-right: 14px; }
 
 .bs-card.is-main { background: linear-gradient(180deg, rgba(60,22,18,0.55), var(--night-2) 60%); border-color: rgba(224,100,75,0.3); }
 
-.bs-card-art { position: relative; aspect-ratio: 16 / 10; background: #0d0a07; border-bottom: 1px solid var(--line-soft); }
+.bs-card-art { position: relative; aspect-ratio: 23 / 16; background: #0d0a07; border-bottom: 1px solid var(--line-soft); }
 .bs-card-fallback { display: grid; place-items: center; height: 100%; }
 .bs-card-art { overflow: hidden; }
-.bs-card-art img, .bs-card-art video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 40%; }
+.bs-card-art img, .bs-card-art video { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 28%; }
 .bs-card-art video { position: absolute; inset: 0; background: transparent; transition: transform 0.6s ease; }
 /* the card answers the pointer: it lifts, its border catches the boss's light and the monster steps closer */
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {

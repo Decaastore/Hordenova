@@ -70,6 +70,37 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v178",
+    dateIso: "2026-11-26",
+    category: "INTERFACE",
+    title: {
+      en: "Bosses Page: The Monsters Move",
+      ptBR: "Página Bosses: Os Monstros se Mexem",
+    },
+    description: {
+      en: "Every boss on the Bosses page is now alive: its own 3D monster plays a short loop instead of a still picture.",
+      ptBR: "Todo chefe da página Bosses agora está vivo: o próprio monstro 3D dele aparece num loop curto, em vez de uma foto parada.",
+    },
+    highlights: [
+      {
+        en: "Region bosses roar, mini-bosses stalk; each one in its region's colours, the way it looks in battle.",
+        ptBR: "Os chefes de região rugem e os mini-chefes andam; cada um nas cores da sua região, do jeito que aparece na batalha.",
+      },
+      {
+        en: "A clip only loads and plays while its card is on screen (about 100 KB each), so the page stays light, also on phones.",
+        ptBR: "Cada vídeo só carrega e toca enquanto o cartão está na tela (cerca de 100 KB cada), então a página continua leve, inclusive no celular.",
+      },
+      {
+        en: "On a computer, pointing at a card lifts it, lights its border in the boss's colour and brings the monster closer.",
+        ptBR: "No computador, ao passar o mouse, o cartão sobe, a borda acende na cor do chefe e o monstro chega mais perto.",
+      },
+      {
+        en: "If your device is set to reduce motion, the cards keep a still picture.",
+        ptBR: "Se o seu aparelho estiver com animações reduzidas, os cartões continuam com a imagem parada.",
+      },
+    ],
+  },
+  {
     id: "v177",
     dateIso: "2026-11-26",
     category: "FIXES",
