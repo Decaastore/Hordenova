@@ -70,6 +70,114 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v175",
+    dateIso: "2026-11-26",
+    category: "BOSSES",
+    title: {
+      en: "Global Boss Reworked: Two Laps and a Real Finale",
+      ptBR: "Chefe Global Refeito: Duas Voltas e um Final de Verdade",
+    },
+    description: {
+      en: "The Serpent of the Eclipse no longer stops at the end of the road and stands there. It now crawls the spiral twice, slower on the second lap, fights back against your towers and dives into the Eclipse Core when time runs out.",
+      ptBR: "A Serpente do Eclipse não chega mais ao fim da estrada para ficar parada. Agora ela percorre a espiral duas vezes, mais devagar na segunda volta, ataca as suas torres e mergulha no Núcleo do Eclipse quando o tempo acaba.",
+    },
+    highlights: [
+      {
+        en: "Two laps: the first takes about 1 minute; then the head goes through the Core, comes back out of the rift and makes a slower second lap until the end. Its body covers more than half the road, so from the second lap on every slot has the Serpent in range.",
+        ptBR: "Duas voltas: a primeira leva cerca de 1 minuto; depois a cabeça atravessa o Núcleo, volta a sair da fenda e faz uma segunda volta mais lenta até o fim. O corpo cobre mais da metade da estrada, então a partir da segunda volta todas as vagas têm a Serpente ao alcance.",
+      },
+      {
+        en: "Venom (from 10 s): marked towers are poisoned for 6 s and shoot at half speed. Move away in time to dodge it.",
+        ptBR: "Veneno (a partir de 10 s): as torres marcadas ficam envenenadas por 6 s e atiram na metade da velocidade. Mude de vaga a tempo para desviar.",
+      },
+      {
+        en: "Tail lash (from about 52 s): the tail sweeps 3 slots side by side, knocks those towers down for 2.5 s and costs them half their Star Strike charge.",
+        ptBR: "Golpe de cauda (a partir de cerca de 52 s): a cauda varre 3 vagas vizinhas, derruba essas torres por 2,5 s e tira metade da carga do Golpe Estelar delas.",
+      },
+      {
+        en: "Falling stars still stun for 5 s, the Eclipse darkens the sky and raises scale shields every 14 s; head shots are marked as the weak point.",
+        ptBR: "As estrelas continuam atordoando por 5 s, o Eclipse escurece o céu e ergue escudos de escamas a cada 14 s; a cabeça aparece marcada como ponto fraco.",
+      },
+      {
+        en: "Banners for each phase, the second lap and the final dive, plus a countdown in the last 15 s to spend your Star Strike.",
+        ptBR: "Avisos na tela em cada fase, na segunda volta e no mergulho final, mais uma contagem nos últimos 15 s para você gastar o Golpe Estelar.",
+      },
+      {
+        en: "The result screen now also shows how much of the Serpent's world life is left.",
+        ptBR: "A tela de resultado agora também mostra quanto resta da vida da Serpente no mundo.",
+      },
+    ],
+  },
+  {
+    id: "v174",
+    dateIso: "2026-11-26",
+    category: "BOSSES",
+    title: {
+      en: "Every Boss Has Its Own Monster",
+      ptBR: "Cada Chefe com o Seu Próprio Monstro",
+    },
+    description: {
+      en: "Region bosses and mini-bosses no longer share the same two bodies. They now use nine different monsters, and the Bosses page shows each one's real numbers and portrait.",
+      ptBR: "Os chefes de região e os mini-chefes não dividem mais os mesmos dois corpos. Agora eles usam nove monstros diferentes, e a página Bosses mostra os números e o retrato de cada um.",
+    },
+    highlights: [
+      {
+        en: "Nine monsters spread over the 16 region bosses and 16 mini-bosses: neighbouring regions never repeat a boss, and each region's mini-boss is different from its boss.",
+        ptBR: "Nove monstros distribuídos entre os 16 chefes de região e os 16 mini-chefes: regiões vizinhas nunca repetem o chefe, e o mini-chefe de cada região é diferente do chefe dela.",
+      },
+      {
+        en: "Each card on the Bosses page has a portrait of the monster you actually fight.",
+        ptBR: "Cada cartão da página Bosses tem o retrato do monstro que você enfrenta de verdade.",
+      },
+      {
+        en: "Region boss cards show their real life at their wave, their weak tower (+30%), speed, resistance, regeneration, gold and drops with their odds.",
+        ptBR: "Os cartões dos chefes de região mostram a vida real na onda deles, a torre que é o ponto fraco (+30%), velocidade, resistência, regeneração, ouro e os drops com as chances.",
+      },
+    ],
+  },
+  {
+    id: "v173",
+    dateIso: "2026-11-26",
+    category: "INTERFACE",
+    title: {
+      en: "New Questions Page and an In-Game Gallery",
+      ptBR: "Nova Página de Perguntas e Galeria do Jogo",
+    },
+    description: {
+      en: "Straight answers to what new players ask most, and real screenshots of the game in the Wiki.",
+      ptBR: "Respostas diretas para o que os jogadores novos mais perguntam e imagens reais do jogo na Wiki.",
+    },
+    highlights: [
+      {
+        en: "Questions page (link at the bottom of Home): installing, cost, phone, saving, what resets each Season, Free vs Purchased Gems, real money, Global Boss, rankings and support.",
+        ptBR: "Página de Perguntas (link no rodapé da Home): instalação, preço, celular, progresso salvo, o que zera a cada Temporada, Gemas Grátis x Compradas, dinheiro real, Chefe Global, rankings e suporte.",
+      },
+      {
+        en: "\"Inside the game\" in the Wiki: 7 screenshots (battle, Forge, city, Garrison, Expeditions, Bestiary, Global Boss). Click one to see it large, and use the arrows or Esc.",
+        ptBR: "\"Por dentro do jogo\" na Wiki: 7 imagens (batalha, Forja, cidade, Guarnição, Expedições, Bestiário, Chefe Global). Clique numa para ver em tamanho grande e use as setas ou Esc.",
+      },
+    ],
+  },
+  {
+    id: "v172",
+    dateIso: "2026-11-26",
+    category: "FIXES",
+    title: {
+      en: "Expeditions Open at Wave 30",
+      ptBR: "Expedições Abrem na Onda 30",
+    },
+    description: {
+      en: "Expeditions now open as soon as you beat the first region's boss at wave 30, as the site and the missions say. Before this fix they only opened at wave 31.",
+      ptBR: "As Expedições agora abrem assim que você vence o chefe da primeira região na onda 30, como o site e as missões dizem. Antes da correção, elas só abriam na onda 31.",
+    },
+    highlights: [
+      {
+        en: "Every later expedition region also opens on beating its region's last wave.",
+        ptBR: "As outras regiões de expedição também abrem ao vencer a última onda da região.",
+      },
+    ],
+  },
+  {
     id: "v171",
     dateIso: "2026-11-25",
     category: "BOSSES",
