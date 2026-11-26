@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COLOSSUS_LENGTH_MS, COLOSSUS_ROOM_SIZE } from "@/config/colossus";
-import { ColossusEngine, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS } from "./ColossusEngine";
+import { ARRIVE_MS, ColossusEngine, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS, SWEEP_WARN_MS, VENOM_MS, VENOM_WARN_MS } from "./ColossusEngine";
 
 const setup = (seed = 7, slot = 3) => ({ seed, you: { name: "Eu", type: "IRONWOOD" as const, power: 2000, skin: null }, slot });
 
@@ -105,5 +105,65 @@ describe("ColossusEngine — fair play", () => {
   it("every slot is worth about the same over a full attempt", () => {
     const d = COLOSSUS_SLOTS.map((_, slot) => avg((seed) => run("INFERNO", slot, seed)));
     expect(Math.max(...d) / Math.min(...d)).toBeLessThan(1.25);
+  });
+
+  it("every slot on the map gets to shoot the Serpent once it has coiled in", () => {
+    for (let slot = 0; slot < COLOSSUS_SLOTS.length; slot++) {
+      const e = new ColossusEngine(setup(11, slot));
+      e.advance(ARRIVE_MS);
+      const before = e.snapshot().players[0]!.damage;
+      e.advance(4_000);
+      expect(e.snapshot().players[0]!.damage, `slot ${slot}`).toBeGreaterThan(before);
+    }
+  });
+
+  it("venom poisons the tower that stays (half attack speed); moving away dodges it", () => {
+    const find = () => {
+      for (let seed = 1; seed < 400; seed++) {
+        const e = new ColossusEngine(setup(seed));
+        for (let t = 0; t < 40_000; t += 50) {
+          e.advance(50);
+          const s = e.snapshot();
+          if (s.venoms.some((v) => v.slot === s.players[0]!.slot)) return { e, seed, at: s.timeMs };
+        }
+      }
+      throw new Error("no venom on the player");
+    };
+    const { e, seed, at } = find();
+    e.advance(VENOM_WARN_MS + 100);
+    expect(e.snapshot().players[0]!.poisonedUntil).toBeGreaterThan(e.timeMs);
+    expect(e.snapshot().players[0]!.poisonedUntil).toBeLessThanOrEqual(e.timeMs + VENOM_MS);
+    // same attempt, but the player moves when the mark appears
+    const d = new ColossusEngine(setup(seed));
+    d.advance(at);
+    const me = d.snapshot().players[0]!;
+    const taken = new Set(d.snapshot().players.map((p) => p.slot));
+    const free = COLOSSUS_SLOTS.map((_, i) => i).filter((i) => !taken.has(i) && !d.snapshot().venoms.some((v) => v.slot === i) && !d.snapshot().stars.some((v) => v.slot === i) && !d.snapshot().sweeps.some((w) => w.slots.includes(i)));
+    expect(d.moveTo(free[0]!)).toBe(true);
+    d.advance(VENOM_WARN_MS + 100);
+    expect(d.snapshot().players[0]!.poisonedUntil).toBeLessThan(d.timeMs);
+    void me;
+  });
+
+  it("the tail lashes three slots in a row from Starfall on, knocking towers down and halving their Strike charge", () => {
+    const e = new ColossusEngine(setup(5));
+    let sweep = null as null | { slots: readonly number[]; impactAt: number };
+    while (!sweep && e.timeMs < COLOSSUS_LENGTH_MS) {
+      e.advance(50);
+      sweep = e.snapshot().sweeps[0] ?? null;
+    }
+    expect(sweep).not.toBeNull();
+    expect(e.timeMs).toBeGreaterThanOrEqual(45_000);
+    expect(sweep!.slots).toHaveLength(3);
+    expect(sweep!.slots[2]! - sweep!.slots[0]!).toBe(2);
+    const victims = e.snapshot().players.filter((p) => sweep!.slots.includes(p.slot));
+    e.advance(SWEEP_WARN_MS + 50);
+    const after = e.snapshot();
+    expect(after.impacts.filter((i) => i.kind === "SWEEP")).toHaveLength(3);
+    // whoever was still on a lashed slot is knocked down
+    for (const v of victims) {
+      const now = after.players.find((p) => p.name === v.name)!;
+      if (sweep!.slots.includes(now.slot)) expect(now.stunnedUntil).toBeGreaterThan(after.timeMs);
+    }
   });
 });

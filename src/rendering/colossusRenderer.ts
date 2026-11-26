@@ -34,8 +34,7 @@ import {
   STAR_WARN_MS,
   pathAt,
   type ColossusSnapshot,
-  type Pt,
-} from "@/engine/ColossusEngine";
+  type Pt, VENOM_WARN_MS, SWEEP_WARN_MS } from "@/engine/ColossusEngine";
 import { COLOSSUS_LENGTH_MS } from "@/config/colossus";
 
 const W = COLOSSUS_W;
@@ -1102,6 +1101,7 @@ function drawStars(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot): void 
     ctx.restore();
   }
   for (const im of snap.impacts) {
+    if (im.kind !== "STAR") continue;
     const s = COLOSSUS_SLOTS[im.slot]!;
     const k = (snap.timeMs - im.at) / 900;
     ctx.save();
@@ -1130,6 +1130,125 @@ function drawStars(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot): void 
   }
 }
 
+/** A ground mark with a filling countdown wedge (stars are red, venom green, the tail orange). */
+function dangerMark(ctx: CanvasRenderingContext2D, slot: number, k: number, rgb: string, timeMs: number, radius = 40): void {
+  const s = COLOSSUS_SLOTS[slot]!;
+  ctx.save();
+  ctx.translate(s.x, s.y);
+  ctx.scale(1, 0.55);
+  ctx.fillStyle = `rgba(${rgb},${0.12 + 0.18 * k})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = `rgba(${rgb},${0.6 + 0.4 * Math.sin(timeMs / 70)})`;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = `rgba(${rgb},0.32)`;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.arc(0, 0, radius, -Math.PI / 2, -Math.PI / 2 + k * Math.PI * 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Venom: a green mark on the slot, then a glob arcing from the Serpent's mouth; a green splash where it lands. */
+function drawVenom(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs: number): void {
+  const head = pathAt(Math.min(snap.headS, PATH_LENGTH));
+  for (const v of snap.venoms) {
+    const left = v.impactAt - snap.timeMs;
+    const k = 1 - Math.max(0, left) / VENOM_WARN_MS;
+    dangerMark(ctx, v.slot, k, "90,230,90", timeMs, 36);
+    // a skull-ish drip sign over the slot
+    const s = COLOSSUS_SLOTS[v.slot]!;
+    ctx.save();
+    ctx.font = "bold 16px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillStyle = `rgba(150,255,130,${0.6 + 0.4 * Math.sin(timeMs / 90)})`;
+    ctx.fillText("☠", s.x, s.y - 50);
+    ctx.restore();
+    if (left < 500) {
+      const f = 1 - Math.max(0, left) / 500;
+      const x = head.x + (s.x - head.x) * f;
+      const y = head.y - HOVER + (s.y - head.y + HOVER) * f - Math.sin(f * Math.PI) * 120;
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 14);
+      g.addColorStop(0, "rgba(220,255,200,1)");
+      g.addColorStop(0.5, "rgba(90,230,70,0.9)");
+      g.addColorStop(1, "rgba(40,160,40,0)");
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(x, y, 14, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+  for (const im of snap.impacts) {
+    if (im.kind !== "VENOM") continue;
+    const s = COLOSSUS_SLOTS[im.slot]!;
+    const k = (snap.timeMs - im.at) / 900;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    const r = 18 + k * 50;
+    ctx.fillStyle = `rgba(70,200,60,${(1 - k) * 0.55})`;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, r, r * 0.55, 0, 0, Math.PI * 2);
+    ctx.fill();
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * Math.PI * 2 + im.slot;
+      ctx.fillStyle = `rgba(160,255,120,${1 - k})`;
+      ctx.beginPath();
+      ctx.arc(Math.cos(a) * r, Math.sin(a) * r * 0.55 - Math.sin(k * Math.PI) * 26, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+/** The tail lash: orange marks on the slots in a row, a band joining them, then a sweeping arc of dust. */
+function drawSweeps(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs: number): void {
+  for (const sw of snap.sweeps) {
+    const left = sw.impactAt - snap.timeMs;
+    const k = 1 - Math.max(0, left) / SWEEP_WARN_MS;
+    ctx.save();
+    ctx.strokeStyle = `rgba(255,150,40,${0.25 + 0.3 * k})`;
+    ctx.lineWidth = 22;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    sw.slots.forEach((slot, i) => {
+      const p = COLOSSUS_SLOTS[slot]!;
+      if (i === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+    ctx.restore();
+    for (const slot of sw.slots) dangerMark(ctx, slot, k, "255,150,40", timeMs, 38);
+  }
+  for (const im of snap.impacts) {
+    if (im.kind !== "SWEEP") continue;
+    const s = COLOSSUS_SLOTS[im.slot]!;
+    const k = (snap.timeMs - im.at) / 900;
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `rgba(255,180,90,${1 - k})`;
+    ctx.lineWidth = 6 * (1 - k) + 1;
+    ctx.beginPath();
+    ctx.ellipse(0, -6, 30 + k * 40, (30 + k * 40) * 0.5, 0, Math.PI * (1.05 + k * 0.4), Math.PI * (1.95 + k * 0.4));
+    ctx.stroke();
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + im.slot * 1.7;
+      ctx.fillStyle = `rgba(200,160,120,${(1 - k) * 0.8})`;
+      ctx.fillRect(Math.cos(a) * (14 + k * 50), Math.sin(a) * (8 + k * 26) - k * 18, 4, 4);
+    }
+    ctx.restore();
+  }
+}
+
 function drawTowers(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, towers: readonly TowerInstance[], timeMs: number): void {
   const order = snap.players.map((p, i) => ({ p, i })).sort((a, b) => COLOSSUS_SLOTS[a.p.slot]!.y - COLOSSUS_SLOTS[b.p.slot]!.y);
   for (const { p, i } of order) {
@@ -1141,7 +1260,9 @@ function drawTowers(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, tower
     const moving = snap.timeMs < p.movingUntil;
     ctx.save();
     if (moving) ctx.globalAlpha = 1 - (p.movingUntil - snap.timeMs) / 800;
+    const poisoned = snap.timeMs < p.poisonedUntil;
     if (stunned) ctx.filter = "grayscale(0.85) brightness(0.6)";
+    else if (poisoned) ctx.filter = "sepia(0.6) hue-rotate(60deg) saturate(2.2) brightness(0.9)";
     const lastShot = snap.shots.filter((sh) => sh.from === i).reduce((m, sh) => Math.max(m, sh.at), -1e9);
     drawTower(ctx, tower, false, timeMs, snap.timeMs - lastShot, true);
     ctx.restore();
@@ -1156,7 +1277,30 @@ function drawTowers(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, tower
       ctx.stroke();
       ctx.restore();
     }
+    if (poisoned && !stunned) {
+      // green bubbles rising off a poisoned tower
+      for (let b = 0; b < 4; b++) {
+        const ph = ((timeMs / 900 + b / 4 + i * 0.13) % 1 + 1) % 1;
+        ctx.fillStyle = `rgba(130,255,110,${0.8 * (1 - ph)})`;
+        ctx.beginPath();
+        ctx.arc(s.x + Math.sin(b * 2.1 + timeMs / 400) * 10, s.y - 20 - ph * 34, 2.5 + b * 0.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
     if (stunned) {
+      if (p.isYou) {
+        // how long your tower stays down
+        ctx.save();
+        ctx.font = "800 14px system-ui, sans-serif";
+        ctx.textAlign = "center";
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = "rgba(0,0,0,0.75)";
+        ctx.fillStyle = "#ffe08a";
+        const secs = `${Math.ceil((p.stunnedUntil - snap.timeMs) / 1000)}s`;
+        ctx.strokeText(secs, s.x, s.y - 58);
+        ctx.fillText(secs, s.x, s.y - 58);
+        ctx.restore();
+      }
       const t = timeMs / 1000;
       for (let k = 0; k < 3; k++) {
         const a = t * 4 + (k / 3) * Math.PI * 2;
@@ -1187,6 +1331,7 @@ function drawNameTags(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot): vo
   }
 }
 let opts_youLabel = "YOU";
+let opts_weakLabel = "";
 
 function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs: number): void {
   ctx.save();
@@ -1218,13 +1363,22 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
     const k = (age - 140) / 560;
     const to = pathAt(Math.min(sh.s, PATH_LENGTH));
     ctx.globalAlpha = 1 - k;
-    ctx.font = `800 ${sh.strike ? 22 : sh.crit ? 15 : 12}px system-ui, sans-serif`;
-    ctx.fillStyle = sh.shielded ? "#9fe4ff" : sh.strike ? "#fff1c4" : sh.crit ? "#ffcf5a" : "#ffe6a8";
+    const weak = sh.head && !sh.shielded;
+    ctx.font = `800 ${sh.strike ? 22 : sh.crit || weak ? 15 : 12}px system-ui, sans-serif`;
+    ctx.fillStyle = sh.shielded ? "#9fe4ff" : sh.strike ? "#fff1c4" : weak ? "#ff9a4a" : sh.crit ? "#ffcf5a" : "#ffe6a8";
     ctx.strokeStyle = "rgba(0,0,0,0.7)";
     ctx.lineWidth = 3;
     const txt = formatShort(sh.amount);
-    ctx.strokeText(txt, to.x, to.y - HOVER - 26 - k * 26);
-    ctx.fillText(txt, to.x, to.y - HOVER - 26 - k * 26);
+    const y = to.y - HOVER - 26 - k * 26;
+    ctx.strokeText(txt, to.x, y);
+    ctx.fillText(txt, to.x, y);
+    // the head is the weak point: say so on the hit
+    if (weak && opts_weakLabel) {
+      ctx.font = "800 9.5px system-ui, sans-serif";
+      ctx.fillStyle = "#ffcf9a";
+      ctx.strokeText(opts_weakLabel, to.x, y - 15);
+      ctx.fillText(opts_weakLabel, to.x, y - 15);
+    }
   }
   ctx.restore();
   void timeMs;
@@ -1333,6 +1487,8 @@ export interface FrameOpts {
   hoverSlot: number | null;
   canMove: boolean;
   youLabel: string;
+  /** Tag over your hits on the head (the weak point), e.g. "PONTO FRACO". */
+  weakLabel?: string;
   /** The towers' magic layer (projectiles + the main game's impact effects). */
   fx?: ColossusFxLayer | null;
 }
@@ -1340,6 +1496,7 @@ export interface FrameOpts {
 /** A full frame of the raid (snap = null before the attempt starts: slot picking over an idle Serpent). */
 export function drawColossusFrame(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot | null, towers: readonly TowerInstance[], timeMs: number, opts: FrameOpts): void {
   opts_youLabel = opts.youLabel;
+  opts_weakLabel = opts.weakLabel ?? "";
   const st = snap?.timeMs ?? 0;
   const eclipse = snap ? Math.max(0, Math.min(1, (st - 100_000) / 2_000)) * (1 - (snap.dive > 0 ? snap.dive : 0)) : 0;
   // screen shake when a star lands next to you
@@ -1354,11 +1511,18 @@ export function drawColossusFrame(ctx: CanvasRenderingContext2D, snap: ColossusS
   drawVoid(ctx, timeMs, eclipse);
   drawArena(ctx, timeMs);
   drawRiftPortal(ctx, RIFT_AT, getBiome("ABYSS"), timeMs, [], true);
+  if (eclipse > 0) {
+    // Eclipse: the sky goes dark over the whole island
+    ctx.fillStyle = `rgba(6,0,14,${0.5 * eclipse})`;
+    ctx.fillRect(-20, -20, W + 40, H + 40);
+  }
   drawCore(ctx, timeMs, eclipse, snap ? Math.sin(snap.dive * Math.PI) : 0);
   drawSlotMarks(ctx, snap, timeMs, opts);
   if (snap) opts.fx?.drawGround(ctx, timeMs);
   if (snap) {
     drawStars(ctx, snap);
+    drawSweeps(ctx, snap, timeMs);
+    drawVenom(ctx, snap, timeMs);
     drawTowers(ctx, snap, towers, timeMs);
   }
   // the Serpent: idle (before the start) waits half out of the rift

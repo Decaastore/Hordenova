@@ -7,9 +7,18 @@
  * SLOT_COUNT slots between the spiral's arms and pour damage into whatever
  * part of its body is in range (the head is the weak point).
  *
- * Phases (config/colossus.ts): AWAKEN → STARFALL (falling stars stun the
- * tower on a marked slot — move away in time) → ECLIPSE (damage up, but the
- * Serpent raises scale shields every few seconds — time your Star Strike).
+ * The Serpent is as long as the whole road: it surges out of the rift and
+ * reaches the Core in ARRIVE_MS, and from then on its coils cover the whole
+ * spiral, so every slot on the map has something to shoot.
+ *
+ * Phases (config/colossus.ts), each one adding to the last:
+ * - AWAKEN: the Serpent spits venom at towers (a green mark — move away, or
+ *   the tower attacks at half speed for a while).
+ * - STARFALL: falling stars stun the tower on a red-marked slot, and the
+ *   tail lashes three slots in a row (an orange mark — knocked down, and half
+ *   the Star Strike charge is lost).
+ * - ECLIPSE: damage up, but the Serpent raises scale shields every few
+ *   seconds (time your Star Strike) and every attack comes faster.
  *
  * Deterministic: fixed 50 ms steps and a seeded RNG, so a seed replays the
  * same attempt. Player 0 is the local player; 1..11 are simulated allies.
@@ -91,8 +100,11 @@ export const COLOSSUS_SLOTS: readonly Pt[] = (() => {
 export const SLOT_COUNT = COLOSSUS_SLOTS.length;
 
 /** The Serpent: a head and BODY_SEGMENTS plates trailing behind it. */
-export const BODY_SEGMENTS = 30;
 export const SEGMENT_GAP = 19;
+/** Long enough to fill the whole road once the head is at the Core. */
+export const BODY_SEGMENTS = Math.ceil(PATH_LENGTH / SEGMENT_GAP) + 1;
+/** When the head reaches the Core (it surges out fast, then slows down). */
+export const ARRIVE_MS = 36_000;
 /** The same range for every tower type, whatever its level or kind. */
 export const TOWER_RANGE = 185;
 const IRONWOOD_CRIT_CHANCE = 0.25;
@@ -112,6 +124,20 @@ const SHIELD_FIRST_MS = 104_000;
 const SHIELD_EVERY_MS = 14_000;
 export const SHIELD_MS = 4_000;
 const DIVE_MS = 2_500;
+export const VENOM_WARN_MS = 2_000;
+export const VENOM_MS = 6_000;
+const VENOM_FIRST_MS = 10_000;
+export const SWEEP_WARN_MS = 2_200;
+export const SWEEP_STUN_MS = 2_500;
+/** Slots in a row hit by one lash of the tail. */
+const SWEEP_WIDTH = 3;
+
+/** Distance of the head along the road at time `t` (eases out of the rift, then rests coiled at the Core; after the clock it dives in). */
+export function headAt(t: number): number {
+  const k = Math.min(1, Math.max(0, t) / ARRIVE_MS);
+  const eased = 1 - Math.pow(1 - k, 1.6);
+  return PATH_LENGTH * eased + Math.max(0, t - COLOSSUS_LENGTH_MS) * (PATH_LENGTH / COLOSSUS_LENGTH_MS) * 3;
+}
 
 /** Whether a tower on `slot` can reach the body part at distance `s` (same test for every tower). */
 function inRange(slot: Pt, s: number): boolean {
@@ -129,7 +155,7 @@ export const SLOT_FAIRNESS: readonly number[] = (() => {
   const exposure = COLOSSUS_SLOTS.map((slot) => {
     let e = 0;
     for (let t = 0; t <= COLOSSUS_LENGTH_MS; t += 250) {
-      const head = (PATH_LENGTH * t) / COLOSSUS_LENGTH_MS;
+      const head = headAt(t);
       for (let k = 0; k <= BODY_SEGMENTS; k++) {
         const s = head - k * SEGMENT_GAP;
         if (s < 0 || s > PATH_LENGTH) continue;
@@ -156,6 +182,8 @@ export interface RaidPlayer {
   damage: number;
   attackInMs: number;
   stunnedUntil: number;
+  /** Poisoned by venom: attacks at half speed until then. */
+  poisonedUntil: number;
   movingUntil: number;
   moveReadyAt: number;
   /** 0..1 Star Strike charge. */
@@ -182,10 +210,25 @@ export interface FallingStar {
   impactAt: number;
 }
 
+/** Venom the Serpent spat at a slot: whatever stands there when it lands is poisoned. */
+export interface VenomShot {
+  slot: number;
+  impactAt: number;
+}
+
+/** A lash of the tail across several slots in a row. */
+export interface TailSweep {
+  slots: readonly number[];
+  impactAt: number;
+}
+
+export type ImpactKind = "STAR" | "VENOM" | "SWEEP";
+
 export interface Impact {
   slot: number;
   at: number;
   hit: boolean;
+  kind: ImpactKind;
 }
 
 export interface ColossusSnapshot {
@@ -196,6 +239,8 @@ export interface ColossusSnapshot {
   players: readonly RaidPlayer[];
   shots: readonly RaidShot[];
   stars: readonly FallingStar[];
+  venoms: readonly VenomShot[];
+  sweeps: readonly TailSweep[];
   impacts: readonly Impact[];
   shieldUntil: number;
   /** Next shield start (Eclipse only), for the warning. */
@@ -237,6 +282,10 @@ export class ColossusEngine {
   private players: RaidPlayer[] = [];
   private shots: RaidShot[] = [];
   private stars: FallingStar[] = [];
+  private venoms: VenomShot[] = [];
+  private sweeps: TailSweep[] = [];
+  private nextVenomAt = VENOM_FIRST_MS;
+  private nextSweepAt = 52_000;
   private impacts: Impact[] = [];
   private nextStarAt = 45_000;
   private shieldUntil = -1;
@@ -266,7 +315,7 @@ export class ColossusEngine {
   }
 
   private makePlayer(name: string, type: TowerType, power: number, slot: number, skin: string | null, isYou: boolean): RaidPlayer {
-    return { name, type, power, slot, damage: 0, attackInMs: 300 + Math.floor(this.rng() * 600), stunnedUntil: -1, movingUntil: -1, moveReadyAt: 0, charge: 0, skin, isYou };
+    return { name, type, power, slot, damage: 0, attackInMs: 300 + Math.floor(this.rng() * 600), stunnedUntil: -1, poisonedUntil: -1, movingUntil: -1, moveReadyAt: 0, charge: 0, skin, isYou };
   }
 
   get timeMs(): number {
@@ -274,7 +323,7 @@ export class ColossusEngine {
   }
 
   headS(): number {
-    return (PATH_LENGTH * Math.min(this.t, COLOSSUS_LENGTH_MS)) / COLOSSUS_LENGTH_MS + Math.max(0, this.t - COLOSSUS_LENGTH_MS) * (PATH_LENGTH / COLOSSUS_LENGTH_MS) * 3;
+    return headAt(this.t);
   }
 
   private shielded(): boolean {
@@ -369,6 +418,8 @@ export class ColossusEngine {
     if (!live) {
       if (this.t >= COLOSSUS_LENGTH_MS + DIVE_MS) this.ended = true;
       this.stars = [];
+      this.venoms = [];
+      this.sweeps = [];
       this.pruneFx();
       return;
     }
@@ -379,8 +430,8 @@ export class ColossusEngine {
 
     // Falling stars
     if (phase !== "AWAKEN" && this.t >= this.nextStarAt && this.t < COLOSSUS_LENGTH_MS - STAR_WARN_MS) {
-      const count = phase === "ECLIPSE" ? 3 : 2;
-      const taken = new Set(this.stars.map((s) => s.slot));
+      const count = phase === "ECLIPSE" ? 4 : 3;
+      const taken = this.dangerSlots();
       const occupied = this.players.map((p) => p.slot).filter((s) => !taken.has(s));
       for (let k = 0; k < count; k++) {
         const pool = occupied.length ? occupied : Array.from({ length: SLOT_COUNT }, (_, i) => i).filter((s) => !taken.has(s));
@@ -390,13 +441,34 @@ export class ColossusEngine {
         taken.add(slot);
         this.stars.push({ slot, impactAt: this.t + STAR_WARN_MS });
         // a simulated ally on that slot may step away in time
-        const ally = this.players.findIndex((p) => !p.isYou && p.slot === slot);
-        if (ally > 0 && this.rng() < 0.55) this.pendingMoves.push({ player: ally, at: this.t + 600 + Math.floor(this.rng() * 900), to: -1 });
+        this.allyMayDodge(slot);
       }
-      this.nextStarAt = this.t + (phase === "ECLIPSE" ? 5_000 : 7_000);
+      this.nextStarAt = this.t + (phase === "ECLIPSE" ? 4_500 : 6_000);
+    }
+
+    // Venom: the head spits at a tower
+    if (this.t >= this.nextVenomAt && this.t < COLOSSUS_LENGTH_MS - VENOM_WARN_MS) {
+      const count = phase === "ECLIPSE" ? 2 : 1;
+      const taken = this.dangerSlots();
+      const pool = this.players.map((p) => p.slot).filter((s) => !taken.has(s));
+      for (let k = 0; k < count && pool.length; k++) {
+        const slot = pool.splice(Math.floor(this.rng() * pool.length), 1)[0]!;
+        this.venoms.push({ slot, impactAt: this.t + VENOM_WARN_MS });
+        this.allyMayDodge(slot);
+      }
+      this.nextVenomAt = this.t + (phase === "ECLIPSE" ? 6_000 : phase === "STARFALL" ? 8_000 : 9_000);
+    }
+
+    // Tail sweep: three slots in a row
+    if (phase !== "AWAKEN" && this.t >= this.nextSweepAt && this.t < COLOSSUS_LENGTH_MS - SWEEP_WARN_MS) {
+      const start = Math.floor(this.rng() * (SLOT_COUNT - SWEEP_WIDTH + 1));
+      const slots = Array.from({ length: SWEEP_WIDTH }, (_, i) => start + i);
+      this.sweeps.push({ slots, impactAt: this.t + SWEEP_WARN_MS });
+      for (const slot of slots) this.allyMayDodge(slot);
+      this.nextSweepAt = this.t + (phase === "ECLIPSE" ? 9_000 : 12_000);
     }
     for (const mv of this.pendingMoves.filter((m) => m.at <= this.t)) {
-      const danger = new Set(this.stars.map((s) => s.slot));
+      const danger = this.dangerSlots();
       const options = Array.from({ length: SLOT_COUNT }, (_, i) => i).filter((s) => !danger.has(s) && !this.occupied(s));
       if (options.length) this.moveTo(options[Math.floor(this.rng() * options.length)]!, mv.player);
     }
@@ -404,9 +476,26 @@ export class ColossusEngine {
     for (const star of this.stars.filter((s) => s.impactAt <= this.t)) {
       const victim = this.players.find((p) => p.slot === star.slot);
       if (victim) victim.stunnedUntil = this.t + STUN_MS;
-      this.impacts.push({ slot: star.slot, at: this.t, hit: !!victim });
+      this.impacts.push({ slot: star.slot, at: this.t, hit: !!victim, kind: "STAR" });
     }
     this.stars = this.stars.filter((s) => s.impactAt > this.t);
+    for (const v of this.venoms.filter((s) => s.impactAt <= this.t)) {
+      const victim = this.players.find((p) => p.slot === v.slot);
+      if (victim) victim.poisonedUntil = this.t + VENOM_MS;
+      this.impacts.push({ slot: v.slot, at: this.t, hit: !!victim, kind: "VENOM" });
+    }
+    this.venoms = this.venoms.filter((s) => s.impactAt > this.t);
+    for (const sw of this.sweeps.filter((s) => s.impactAt <= this.t)) {
+      for (const slot of sw.slots) {
+        const victim = this.players.find((p) => p.slot === slot);
+        if (victim) {
+          victim.stunnedUntil = Math.max(victim.stunnedUntil, this.t + SWEEP_STUN_MS);
+          victim.charge *= 0.5;
+        }
+        this.impacts.push({ slot, at: this.t, hit: !!victim, kind: "SWEEP" });
+      }
+    }
+    this.sweeps = this.sweeps.filter((s) => s.impactAt > this.t);
 
     // Towers
     this.players.forEach((p, i) => {
@@ -419,11 +508,27 @@ export class ColossusEngine {
       }
       p.attackInMs -= DT;
       if (p.attackInMs > 0) return;
-      p.attackInMs += ATTACK_MS[p.type];
+      // poisoned towers attack at half speed
+      p.attackInMs += ATTACK_MS[p.type] * (this.t < p.poisonedUntil ? 2 : 1);
       const target = this.targetFor(p);
       if (target) this.hit(i, target, 1, false);
     });
     this.pruneFx();
+  }
+
+  /** Slots something is about to land on (stars, venom, the tail). */
+  private dangerSlots(): Set<number> {
+    const out = new Set<number>();
+    for (const s of this.stars) out.add(s.slot);
+    for (const v of this.venoms) out.add(v.slot);
+    for (const sw of this.sweeps) for (const s of sw.slots) out.add(s);
+    return out;
+  }
+
+  /** A simulated ally on a marked slot may step away in time (about half do). */
+  private allyMayDodge(slot: number): void {
+    const ally = this.players.findIndex((p) => !p.isYou && p.slot === slot);
+    if (ally > 0 && this.rng() < 0.5) this.pendingMoves.push({ player: ally, at: this.t + 500 + Math.floor(this.rng() * 900), to: -1 });
   }
 
   private pruneFx(): void {
@@ -445,6 +550,8 @@ export class ColossusEngine {
       players: this.players.map((p) => ({ ...p })),
       shots: [...this.shots],
       stars: [...this.stars],
+      venoms: [...this.venoms],
+      sweeps: this.sweeps.map((s) => ({ slots: [...s.slots], impactAt: s.impactAt })),
       impacts: [...this.impacts],
       shieldUntil: this.shieldUntil,
       nextShieldAt: this.nextShieldAt(),

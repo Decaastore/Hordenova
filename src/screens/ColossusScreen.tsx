@@ -25,6 +25,7 @@ import {
   worldState,
   type ColossusCosmeticId,
   type ColossusPrize,
+  COLOSSUS_PHASES,
 } from "@/config/colossus";
 import { createTowerInstance, getTowerStats, type TowerInstance } from "@/entities/Tower";
 import { TOWER_TYPES, type TowerType } from "@/config/towerStats";
@@ -451,7 +452,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
         ctx.setTransform(sc, 0, 0, sc, (cv.width - W * sc) / 2, (cv.height - H * sc) / 2);
         const you = s?.players.find((p) => p.isYou);
         const canMove = !!s && !!you && s.timeMs >= you.moveReadyAt && s.timeMs >= you.stunnedUntil && s.timeMs < COLOSSUS_LENGTH_MS;
-        drawColossusFrame(ctx, s, towersRef.current, now, { pickMode: !e, hoverSlot: hoverRef.current, canMove, youLabel: t("colossus.you"), fx: fxRef.current });
+        drawColossusFrame(ctx, s, towersRef.current, now, { pickMode: !e, hoverSlot: hoverRef.current, canMove, youLabel: t("colossus.you"), weakLabel: t("colossus.weakPoint"), fx: fxRef.current });
       }
       if (s) setSnap(s);
       if (s?.over && !finishedRef.current && e) {
@@ -530,6 +531,16 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
   const moveIn = you ? Math.max(0, you.moveReadyAt - time) : 0;
   const stunned = !!you && time < you.stunnedUntil;
   const marked = !!snap && !!you && snap.stars.some((s) => s.slot === you.slot);
+  const venomed = !!snap && !!you && snap.venoms.some((v) => v.slot === you.slot);
+  const swept = !!snap && !!you && snap.sweeps.some((w) => w.slots.includes(you.slot));
+  const poisoned = !!you && time < you.poisonedUntil;
+  const outOfRange = !!engine && !!you && time > 1_500 && time < COLOSSUS_LENGTH_MS && !snap?.shots.some((sh) => sh.from === 0) && !stunned && time >= you.movingUntil;
+  // the moment a scale shield drops: the window for the Star Strike
+  const shieldDown = !!snap && !shielded && snap.shieldUntil > 0 && time - snap.shieldUntil < 2_500;
+  // a phase starts: its name and what to do, big, for a few seconds
+  const phaseFrom = COLOSSUS_PHASES.find((p) => p.id === phase)?.fromMs ?? 0;
+  const phaseBanner = !!engine && !summary && countdown === null && time - phaseFrom < 3_500 ? phase : null;
+  const HOW: Record<string, TranslationKey> = { AWAKEN: "colossus.how1", STARFALL: "colossus.how2", ECLIPSE: "colossus.how3" };
 
   return (
     <div style={raidRoot}>
@@ -578,9 +589,40 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
             ))}
           </ol>
         )}
-        {engine && !summary && (shielded || marked || stunned) && (
-          <div className={`cr-alert${marked ? " is-danger" : ""}`}>{stunned ? t("colossus.alertStunned") : marked ? t("colossus.alertStar") : t("colossus.alertShield")}</div>
+        {phaseBanner && (
+          <div className={`cr-phase-banner is-${phaseBanner}`} key={phaseBanner} data-testid="colossus-phase-banner">
+            <strong>{t(`colossus.phase.${phaseBanner}` as TranslationKey)}</strong>
+            <span>{t(HOW[phaseBanner]!)}</span>
+          </div>
         )}
+        {engine && !summary && (() => {
+          // one alert at a time, the most urgent first
+          const danger = marked || swept || venomed;
+          const msg = stunned
+            ? t("colossus.alertStunned")
+            : marked
+              ? t("colossus.alertStar")
+              : swept
+                ? t("colossus.alertSweep")
+                : venomed
+                  ? t("colossus.alertVenom")
+                  : shielded
+                    ? t("colossus.alertShield")
+                    : shieldDown
+                      ? t("colossus.alertShieldDown")
+                      : poisoned
+                        ? t("colossus.alertPoisoned")
+                        : outOfRange
+                          ? t("colossus.alertOutOfRange")
+                          : null;
+          if (!msg) return null;
+          const tone = danger ? (venomed && !marked && !swept ? " is-venom" : " is-danger") : shieldDown && !stunned && !shielded ? " is-go" : poisoned && !shielded ? " is-venom-soft" : "";
+          return (
+            <div className={`cr-alert${tone}`} data-testid="colossus-alert">
+              {msg}
+            </div>
+          );
+        })()}
         {summary && (
           <div className="cr-result" role="dialog" data-testid="colossus-result">
             <p className="cr-res-kicker">{t("colossus.resultKicker")}</p>
@@ -716,6 +758,19 @@ const RAID_CSS = `
 .cr-rank li b { font-variant-numeric: tabular-nums; }
 .cr-rank li.is-you { background: rgba(255,211,107,0.16); color: #ffd36b; font-weight: 800; }
 .cr-alert { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 10px 20px; border-radius: 10px; font-weight: 800; background: rgba(40,90,140,0.85); color: #e6f6ff; border: 1px solid rgba(150,230,255,0.7); pointer-events: none; }
+.cr-alert.is-go { background: rgba(150,110,20,0.92); border-color: #ffd66b; color: #fff6d8; animation: cr-blink 0.5s infinite alternate; }
+.cr-alert.is-venom { background: rgba(30,110,40,0.92); border-color: #8dff7a; color: #f0ffe8; animation: cr-blink 0.5s infinite alternate; }
+.cr-alert.is-venom-soft { background: rgba(30,90,40,0.85); border-color: #8dff7a; color: #e8ffe0; }
+.cr-phase-banner { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); width: min(560px, 86%); padding: 16px 22px 18px; text-align: center; border-radius: 14px; pointer-events: none;
+  background: rgba(14,8,24,0.86); border: 1px solid rgba(199,155,255,0.6); box-shadow: 0 12px 40px rgba(0,0,0,0.6); animation: cr-banner 3.5s ease forwards; }
+.cr-phase-banner strong { display: block; font-family: Georgia, serif; font-size: 30px; color: #e6cbff; letter-spacing: 0.01em; margin-bottom: 6px; }
+.cr-phase-banner span { font-size: 13.5px; line-height: 1.5; color: #e9def8; }
+.cr-phase-banner.is-STARFALL { border-color: rgba(255,140,100,0.7); }
+.cr-phase-banner.is-STARFALL strong { color: #ffb08a; }
+.cr-phase-banner.is-ECLIPSE { border-color: rgba(255,90,74,0.75); }
+.cr-phase-banner.is-ECLIPSE strong { color: #ff7a6a; }
+@keyframes cr-banner { 0% { opacity: 0; transform: translate(-50%, -12px) scale(0.96); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1); } 82% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cr-phase-banner { animation: none; } }
 .cr-alert.is-danger { background: rgba(140,30,20,0.9); border-color: #ff8a6a; color: #fff; animation: cr-blink 0.5s infinite alternate; }
 @keyframes cr-blink { to { filter: brightness(1.35); } }
 .cr-result { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(460px, 92vw); display: grid; gap: 10px; justify-items: center; text-align: center; padding: 26px 24px; border-radius: 16px; background: rgba(12,7,22,0.94); border: 1px solid rgba(255,211,107,0.55); box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
