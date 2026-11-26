@@ -4,7 +4,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import type { TranslationKey } from "@/i18n/translate";
 import { loadEternalCastle, loadSave, updateSave, type SaveData } from "@/engine/SaveSystem";
 import { appendLedgerEvent } from "@/engine/EconomyLedger";
-import { ColossusEngine, COLOSSUS_SLOTS, MOVE_COOLDOWN_MS, type ColossusSnapshot } from "@/engine/ColossusEngine";
+import { ColossusEngine, COLOSSUS_SLOTS, LAP_MS, MOVE_COOLDOWN_MS, type ColossusSnapshot } from "@/engine/ColossusEngine";
 import {
   applyAttempt,
   attemptsLeft,
@@ -194,6 +194,8 @@ interface AttemptSummary {
   prize: ColossusPrize;
   dailyGem: boolean;
   newCosmetics: ColossusCosmeticId[];
+  /** The Serpent's world life left after this attempt (0..1). */
+  worldLeft: number;
 }
 
 /** CHEFE GLOBAL — the Serpent of the Eclipse: lobby (world life, attempts, prizes, Eclipse looks) and the raid itself. */
@@ -462,7 +464,7 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
         const cur = loadSave();
         const r = applyAttempt(cur.colossus, place, damage, Date.now());
         updateSave({ ...grant(cur, r.prize, "colossus_attempt"), colossus: r.profile });
-        setSummary({ place, damage, roomDamage: s.roomDamage, prize: r.prize, dailyGem: r.dailyGem, newCosmetics: r.newCosmetics });
+        setSummary({ place, damage, roomDamage: s.roomDamage, prize: r.prize, dailyGem: r.dailyGem, newCosmetics: r.newCosmetics, worldLeft: worldState(r.profile, Date.now()).fraction });
       }
       raf = requestAnimationFrame(loop);
     };
@@ -540,6 +542,9 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
   // a phase starts: its name and what to do, big, for a few seconds
   const phaseFrom = COLOSSUS_PHASES.find((p) => p.id === phase)?.fromMs ?? 0;
   const phaseBanner = !!engine && !summary && countdown === null && time - phaseFrom < 3_500 ? phase : null;
+  // the Serpent's story beats: back out of the rift for lap 2, and the final dive
+  const beat = !engine || summary || countdown !== null ? null : time >= COLOSSUS_LENGTH_MS ? "DIVE" : time >= LAP_MS && time - LAP_MS < 3_500 ? "LAP2" : null;
+  const finalIn = engine && time < COLOSSUS_LENGTH_MS ? COLOSSUS_LENGTH_MS - time : Infinity;
   const HOW: Record<string, TranslationKey> = { AWAKEN: "colossus.how1", STARFALL: "colossus.how2", ECLIPSE: "colossus.how3" };
 
   return (
@@ -589,6 +594,12 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
             ))}
           </ol>
         )}
+        {beat && !phaseBanner && (
+          <div className={`cr-phase-banner is-${beat}`} key={beat} data-testid="colossus-beat-banner">
+            <strong>{t(beat === "DIVE" ? "colossus.beatDiveTitle" : "colossus.beatLapTitle")}</strong>
+            <span>{t(beat === "DIVE" ? "colossus.beatDiveText" : "colossus.beatLapText")}</span>
+          </div>
+        )}
         {phaseBanner && (
           <div className={`cr-phase-banner is-${phaseBanner}`} key={phaseBanner} data-testid="colossus-phase-banner">
             <strong>{t(`colossus.phase.${phaseBanner}` as TranslationKey)}</strong>
@@ -610,13 +621,15 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
                     ? t("colossus.alertShield")
                     : shieldDown
                       ? t("colossus.alertShieldDown")
-                      : poisoned
+                      : finalIn <= 15_000
+                        ? t("colossus.alertFinal", { s: Math.ceil(finalIn / 1000) })
+                        : poisoned
                         ? t("colossus.alertPoisoned")
                         : outOfRange
                           ? t("colossus.alertOutOfRange")
                           : null;
           if (!msg) return null;
-          const tone = danger ? (venomed && !marked && !swept ? " is-venom" : " is-danger") : shieldDown && !stunned && !shielded ? " is-go" : poisoned && !shielded ? " is-venom-soft" : "";
+          const tone = !danger && !stunned && !shielded && !shieldDown && finalIn <= 15_000 ? " is-go" : danger ? (venomed && !marked && !swept ? " is-venom" : " is-danger") : shieldDown && !stunned && !shielded ? " is-go" : poisoned && !shielded ? " is-venom-soft" : "";
           return (
             <div className={`cr-alert${tone}`} data-testid="colossus-alert">
               {msg}
@@ -628,6 +641,12 @@ function ColossusRaid({ best, onDone }: { best: BestTower; onDone: () => void })
             <p className="cr-res-kicker">{t("colossus.resultKicker")}</p>
             <h2>{t("colossus.resultPlace", { n: summary.place, of: COLOSSUS_ROOM_SIZE })}</h2>
             <p>{t("colossus.resultDamage", { n: formatShort(summary.damage), room: formatShort(summary.roomDamage) })}</p>
+            <div className="cr-res-world" data-testid="colossus-result-world">
+              <span>{t("colossus.resultWorld", { pct: (summary.worldLeft * 100).toFixed(1) })}</span>
+              <div>
+                <i style={{ width: `${(summary.worldLeft * 100).toFixed(2)}%` }} />
+              </div>
+            </div>
             {summary.dailyGem && <p className="cr-tag">{t("colossus.dailyGemTag", { n: COLOSSUS_DAILY_GEMS })}</p>}
             {summary.newCosmetics.map((c) => (
               <p key={c} className="cr-tag is-gold">
@@ -758,6 +777,12 @@ const RAID_CSS = `
 .cr-rank li b { font-variant-numeric: tabular-nums; }
 .cr-rank li.is-you { background: rgba(255,211,107,0.16); color: #ffd36b; font-weight: 800; }
 .cr-alert { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 10px 20px; border-radius: 10px; font-weight: 800; background: rgba(40,90,140,0.85); color: #e6f6ff; border: 1px solid rgba(150,230,255,0.7); pointer-events: none; }
+.cr-phase-banner.is-LAP2 { border-color: rgba(170,120,255,0.75); }
+.cr-phase-banner.is-DIVE { border-color: rgba(255,210,120,0.8); }
+.cr-phase-banner.is-DIVE strong { color: #ffd98a; }
+.cr-res-world { margin: 10px auto 4px; max-width: 320px; text-align: left; font-size: 12.5px; color: #d9c8f0; }
+.cr-res-world div { height: 8px; margin-top: 5px; border-radius: 4px; background: rgba(255,255,255,0.08); overflow: hidden; }
+.cr-res-world i { display: block; height: 100%; background: linear-gradient(90deg, #8a3cff, #ff5a7a); }
 .cr-alert.is-go { background: rgba(150,110,20,0.92); border-color: #ffd66b; color: #fff6d8; animation: cr-blink 0.5s infinite alternate; }
 .cr-alert.is-venom { background: rgba(30,110,40,0.92); border-color: #8dff7a; color: #f0ffe8; animation: cr-blink 0.5s infinite alternate; }
 .cr-alert.is-venom-soft { background: rgba(30,90,40,0.85); border-color: #8dff7a; color: #e8ffe0; }

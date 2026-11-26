@@ -7,9 +7,12 @@
  * SLOT_COUNT slots between the spiral's arms and pour damage into whatever
  * part of its body is in range (the head is the weak point).
  *
- * The Serpent is as long as the whole road: it surges out of the rift and
- * reaches the Core in ARRIVE_MS, and from then on its coils cover the whole
- * spiral, so every slot on the map has something to shoot.
+ * The Serpent makes TWO laps of the spiral (the Core is a gate back to the
+ * rift): the first, faster, in LAP_MS — it dives through the Core and comes
+ * back out of the rift — and the second, slower and angrier, until the clock
+ * ends, when it dives into the Core for good (the finale). Its body is
+ * BODY_LENGTH long, so after the first stretch every slot on the map has a
+ * part of it in range most of the time, and the head keeps moving to the end.
  *
  * Phases (config/colossus.ts), each one adding to the last:
  * - AWAKEN: the Serpent spits venom at towers (a green mark — move away, or
@@ -101,10 +104,15 @@ export const SLOT_COUNT = COLOSSUS_SLOTS.length;
 
 /** The Serpent: a head and BODY_SEGMENTS plates trailing behind it. */
 export const SEGMENT_GAP = 19;
-/** Long enough to fill the whole road once the head is at the Core. */
-export const BODY_SEGMENTS = Math.ceil(PATH_LENGTH / SEGMENT_GAP) + 1;
-/** When the head reaches the Core (it surges out fast, then slows down). */
-export const ARRIVE_MS = 36_000;
+/** Laps of the spiral in one attempt. */
+export const LAPS = 2;
+/** The first lap (out of the rift, through the Core); the second fills the rest of the clock. */
+export const LAP_MS = 66_000;
+/** The body: about 60% of the road. */
+export const BODY_SEGMENTS = Math.round((PATH_LENGTH * 0.6) / SEGMENT_GAP);
+export const BODY_LENGTH = BODY_SEGMENTS * SEGMENT_GAP;
+/** Where the route ends: after the last lap, everything past here is inside the Core. */
+export const ROUTE_END = PATH_LENGTH * LAPS;
 /** The same range for every tower type, whatever its level or kind. */
 export const TOWER_RANGE = 185;
 const IRONWOOD_CRIT_CHANCE = 0.25;
@@ -123,7 +131,7 @@ export const STUN_MS = 5_000;
 const SHIELD_FIRST_MS = 104_000;
 const SHIELD_EVERY_MS = 14_000;
 export const SHIELD_MS = 4_000;
-const DIVE_MS = 2_500;
+export const DIVE_MS = 4_000;
 export const VENOM_WARN_MS = 2_000;
 export const VENOM_MS = 6_000;
 const VENOM_FIRST_MS = 10_000;
@@ -132,16 +140,32 @@ export const SWEEP_STUN_MS = 2_500;
 /** Slots in a row hit by one lash of the tail. */
 const SWEEP_WIDTH = 3;
 
-/** Distance of the head along the road at time `t` (eases out of the rift, then rests coiled at the Core; after the clock it dives in). */
+/**
+ * Distance of the head along its route at time `t` (0..ROUTE_END; one road
+ * length per lap): lap 1 in LAP_MS, lap 2 over the rest of the clock, then
+ * the final dive pulls the whole body into the Core in DIVE_MS.
+ */
 export function headAt(t: number): number {
-  const k = Math.min(1, Math.max(0, t) / ARRIVE_MS);
-  const eased = 1 - Math.pow(1 - k, 1.6);
-  return PATH_LENGTH * eased + Math.max(0, t - COLOSSUS_LENGTH_MS) * (PATH_LENGTH / COLOSSUS_LENGTH_MS) * 3;
+  if (t <= LAP_MS) return (PATH_LENGTH * Math.max(0, t)) / LAP_MS;
+  if (t <= COLOSSUS_LENGTH_MS) return PATH_LENGTH + (PATH_LENGTH * (LAPS - 1) * (t - LAP_MS)) / (COLOSSUS_LENGTH_MS - LAP_MS);
+  return ROUTE_END + (Math.min(DIVE_MS, t - COLOSSUS_LENGTH_MS) / DIVE_MS) * (BODY_LENGTH + SEGMENT_GAP * 2);
+}
+
+/** Whether a body part at route distance `s` is out on the island (not still in the rift, not already inside the Core). */
+export function onIsland(s: number): boolean {
+  return s >= 0 && s < ROUTE_END;
+}
+
+/** Where a body part at route distance `s` is on the road (each lap runs the same spiral). */
+export function roadAt(s: number): { x: number; y: number; angle: number } {
+  if (s < 0) return pathAt(s);
+  if (s >= ROUTE_END) return pathAt(PATH_LENGTH);
+  return pathAt(s % PATH_LENGTH);
 }
 
 /** Whether a tower on `slot` can reach the body part at distance `s` (same test for every tower). */
 function inRange(slot: Pt, s: number): boolean {
-  const pt = pathAt(s);
+  const pt = roadAt(s);
   return Math.hypot(pt.x - slot.x, (pt.y - slot.y) * 1.15) <= TOWER_RANGE;
 }
 
@@ -158,7 +182,7 @@ export const SLOT_FAIRNESS: readonly number[] = (() => {
       const head = headAt(t);
       for (let k = 0; k <= BODY_SEGMENTS; k++) {
         const s = head - k * SEGMENT_GAP;
-        if (s < 0 || s > PATH_LENGTH) continue;
+        if (!onIsland(s)) continue;
         if (inRange(slot, s)) {
           e += k === 0 ? HEAD_WEAK_POINT : 1;
           break;
@@ -250,6 +274,8 @@ export interface ColossusSnapshot {
   over: boolean;
   /** 0..1 progress of the final dive into the core (after the clock ends). */
   dive: number;
+  /** Which lap the head is on (1 or 2). */
+  lap: number;
 }
 
 function mulberry32(seed: number): () => number {
@@ -372,7 +398,7 @@ export class ColossusEngine {
     const head = this.headS();
     for (let k = 0; k <= BODY_SEGMENTS; k++) {
       const s = head - k * SEGMENT_GAP;
-      if (s < 0 || s > PATH_LENGTH) continue;
+      if (!onIsland(s)) continue;
       if (inRange(slot, s)) return { s, head: k === 0 };
     }
     return null;
@@ -559,6 +585,7 @@ export class ColossusEngine {
       roomDamage: this.roomDamage,
       over: this.ended,
       dive: Math.max(0, Math.min(1, (this.t - COLOSSUS_LENGTH_MS) / DIVE_MS)),
+      lap: this.t < LAP_MS ? 1 : 2,
     };
   }
 }

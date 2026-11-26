@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { COLOSSUS_LENGTH_MS, COLOSSUS_ROOM_SIZE } from "@/config/colossus";
-import { ARRIVE_MS, ColossusEngine, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS, SWEEP_WARN_MS, VENOM_MS, VENOM_WARN_MS } from "./ColossusEngine";
+import { BODY_LENGTH, ColossusEngine, headAt, LAP_MS, ROUTE_END, COLOSSUS_SLOTS, PATH_LENGTH, pathAt, SPIRAL_PATH, STRIKE_CHARGE_MS, STUN_MS, SWEEP_WARN_MS, VENOM_MS, VENOM_WARN_MS } from "./ColossusEngine";
 
 const setup = (seed = 7, slot = 3) => ({ seed, you: { name: "Eu", type: "IRONWOOD" as const, power: 2000, skin: null }, slot });
 
@@ -107,14 +107,28 @@ describe("ColossusEngine — fair play", () => {
     expect(Math.max(...d) / Math.min(...d)).toBeLessThan(1.25);
   });
 
-  it("every slot on the map gets to shoot the Serpent once it has coiled in", () => {
+  it("every slot on the map gets to shoot the Serpent on its second lap", () => {
     for (let slot = 0; slot < COLOSSUS_SLOTS.length; slot++) {
       const e = new ColossusEngine(setup(11, slot));
-      e.advance(ARRIVE_MS);
+      e.advance(LAP_MS);
       const before = e.snapshot().players[0]!.damage;
-      e.advance(4_000);
+      e.advance(15_000);
       expect(e.snapshot().players[0]!.damage, `slot ${slot}`).toBeGreaterThan(before);
     }
+  });
+
+  it("keeps moving the whole attempt (two laps, lap 1 faster) and then dives into the Core for good", () => {
+    let last = -1;
+    for (let t = 0; t <= COLOSSUS_LENGTH_MS; t += 1_000) {
+      expect(headAt(t)).toBeGreaterThan(last);
+      last = headAt(t);
+    }
+    const lap1Speed = PATH_LENGTH / LAP_MS;
+    const lap2Speed = PATH_LENGTH / (COLOSSUS_LENGTH_MS - LAP_MS);
+    expect(lap2Speed).toBeLessThan(lap1Speed);
+    expect(headAt(COLOSSUS_LENGTH_MS)).toBeCloseTo(ROUTE_END, 5);
+    // after the dive the tail is past the end of the route too: nothing left on the island
+    expect(headAt(COLOSSUS_LENGTH_MS + 60_000) - BODY_LENGTH).toBeGreaterThan(ROUTE_END);
   });
 
   it("venom poisons the tower that stays (half attack speed); moving away dodges it", () => {

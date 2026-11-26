@@ -34,7 +34,7 @@ import {
   STAR_WARN_MS,
   pathAt,
   type ColossusSnapshot,
-  type Pt, VENOM_WARN_MS, SWEEP_WARN_MS } from "@/engine/ColossusEngine";
+  type Pt, VENOM_WARN_MS, SWEEP_WARN_MS, roadAt, ROUTE_END } from "@/engine/ColossusEngine";
 import { COLOSSUS_LENGTH_MS } from "@/config/colossus";
 
 const W = COLOSSUS_W;
@@ -565,8 +565,9 @@ export function serpentParts(headS: number, timeMs: number): BodyPart[] {
   const parts: BodyPart[] = [];
   for (let k = 0; k <= BODY_SEGMENTS; k++) {
     const s = headS - k * SEGMENT_GAP;
-    if (s < -SEGMENT_GAP * 1.5 || s > PATH_LENGTH + 4) continue;
-    const p = pathAt(Math.min(s, PATH_LENGTH));
+    // still in the rift, or already through the Core for good
+    if (s < -SEGMENT_GAP * 1.5 || s >= ROUTE_END) continue;
+    const p = roadAt(s);
     const taper = k === 0 ? 1 : 1.18 - 0.72 * Math.pow(k / BODY_SEGMENTS, 1.25);
     const wave = Math.sin(s * 0.035 - t * 2.6) * 6 * Math.min(1, k / 3) * taper;
     const nx = -Math.sin(p.angle);
@@ -861,8 +862,9 @@ export function drawSerpent(
   const t = timeMs / 1000;
   const parts = serpentParts(headS, timeMs).filter((p) => p.s >= -SEGMENT_GAP * 0.5);
   if (!parts.length) return;
-  const visible = (p: BodyPart) => p.s <= PATH_LENGTH - 2 || opts.dive === 0;
+  const visible = (p: BodyPart) => p.s < ROUTE_END - 2;
   const shown = parts.filter(visible);
+  if (!shown.length) return;
 
   // shadows on the ground
   for (const p of shown) stamp(ctx, sp.shadow, p.x + 8, p.y + HOVER + 10, p.angle, p.k === 0 ? 2.6 : p.scale * 1.35);
@@ -885,7 +887,16 @@ export function drawSerpent(
   }
 
   const flashing = (s: number) => opts.flashS.some((f) => Math.abs(f - s) < SEGMENT_GAP * 0.55);
-  drawBody(ctx, shown, timeMs, { eclipse: opts.eclipse, shield: opts.shield, flashing });
+  // the Core is a gate back to the rift: on the second lap the body is two
+  // stretches — one coming out of the rift, one still pouring into the Core
+  const runs: BodyPart[][] = [];
+  for (const p of shown) {
+    const lap = Math.floor(Math.max(0, p.s) / PATH_LENGTH);
+    const run = runs[runs.length - 1];
+    if (run && Math.floor(Math.max(0, run[run.length - 1]!.s) / PATH_LENGTH) === lap) run.push(p);
+    else runs.push([p]);
+  }
+  for (const run of runs) drawBody(ctx, run, timeMs, { eclipse: opts.eclipse, shield: opts.shield, flashing });
 
   // embers trailing in the Eclipse
   if (opts.eclipse > 0) {
@@ -905,7 +916,7 @@ export function drawSerpent(
 
   // the head
   const head = parts[0]!;
-  if (!visible(head)) return;
+  if (head.k !== 0 || !visible(head)) return;
   const hs = 1 - opts.dive * 0.6;
   ctx.save();
   ctx.globalAlpha = 1 - opts.dive;
@@ -1156,7 +1167,7 @@ function dangerMark(ctx: CanvasRenderingContext2D, slot: number, k: number, rgb:
 
 /** Venom: a green mark on the slot, then a glob arcing from the Serpent's mouth; a green splash where it lands. */
 function drawVenom(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs: number): void {
-  const head = pathAt(Math.min(snap.headS, PATH_LENGTH));
+  const head = roadAt(snap.headS);
   for (const v of snap.venoms) {
     const left = v.impactAt - snap.timeMs;
     const k = 1 - Math.max(0, left) / VENOM_WARN_MS;
@@ -1338,7 +1349,7 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
   ctx.globalCompositeOperation = "lighter";
   for (const sh of snap.shots) {
     const age = snap.timeMs - sh.at;
-    const to = pathAt(Math.min(sh.s, PATH_LENGTH));
+    const to = roadAt(sh.s);
     const ty = to.y - HOVER;
     if (sh.strike) {
       const k = Math.min(1, age / 500);
@@ -1361,7 +1372,7 @@ function drawShots(ctx: CanvasRenderingContext2D, snap: ColossusSnapshot, timeMs
     const age = snap.timeMs - sh.at;
     if (age < 140 || age > 700) continue;
     const k = (age - 140) / 560;
-    const to = pathAt(Math.min(sh.s, PATH_LENGTH));
+    const to = roadAt(sh.s);
     ctx.globalAlpha = 1 - k;
     const weak = sh.head && !sh.shielded;
     ctx.font = `800 ${sh.strike ? 22 : sh.crit || weak ? 15 : 12}px system-ui, sans-serif`;
@@ -1429,12 +1440,12 @@ export class ColossusFxLayer {
       const slot = COLOSSUS_SLOTS[player.slot]!;
       tower.position = { x: slot.x, y: slot.y };
       const muzzle = getTowerMuzzleOffset(tower);
-      const hit = pathAt(Math.min(sh.s, PATH_LENGTH));
+      const hit = roadAt(sh.s);
       const to = { x: hit.x, y: hit.y - HOVER };
       const chain: Pt[] = [];
       if (sh.type === "STORMCALLER") {
         for (const d of [-2, -4]) {
-          const c = pathAt(Math.max(0, Math.min(PATH_LENGTH, sh.s + d * SEGMENT_GAP)));
+          const c = roadAt(Math.max(0, sh.s + d * SEGMENT_GAP));
           chain.push({ x: c.x, y: c.y - HOVER });
         }
       }
@@ -1516,7 +1527,24 @@ export function drawColossusFrame(ctx: CanvasRenderingContext2D, snap: ColossusS
     ctx.fillStyle = `rgba(6,0,14,${0.5 * eclipse})`;
     ctx.fillRect(-20, -20, W + 40, H + 40);
   }
-  drawCore(ctx, timeMs, eclipse, snap ? Math.sin(snap.dive * Math.PI) : 0);
+  // the gate: when the head passes through the Core it bursts back out of the rift
+  const sinceGate = snap ? snap.headS - PATH_LENGTH : -1;
+  const gate = sinceGate >= 0 && sinceGate < 90 ? 1 - sinceGate / 90 : 0;
+  drawCore(ctx, timeMs, eclipse, snap ? Math.max(Math.sin(snap.dive * Math.PI), gate * 0.8) : 0);
+  if (gate > 0) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const r = 40 + (1 - gate) * 120;
+    const g = ctx.createRadialGradient(RIFT_AT.x, RIFT_AT.y, 0, RIFT_AT.x, RIFT_AT.y, r);
+    g.addColorStop(0, `rgba(230,200,255,${0.9 * gate})`);
+    g.addColorStop(0.5, `rgba(160,90,255,${0.5 * gate})`);
+    g.addColorStop(1, "rgba(120,60,255,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(RIFT_AT.x, RIFT_AT.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
   drawSlotMarks(ctx, snap, timeMs, opts);
   if (snap) opts.fx?.drawGround(ctx, timeMs);
   if (snap) {
