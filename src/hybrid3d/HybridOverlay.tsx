@@ -29,6 +29,7 @@ import { TILT_COS } from "@/rendering3d/enemyProjection";
 import { WORLD_SIZE } from "@/config/gameBalance";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures, rankScale } from "@/battlefield3d/creatures";
 import { getPointAtDistance, type Vector2 } from "@/utils/geometry";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /**
  * HÍBRIDO (prévia) — the 2D map stays exactly as it is; on top of it a
@@ -2250,6 +2251,7 @@ export function HybridOverlay({ engine, hiddenIds, hiddenTowerIds, ui }: { engin
         camera={{ near: 0.1, far: 6000 }}
         gl={{ alpha: true, antialias: true, localClippingEnabled: true } as THREE.WebGLRendererParameters & { localClippingEnabled: boolean }}
         onCreated={({ gl }) => {
+          tuneRenderer(gl);
           gl.localClippingEnabled = true;
           gl.toneMapping = THREE.ACESFilmicToneMapping;
           gl.toneMappingExposure = 0.9;

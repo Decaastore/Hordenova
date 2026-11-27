@@ -3,7 +3,7 @@
 // @ts-nocheck — mechanically wrapped from the offline bake script; type-checked there.
 /* eslint-disable */
 import * as THREE from "three";
-import { fitCanvas, LOW_TEXTURE_MEMORY, TEX_MAX } from "./texBudget";
+import { fitCanvas, LOW_TEXTURE_MEMORY, shareTexture, TEX_MAX } from "./texBudget";
 
 export interface CastleModel {
   root: THREE.Group;
@@ -168,23 +168,41 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
   }
   /** A tangent-space normal map from a greyscale height canvas (Sobel). */
   function normalFromHeight(h: HTMLCanvasElement, strength: number): THREE.CanvasTexture {
+    // A Sobel pass over the height field. Written for speed (this runs for every stone and slate
+    // surface of a castle, on the main thread): one byte per pixel read once into a typed array,
+    // wrap-around rows/columns looked up from small index tables instead of a modulo per sample,
+    // and a plain square root instead of Math.hypot — the same normals, many times faster.
     const S = h.width;
-    const src = h.getContext("2d")!.getImageData(0, 0, S, S).data;
+    const rgba = h.getContext("2d")!.getImageData(0, 0, S, S).data;
+    const hgt = new Float32Array(S * S);
+    const k = strength / 255;
+    for (let i = 0, j = 0; i < hgt.length; i++, j += 4) hgt[i] = rgba[j]! * k;
     const out = document.createElement("canvas");
     out.width = out.height = S;
     const og = out.getContext("2d")!;
     const img = og.createImageData(S, S);
-    const H = (x: number, y: number) => src[(((y + S) % S) * S + ((x + S) % S)) * 4] / 255;
+    const d = img.data;
+    const prev = new Int32Array(S);
+    const next = new Int32Array(S);
+    for (let i = 0; i < S; i++) {
+      prev[i] = (i + S - 1) % S;
+      next[i] = (i + 1) % S;
+    }
     for (let y = 0; y < S; y++) {
+      const rU = prev[y]! * S, rC = y * S, rD = next[y]! * S;
       for (let x = 0; x < S; x++) {
-        const dx = (H(x + 1, y - 1) + 2 * H(x + 1, y) + H(x + 1, y + 1) - H(x - 1, y - 1) - 2 * H(x - 1, y) - H(x - 1, y + 1)) * strength;
-        const dy = (H(x - 1, y + 1) + 2 * H(x, y + 1) + H(x + 1, y + 1) - H(x - 1, y - 1) - 2 * H(x, y - 1) - H(x + 1, y - 1)) * strength;
-        const len = Math.hypot(dx, dy, 1);
-        const i = (y * S + x) * 4;
-        img.data[i] = Math.round((-dx / len) * 127 + 128);
-        img.data[i + 1] = Math.round((dy / len) * 127 + 128);
-        img.data[i + 2] = Math.round((1 / len) * 127 + 128);
-        img.data[i + 3] = 255;
+        const xl = prev[x]!, xr = next[x]!;
+        const ul = hgt[rU + xl]!, uc = hgt[rU + x]!, ur = hgt[rU + xr]!;
+        const cl = hgt[rC + xl]!, cr = hgt[rC + xr]!;
+        const dl = hgt[rD + xl]!, dc = hgt[rD + x]!, dr = hgt[rD + xr]!;
+        const dx = ur + 2 * cr + dr - ul - 2 * cl - dl;
+        const dy = dl + 2 * dc + dr - ul - 2 * uc - ur;
+        const inv = 127 / Math.sqrt(dx * dx + dy * dy + 1);
+        const i = (rC + x) * 4;
+        d[i] = Math.round(-dx * inv + 128);
+        d[i + 1] = Math.round(dy * inv + 128);
+        d[i + 2] = Math.round(inv + 128);
+        d[i + 3] = 255;
       }
     }
     og.putImageData(img, 0, 0);
@@ -390,7 +408,8 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
     }
     // painted at full size, kept at the device's budget (see texBudget.ts); the relief keeps its depth
     // the height field only feeds the normal map (the material never uses it as a bump), so it's released after
-    const hb = fitCanvas(b);
+    // the relief map is soft detail: 512 px is plenty on every device (and 4x less work than 1024)
+    const hb = fitCanvas(b, Math.min(TEX_MAX, 512));
     const normal = normalFromHeight(hb, 2.6 * (hb.width / S));
     hb.width = hb.height = 0;
     const map = new THREE.CanvasTexture(fitCanvas(c));
@@ -476,7 +495,7 @@ export function buildCastleModel(BIOME: string, TIER: number, SKIN = ""): Castle
       g.fillStyle = grd;
       g.fillRect(x, 0, 8 + r() * 24, S);
     }
-    const hb = fitCanvas(b);
+    const hb = fitCanvas(b, Math.min(TEX_MAX, 512));
     const normal = normalFromHeight(hb, 3.2 * (hb.width / S));
     hb.width = hb.height = 0;
     const map = new THREE.CanvasTexture(fitCanvas(c));
@@ -601,27 +620,23 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       set = stoneTexture(key.length * 31 + (opts.rows ?? 10), { rows: opts.rows ?? 10, cols: opts.cols ?? 5, mossy: opts.mossy, cracks, lava: D.lava });
       stoneSets.set(setKey, set);
     }
-    const map = set.map.clone();
+    const map = shareTexture(set.map);
     map.repeat.set(repeatX, repeatY);
-    map.needsUpdate = true;
     const mat = new THREE.MeshStandardMaterial({ map, roughness: 1, metalness: 0.0 });
     if (set.normal) {
-      const nm = set.normal.clone();
+      const nm = shareTexture(set.normal);
       nm.repeat.set(repeatX, repeatY);
-      nm.needsUpdate = true;
       mat.normalMap = nm;
       mat.normalScale = new THREE.Vector2(1.15, 1.15);
     } else if (set.bump) {
-      const bump = set.bump.clone();
+      const bump = shareTexture(set.bump);
       bump.repeat.set(repeatX, repeatY);
-      bump.needsUpdate = true;
       mat.bumpMap = bump;
       mat.bumpScale = 2.2;
     }
     if (set.rough) {
-      const rm = set.rough.clone();
+      const rm = shareTexture(set.rough);
       rm.repeat.set(repeatX, repeatY);
-      rm.needsUpdate = true;
       mat.roughnessMap = rm;
     }
     weather(mat, "stone");
@@ -641,10 +656,9 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
       mat.normalScale = new THREE.Vector2(0.5, 0.5);
     } else if (ARCH.wall === "wood") {
       const w = woodSet ?? (woodSet = woodTexture());
-      const wm = w.map.clone();
+      const wm = shareTexture(w.map);
       wm.wrapS = wm.wrapT = THREE.RepeatWrapping;
       wm.repeat.set(repeatX * 1.4, repeatY * 0.6);
-      wm.needsUpdate = true;
       mat.map = wm;
       mat.bumpMap = null;
       mat.normalMap = null;
@@ -722,14 +736,12 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
   const roofSet = ROOF_SET_CACHE.get(roofKey) ?? roofTexture(3);
   ROOF_SET_CACHE.set(roofKey, roofSet);
   function roofMat(repX: number, repY: number) {
-    const map = roofSet.map.clone();
+    const map = shareTexture(roofSet.map);
     map.repeat.set(repX, repY);
-    map.needsUpdate = true;
     const m = new THREE.MeshStandardMaterial({ map, roughness: D.roofMetal ? 0.35 : 0.82, metalness: D.roofMetal ?? 0.0 });
     if (roofSet.normal) {
-      const nm = roofSet.normal.clone();
+      const nm = shareTexture(roofSet.normal);
       nm.repeat.set(repX, repY);
-      nm.needsUpdate = true;
       m.normalMap = nm;
       m.normalScale = new THREE.Vector2(1.3, 1.3);
     } else if (roofSet.bump) {
@@ -1126,10 +1138,9 @@ float wn(vec3 p){ vec3 i=floor(p); vec3 f=fract(p); f=f*f*(3.0-2.0*f);
         const by = Math.round((broken ? th - 9 : th) * 0.66);
         const br = tr + 3.2;
         const plank = woodSet ?? (woodSet = woodTexture());
-        const deckMap = plank.map.clone();
+        const deckMap = shareTexture(plank.map);
         deckMap.wrapS = deckMap.wrapT = THREE.RepeatWrapping;
         deckMap.repeat.set(4, 0.3);
-        deckMap.needsUpdate = true;
         const deck = new THREE.Mesh(new THREE.CylinderGeometry(br, br - 1.2, 1.4, 20), new THREE.MeshStandardMaterial({ map: deckMap, color: 0x9a8070, roughness: 0.9 }));
         // timber brackets under the deck, braced into the tower wall
         for (let i = 0; i < 8; i++) {

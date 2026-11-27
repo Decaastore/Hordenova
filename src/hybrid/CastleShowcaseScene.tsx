@@ -3,6 +3,7 @@ import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { ModularCastle } from "./castle/ModularCastle";
 import { castleHordenovaBaseSkin } from "./castle/skins/castleHordenovaBaseSkin";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 function SlowSpin({ children }: { children: React.ReactNode }) {
   const ref = useRef<THREE.Group>(null);
@@ -45,7 +46,7 @@ function CastleCameraRig() {
  */
 export function CastleShowcaseScene() {
   return (
-    <Canvas camera={{ fov: 38 }} gl={{ antialias: true }} style={{ position: "absolute", inset: 0 }}>
+    <Canvas camera={{ fov: 38 }} gl={{ antialias: true }} style={{ position: "absolute", inset: 0 }} onCreated={({ gl }) => tuneRenderer(gl)}>
       <CastleCameraRig />
       <color attach="background" args={["#0a0c07"]} />
       <fog attach="fog" args={["#0a0c07", 9, 20]} />

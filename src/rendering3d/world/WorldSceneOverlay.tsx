@@ -5,6 +5,7 @@ import type { GameEngine } from "@/engine/GameEngine";
 import { WorldTerrain } from "./WorldTerrain";
 import { cameraPosition, groundGroupPlacement } from "../enemyProjection";
 import { hasGroundBake } from "@/rendering/groundBakes";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /** Same manual orthographic-frustum rig as `rendering3d/Enemy3DOverlay.tsx`'s `CameraRig` — kept as its own small copy (not shared) so this layer and the enemy overlay stay independently mountable/removable while both use the identical tilt, matching camera math (`enemyProjection.ts` is the single source of truth for the numbers either rig uses). */
 function CameraRig() {
@@ -98,7 +99,7 @@ export function WorldSceneOverlay({ engine }: { engine: GameEngine }) {
         camera={{ near: 0.1, far: 4000 }}
         gl={{ antialias: true, preserveDrawingBuffer: true }}
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
-      >
+       onCreated={({ gl }) => tuneRenderer(gl)}>
         <CameraRig />
         <ScaledWorld biomeId={biomeId} />
       </Canvas>

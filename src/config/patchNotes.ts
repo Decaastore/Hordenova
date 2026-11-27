@@ -70,6 +70,41 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v180",
+    dateIso: "2026-11-27",
+    category: "SYSTEMS",
+    title: {
+      en: "Fewer Freezes on the Site and in Battle",
+      ptBR: "Menos Travamentos no Site e na Batalha",
+    },
+    description: {
+      en: "Opening the Play page, starting a battle and browsing the Store and the Wiki now freeze much less, especially on weaker phones and PCs.",
+      ptBR: "Abrir a página de Jogar, começar uma batalha e navegar pela Loja e pela Wiki agora travam bem menos, principalmente em celulares e PCs mais fracos.",
+    },
+    highlights: [
+      {
+        en: "The 3D castle builds its stone surfaces about 5× faster: the Play page no longer stalls for seconds the first time it opens.",
+        ptBR: "O castelo 3D monta as texturas de pedra cerca de 5× mais rápido: a página de Jogar não fica mais parada por segundos na primeira vez.",
+      },
+      {
+        en: "Castles, towers and the city reuse the images already on the graphics card instead of sending them again for every wall and roof.",
+        ptBR: "Castelos, torres e cidade reaproveitam as imagens que já estão na placa de vídeo, em vez de enviá-las de novo para cada parede e telhado.",
+      },
+      {
+        en: "The first visit downloads about a third less code: each page loads its own part when opened, and the Play page and the battle are fetched in the background.",
+        ptBR: "A primeira visita baixa cerca de um terço a menos de código: cada página carrega a sua parte quando é aberta, e a página de Jogar e a batalha são baixadas em segundo plano.",
+      },
+      {
+        en: "Battles start without waiting for the graphics card to check each effect, and the Store's castle previews only move while you can see them.",
+        ptBR: "A batalha começa sem esperar a placa de vídeo conferir cada efeito, e as prévias de castelo da Loja só se mexem enquanto estão na tela.",
+      },
+      {
+        en: "Store bundles show the name and tower of every skin right under its picture.",
+        ptBR: "Os pacotes da Loja mostram o nome e a torre de cada skin logo abaixo do desenho dela.",
+      },
+    ],
+  },
+  {
     id: "v179",
     dateIso: "2026-11-27",
     category: "ITEMS",

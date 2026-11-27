@@ -378,13 +378,20 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                     <div className={`st-bundle-stage${pair ? " is-pair" : ""}`}>
                       {skinIds.map((id) => {
                         const def = getTowerSkinDefinition(id);
-                        return def ? <Tower3DPortrait key={id} type={def.towerType} level={MAX_TOWER_LEVEL} skinId={id} width={pair ? 130 : 170} height={pair ? 150 : 170} /> : null;
+                        // each skin of the bundle: its drawing, with its name and tower right under it
+                        return def ? (
+                          <figure key={id} className="st-bundle-skin" data-testid={`bundle-skin-${id}`}>
+                            <Tower3DPortrait type={def.towerType} level={MAX_TOWER_LEVEL} skinId={id} width={pair ? 130 : 170} height={pair ? 150 : 170} />
+                            <figcaption>
+                              <strong>{t(`towerSkins.${id}.name` as TranslationKey)}</strong>
+                              <span>{t("store.bundleSkinFor", { tower: t(`towers.${def.towerType}.name` as TranslationKey) })}</span>
+                            </figcaption>
+                          </figure>
+                        ) : null;
                       })}
                     </div>
                     <h3>{t(`store.bundles.${b.id}.name` as TranslationKey)}</h3>
                     <p className="st-feat-body">{t(`store.bundles.${b.id}.body` as TranslationKey)}</p>
-                    <p className="st-contents-label">{t("store.bundleSkins")}</p>
-                    <p className="st-bundle-skins">{skinIds.map((id) => t(`towerSkins.${id}.name` as TranslationKey)).join(" · ")}</p>
                     {bundleCastleSkinId(b) && (
                       <div className="st-bundle-castle">
                         <Castle3DPortrait dressing="ANCIENT_FOREST" skin={bundleCastleSkinId(b)!} width={104} height={78} spin={false} />
@@ -763,11 +770,15 @@ const STORE_CSS = `
 .st-bundle:hover { transform: translateY(-4px); border-color: rgba(240,190,82,0.75); box-shadow: inset 0 1px 0 rgba(255,236,190,0.16), 0 18px 34px rgba(0,0,0,0.5), 0 0 26px rgba(240,190,82,0.16); }
 .st-bundle.is-BEST_VALUE { border-color: rgba(240,190,82,0.8); box-shadow: inset 0 1px 0 rgba(255,236,190,0.18), 0 10px 26px rgba(0,0,0,0.42), 0 0 34px rgba(240,190,82,0.2); }
 .st-bundle .st-tag { left: 50%; transform: translateX(-50%); }
-.st-bundle-stage { display: flex; align-items: flex-end; justify-content: center; gap: 0; height: 170px; margin: -4px -8px 8px;
+.st-bundle-stage { display: flex; align-items: flex-end; justify-content: center; gap: 0; min-height: 170px; margin: -4px -8px 12px;
   background: radial-gradient(48% 62% at 50% 46%, rgba(255,200,130,0.2), transparent 70%), radial-gradient(42% 10% at 50% 94%, rgba(0,0,0,0.6), transparent 70%); }
 .st-bundle-stage canvas { transition: transform 320ms var(--hn-ease-back); }
 .st-bundle:hover .st-bundle-stage canvas { transform: translateY(-4px) scale(1.04); }
 .st-bundle h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1.08; color: var(--gold-hi); }
+.st-bundle-skin { margin: 0; display: flex; flex-direction: column; align-items: center; }
+.st-bundle-skin figcaption { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 2px; text-align: center; line-height: 1.25; }
+.st-bundle-skin figcaption strong { font-size: 14px; font-weight: 700; color: #ffd9a0; }
+.st-bundle-skin figcaption span { font-size: 12px; color: var(--ash, #b9ad97); }
 .st-bundle-skins { margin: 0 0 10px; font-size: 14px; font-weight: 700; color: #ffd9a0; }
 .st-bundle .st-contents { grid-template-columns: 1fr; }
 .st-bundle.is-owned { opacity: 0.85; }

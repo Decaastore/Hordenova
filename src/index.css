@@ -282,3 +282,6 @@ nav.tn .tn-play:hover::after, .pg-btn:hover::after, .hn-play:hover::after { anim
 @media (pointer: coarse) {
   .gs-map .hn-pop[role="dialog"] > button[aria-label]:first-child, .gs-map .hn-pop[role="dialog"] button[aria-label="Close"], .gs-map .hn-pop[role="dialog"] button[aria-label="Fechar"] { min-width: 40px; min-height: 40px; }
 }
+
+/* shown for the instant a screen is still downloading (App.tsx lazy screens): the site background, no flash */
+.screen-loading { position: fixed; inset: 0; background: #0d0a07; }

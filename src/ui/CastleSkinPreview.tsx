@@ -16,7 +16,21 @@ export function CastleSkinPreview({ skinId, size = 150 }: { skinId: string | nul
     cv.height = size * 0.8 * dpr;
     const skin = skinId ? getCastleSkinDefinition(skinId) : null;
     let raf = 0;
+    let visible = true;
+    let last = -1e9;
+    const still = (() => {
+      try {
+        return !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      } catch {
+        return false;
+      }
+    })();
     const loop = (now: number) => {
+      // only while on screen, at about 30 frames a second: a Store page holds many of these
+      if (!visible) return;
+      raf = requestAnimationFrame(loop);
+      if (now - last < 32) return;
+      last = now;
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, size, size * 0.8);
       const g = ctx.createRadialGradient(size / 2, size * 0.62, 4, size / 2, size * 0.62, size * 0.6);
@@ -25,10 +39,23 @@ export function CastleSkinPreview({ skinId, size = 150 }: { skinId: string | nul
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, size, size * 0.8);
       drawFortress(ctx, { x: size / 2, y: size * 0.66 }, ACTIVE_BIOME, now, (size / 150) * 0.72, 0, 1, skin ?? NO_CASTLE_SKIN);
-      raf = requestAnimationFrame(loop);
+      if (still) cancelAnimationFrame(raf);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    const io =
+      typeof IntersectionObserver !== "undefined"
+        ? new IntersectionObserver(([e]) => {
+            const was = visible;
+            visible = !!e?.isIntersecting;
+            if (visible && !was && !still) raf = requestAnimationFrame(loop);
+          })
+        : null;
+    io?.observe(cv);
+    return () => {
+      visible = false;
+      io?.disconnect();
+      cancelAnimationFrame(raf);
+    };
   }, [skinId, size]);
   return <canvas ref={ref} style={{ width: size, height: size * 0.8, display: "block", borderRadius: 10 }} aria-hidden="true" />;
 }

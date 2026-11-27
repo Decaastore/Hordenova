@@ -2070,6 +2070,7 @@ export const en = {
     bundlesBody: "Each bundle carries tower skins and a castle that exist only in it. They never show up in the daily shop, the Pass or for Gems. Everything inside is shown before you buy. Once per account.",
     bundleOwned: "Owned",
     bundleCastle: "Castle skin",
+    bundleSkinFor: "{tower} tower skin",
     bundleItemsNote: "The bundle's items stay on your account: you can equip and forge them, not sell them. If the Forge works, the new item can be sold on the Marketplace.",
     bundleSkins: "Exclusive skins",
     bundlePopular: "Most picked",

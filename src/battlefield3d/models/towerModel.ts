@@ -3,6 +3,7 @@
 // @ts-nocheck — mechanically wrapped from the offline bake script; type-checked there.
 /* eslint-disable */
 import * as THREE from "three";
+import { shareTexture } from "./texBudget";
 
 export interface TowerModel {
   root: THREE.Group;
@@ -190,8 +191,8 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
   }
 
   function mat(set: TexSet, rx: number, ry: number, o: { rough?: number; metal?: number; bump?: number; emissiveColor?: string; emissiveIntensity?: number } = {}) {
-    const map = set.map.clone(); map.repeat.set(rx, ry); map.needsUpdate = true;
-    const bump = set.bump.clone(); bump.repeat.set(rx, ry); bump.needsUpdate = true;
+    const map = shareTexture(set.map); map.repeat.set(rx, ry);
+    const bump = shareTexture(set.bump); bump.repeat.set(rx, ry);
     const m = new THREE.MeshStandardMaterial({ map, bumpMap: bump, bumpScale: o.bump ?? 1.6, roughness: o.rough ?? 0.9, metalness: o.metal ?? 0.02 });
     if (set.emissive) {
       const em = set.emissive.clone(); em.repeat.set(rx, ry); em.needsUpdate = true;
@@ -267,14 +268,17 @@ export function buildTowerModel(TYPE: string, STAGE: number, SKIN: string, FUSED
     const img = g.getImageData(0, 0, S, S);
     const himg = h.getImageData(0, 0, S, S);
     const shade = pts.map(() => r());
+    // nearest two stones, with the tile wrapping round (the shortest way across each edge):
+    // one distance per stone instead of five, and no array built per pixel
+    const px = pts.map((p) => p[0]), py = pts.map((p) => p[1]), n = pts.length, half = S / 2;
     for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
       let d1 = 1e9, d2 = 1e9, k1 = 0;
-      for (let i = 0; i < pts.length; i++) {
-        for (const [ox, oy] of [[0, 0], [S, 0], [-S, 0], [0, S], [0, -S]] as const) {
-          const dx = x - pts[i]![0] - ox, dy = y - pts[i]![1] - oy;
-          const d = dx * dx + dy * dy;
-          if (d < d1) { d2 = d1; d1 = d; k1 = i; } else if (d < d2) d2 = d;
-        }
+      for (let i = 0; i < n; i++) {
+        let dx = Math.abs(x - px[i]!), dy = Math.abs(y - py[i]!);
+        if (dx > half) dx = S - dx;
+        if (dy > half) dy = S - dy;
+        const d = dx * dx + dy * dy;
+        if (d < d1) { d2 = d1; d1 = d; k1 = i; } else if (d < d2) d2 = d;
       }
       const edge = Math.sqrt(d2) - Math.sqrt(d1);
       const o = (y * S + x) * 4;

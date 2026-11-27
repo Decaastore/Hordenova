@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { shareTexture } from "./texBudget";
 import type { CityBuildingId } from "@/config/city";
 
 /**
@@ -288,12 +289,10 @@ class Kit {
     const m = new THREE.MeshStandardMaterial({ color: opts.color ?? "#ffffff", roughness: opts.rough ?? 0.92, metalness: opts.metal ?? 0 });
     if (kind !== "plain") {
       const s = surface(kind);
-      m.map = s.map.clone();
+      m.map = shareTexture(s.map);
       m.map.repeat.set(rx, ry);
-      m.map.needsUpdate = true;
-      m.normalMap = s.normal.clone();
+      m.normalMap = shareTexture(s.normal);
       m.normalMap.repeat.set(rx, ry);
-      m.normalMap.needsUpdate = true;
       m.normalScale = new THREE.Vector2(1, 1);
     }
     if (opts.emissive) {

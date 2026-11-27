@@ -24,6 +24,7 @@ import { threeToWorld, worldDirToYaw, worldToThree } from "./coords";
 import { Effects, SKIN_BOLT_COLORS } from "./fx";
 import { Creature, CREATURE_URLS, creatureFor, heightFactor, prepareCreatures } from "./creatures";
 import { buildProps } from "./props";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /**
  * CAMPO DE BATALHA 3D (prévia) — the battlefield rendered as a real-time 3D
@@ -1311,7 +1312,7 @@ export const Battlefield3D = memo(function Battlefield3D({
         gl={{ antialias: false, powerPreference: "high-performance", toneMapping: THREE.NoToneMapping, outputColorSpace: THREE.SRGBColorSpace }}
         camera={{ fov: CAMERA_FOV, position: [0, 900, 700] }}
         style={{ position: "absolute", inset: 0 }}
-      >
+       onCreated={({ gl }) => tuneRenderer(gl)}>
         <CameraRig />
         <PointerBridge bridge={pointerBridge} />
         <FrameRateGuard quality={quality} onSlow={() => setQuality("low")} />

@@ -4,6 +4,7 @@ import * as THREE from "three";
 import { HybridDemoController } from "./HybridDemoController";
 import { cameraPosition } from "./hybridProjection";
 import type { TowerSkinDefinition } from "./towers/towerSkinTypes";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /**
  * PROVA DE CONCEITO HÍBRIDA — the 3D half. A transparent, absolutely-
@@ -45,7 +46,7 @@ export function HybridScene3D({ towerSkin }: { towerSkin?: TowerSkinDefinition }
       camera={{ near: 0.1, far: 1000 }}
       gl={{ alpha: true, antialias: true }}
       style={{ position: "absolute", inset: 0 }}
-    >
+     onCreated={({ gl }) => tuneRenderer(gl)}>
       <CameraRig />
 
       <ambientLight intensity={0.75} />

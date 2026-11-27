@@ -1,24 +1,40 @@
-import { AccountScreen } from "./screens/AccountScreen";
-import { DuelScreen } from "./screens/DuelScreen";
-import { ColossusScreen } from "./screens/ColossusScreen";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { startCloud } from "@/net/cloud";
 import { MainMenu } from "./screens/MainMenu";
-import { GameScreen, type GameMode } from "./screens/GameScreen";
+import type { GameMode } from "./screens/GameScreen";
 import { syncSeasonIfNeeded } from "./engine/AscensionManager";
-import { SeasonScreen } from "./screens/SeasonScreen";
-import { RankingScreen } from "./screens/RankingScreen";
-import { WikiScreen } from "./screens/WikiScreen";
-import { NovidadesScreen } from "./screens/NovidadesScreen";
-import { SupportScreen } from "./screens/SupportScreen";
-import { BossesScreen } from "./screens/BossesScreen";
-import { FaqScreen } from "./screens/FaqScreen";
-import { MarketplaceScreen } from "./screens/MarketplaceScreen";
-import { StoreScreen } from "./screens/StoreScreen";
-import { PassScreen } from "./screens/PassScreen";
 import { LanguageProvider } from "./i18n/LanguageContext";
 import { audioManager } from "./audio/AudioManager";
 import type { NavView } from "./ui/TopNav";
+
+/**
+ * Every screen but the Home is loaded when it is first opened (its own file),
+ * so the first visit downloads and starts only what the Home needs — the
+ * rest of the game no longer freezes the first seconds on a phone. The Play
+ * page and the battle are fetched in the background right after the Home
+ * settles, so "Jogar" opens at once.
+ */
+const AccountScreen = lazy(() => import("./screens/AccountScreen").then((m) => ({ default: m.AccountScreen })));
+const DuelScreen = lazy(() => import("./screens/DuelScreen").then((m) => ({ default: m.DuelScreen })));
+const ColossusScreen = lazy(() => import("./screens/ColossusScreen").then((m) => ({ default: m.ColossusScreen })));
+const GameScreen = lazy(() => import("./screens/GameScreen").then((m) => ({ default: m.GameScreen })));
+const SeasonScreen = lazy(() => import("./screens/SeasonScreen").then((m) => ({ default: m.SeasonScreen })));
+const RankingScreen = lazy(() => import("./screens/RankingScreen").then((m) => ({ default: m.RankingScreen })));
+const WikiScreen = lazy(() => import("./screens/WikiScreen").then((m) => ({ default: m.WikiScreen })));
+const NovidadesScreen = lazy(() => import("./screens/NovidadesScreen").then((m) => ({ default: m.NovidadesScreen })));
+const SupportScreen = lazy(() => import("./screens/SupportScreen").then((m) => ({ default: m.SupportScreen })));
+const BossesScreen = lazy(() => import("./screens/BossesScreen").then((m) => ({ default: m.BossesScreen })));
+const FaqScreen = lazy(() => import("./screens/FaqScreen").then((m) => ({ default: m.FaqScreen })));
+const MarketplaceScreen = lazy(() => import("./screens/MarketplaceScreen").then((m) => ({ default: m.MarketplaceScreen })));
+const StoreScreen = lazy(() => import("./screens/StoreScreen").then((m) => ({ default: m.StoreScreen })));
+const PassScreen = lazy(() => import("./screens/PassScreen").then((m) => ({ default: m.PassScreen })));
+
+/** Fetches the Play page and the battle once the Home is up, so opening them doesn't wait for a download. */
+function prefetchPlay(): void {
+  void import("./screens/SeasonScreen");
+  void import("./screens/GameScreen");
+}
+
 
 type View = NavView | "GAME" | "DUEL" | "COLOSSUS";
 
@@ -90,8 +106,14 @@ export default function App() {
     }
   }, [view]);
 
+  useEffect(() => {
+    const t = window.setTimeout(prefetchPlay, 2500);
+    return () => window.clearTimeout(t);
+  }, []);
+
   return (
     <LanguageProvider>
+      <Suspense fallback={<div className="screen-loading" aria-busy="true" />}>
       {view === "GAME" ? (
         <GameScreen
           key={`${mode}-${huntSeq}`}
@@ -143,6 +165,7 @@ export default function App() {
       ) : (
         <MainMenu onStart={() => setView("SEASON")} onNavigate={navigate} onPlayColossus={() => setView("COLOSSUS")} />
       )}
+      </Suspense>
     </LanguageProvider>
   );
 }

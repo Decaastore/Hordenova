@@ -5,6 +5,7 @@ import type { GameEngine } from "@/engine/GameEngine";
 import { getBiome } from "@/rendering/biomes";
 import { Enemy3DLayer } from "./Enemy3DLayer";
 import { cameraPosition } from "./enemyProjection";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /**
  * Same rig technique as `src/hybrid/HybridScene3D.tsx`'s CameraRig: manual
@@ -76,7 +77,7 @@ export function Enemy3DOverlay({ engine, hiddenIdsRef }: { engine: GameEngine; h
         // out of the input chain — the wrapping div's pointer-events:none
         // alone was not enough.
         style={{ width: "100%", height: "100%", display: "block", pointerEvents: "none" }}
-      >
+       onCreated={({ gl }) => tuneRenderer(gl)}>
         <CameraRig />
         <ambientLight intensity={0.75} />
         <hemisphereLight args={[0xdfe8c8, 0x231a12, 0.5]} />

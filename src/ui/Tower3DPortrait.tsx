@@ -4,6 +4,7 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
 import { animateTowerParts, buildTowerModel, type TowerModel } from "@/battlefield3d/models/towerModel";
 import { getTowerVisualStage, type TowerType } from "@/config/towerStats";
 import { buildCastleModel } from "@/battlefield3d/models/castleModel";
+import { tuneRenderer } from "@/rendering3d/rendererDefaults";
 
 /**
  * TOWER PORTRAIT IN 3D — the tower exactly as the battlefield draws it (the
@@ -65,6 +66,7 @@ function setup(): boolean {
   try {
     const canvas = document.createElement("canvas");
     renderer = new THREE.WebGLRenderer({ canvas, antialias: !LOW_END, alpha: true, preserveDrawingBuffer: true, powerPreference: "low-power" });
+    tuneRenderer(renderer);
   } catch {
     return false;
   }

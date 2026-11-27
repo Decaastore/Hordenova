@@ -2071,6 +2071,7 @@ export const ptBR: TranslationSchema = {
     bundlesBody: "Cada pacote traz skins de torre e um castelo que só existem nele. Elas nunca saem na loja do dia, no Passe nem por Gemas. Tudo o que vem dentro aparece antes da compra. Uma vez por conta.",
     bundleOwned: "Comprado",
     bundleCastle: "Skin de castelo",
+    bundleSkinFor: "Skin da torre {tower}",
     bundleItemsNote: "Os itens do pacote ficam na sua conta: dá para equipar e forjar, mas não vender. Se a Forja der certo, o item novo pode ser vendido no Mercado.",
     bundleSkins: "Skins exclusivas",
     bundlePopular: "Mais escolhido",

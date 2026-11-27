@@ -41,10 +41,26 @@ export function fitCanvas(canvas: HTMLCanvasElement, max = TEX_MAX): HTMLCanvasE
   const g = out.getContext("2d");
   if (!g) return canvas;
   g.imageSmoothingEnabled = true;
-  g.imageSmoothingQuality = "high";
+  g.imageSmoothingQuality = "medium"; // "high" is a slow resampler; a 2:1 reduction looks the same with "medium"
   g.drawImage(canvas, 0, 0, out.width, out.height);
   // a canvas's memory is only given back when its size goes to zero (Safari keeps it until then)
   canvas.width = 0;
   canvas.height = 0;
   return out;
+}
+
+/**
+ * A copy of a texture that reuses the picture already on the graphics card.
+ * three.js's `clone()` (and `needsUpdate = true` on the copy) marks the shared
+ * picture as changed, so the whole image is sent to the GPU again; a castle
+ * makes dozens of copies (one per wall and roof, each with its own tiling),
+ * and every one re-sent the same 512–1024 px images — the freeze when a
+ * battle or the Play page opened. Only the copy's own settings (repeat,
+ * offset) differ, which never need a re-upload.
+ */
+export function shareTexture<T extends { clone(): T; source: { version: number } }>(tex: T): T {
+  const before = tex.source.version;
+  const copy = tex.clone();
+  tex.source.version = before;
+  return copy;
 }
