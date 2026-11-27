@@ -29,6 +29,10 @@ interface Portrait {
   drawn: boolean;
   /** Has spinning or moving parts, so it keeps being redrawn. */
   moving: boolean;
+  /** Turns only while the pointer is over its card (Store grids). */
+  hoverSpin: boolean;
+  /** The pointer is over it right now: drawn first, every frame. */
+  hovered: boolean;
 }
 
 /**
@@ -60,6 +64,8 @@ let last = 0;
 let lastDraw = 0;
 let cursor = 0;
 let slowFrames = 0;
+/** Dev only (tests on a machine with no graphics card): never drop to still portraits. */
+let keepMotion = false;
 
 function setup(): boolean {
   if (renderer) return true;
@@ -103,12 +109,17 @@ function draw(p: Portrait, m: NonNullable<ReturnType<typeof models.get>>, now: n
   const ctx = p.canvas.getContext("2d");
   if (!ctx) return;
   const { model, size, center } = m;
-  if (p.spin && !still) p.angle += dt * (p.key.startsWith("castle") ? 0.18 : 0.5);
+  if ((p.spin || p.hovered) && !still) p.angle += dt * (p.key.startsWith("castle") ? 0.18 : 0.5);
   model.root.rotation.y = p.angle;
   if (!still) animateTowerParts(model.root, now / 1000);
   const dpr = still ? 1 : Math.min(window.devicePixelRatio || 1, 1.5);
   const w = Math.round(p.width * dpr), h = Math.round(p.height * dpr);
-  renderer.setSize(w, h, false);
+  // the shared drawing surface only ever grows; each portrait is drawn into its top-left corner
+  // (re-sizing it for every portrait re-allocated the GPU buffer on every draw)
+  const cur = renderer.domElement;
+  if (cur.width < w || cur.height < h) renderer.setSize(Math.max(cur.width, w), Math.max(cur.height, h), false);
+  const fullH = renderer.domElement.height;
+  renderer.setViewport(0, fullH - h, w, h);
   camera.aspect = w / h;
   // frame the whole tower, seen a little from above like on the battlefield
   const fit = Math.max(size.y, (Math.max(size.x, size.z) * 1.15 * h) / w);
@@ -124,7 +135,7 @@ function draw(p: Portrait, m: NonNullable<ReturnType<typeof models.get>>, now: n
     p.canvas.height = h;
   }
   ctx.clearRect(0, 0, w, h);
-  ctx.drawImage(renderer.domElement, 0, 0, w, h);
+  ctx.drawImage(renderer.domElement, 0, 0, w, h, 0, 0, w, h);
   p.drawn = true;
 }
 
@@ -138,9 +149,13 @@ function frame(now: number) {
   const t0 = performance.now();
   let built = false;
   let draws = 0;
-  const list = [...portraits];
-  for (let i = 0; i < list.length && draws < MAX_DRAWS_PER_FRAME; i++) {
-    const p = list[(cursor + i) % list.length]!;
+  const all = [...portraits];
+  // the portrait under the pointer always turns smoothly: it is drawn first, every frame
+  const hovered = all.filter((p) => p.hovered && p.visible);
+  const list = hovered.length ? [...hovered, ...all.filter((p) => !p.hovered)] : all;
+  const start = hovered.length ? 0 : cursor;
+  for (let i = 0; i < list.length && draws < MAX_DRAWS_PER_FRAME + hovered.length; i++) {
+    const p = list[(start + i) % list.length]!;
     if (!p.visible) continue;
     let m = models.get(p.key);
     if (!m) {
@@ -161,23 +176,26 @@ function frame(now: number) {
       continue;
     }
     if (!m.ready) continue;
-    p.moving = !still && (p.spin || m.moving);
+    p.moving = !still && (p.spin || p.hovered || (m.moving && !p.hoverSpin));
     if (p.drawn && !p.moving) continue;
     draw(p, m, now, dt);
     draws++;
   }
-  cursor = list.length ? (cursor + draws) % list.length : 0;
+  cursor = all.length ? (cursor + Math.max(0, draws - hovered.length)) % all.length : 0;
   // a machine that can't keep up drops to still portraits
-  if (!still && !built) {
+  if (!still && !built && !keepMotion) {
     slowFrames = performance.now() - t0 > 24 ? slowFrames + 1 : Math.max(0, slowFrames - 1);
     if (slowFrames > 8) still = true;
   }
-  const busy = list.some((p) => p.visible && (!p.drawn || p.moving) && models.get(p.key)?.ready !== false);
+  const busy = all.some((p) => p.visible && (!p.drawn || p.moving) && models.get(p.key)?.ready !== false);
   if (portraits.size === 0 || !busy) {
     cancelAnimationFrame(raf);
     raf = 0;
   }
 }
+
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __portraitDebug?: () => unknown }).__portraitDebug = () => ({ still, slowFrames, n: portraits.size, hovered: [...portraits].filter((p) => p.hovered).length, raf });
+if (import.meta.env.DEV && typeof window !== "undefined") (window as unknown as { __portraitMotion?: () => void }).__portraitMotion = () => { still = false; keepMotion = true; };
 
 function wake() {
   if (!raf) raf = requestAnimationFrame(frame);
@@ -189,8 +207,8 @@ interface Tower3DPortraitProps {
   skinId?: string | null;
   width: number;
   height: number;
-  /** Turn slowly (default) or stand still facing the viewer. */
-  spin?: boolean;
+  /** Turn slowly (default), stand still facing the viewer, or turn only while the pointer is over its card ("hover"). */
+  spin?: boolean | "hover";
 }
 
 export function Tower3DPortrait({ type, level, skinId = null, width, height, spin = true }: Tower3DPortraitProps) {
@@ -205,9 +223,21 @@ export function Tower3DPortrait({ type, level, skinId = null, width, height, spi
   return <canvas ref={ref} style={{ width, height, display: "block" }} aria-hidden="true" />;
 }
 
-function mountPortrait(canvas: HTMLCanvasElement, key: string, build: () => THREE.Object3D, width: number, height: number, spin: boolean, angle: number): () => void {
-  const p: Portrait = { canvas, key, build, width, height, visible: true, spin, angle, drawn: false, moving: true };
+function mountPortrait(canvas: HTMLCanvasElement, key: string, build: () => THREE.Object3D, width: number, height: number, spin: boolean | "hover", angle: number): () => void {
+  const hoverSpin = spin === "hover";
+  const p: Portrait = { canvas, key, build, width, height, visible: true, spin: spin === true, angle, drawn: false, moving: true, hoverSpin, hovered: false };
   portraits.add(p);
+  // "hover": the whole card it sits in starts and stops the turn
+  const card = hoverSpin ? ((canvas.closest("article") ?? canvas.closest("li") ?? canvas.closest("figure") ?? canvas) as HTMLElement) : null;
+  const enter = () => {
+    p.hovered = true;
+    wake();
+  };
+  const leave = () => {
+    p.hovered = false;
+  };
+  card?.addEventListener("pointerenter", enter);
+  card?.addEventListener("pointerleave", leave);
   const observer =
     typeof IntersectionObserver !== "undefined"
       ? new IntersectionObserver(([e]) => {
@@ -220,6 +250,8 @@ function mountPortrait(canvas: HTMLCanvasElement, key: string, build: () => THRE
   return () => {
     portraits.delete(p);
     observer?.disconnect();
+    card?.removeEventListener("pointerenter", enter);
+    card?.removeEventListener("pointerleave", leave);
   };
 }
 
@@ -228,7 +260,7 @@ function mountPortrait(canvas: HTMLCanvasElement, key: string, build: () => THRE
  * (battlefield3d/models/castleModel.ts), intact, for the mode cards.
  * `dressing` is a biome dressing id (e.g. "FROZEN_TUNDRA"); `skin` a castle skin id.
  */
-export function Castle3DPortrait({ dressing, skin = "", width, height, spin = true }: { dressing: string; skin?: string; width: number; height: number; spin?: boolean }) {
+export function Castle3DPortrait({ dressing, skin = "", width, height, spin = true }: { dressing: string; skin?: string; width: number; height: number; spin?: boolean | "hover" }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const canvas = ref.current;

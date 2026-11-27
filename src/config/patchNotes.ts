@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v181",
+    dateIso: "2026-11-27",
+    category: "INTERFACE",
+    title: {
+      en: "A Smoother Store",
+      ptBR: "Loja Mais Leve",
+    },
+    description: {
+      en: "The Store's tower skins no longer all turn at once, which made every one of them stutter. They stand still and turn smoothly when you point at their card.",
+      ptBR: "As skins de torre da Loja não giram mais todas ao mesmo tempo, o que fazia todas engasgarem. Elas ficam paradas e giram suaves quando você passa o mouse no cartão.",
+    },
+    highlights: [
+      {
+        en: "The skin catalogue and the bundles: towers stand in a clean pose and turn at a full frame rate while you point at them.",
+        ptBR: "Catálogo de skins e pacotes: as torres ficam numa pose bonita e giram com movimento cheio enquanto o mouse está sobre elas.",
+      },
+      {
+        en: "The skin of the day and the starter pack keep turning, and every 3D picture on the site is drawn with less work for the graphics card.",
+        ptBR: "A skin do dia e o pacote inicial continuam girando, e todas as imagens 3D do site são desenhadas com menos trabalho para a placa de vídeo.",
+      },
+    ],
+  },
+  {
     id: "v180",
     dateIso: "2026-11-27",
     category: "SYSTEMS",
