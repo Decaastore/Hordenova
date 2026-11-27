@@ -64,3 +64,13 @@ export function createItemInstance(itemDefinitionId: string, ownerId: string, so
 export function isPassItem(item: { source?: ItemAcquiredFrom }): boolean {
   return item.source?.type === "SEASON_PASS";
 }
+
+/**
+ * Items that arrive account-bound to be FORGED: the Season Pass's and the
+ * Store's (bundles, starter pack). They can't be sold or traded, but they
+ * can be equipped and fused — and a successful Fusion's result is a normal
+ * item, free to sell and trade.
+ */
+export function isForgeFeedItem(item: { source?: ItemAcquiredFrom }): boolean {
+  return item.source?.type === "SEASON_PASS" || item.source?.type === "STORE";
+}

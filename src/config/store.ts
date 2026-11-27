@@ -89,6 +89,17 @@ export interface SkinBundle {
   tag?: "POPULAR" | "BEST_VALUE";
 }
 
+/** `n` account-bound items of `rarity` (bundles give them in trios: three of a rarity are one Forge attempt). */
+function items(rarity: "UNCOMMON" | "RARE" | "EPIC", n: number): RewardPart[] {
+  return Array.from({ length: n }, () => ({ kind: "ITEM" as const, rarity }));
+}
+
+/**
+ * Bundles keep their Gems at the loose packs' price and add a skin, a
+ * castle and items to FORGE (owner's call, Nov 2026): Normal and Rare items
+ * in trios, account-bound (equip or forge them, never sell them); what a
+ * successful Forge makes from them is a normal item, free to sell.
+ */
 export const SKIN_BUNDLES: readonly SkinBundle[] = [
   {
     id: "BUNDLE_EMBER",
@@ -97,6 +108,7 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "INFERNO_PACK_EMBERHEART" },
       { kind: "CASTLE_SKIN", skinId: "EMBER_KEEP" },
       { kind: "PURCHASED_GEMS", amount: 450 },
+      ...items("UNCOMMON", 3),
     ],
   },
   {
@@ -106,7 +118,8 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "FROSTBORN_PACK_WINTER_CROWN" },
       { kind: "CASTLE_SKIN", skinId: "WINTER_CROWN_CITADEL" },
       { kind: "PURCHASED_GEMS", amount: 900 },
-      { kind: "ITEM", rarity: "RARE" },
+      ...items("UNCOMMON", 3),
+      ...items("RARE", 1),
     ],
   },
   {
@@ -116,8 +129,9 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "IRONWOOD_PACK_EMERALD_SENTINEL" },
       { kind: "CASTLE_SKIN", skinId: "EMERALD_BASTION" },
       { kind: "PURCHASED_GEMS", amount: 1700 },
-      { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 10 },
+      ...items("UNCOMMON", 6),
+      ...items("RARE", 1),
     ],
     tag: "POPULAR",
   },
@@ -128,9 +142,9 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "STORMCALLER_PACK_CRIMSON_STORM" },
       { kind: "CASTLE_SKIN", skinId: "CRIMSON_STORM_KEEP" },
       { kind: "PURCHASED_GEMS", amount: 3600 },
-      { kind: "ITEM", rarity: "RARE" },
-      { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 10 },
+      ...items("UNCOMMON", 6),
+      ...items("RARE", 3),
     ],
   },
   {
@@ -141,9 +155,9 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "FROSTBORN_PACK_ECLIPSE" },
       { kind: "CASTLE_SKIN", skinId: "ECLIPSE_SPIRE" },
       { kind: "PURCHASED_GEMS", amount: 5800 },
-      { kind: "ITEM", rarity: "RARE" },
-      { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 10 },
+      ...items("UNCOMMON", 9),
+      ...items("RARE", 3),
     ],
   },
   {
@@ -154,10 +168,10 @@ export const SKIN_BUNDLES: readonly SkinBundle[] = [
       { kind: "SKIN", skinId: "STORMCALLER_PACK_SOVEREIGN" },
       { kind: "CASTLE_SKIN", skinId: "SOVEREIGN_PALACE" },
       { kind: "PURCHASED_GEMS", amount: 9000 },
-      { kind: "ITEM", rarity: "EPIC" },
-      { kind: "ITEM", rarity: "RARE" },
-      { kind: "ITEM", rarity: "RARE" },
       { kind: "INVENTORY_SLOTS", amount: 20 },
+      ...items("UNCOMMON", 9),
+      ...items("RARE", 3),
+      ...items("EPIC", 1),
     ],
     tag: "BEST_VALUE",
   },

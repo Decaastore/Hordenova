@@ -405,6 +405,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
                         </li>
                       ))}
                     </ul>
+                    <p className="st-bundle-note">{t("store.bundleItemsNote")}</p>
                     <div className="st-buybox">
                       <span className="st-price">{brl.format(b.priceBrl)}</span>
                       {owned ? (
@@ -694,6 +695,7 @@ const STORE_CSS = `
 .st-starter-gems .st-pile { width: 100%; height: auto; }
 .st-starter h3, .st-vip h3 { margin: 0; font-family: var(--display); font-weight: 700; font-size: 30px; line-height: 1.05; color: var(--gold-hi); }
 .st-feat-body { margin: 6px 0 0; font-size: 14px; color: #d9cdb6; line-height: 1.5; }
+.st-bundle-note { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: var(--ash, #b9ad97); }
 .st-contents-label { margin: 14px 0 6px; font-size: 11.5px; letter-spacing: 0.06em; color: var(--ash); }
 .st-contents, .st-perks { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .st-perks { grid-template-columns: 1fr; margin-top: 14px; }

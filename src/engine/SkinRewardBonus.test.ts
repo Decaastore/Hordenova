@@ -3,8 +3,10 @@ import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
 import { getSkinRewardMultiplier, PRESTIGE_TOWER_SKINS, TOWER_SKINS } from "@/config/towerSkins";
 
-const ironSkin = TOWER_SKINS.find((s) => s.towerType === "IRONWOOD")!.id;
-const infernoSkin = TOWER_SKINS.find((s) => s.towerType === "INFERNO")!.id;
+const ironSkin = TOWER_SKINS.find((s) => s.towerType === "IRONWOOD" && s.tier === "PREMIUM")!.id;
+const infernoSkin = TOWER_SKINS.find((s) => s.towerType === "INFERNO" && s.tier === "PREMIUM")!.id;
+const ironEntry = TOWER_SKINS.find((s) => s.towerType === "IRONWOOD" && s.tier === "ENTRY")!.id;
+const infernoMid = TOWER_SKINS.find((s) => s.towerType === "INFERNO" && s.tier === "INTERMEDIATE")!.id;
 const prestigeIron = PRESTIGE_TOWER_SKINS.find((s) => s.towerType === "IRONWOOD")!.id;
 
 describe("paid skin reward bonus", () => {
@@ -16,6 +18,12 @@ describe("paid skin reward bonus", () => {
     expect(getSkinRewardMultiplier({ IRONWOOD: ironSkin, INFERNO: infernoSkin }, ["IRONWOOD", "INFERNO"])).toBeCloseTo(1.1);
     expect(getSkinRewardMultiplier({ IRONWOOD: ironSkin, INFERNO: infernoSkin }, ["IRONWOOD"])).toBeCloseTo(1.05);
     expect(getSkinRewardMultiplier({ IRONWOOD: prestigeIron }, ["IRONWOOD"])).toBe(1);
+  });
+
+  it("the bonus grows with the skin's tier: +2% basic, +3% intermediate, +5% premium", () => {
+    expect(getSkinRewardMultiplier({ IRONWOOD: ironEntry }, ["IRONWOOD"])).toBeCloseTo(1.02);
+    expect(getSkinRewardMultiplier({ INFERNO: infernoMid }, ["INFERNO"])).toBeCloseTo(1.03);
+    expect(getSkinRewardMultiplier({ IRONWOOD: ironEntry, INFERNO: infernoSkin }, ["IRONWOOD", "INFERNO"])).toBeCloseTo(1.07);
   });
 
   it("the engine applies it to Gold without rounding small kills away", () => {

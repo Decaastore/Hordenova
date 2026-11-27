@@ -4,6 +4,8 @@ import { GameEngine } from "./GameEngine";
 import { updateSave } from "./SaveSystem";
 import { TOWER_SLOTS } from "@/data/mapWhisperingWoods";
 import { getScaledEnemyStats } from "@/config/enemyStats";
+import { getSeasonRule } from "@/config/seasonRules";
+import { seasonClock } from "./SeasonClock";
 
 const TICK_MS = 50;
 
@@ -62,7 +64,11 @@ describe("Enemy difficulty is the same for every player — real GameEngine inte
     expect(weakHp).not.toBeNull();
     expect(strongHp).not.toBeNull();
     // The same per-wave budget factor for everyone (config/waveBudget.ts) — never a per-player adjustment.
-    const baselineHp = Math.max(1, Math.round(getScaledEnemyStats("CRAWLER", 45).hp * waveHpFactor(45)));
+    // The current Season's rule (config/seasonRules.ts) is the same for everyone too: a Season with more
+    // enemy life raises everybody's enemies alike, so it is part of the baseline (the test must not depend on the date).
+    const rulePct = getSeasonRule(seasonClock.getCurrentSeasonWindow().seasonNumber)?.enemyHpPct ?? 0;
+    const baseHp = Math.max(1, Math.round(getScaledEnemyStats("CRAWLER", 45).hp * waveHpFactor(45)));
+    const baselineHp = rulePct ? Math.round(baseHp * (1 + rulePct / 100)) : baseHp;
     expect(weakHp).toBe(baselineHp);
     expect(strongHp).toBe(baselineHp);
   });

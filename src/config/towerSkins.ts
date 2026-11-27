@@ -218,6 +218,21 @@ export function getTowerSkinDualPrice(def: Pick<TowerSkinDefinition, "gemCost">)
 export const SKIN_REWARD_BONUS_PER_TYPE = 0.05;
 
 /**
+ * The bonus grows with the skin's tier (owner's call, Nov 2026): a basic
+ * skin gives +2%, an intermediate one +3%, and the top skins (Premium,
+ * bundle, Duel and ranking skins) the full +5% — so the cheapest skin no
+ * longer gives the same bonus as the best one.
+ */
+export const SKIN_REWARD_BONUS_BY_TIER: Partial<Record<TowerSkinTier, number>> = { ENTRY: 0.02, INTERMEDIATE: 0.03 };
+
+/** The reward bonus one equipped skin gives for its tower type (0 for Prestige skins and unknown ids). */
+export function skinRewardBonus(skinId: string | null | undefined): number {
+  if (!isPaidTowerSkin(skinId)) return 0;
+  const def = getTowerSkinDefinition(skinId!);
+  return def ? (SKIN_REWARD_BONUS_BY_TIER[def.tier] ?? SKIN_REWARD_BONUS_PER_TYPE) : 0;
+}
+
+/**
  * EVOLUÇÃO DE SKIN — the animated version of a Premium skin you own: a
  * turning rune ring, a breathing glow and rising sparks in the skin's own
  * colours (rendering/skinEvolution.ts). Purely visual, permanent.
@@ -239,11 +254,11 @@ export function isPaidTowerSkin(skinId: string | null | undefined): boolean {
   return !!def && def.tier !== "PRESTIGE";
 }
 
-/** 1 + 5% for each tower type in play wearing a paid skin. */
+/** 1 + each tower type in play's skin bonus (+2% basic, +3% intermediate, +5% the rest — SKIN_REWARD_BONUS_BY_TIER). */
 export function getSkinRewardMultiplier(equippedByType: Partial<Record<TowerType, string>>, typesInPlay: Iterable<TowerType>): number {
-  let types = 0;
-  for (const type of new Set(typesInPlay)) if (isPaidTowerSkin(equippedByType[type])) types++;
-  return 1 + types * SKIN_REWARD_BONUS_PER_TYPE;
+  let bonus = 0;
+  for (const type of new Set(typesInPlay)) bonus += skinRewardBonus(equippedByType[type]);
+  return 1 + bonus;
 }
 
 export interface TowerSkinDefinition {

@@ -53,7 +53,7 @@ import {
 import { getScaledEnemyStats, type EnemyType } from "@/config/enemyStats";
 import { getDropTable, rollDropTable } from "@/config/dropTables";
 import { itemBonusFrom, rerollCost, rollItemEffects } from "@/config/itemRolls";
-import { createItemInstance, isPassItem, type ItemInstance } from "@/entities/Item";
+import { createItemInstance, isForgeFeedItem, type ItemInstance } from "@/entities/Item";
 import { addItemWithCapacity, claimFromOverflow, DEFAULT_INVENTORY_CAPACITY, findItem } from "./InventoryManager";
 import { appendLedgerEvent } from "./EconomyLedger";
 import {
@@ -1872,11 +1872,11 @@ export class GameEngine {
         }
       }
     }
-    // An account-bound input (a Store reward, a soulbound drop) makes an
-    // account-bound result. Season Pass items are the exception: they exist
-    // to be fused, and what comes out of a successful Fusion is free to
-    // equip, sell on the Marketplace and trade.
-    const allInputsTradable = this.inventory.filter((item) => consumedIds.has(item.instanceId)).every((item) => item.tradable || isPassItem(item));
+    // An account-bound input (a soulbound drop, a ranking relic) makes an
+    // account-bound result. Season Pass and Store items are the exception:
+    // they exist to be forged, and what comes out of a successful Fusion is
+    // free to equip, sell on the Marketplace and trade.
+    const allInputsTradable = this.inventory.filter((item) => consumedIds.has(item.instanceId)).every((item) => item.tradable || isForgeFeedItem(item));
     this.inventory = this.inventory.filter((item) => !consumedIds.has(item.instanceId));
 
     for (const instanceId of selectedInstanceIds) {

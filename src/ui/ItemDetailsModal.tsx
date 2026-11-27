@@ -5,7 +5,7 @@ import type { TranslationKey } from "@/i18n/translate";
 import { getItemDefinition } from "@/config/itemDefinitions";
 import { getDropTable } from "@/config/dropTables";
 import { getItemHistory } from "@/engine/EconomyLedger";
-import { isPassItem, type ItemInstance } from "@/entities/Item";
+import { isForgeFeedItem, type ItemInstance } from "@/entities/Item";
 import { RarityBadge } from "./RarityBadge";
 import { DropTableView } from "./DropTableView";
 import { ItemGlyph } from "./ItemGlyph";
@@ -119,10 +119,10 @@ export function ItemDetailsBody({ item, gemShards, onReroll, equippedOn }: ItemD
       </Section>
 
       <Section label={t("inventory.tradable")}>
-        {isPassItem(item) ? (
+        {isForgeFeedItem(item) ? (
           <>
             <div style={{ ...mutedLineStyle, color: "#ffd36b", fontWeight: 700 }} data-testid="item-pass-only">
-              {t("inventory.passOnly")}
+              {t(item.source?.type === "STORE" ? "inventory.storeOnly" : "inventory.passOnly")}
             </div>
             <div style={mutedLineStyle}>{t("inventory.passOnlyHint")}</div>
           </>

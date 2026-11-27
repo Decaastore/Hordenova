@@ -70,6 +70,33 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v179",
+    dateIso: "2026-11-27",
+    category: "ITEMS",
+    title: {
+      en: "Bundles Bring Items to Forge",
+      ptBR: "Pacotes com Itens para Forjar",
+    },
+    description: {
+      en: "Every skin bundle in the Store now also brings Uncommon and Rare items to forge, and the skin bonus now grows with the skin's tier.",
+      ptBR: "Todo pacote de skin da Loja agora também traz itens Incomuns e Raros para forjar, e o bônus das skins passa a crescer com a categoria da skin.",
+    },
+    highlights: [
+      {
+        en: "Uncommon items come in trios (one Forge attempt each): 3 in the smallest bundle, up to 9 Uncommon, 3 Rare and 1 Epic in the biggest.",
+        ptBR: "Os itens Incomuns vêm em trios (uma tentativa de Forja cada): 3 no pacote menor, até 9 Incomuns, 3 Raros e 1 Épico no maior.",
+      },
+      {
+        en: "Bundle items stay on your account: equip or forge them, they can't be sold. If the Forge works, the new item can be sold on the Marketplace.",
+        ptBR: "Os itens do pacote ficam na sua conta: dá para equipar ou forjar, mas não vender. Se a Forja der certo, o item novo pode ser vendido no Mercado.",
+      },
+      {
+        en: "Skin reward bonus per tower type: +2% Gold and Gem Shards with a basic skin, +3% with an intermediate one, +5% with a premium or exclusive one (up to +20%).",
+        ptBR: "Bônus de skin por tipo de torre: +2% de ouro e fragmentos com skin básica, +3% com intermediária e +5% com premium ou exclusiva (até +20%).",
+      },
+    ],
+  },
+  {
     id: "v178",
     dateIso: "2026-11-26",
     category: "INTERFACE",
