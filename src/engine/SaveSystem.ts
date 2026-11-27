@@ -328,6 +328,10 @@ export interface SaveData {
   /** CONQUISTAS — achievements unlocked, the title worn, and the counters they need. Permanent. */
   achievements: AchievementId[];
   equippedTitle: AchievementId | null;
+  /** PROGRAMA DE CRIADORES (config/creators.ts): the creator code this account supports, upper-case, or null. */
+  creatorCode: string | null;
+  /** When it was set (ms), or null. */
+  creatorCodeSetAt: number | null;
   riftsCleared: number;
   /** Highest item rarity ever found (0-5), -1 for none. */
   bestRarityFound: number;
@@ -447,6 +451,8 @@ export const DEFAULT_SAVE_DATA: SaveData = {
   bossKills: {},
   achievements: [],
   equippedTitle: null,
+  creatorCode: null,
+  creatorCodeSetAt: null,
   riftsCleared: 0,
   bestRarityFound: -1,
   auctionListings: [],
@@ -1008,6 +1014,8 @@ function parseSaveObject(parsed: Partial<SaveData>): SaveData {
       bossKills: sanitizeBossKills(parsed.bossKills),
       achievements: Array.isArray(parsed.achievements) ? [...new Set(parsed.achievements.filter(isAchievementId))] : [],
       equippedTitle: isAchievementId(parsed.equippedTitle) && Array.isArray(parsed.achievements) && parsed.achievements.includes(parsed.equippedTitle) ? parsed.equippedTitle : null,
+      creatorCode: typeof parsed.creatorCode === "string" && /^[A-Z0-9_]{3,16}$/.test(parsed.creatorCode) ? parsed.creatorCode : null,
+      creatorCodeSetAt: typeof parsed.creatorCode === "string" && typeof parsed.creatorCodeSetAt === "number" && Number.isFinite(parsed.creatorCodeSetAt) ? parsed.creatorCodeSetAt : null,
       riftsCleared: typeof parsed.riftsCleared === "number" && Number.isFinite(parsed.riftsCleared) ? Math.max(0, Math.floor(parsed.riftsCleared)) : 0,
       bestRarityFound: typeof parsed.bestRarityFound === "number" && Number.isFinite(parsed.bestRarityFound) ? Math.max(-1, Math.min(5, Math.floor(parsed.bestRarityFound))) : -1,
       ageVerification: sanitizeAgeVerification(parsed.ageVerification),

@@ -43,7 +43,10 @@ export type LedgerEventType =
   // ITEM_TRADED's own "trade:<sessionId>" source exactly. Never GEMS_EARNED/
   // GEMS_SPENT: those mean "this save's balance moved against the game's own
   // sinks/faucets", not a peer-to-peer transfer between two players' Gems.
-  | "GEMS_TRADED";
+  | "GEMS_TRADED"
+  // PROGRAMA DE CRIADORES — a real-money purchase made with a creator code: `source` = "creator:<CODE>:<packId>",
+  // `amount` = the price in BRL cents. A record for the payout; the payout itself is settled from the payment provider.
+  | "CREATOR_SALE";
 
 export interface LedgerEvent {
   eventId: string;
