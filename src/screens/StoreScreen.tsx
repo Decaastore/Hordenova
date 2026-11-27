@@ -25,6 +25,7 @@ import { STARTER_PACK_SKIN_ID, type RewardPart } from "@/config/seasonPass";
 import { ItemGlyph } from "@/ui/ItemGlyph";
 import { rewardItemDefinitionId } from "@/engine/RewardGrant";
 import { RewardPartsLabel, REWARD_CSS } from "@/ui/RewardPartsLabel";
+import { CREATOR_CODE_CSS, CreatorCodeCard } from "@/ui/CreatorCodeCard";
 
 interface StoreScreenProps {
   onNavigate: (view: NavView) => void;
@@ -167,7 +168,7 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
 
   return (
     <div className="pg-root">
-      <style>{PAGE_CSS + STORE_CSS + REWARD_CSS}</style>
+      <style>{PAGE_CSS + STORE_CSS + REWARD_CSS + CREATOR_CODE_CSS}</style>
       <TopNav active="STORE" onNavigate={onNavigate} onPlay={onPlay} />
       <div className="pg-scroll">
         <header className="pg-hero st-hero">
@@ -428,6 +429,8 @@ export function StoreScreen({ onNavigate, onPlay }: StoreScreenProps) {
               })}
             </div>
           </section>
+
+          <CreatorCodeCard onOpenCreators={() => onNavigate("CREATORS")} />
 
           <section className="st-section">
             <div className="pg-head st-head">

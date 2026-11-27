@@ -70,6 +70,29 @@ export interface PatchNoteEntry {
 /** Newest first. */
 export const PATCH_NOTES: readonly PatchNoteEntry[] = [
   {
+    id: "v182",
+    dateIso: "2026-11-27",
+    category: "SYSTEMS",
+    title: {
+      en: "Creator Program and Creator Codes",
+      ptBR: "Programa de Criadores e Código de Criador",
+    },
+    description: {
+      en: "A new Creators page explains how streamers and video makers will earn a share of what their audience buys, and the Store now has a box to support your favourite creator with their code.",
+      ptBR: "Uma nova página Criadores explica como streamers e quem faz vídeo vão ganhar uma parte do que o público deles comprar, e a Loja ganhou um espaço para apoiar o seu criador favorito com o código dele.",
+    },
+    highlights: [
+      {
+        en: "Creators page (in the site footer): how it works, the 5% / 10% / 15% monthly share and the rules. Applications open when the online server is on.",
+        ptBR: "Página Criadores (no rodapé do site): como funciona, a parte de 5% / 10% / 15% por mês e as regras. As inscrições abrem quando o servidor online for ligado.",
+      },
+      {
+        en: "Using a partner creator's code, or entering through their link, gives you the Supporter Banner and Frame in the Duel.",
+        ptBR: "Usar o código de um criador parceiro, ou entrar pelo link dele, dá a você o Estandarte e a Moldura do Apoiador no Duelo.",
+      },
+    ],
+  },
+  {
     id: "v181",
     dateIso: "2026-11-27",
     category: "INTERFACE",

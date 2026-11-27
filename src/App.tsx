@@ -27,6 +27,7 @@ const BossesScreen = lazy(() => import("./screens/BossesScreen").then((m) => ({ 
 const FaqScreen = lazy(() => import("./screens/FaqScreen").then((m) => ({ default: m.FaqScreen })));
 const MarketplaceScreen = lazy(() => import("./screens/MarketplaceScreen").then((m) => ({ default: m.MarketplaceScreen })));
 const StoreScreen = lazy(() => import("./screens/StoreScreen").then((m) => ({ default: m.StoreScreen })));
+const CreatorsScreen = lazy(() => import("./screens/CreatorsScreen").then((m) => ({ default: m.CreatorsScreen })));
 const PassScreen = lazy(() => import("./screens/PassScreen").then((m) => ({ default: m.PassScreen })));
 
 /** Fetches the Play page and the battle once the Home is up, so opening them doesn't wait for a download. */
@@ -83,6 +84,10 @@ export default function App() {
   //      today simply has none — see GameScreen.tsx's SFX-only audio use).
   // CONTA ONLINE — restores a remembered session; does nothing while the server isn't configured
   useEffect(() => startCloud(), []);
+  // a creator's link (?criador=CODE): an account that supports nobody yet starts supporting that creator
+  useEffect(() => {
+    void import("./engine/CreatorService").then((m) => m.captureCreatorLink());
+  }, []);
 
   useEffect(() => {
     const startMusic = () => {
@@ -160,6 +165,8 @@ export default function App() {
         <StoreScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "PASS" ? (
         <PassScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
+      ) : view === "CREATORS" ? (
+        <CreatorsScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : view === "MARKETPLACE" ? (
         <MarketplaceScreen onNavigate={navigate} onPlay={() => setView("SEASON")} />
       ) : (

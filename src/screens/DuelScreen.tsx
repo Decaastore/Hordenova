@@ -86,6 +86,7 @@ import { Tower3DPortrait } from "@/ui/Tower3DPortrait";
 import { PAGE_CSS } from "@/ui/pageChrome";
 import { MaterialIcon, type MaterialKind } from "@/ui/MaterialIcon";
 import { drawKillFx, setDuelLooks } from "@/rendering/duelLooks";
+import { LIVE_REWARDS_ENABLED } from "@/config/liveRewards";
 
 const W = DUEL_W;
 const H = DUEL_H;
@@ -803,7 +804,7 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                 <h3 className="du-shop-h">{t(`duel.shopGroup.${group}` as TranslationKey)}</h3>
                 {(group === "skins" || group === "kills") && <p className="pg-sub">{t("duel.shopWhereShown")}</p>}
                 <div className="du-shop">
-                  {DUEL_SHOP.filter(pick).map((item) => {
+                  {DUEL_SHOP.filter((i) => pick(i) && (LIVE_REWARDS_ENABLED || !earnedHow(i.id).live)).map((item) => {
                     const owned = duel.owned.includes(item.id);
                     const c = item.cosmetic;
                     const worn = duel.banner === item.id || duel.frame === item.id || duel.killFx === item.id || (c?.tower ? duel.towerSkins[c.tower] === item.id : false);
@@ -835,6 +836,8 @@ export function DuelScreen({ onExit }: DuelScreenProps) {
                               if (how.tourney || item.id === TOURNEY_BANNER) return t("duel.tourneyOnly");
                               if (how.weekly) return t("duel.earnedWeekly");
                               if (how.ranked) return t("duel.earnedRanked", { board: t(`ranked.board.${how.ranked}` as TranslationKey) });
+                              if (how.creator) return t("duel.earnedCreator");
+                              if (how.live) return t("duel.earnedLive");
                               return t("duel.earnedOnly");
                             })()}
                           </button>

@@ -13,6 +13,17 @@ interface SupportScreenProps {
 }
 
 const EMPTY: TicketDraft = { topic: null, area: null, subject: "", body: "", contactEmail: "" };
+/** sessionStorage key a page sets before opening Support with a draft ready (see openSupportWithDraft). */
+export const SUPPORT_DRAFT_KEY = "hn-support-draft";
+
+/** Stores a draft for the Support form to open with. */
+export function prefillSupportDraft(d: Partial<TicketDraft>): void {
+  try {
+    window.sessionStorage.setItem(SUPPORT_DRAFT_KEY, JSON.stringify(d));
+  } catch {
+    /* the form opens empty */
+  }
+}
 const topicColor = (id: TicketTopic) => TICKET_TOPICS.find((x) => x.id === id)?.color ?? "#b8a888";
 
 /**
@@ -29,7 +40,24 @@ export function SupportScreen({ onNavigate, onPlay }: SupportScreenProps) {
   useEffect(() => subscribeCloud(setCloud), []);
   const signedIn = cloud.email !== null && cloud.status !== "SIGNED_OUT";
 
-  const [draft, setDraft] = useState<TicketDraft>(EMPTY);
+  // another page can open this form already filled in (e.g. the Creators page's application)
+  const [draft, setDraft] = useState<TicketDraft>(() => {
+    try {
+      const raw = window.sessionStorage.getItem(SUPPORT_DRAFT_KEY);
+      if (!raw) return EMPTY;
+      const d = JSON.parse(raw) as Partial<TicketDraft>;
+      return { ...EMPTY, ...d };
+    } catch {
+      return EMPTY;
+    }
+  });
+  useEffect(() => {
+    try {
+      window.sessionStorage.removeItem(SUPPORT_DRAFT_KEY);
+    } catch {
+      /* storage blocked */
+    }
+  }, []);
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);

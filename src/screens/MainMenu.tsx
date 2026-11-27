@@ -276,7 +276,7 @@ export function MainMenu({ onStart, onNavigate, onPlayColossus }: MainMenuProps)
           <p>{t("menu.footerTagline")}</p>
         </div>
         <nav aria-label="HORDE NOVA">
-          {(["SEASON", "BOSSES", "RANKING", "MARKETPLACE", "WIKI", "NOVIDADES", "FAQ", "SUPPORT"] as const).map((view) => (
+          {(["SEASON", "BOSSES", "RANKING", "MARKETPLACE", "WIKI", "NOVIDADES", "FAQ", "CREATORS", "SUPPORT"] as const).map((view) => (
             <button key={view} onClick={() => onNavigate(view)} data-testid={`footer-${view}`}>
               {t(`nav.${view.toLowerCase()}` as TranslationKey)}
             </button>

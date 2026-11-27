@@ -399,6 +399,13 @@ export const DUEL_SHOP: readonly DuelShopItem[] = [
   { id: "KILL_LAUREL", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#ffd070", color2: "#8a1a14", fx: "LAUREL" } },
   { id: "BANNER_ETERNITY", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#3a1a6a", color2: "#ffd878" } },
   { id: "KILL_STARDUST", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#c08aff", color2: "#ffd878", fx: "STARDUST" } },
+  // PROGRAMA DE CRIADORES (config/creators.ts) — earned by supporting a creator with their code in the Store, never sold
+  { id: "BANNER_SUPPORTER", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#6a2a8a", color2: "#5ae0c8" } },
+  { id: "FRAME_SUPPORTER", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#5ae0c8", color2: "#6a2a8a" } },
+  // RECOMPENSAS DA LIVE (config/liveRewards.ts) — redeemed with Live Points, never sold; hidden while the live rewards are off
+  { id: "BANNER_LIVE", price: 0, earnedOnly: true, cosmetic: { kind: "BANNER", color: "#6441a5", color2: "#e8e0ff" } },
+  { id: "FRAME_LIVE", price: 0, earnedOnly: true, cosmetic: { kind: "FRAME", color: "#9146ff", color2: "#1a0f2e" } },
+  { id: "KILL_LIVE", price: 0, earnedOnly: true, cosmetic: { kind: "KILL_FX", color: "#b9a3ff", color2: "#3a1a7a", fx: "SOULS" } },
   { id: "SKIN_IRONWOOD_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "IRONWOOD_LEGEND", tower: "IRONWOOD" } },
   { id: "SKIN_INFERNO_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "INFERNO_LEGEND", tower: "INFERNO" } },
   { id: "SKIN_FROSTBORN_LEGEND", price: 0, earnedOnly: true, cosmetic: { kind: "TOWER_SKIN", color: "#ff3a5a", color2: "#16121a", skinId: "FROSTBORN_LEGEND", tower: "FROSTBORN" } },
@@ -1078,7 +1085,9 @@ export const LEAGUE_UNLOCKS: Partial<Record<LeagueId, readonly string[]>> = {
 export const WEEKLY_TOP_UNLOCK = "KILL_BLOOD";
 
 /** Where an exclusive look comes from (for the shop label). */
-export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; weekly?: boolean; ranked?: "DUEL" | "ETERNAL" } {
+export function earnedHow(id: string): { league?: LeagueId; tourney?: boolean; weekly?: boolean; ranked?: "DUEL" | "ETERNAL"; creator?: boolean; live?: boolean } {
+  if (id === "BANNER_SUPPORTER" || id === "FRAME_SUPPORTER") return { creator: true };
+  if (id === "BANNER_LIVE" || id === "FRAME_LIVE" || id === "KILL_LIVE") return { live: true };
   if (id === "BANNER_ARENA_KING" || id === "FRAME_ARENA_CROWN" || id === "KILL_LAUREL") return { ranked: "DUEL" };
   if (id === "BANNER_ETERNITY" || id === "KILL_STARDUST") return { ranked: "ETERNAL" };
   for (const [l, ids] of Object.entries(LEAGUE_UNLOCKS)) if (ids?.includes(id)) return { league: l as LeagueId };
